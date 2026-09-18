@@ -1,0 +1,105 @@
+/* ==========================================================================
+   PANTAS — Design Tokens
+   Pemantauan Anomali Penyaluran BBM Subsidi
+   Palet diselaraskan dengan bahasa warna korporat Pertamina (biru–hijau–merah).
+   Nilai heksadesimal di bawah adalah nilai kerja PANTAS, bukan salinan resmi
+   brand guideline Pertamina. Ganti dengan nilai resmi bila tersedia aksesnya.
+   ========================================================================== */
+
+:root {
+  /* --- Warna inti --------------------------------------------------------- */
+  --pantas-blue-900: #063B66;  /* header gelap, teks di atas biru muda        */
+  --pantas-blue-700: #0B5FA5;  /* PRIMER — brand, tombol utama, link          */
+  --pantas-blue-500: #1E88D2;  /* aksen, grafik seri utama                     */
+  --pantas-blue-100: #E3F0FB;  /* latar lembut, baris terpilih                 */
+
+  --pantas-green-700: #00813F;
+  --pantas-green-600: #00A651; /* SEKUNDER — status normal / sesuai kuota      */
+  --pantas-green-100: #E2F6EC;
+
+  --pantas-red-700: #B3001B;
+  --pantas-red-600: #E4002B;   /* ANOMALI — pelanggaran, selisih kritis        */
+  --pantas-red-100: #FDE6EA;
+
+  --pantas-amber-600: #C97F00;
+  --pantas-amber-500: #F5A300; /* PERINGATAN — perlu ditinjau manual           */
+  --pantas-amber-100: #FFF3DC;
+
+  /* --- Netral ------------------------------------------------------------- */
+  --pantas-ink: #0E1520;       /* teks utama                                   */
+  --pantas-ink-muted: #5A6B7B; /* teks sekunder, label                         */
+  --pantas-line: #E1E8EF;      /* garis tabel, pembatas                        */
+  --pantas-surface: #F5F8FA;   /* latar halaman                                */
+  --pantas-surface-raised: #FFFFFF;
+
+  /* --- Peran semantik (pakai ini di komponen, bukan warna mentah) ---------- */
+  --color-brand: var(--pantas-blue-700);
+  --color-bg: var(--pantas-surface);
+  --color-card: var(--pantas-surface-raised);
+  --color-text: var(--pantas-ink);
+  --color-text-muted: var(--pantas-ink-muted);
+  --color-border: var(--pantas-line);
+
+  --status-normal-fg: var(--pantas-green-700);
+  --status-normal-bg: var(--pantas-green-100);
+  --status-review-fg: var(--pantas-amber-600);
+  --status-review-bg: var(--pantas-amber-100);
+  --status-anomaly-fg: var(--pantas-red-700);
+  --status-anomaly-bg: var(--pantas-red-100);
+  --status-info-fg: var(--pantas-blue-700);
+  --status-info-bg: var(--pantas-blue-100);
+
+  /* --- Tipografi ---------------------------------------------------------- */
+  --font-display: 'Plus Jakarta Sans', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Roboto Mono', ui-monospace, monospace;
+
+  --text-display: 2.25rem/1.15 var(--font-display);
+  --text-h1: 1.75rem/1.2 var(--font-display);
+  --text-h2: 1.375rem/1.3 var(--font-display);
+  --text-h3: 1.125rem/1.35 var(--font-display);
+  --text-body: 0.9375rem/1.6 var(--font-body);
+  --text-small: 0.8125rem/1.5 var(--font-body);
+  --text-label: 0.6875rem/1.4 var(--font-body);
+
+  /* --- Ruang & bentuk ----------------------------------------------------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(14, 21, 32, 0.06);
+  --shadow-md: 0 4px 16px rgba(14, 21, 32, 0.08);
+  --shadow-alert: 0 0 0 3px rgba(228, 0, 43, 0.15);
+}
+
+/* --- Mode gelap (ruang kendali / pemakaian malam di terminal) -------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #0A121C;
+    --color-card: #111C2A;
+    --color-text: #EAF1F7;
+    --color-text-muted: #9FB6C9;
+    --color-border: #1F2E3F;
+    --color-brand: #4AA8E8;
+
+    --status-normal-fg: #4ADE80; --status-normal-bg: rgba(0, 166, 81, 0.16);
+    --status-review-fg: #FBBF24; --status-review-bg: rgba(245, 163, 0, 0.16);
+    --status-anomaly-fg: #FF6B7F; --status-anomaly-bg: rgba(228, 0, 43, 0.18);
+    --status-info-fg: #6FBEF3;   --status-info-bg: rgba(30, 136, 210, 0.16);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #0A121C;
+  --color-card: #111C2A;
+  --color-text: #EAF1F7;
+  --color-text-muted: #9FB6C9;
+  --color-border: #1F2E3F;
+  --color-brand: #4AA8E8;
+
+  --status-normal-fg: #4ADE80; --status-normal-bg: rgba(0, 166, 81, 0.16);
+  --status-review-fg: #FBBF24; --status-review-bg: rgba(245, 163, 0, 0.16);
+  --status-anomaly-fg: #FF6B7F; --status-anomaly-bg: rgba(228, 0, 43, 0.18);
+  --status-info-fg: #6FBEF3;   --status-info-bg: rgba(30, 136, 210, 0.16);
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="PANTAS">
+  <title>PANTAS — lambang satu warna (mengikuti currentColor)</title>
+  <defs>
+    <mask id="pantasKnockout">
+      <rect x="0" y="0" width="64" height="64" fill="#fff"/>
+      <g fill="none" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 40 H24 L26.5 35.5 L29 40 H35.5 L39.5 24 L43.5 40 H48"/>
+      </g>
+      <circle cx="39.5" cy="24" r="5.4" fill="#000"/>
+      <circle cx="39.5" cy="24" r="2.6" fill="#fff"/>
+    </mask>
+  </defs>
+  <path fill="currentColor" mask="url(#pantasKnockout)"
+        d="M32 5 L54 12.5 C55.2 12.9 56 14 56 15.3 V31
+           C56 44.5 46.4 54.6 33.3 59.6 C32.5 59.9 31.5 59.9 30.7 59.6
+           C17.6 54.6 8 44.5 8 31 V15.3 C8 14 8.8 12.9 10 12.5 Z"/>
+</svg>

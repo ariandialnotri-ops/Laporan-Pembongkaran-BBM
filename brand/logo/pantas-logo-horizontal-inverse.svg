@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64" role="img" aria-label="PANTAS — Pemantauan Anomali Penyaluran BBM Subsidi">
+  <title>PANTAS — kunci logo horizontal untuk latar gelap</title>
+  <defs>
+    <linearGradient id="pantasShieldI" x1="8" y1="5" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4AA8E8"/>
+      <stop offset="0.55" stop-color="#1E88D2"/>
+      <stop offset="1" stop-color="#2ECC71"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path fill="url(#pantasShieldI)"
+          d="M32 5 L54 12.5 C55.2 12.9 56 14 56 15.3 V31
+             C56 44.5 46.4 54.6 33.3 59.6 C32.5 59.9 31.5 59.9 30.7 59.6
+             C17.6 54.6 8 44.5 8 31 V15.3 C8 14 8.8 12.9 10 12.5 Z"/>
+    <g fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="#0A1A2B" d="M16 40 H24 L26.5 35.5 L29 40 H35.5"/>
+      <path stroke="#B3001B" d="M35.5 40 L39.5 24 L43.5 40"/>
+      <path stroke="#0A1A2B" d="M43.5 40 H48"/>
+    </g>
+    <circle cx="39.5" cy="24" r="4.6" fill="#B3001B" opacity="0.3"/>
+    <circle cx="39.5" cy="24" r="2.6" fill="#B3001B"/>
+  </g>
+  <g font-family="'Plus Jakarta Sans','Inter','Segoe UI',Arial,sans-serif">
+    <text x="72" y="35" font-size="27" font-weight="800" letter-spacing="1.6" fill="#FFFFFF">PANTAS</text>
+    <text x="73.5" y="48.5" font-size="7.6" font-weight="600" letter-spacing="0.62" fill="#9FB6C9">PEMANTAUAN ANOMALI PENYALURAN BBM SUBSIDI</text>
+  </g>
+</svg>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PANTAS Brand Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    background: var(--color-bg); color: var(--color-text);
+    font: var(--text-body); font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 28px 0 20px; flex-wrap: wrap;
+  }
+  header.top img { height: 46px; }
+  .toggle {
+    font: var(--text-small); font-family: var(--font-body); font-weight: 600;
+    background: var(--color-card); color: var(--color-text);
+    border: 1px solid var(--color-border); border-radius: var(--radius-pill);
+    padding: 8px 16px; cursor: pointer;
+  }
+  section { margin: 40px 0; }
+  h2 {
+    font: var(--text-h2); font-family: var(--font-display); font-weight: 800;
+    margin: 0 0 6px; color: var(--color-text);
+  }
+  .sub { color: var(--color-text-muted); font: var(--text-small); font-family: var(--font-body); margin: 0 0 20px; }
+  .grid { display: grid; gap: 16px; }
+  .card {
+    background: var(--color-card); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);
+  }
+  .logos { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .logo-cell { display: flex; align-items: center; justify-content: center; min-height: 120px; }
+  .logo-cell img { max-width: 100%; }
+  .dark-cell { background: #0A121C; border-color: #1F2E3F; }
+  .cap { font: var(--text-label); font-family: var(--font-mono); text-transform: uppercase;
+         letter-spacing: .08em; color: var(--color-text-muted); margin-top: 12px; text-align: center; }
+  .swatches { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .sw { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--color-border); }
+  .sw .chip { height: 72px; }
+  .sw .meta { padding: 10px 12px; background: var(--color-card); }
+  .sw .name { font-weight: 600; font-size: .8125rem; }
+  .sw .hex { font-family: var(--font-mono); font-size: .75rem; color: var(--color-text-muted); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: var(--radius-pill);
+    font-size: .75rem; font-weight: 600;
+  }
+  .b-normal  { color: var(--status-normal-fg);  background: var(--status-normal-bg); }
+  .b-review  { color: var(--status-review-fg);  background: var(--status-review-bg); }
+  .b-anomaly { color: var(--status-anomaly-fg); background: var(--status-anomaly-bg); }
+  .b-info    { color: var(--status-info-fg);    background: var(--status-info-bg); }
+  table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+  th { text-align: left; font: var(--text-label); font-family: var(--font-body);
+       text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted);
+       padding: 10px 12px; border-bottom: 1px solid var(--color-border); }
+  td { padding: 12px; border-bottom: 1px solid var(--color-border); }
+  tr.anomaly td:first-child { box-shadow: inset 3px 0 0 var(--pantas-red-600); }
+  .num { font-family: var(--font-mono); text-align: right; }
+  .type-row { padding: 12px 0; border-bottom: 1px dashed var(--color-border); }
+  .type-row small { display: block; font-family: var(--font-mono); font-size: .6875rem;
+                    color: var(--color-text-muted); margin-bottom: 4px; }
+  .d1 { font: var(--text-display); font-family: var(--font-display); font-weight: 800; }
+  .h1 { font: var(--text-h1); font-family: var(--font-display); font-weight: 700; }
+  .h3 { font: var(--text-h3); font-family: var(--font-display); font-weight: 700; }
+  .mono { font-family: var(--font-mono); font-size: 1.25rem; }
+  @media (max-width: 560px) { header.top img { height: 36px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <img src="logo/pantas-logo-horizontal.svg" alt="PANTAS" id="hdrLogo">
+    <button class="toggle" onclick="var r=document.documentElement,d=r.dataset.theme==='dark';r.dataset.theme=d?'light':'dark';document.getElementById('hdrLogo').src=d?'logo/pantas-logo-horizontal.svg':'logo/pantas-logo-horizontal-inverse.svg';">Ganti mode</button>
+  </header>
+
+  <p class="sub" style="font-size:1rem">Penyaluran yang pantas, tercatat, terawasi. — pratinjau identitas visual v1.0</p>
+
+  <section>
+    <h2>Logo</h2>
+    <p class="sub">Perisai aliran: garis putih adalah penyaluran normal, lonjakan merah adalah anomali yang terdeteksi.</p>
+    <div class="grid logos">
+      <div class="card"><div class="logo-cell"><img src="logo/pantas-logo-horizontal.svg" alt="Logo horizontal"></div><div class="cap">Horizontal — utama</div></div>
+      <div class="card"><div class="logo-cell"><img src="logo/pantas-logo-stacked.svg" alt="Logo bertumpuk" style="height:110px"></div><div class="cap">Bertumpuk</div></div>
+      <div class="card dark-cell"><div class="logo-cell"><img src="logo/pantas-logo-horizontal-inverse.svg" alt="Logo latar gelap"></div><div class="cap" style="color:#9FB6C9">Latar gelap</div></div>
+      <div class="card"><div class="logo-cell"><img src="logo/pantas-mark.svg" alt="Lambang" style="height:72px"></div><div class="cap">Lambang</div></div>
+      <div class="card"><div class="logo-cell" style="color:var(--color-text)"><img src="logo/pantas-mark-mono.svg" alt="Lambang satu warna" style="height:72px"></div><div class="cap">Satu warna</div></div>
+      <div class="card"><div class="logo-cell"><img src="logo/favicon/pantas-app-icon.svg" alt="Ikon aplikasi" style="height:84px"></div><div class="cap">Ikon aplikasi</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Warna</h2>
+    <p class="sub">Diselaraskan dengan bahasa warna korporat Pertamina. Merah hanya untuk anomali — tidak pernah dekoratif.</p>
+    <div class="grid swatches">
+      <div class="sw"><div class="chip" style="background:#0B5FA5"></div><div class="meta"><div class="name">Biru Niaga 700</div><div class="hex">#0B5FA5 · primer</div></div></div>
+      <div class="sw"><div class="chip" style="background:#063B66"></div><div class="meta"><div class="name">Biru Niaga 900</div><div class="hex">#063B66 · header</div></div></div>
+      <div class="sw"><div class="chip" style="background:#1E88D2"></div><div class="meta"><div class="name">Biru Niaga 500</div><div class="hex">#1E88D2 · aksen</div></div></div>
+      <div class="sw"><div class="chip" style="background:#00A651"></div><div class="meta"><div class="name">Hijau Salur 600</div><div class="hex">#00A651 · normal</div></div></div>
+      <div class="sw"><div class="chip" style="background:#F5A300"></div><div class="meta"><div class="name">Kuning Tinjau 500</div><div class="hex">#F5A300 · tinjau</div></div></div>
+      <div class="sw"><div class="chip" style="background:#E4002B"></div><div class="meta"><div class="name">Merah Anomali 600</div><div class="hex">#E4002B · anomali</div></div></div>
+      <div class="sw"><div class="chip" style="background:#0E1520"></div><div class="meta"><div class="name">Tinta</div><div class="hex">#0E1520 · teks</div></div></div>
+      <div class="sw"><div class="chip" style="background:#5A6B7B"></div><div class="meta"><div class="name">Tinta Redup</div><div class="hex">#5A6B7B · label</div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Tipografi</h2>
+    <p class="sub">Plus Jakarta Sans untuk judul · Inter untuk antarmuka · JetBrains Mono untuk angka.</p>
+    <div class="card">
+      <div class="type-row"><small>Display · Plus Jakarta Sans 800 · 36px</small><div class="d1">Pemantauan Anomali</div></div>
+      <div class="type-row"><small>H1 · Plus Jakarta Sans 700 · 28px</small><div class="h1">Penyaluran BBM Subsidi</div></div>
+      <div class="type-row"><small>H3 · Plus Jakarta Sans 700 · 18px</small><div class="h3">Ringkasan Pembongkaran Harian</div></div>
+      <div class="type-row"><small>Body · Inter 400 · 15px</small><div>Selisih volume dihitung dari selisih antara volume surat jalan dan volume terukur pada tangki pendam setelah pembongkaran selesai.</div></div>
+      <div class="type-row" style="border:0"><small>Angka · JetBrains Mono 500</small><div class="mono">12.480 L &nbsp;·&nbsp; −412 L &nbsp;·&nbsp; 2,8%</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Penerapan</h2>
+    <p class="sub">Status selalu memakai warna <em>dan</em> label — laporan sering dicetak hitam-putih.</p>
+    <div class="card" style="margin-bottom:16px">
+      <span class="badge b-normal">✓ Normal</span>
+      <span class="badge b-review">! Perlu Ditinjau</span>
+      <span class="badge b-anomaly">▲ Anomali</span>
+      <span class="badge b-info">i Info</span>
+    </div>
+    <div class="card" style="padding:4px 8px">
+      <table>
+        <thead><tr><th>SPBU</th><th>Produk</th><th class="num">Surat Jalan</th><th class="num">Terukur</th><th class="num">Selisih</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>34.116.02</td><td>Biosolar</td><td class="num">16.000 L</td><td class="num">15.940 L</td><td class="num">−0,4%</td><td><span class="badge b-normal">✓ Normal</span></td></tr>
+          <tr><td>34.116.07</td><td>Pertalite</td><td class="num">24.000 L</td><td class="num">23.760 L</td><td class="num">−1,0%</td><td><span class="badge b-review">! Tinjau</span></td></tr>
+          <tr class="anomaly"><td>34.116.11</td><td>Biosolar</td><td class="num">16.000 L</td><td class="num">15.548 L</td><td class="num">−2,8%</td><td><span class="badge b-anomaly">▲ Anomali</span></td></tr>
+          <tr class="anomaly"><td>34.116.23</td><td>Pertalite</td><td class="num">24.000 L</td><td class="num">23.208 L</td><td class="num">−3,3%</td><td><span class="badge b-anomaly">▲ Anomali</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="sub" style="margin-top:48px">Angka pada tabel di atas adalah contoh ilustrasi, bukan data operasional.</p>
+</div>
+</body>
+</html>

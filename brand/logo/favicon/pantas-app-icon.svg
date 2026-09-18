@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="PANTAS">
+  <title>PANTAS — ikon aplikasi</title>
+  <defs>
+    <linearGradient id="pantasApp" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E88D2"/>
+      <stop offset="0.5" stop-color="#0B5FA5"/>
+      <stop offset="1" stop-color="#00A651"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="114" fill="url(#pantasApp)"/>
+  <g fill="none" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="#FFFFFF" d="M96 328 H160 L186 288 L212 328 H262"/>
+    <path stroke="#FF4757" d="M262 328 L306 186 L350 328"/>
+    <path stroke="#FFFFFF" d="M350 328 H416"/>
+  </g>
+  <circle cx="306" cy="186" r="44" fill="#FF4757" opacity="0.3"/>
+  <circle cx="306" cy="186" r="24" fill="#FF4757"/>
+</svg>
