@@ -45,6 +45,8 @@ Lambang PANTAS adalah **perisai aliran**:
 - **Lonjakan merah bertitik** — anomali yang terdeteksi; satu-satunya elemen merah dalam lambang, sehingga mata langsung tertuju ke sana. Ini merepresentasikan fungsi inti produk.
 - **Gradasi biru ke hijau** — mengikuti bahasa warna korporat Pertamina (biru–hijau–merah) tanpa meniru bentuk logo panah Pertamina.
 
+Garis aliran disusun simetris terhadap sumbu tengah perisai: ruas normal di kiri, lonjakan tepat di tengah, ruas normal di kanan dengan panjang yang sama. Keseimbangan ini menjaga lambang tetap stabil saat diperkecil.
+
 ### Varian berkas
 
 | Berkas | Penggunaan |
@@ -54,8 +56,10 @@ Lambang PANTAS adalah **perisai aliran**:
 | `logo/pantas-logo-horizontal-inverse.svg` | Latar gelap (mode malam, ruang kendali). |
 | `logo/pantas-mark.svg` | Lambang tanpa teks: avatar, watermark, sidebar terlipat. |
 | `logo/pantas-mark-mono.svg` | Satu warna, mengikuti `currentColor`. Untuk cetak hitam-putih, stempel, faks, bordir. |
+| `logo/pantas-wordmark.svg` | Wordmark tanpa lambang, mengikuti `currentColor`. Untuk watermark dokumen dan kop sederhana. |
 | `logo/favicon/pantas-app-icon.svg` | Ikon aplikasi 512×512 (Android/iOS/PWA). |
 | `logo/favicon/pantas-favicon.svg` | Favicon 32×32, detail disederhanakan agar tetap terbaca. |
+| `logo/png/` | Hasil render PNG latar transparan untuk keperluan yang tidak menerima SVG (dokumen Office, WhatsApp, spanduk). |
 
 ### Ruang aman (clear space)
 Sisakan ruang kosong minimal **setinggi ¼ tinggi perisai** di seluruh sisi logo. Tidak boleh ada teks, garis, atau tepi gambar di dalam area itu.
@@ -155,14 +159,27 @@ brand/
 ├── tokens.css                      variabel warna, tipografi, ruang, bentuk
 ├── preview.html                    pratinjau visual seluruh identitas
 └── logo/
-    ├── pantas-mark.svg
-    ├── pantas-mark-mono.svg
-    ├── pantas-logo-horizontal.svg
-    ├── pantas-logo-horizontal-inverse.svg
-    ├── pantas-logo-stacked.svg
-    └── favicon/
-        ├── pantas-app-icon.svg
-        └── pantas-favicon.svg
+    ├── pantas-logo-horizontal.svg          utama
+    ├── pantas-logo-horizontal-inverse.svg  latar gelap
+    ├── pantas-logo-stacked.svg             bertumpuk
+    ├── pantas-mark.svg                     lambang berwarna
+    ├── pantas-mark-mono.svg                lambang satu warna
+    ├── pantas-wordmark.svg                 wordmark saja
+    ├── favicon/
+    │   ├── pantas-app-icon.svg             ikon aplikasi 512
+    │   └── pantas-favicon.svg              favicon 32
+    └── png/                                hasil render latar transparan
+        ├── pantas-logo-horizontal-1200.png
+        ├── pantas-logo-horizontal-inverse-1200.png
+        ├── pantas-logo-stacked-800.png
+        ├── pantas-wordmark-1000.png
+        ├── pantas-mark-512.png
+        ├── pantas-app-icon-1024.png
+        ├── pantas-app-icon-192.png
+        ├── pantas-favicon-64.png
+        └── pantas-logo-sheet.png           lembar kontak semua varian
 ```
 
-**Catatan produksi:** wordmark pada berkas SVG masih memakai elemen `<text>` dengan tumpukan fonta. Sebelum dipakai untuk cetak atau distribusi luar, ubah teks menjadi kurva (outline) di Figma/Illustrator/Inkscape agar tampilannya tidak bergantung pada fonta yang terpasang di perangkat pembaca.
+**Catatan produksi:** wordmark pada seluruh berkas SVG sudah berbentuk kurva (outline), bukan elemen `<text>`. Artinya logo tampil sama persis di perangkat mana pun tanpa perlu memasang fonta Plus Jakarta Sans lebih dulu — aman untuk cetak, lampiran email, dan dokumen yang dibuka pihak luar.
+
+Jangan menulis ulang kata "PANTAS" dengan fonta biasa untuk menggantikan berkas ini; jarak antarhurufnya sudah disetel khusus (tracking 2,0 pada ukuran 34) dan tidak akan sama bila diketik ulang.

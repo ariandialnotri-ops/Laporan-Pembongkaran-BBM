@@ -7,20 +7,14 @@
       <stop offset="1" stop-color="#00A651"/>
     </linearGradient>
   </defs>
-
-  <!-- Perisai: pengawasan & perlindungan kuota subsidi -->
-  <path fill="url(#pantasShield)"
-        d="M32 5 L54 12.5 C55.2 12.9 56 14 56 15.3 V31
-           C56 44.5 46.4 54.6 33.3 59.6 C32.5 59.9 31.5 59.9 30.7 59.6
-           C17.6 54.6 8 44.5 8 31 V15.3 C8 14 8.8 12.9 10 12.5 Z"/>
-
-  <g fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Aliran penyaluran normal -->
-    <path stroke="#FFFFFF" d="M16 40 H24 L26.5 35.5 L29 40 H35.5"/>
-    <!-- Lonjakan anomali -->
-    <path stroke="#E4002B" d="M35.5 40 L39.5 24 L43.5 40"/>
-    <path stroke="#FFFFFF" d="M43.5 40 H48"/>
+  <g>
+    <path fill="url(#pantasShield)" d="M32 5 L54 12.5 C55.2 12.9 56 14 56 15.3 V31 C56 44.5 46.4 54.6 33.3 59.6 C32.5 59.9 31.5 59.9 30.7 59.6 C17.6 54.6 8 44.5 8 31 V15.3 C8 14 8.8 12.9 10 12.5 Z"/>
+    <g fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="#FFFFFF" d="M15 41 H21.5 L24 37 L26.5 41 H28"/>
+      <path stroke="#E4002B" d="M28 41 L32 24.5 L36 41"/>
+      <path stroke="#FFFFFF" d="M36 41 H49"/>
+    </g>
+    <circle cx="32" cy="24.5" r="4.6" fill="#E4002B" opacity="0.3"/>
+    <circle cx="32" cy="24.5" r="2.6" fill="#E4002B"/>
   </g>
-  <circle cx="39.5" cy="24" r="4.6" fill="#E4002B" opacity="0.28"/>
-  <circle cx="39.5" cy="24" r="2.6" fill="#E4002B"/>
 </svg>
