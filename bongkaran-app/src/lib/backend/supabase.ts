@@ -45,6 +45,7 @@ function stripDataUrls(photos: Photos): Photos {
 const SUMMARY_DEFAULTS: Pick<ReportSummary, 'volumeDO' | 'gainLoss' | 'densityAnomaly' | 'doneCount'> = { volumeDO: null, gainLoss: null, densityAnomaly: false, doneCount: 0 }
 
 export function createSupabaseBackend(sb: SupabaseClient): Backend {
+  let currentUserId: string | null = null
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
 
@@ -64,6 +65,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async getSession() {
       const { data } = await sb.auth.getSession()
       const user = data.session?.user
+      currentUserId = user?.id ?? null
       if (!user) return { user: null, role: null, nama: null }
       const role = check(await sb.rpc('bbm_claim_first')) as Role | null
       let nama: string | null = null
@@ -74,7 +76,10 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       return { user: { id: user.id, email: user.email ?? '' }, role, nama }
     },
     onAuthChange(cb) {
-      const { data } = sb.auth.onAuthStateChange((event) => {
+      const { data } = sb.auth.onAuthStateChange((event, session) => {
+        // Supabase mengirim SIGNED_IN lagi setiap kali tab kembali terlihat
+        // (mis. setelah kamera ditutup); abaikan bila penggunanya sama.
+        if (event === 'SIGNED_IN' && session?.user.id === currentUserId) return
         // Panggilan Supabase di dalam callback ini bisa macet; tunda satu tick.
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setTimeout(cb, 0)
       })
@@ -160,13 +165,11 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (files?.length) await sb.storage.from(BUCKET).remove(files.map((f) => `${id}/${f.name}`))
     },
 
-    async uploadPhoto(reportId, dataUrl, name) {
+    async uploadPhoto(reportId, blob, name) {
       const id = genId('p')
       const path = `${reportId}/${id}.jpg`
-      const blob = await (await fetch(dataUrl)).blob()
       check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false }))
-      dataCache.set(path, dataUrl)
-      return { id, name, at: new Date().toISOString(), path, dataUrl }
+      return { id, name, at: new Date().toISOString(), path }
     },
     async deletePhoto(photo) {
       if (!photo.path) return

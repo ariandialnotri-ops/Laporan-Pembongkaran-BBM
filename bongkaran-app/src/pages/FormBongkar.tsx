@@ -11,9 +11,8 @@ import { Pill } from '@/components/ui/pill'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
+import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib/draft-backup'
 import { compressImage, downloadDataUrl } from '@/lib/image'
-import { nodeToJpeg } from '@/lib/jpg'
-import { generateBaPdf } from '@/lib/pdf'
 import { evaluateAll, summarize, suggestNoBA, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
 import { cn } from '@/lib/utils'
@@ -34,7 +33,7 @@ const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 export function FormBongkar() {
   const { id = '' } = useParams()
   const app = useApp()
-  const [report, setReport] = useState<Report | null>(null)
+  const [loaded, setLoaded] = useState<{ report: Report; restored: boolean } | null>(null)
   const [loadError, setLoadError] = useState<Error | null>(null)
   const [tick, setTick] = useState(0)
 
@@ -43,8 +42,14 @@ export function FormBongkar() {
     app.backend.getReport(id).then(
       (r) => {
         if (!alive) return
-        if (r) setReport(r)
-        else setLoadError(new Error('Data bongkaran tidak ditemukan'))
+        if (!r) {
+          clearBackup(id)
+          return setLoadError(new Error('Data bongkaran tidak ditemukan'))
+        }
+        // Perubahan terakhir belum sempat terkirim (halaman dimuat ulang): pakai cadangan perangkat.
+        const backup = app.backend.mode === 'supabase' && r.status === 'draft' ? readBackup(id) : null
+        if (!backup) clearBackup(id)
+        setLoaded(backup ? { report: backup, restored: true } : { report: r, restored: false })
       },
       (e: unknown) => alive && setLoadError(e instanceof Error ? e : new Error(String(e))),
     )
@@ -54,11 +59,11 @@ export function FormBongkar() {
   }, [app.backend, id, tick])
 
   if (loadError) return <LoadError error={loadError} onRetry={() => (setLoadError(null), setTick((t) => t + 1))} />
-  if (!report) return <Loading />
-  return <BongkarEditor key={report.id} initial={report} />
+  if (!loaded) return <Loading />
+  return <BongkarEditor key={loaded.report.id} initial={loaded.report} restored={loaded.restored} />
 }
 
-function BongkarEditor({ initial }: { initial: Report }) {
+function BongkarEditor({ initial, restored }: { initial: Report; restored: boolean }) {
   const app = useApp()
   const toast = useToast()
   const navigate = useNavigate()
@@ -75,31 +80,44 @@ function BongkarEditor({ initial }: { initial: Report }) {
   const evaluation = useMemo(() => evaluateAll(report, rules), [report, rules])
   const readOnly = report.status !== 'draft'
   const firstOpen = evaluation.steps.find((s) => !s.complete)?.id
-  const [view, setView] = useState<StepId | 'finish'>(() => (initial.status !== 'draft' || !firstOpen ? 'finish' : firstOpen))
+  // Kembali ke langkah terakhir yang dibuka (mis. setelah halaman dimuat ulang).
+  const [view, setView] = useState<StepId | 'finish'>(() => {
+    if (initial.status !== 'draft' || !firstOpen) return 'finish'
+    const last = readStep(initial.id)
+    return last && last !== 'finish' && evaluation.steps.some((s) => s.id === last && !s.locked) ? last : firstOpen
+  })
 
   // ---------- Simpan otomatis: jeda 600 ms, berurutan, dan dikirim sebelum keluar halaman ----------
   const pending = useRef<Report | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chain = useRef<Promise<void>>(Promise.resolve())
   const firstRender = useRef(true)
+  /** Simpan tanpa jeda (setelah foto ditambah/dihapus). */
+  const urgent = useRef(false)
 
-  const save = useCallback(
-    (r: Report) => {
-      const summary = summarize(r, evaluateAll(r, rules))
-      app.upsertSummary(summary)
-      chain.current = chain.current.then(async () => {
-        try {
-          await app.backend.saveReport(r, summary)
-          setSaveState('saved')
-        } catch (e) {
-          setSaveState('error')
-          toast(`Gagal menyimpan: ${pesan(e)}`, TriangleAlert)
-        }
-      })
-      return chain.current
-    },
-    [app, rules, toast],
-  )
+  // save/flush harus stabil: bila ikut berubah setiap state aplikasi berubah,
+  // efek autosave terpicu lagi dan menyimpan terus-menerus tanpa henti.
+  const latest = useRef({ backend: app.backend, upsertSummary: app.upsertSummary, rules, toast })
+  useEffect(() => {
+    latest.current = { backend: app.backend, upsertSummary: app.upsertSummary, rules, toast }
+  })
+
+  const save = useCallback((r: Report) => {
+    const { backend, upsertSummary, rules, toast } = latest.current
+    const summary = summarize(r, evaluateAll(r, rules))
+    upsertSummary(summary)
+    chain.current = chain.current.then(async () => {
+      try {
+        await backend.saveReport(r, summary)
+        if (backend.mode === 'supabase') clearBackup(r.id, r.updatedAt)
+        if (!pending.current) setSaveState('saved')
+      } catch (e) {
+        setSaveState('error')
+        toast(`Gagal menyimpan: ${pesan(e)}`, TriangleAlert)
+      }
+    })
+    return chain.current
+  }, [])
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
     const p = pending.current
@@ -112,11 +130,18 @@ function BongkarEditor({ initial }: { initial: Report }) {
       firstRender.current = false
       return
     }
+    if (latest.current.backend.mode === 'supabase') writeBackup(report)
     pending.current = report
     setSaveState('saving')
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => void flush(), 600)
+    timer.current = setTimeout(() => void flush(), urgent.current ? 0 : 600)
+    urgent.current = false
   }, [report, flush])
+
+  // Isian dari cadangan perangkat langsung dikirim ke server.
+  useEffect(() => {
+    if (restored) void save(initial)
+  }, [restored, initial, save])
 
   useEffect(() => {
     const onHide = () => document.visibilityState === 'hidden' && void flush()
@@ -141,6 +166,10 @@ function BongkarEditor({ initial }: { initial: Report }) {
   }, [report.photos, photoUrls, app.backend, toast])
   const srcOf = useCallback((p: Photo) => p.dataUrl || photoUrls[p.id], [photoUrls])
 
+  // Foto yang baru diambil ditampilkan dari blob lokal (tanpa salinan base64).
+  const objectUrls = useRef<string[]>([])
+  useEffect(() => () => objectUrls.current.forEach((u) => URL.revokeObjectURL(u)), [])
+
   const setData = useCallback((patch: Partial<ReportData>) => {
     setError(null)
     setReport((prev) => ({ ...prev, updatedAt: Date.now(), data: { ...prev.data, ...patch } }))
@@ -150,7 +179,14 @@ function BongkarEditor({ initial }: { initial: Report }) {
     setPhotoBusy(slot)
     try {
       for (const f of files) {
-        const photo = await app.backend.uploadPhoto(report.id, await compressImage(f), f.name)
+        const blob = await compressImage(f)
+        const photo = await app.backend.uploadPhoto(report.id, blob, f.name)
+        if (!photo.dataUrl) {
+          const url = URL.createObjectURL(blob)
+          objectUrls.current.push(url)
+          setPhotoUrls((prev) => ({ ...prev, [photo.id]: url }))
+        }
+        urgent.current = true
         setReport((prev) => ({ ...prev, updatedAt: Date.now(), photos: { ...prev.photos, [slot]: [...(prev.photos[slot] ?? []), photo] } }))
       }
       setError(null)
@@ -162,6 +198,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
   }
   const removePhoto = (slot: string, index: number) => {
     const photo = report.photos[slot]?.[index]
+    urgent.current = true
     setReport((prev) => ({ ...prev, updatedAt: Date.now(), photos: { ...prev.photos, [slot]: (prev.photos[slot] ?? []).filter((_, i) => i !== index) } }))
     if (photo) void app.backend.deletePhoto(photo).catch(() => {})
   }
@@ -170,6 +207,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
   const go = (next: StepId | 'finish') => {
     setError(null)
     setView(next)
+    writeStep(report.id, next)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const stepState = view === 'finish' ? null : evaluation.steps.find((s) => s.id === view)!
@@ -220,6 +258,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
   const downloadPdf = async () => {
     setGenerating('pdf')
     try {
+      const { generateBaPdf } = await import('@/lib/pdf')
       generateBaPdf({ report, derived: evaluation.derived, settings: app.settings, rules, photoData: await photoData() }).save(`${fileBase}.pdf`)
     } catch (e) {
       toast(`Gagal membuat PDF: ${pesan(e)}`, TriangleAlert)
@@ -232,6 +271,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
     try {
       setPrintData(await photoData())
       await new Promise((r) => setTimeout(r, 80))
+      const { nodeToJpeg } = await import('@/lib/jpg')
       if (!printRef.current) throw new Error('layout belum siap')
       downloadDataUrl(await nodeToJpeg(printRef.current), `${fileBase}.jpg`)
     } catch (e) {
@@ -250,6 +290,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
     await chain.current
     try {
       await app.backend.deleteReport(report.id)
+      clearBackup(report.id)
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
       navigate('/input')
@@ -271,6 +312,7 @@ function BongkarEditor({ initial }: { initial: Report }) {
     removePhoto,
     photoBusy,
     srcOf,
+    beforePick: () => void flush(),
   }
 
   const tabValue = phase?.id ?? 'selesai'

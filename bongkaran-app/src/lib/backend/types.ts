@@ -40,7 +40,8 @@ export interface Backend {
   saveReport(report: Report, summary: ReportSummary): Promise<void>
   deleteReport(id: string): Promise<void>
 
-  uploadPhoto(reportId: string, dataUrl: string, name: string): Promise<Photo>
+  /** Foto sudah dikompres; mode Supabase langsung mengunggah blob tanpa menyimpan salinan di memori. */
+  uploadPhoto(reportId: string, blob: Blob, name: string): Promise<Photo>
   deletePhoto(photo: Photo): Promise<void>
   /** URL tampilan thumbnail per id foto (mode Supabase). */
   signedUrls(photos: Photo[]): Promise<Record<string, string>>

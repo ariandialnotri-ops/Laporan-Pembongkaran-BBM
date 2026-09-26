@@ -44,6 +44,7 @@ export interface StepProps {
   removePhoto: (slot: string, index: number) => void
   photoBusy: string | null
   srcOf: (p: Photo) => string | undefined
+  beforePick: () => void
 }
 
 const IDLE = { tone: 'idle' as BannerTone, title: 'Lengkapi angka untuk melihat hasil' }
@@ -65,7 +66,7 @@ function Fixed({ value, placeholder }: { value: string; placeholder?: string }) 
   return <Input value={value} placeholder={placeholder} readOnly tabIndex={-1} className="opacity-80" />
 }
 
-function StepPhotos({ step, report, addPhotos, removePhoto, photoBusy, srcOf, readOnly, only }: StepProps & { only?: string[] }) {
+function StepPhotos({ step, report, addPhotos, removePhoto, photoBusy, srcOf, beforePick, readOnly, only }: StepProps & { only?: string[] }) {
   const slots = step.photos.filter((p) => (only ? only.includes(p.key) : !p.optional || step.id === 'density'))
   if (!slots.length) return null
   return (
@@ -81,6 +82,7 @@ function StepPhotos({ step, report, addPhotos, removePhoto, photoBusy, srcOf, re
           srcOf={srcOf}
           onAdd={(files) => addPhotos(slot.key, files)}
           onRemove={(i) => removePhoto(slot.key, i)}
+          onBeforePick={beforePick}
         />
       ))}
     </Section>
@@ -288,6 +290,7 @@ export function StepContent(props: StepProps) {
                   srcOf={props.srcOf}
                   onAdd={(files) => props.addPhotos('draining', files)}
                   onRemove={(i) => props.removePhoto('draining', i)}
+                  onBeforePick={props.beforePick}
                 />
               </>
             )}

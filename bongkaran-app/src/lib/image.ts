@@ -1,26 +1,35 @@
 /**
  * Kompres foto sebelum disimpan/diunggah: foto kamera HP bisa beberapa MB,
  * sedangkan satu pembongkaran berisi belasan foto.
+ *
+ * Hemat memori untuk iPhone: file dibaca lewat object URL (bukan dataURL
+ * base64 berukuran MB), dan memori canvas dilepas segera setelah dipakai.
+ * Safari memuat ulang halaman bila memorinya menipis saat kamera dibuka.
  */
-export function compressImage(file: File, { maxSize = 1280, quality = 0.75 } = {}): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error ?? new Error('Gagal membaca file'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('Gagal memuat gambar'))
-      img.onload = () => {
-        const ratio = Math.min(1, maxSize / img.width, maxSize / img.height)
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(img.width * ratio))
-        canvas.height = Math.max(1, Math.round(img.height * ratio))
-        canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.src = String(reader.result)
-    }
-    reader.readAsDataURL(file)
-  })
+export async function compressImage(file: Blob, { maxSize = 1280, quality = 0.72 } = {}): Promise<Blob> {
+  const url = URL.createObjectURL(file)
+  const img = new Image()
+  const canvas = document.createElement('canvas')
+  try {
+    img.src = url
+    await img.decode()
+    const ratio = Math.min(1, maxSize / img.naturalWidth, maxSize / img.naturalHeight)
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * ratio))
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * ratio))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Perangkat tidak dapat memproses foto')
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob) throw new Error('Gagal mengompres foto')
+    return blob
+  } catch (e) {
+    throw e instanceof Error && e.message.startsWith('Gagal') ? e : new Error('Gagal memuat gambar')
+  } finally {
+    canvas.width = 0
+    canvas.height = 0
+    img.removeAttribute('src')
+    URL.revokeObjectURL(url)
+  }
 }
 
 export function blobToDataUrl(blob: Blob): Promise<string> {
