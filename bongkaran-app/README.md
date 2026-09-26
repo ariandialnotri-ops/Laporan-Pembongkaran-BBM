@@ -60,7 +60,30 @@ src/
   data/mock.ts           data contoh — ganti saat menyambung database
 ```
 
-## Belum tersambung
+## Backend: Supabase
 
-Data masih contoh; belum ada database, autentikasi, maupun penyimpanan.
-Tombol simpan/kirim hanya menampilkan toast.
+Skema ada di `supabase/migrations/`:
+
+| Objek | Isi |
+|-------|-----|
+| `bongkaran` | Satu baris per mobil tangki; tahap Bongkaran → Quality → Quantity mengisi kolom bertahap, lalu `qq_status` dinilai (`sesuai` / `perhatian`) |
+| `laporan` | Berita acara dan laporan harian (draft / menunggu / terkirim) |
+| bucket `bukti-bongkaran` | Foto segel/DO dan hasil tera (privat) |
+
+RLS aktif. Karena aplikasi belum punya login, peran `anon` boleh membaca,
+menambah, dan mengubah data (tidak boleh menghapus). **Pasang Supabase Auth
+dan ganti kebijakan ke `authenticated` sebelum dipakai luas.**
+
+Lokal: salin `.env.example` ke `.env.local` lalu isi URL dan publishable key.
+Tanpa env itu, aplikasi berjalan dengan data contoh.
+
+## Deploy: Vercel
+
+1. Import repo `ariandialnotri-ops/Laporan-Pembongkaran-BBM` di Vercel.
+2. **Root Directory**: `bongkaran-app` (framework Vite terdeteksi otomatis).
+3. Environment variables (Production + Preview):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+4. Deploy. `vercel.json` sudah mengarahkan semua rute ke `index.html`.
+
+Setiap push ke branch utama repo memicu deploy produksi; branch lain jadi preview.
