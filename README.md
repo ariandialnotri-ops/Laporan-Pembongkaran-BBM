@@ -35,9 +35,13 @@ Identitas merek, logo, palet warna, dan design token ada di direktori [`brand/`]
 - [`brand/preview.html`](brand/preview.html) — pratinjau visual (buka di peramban)
 - [`brand/logo/`](brand/logo/) — seluruh varian logo dalam format SVG
 
+## Aplikasi
+
+[`bongkaran-app/`](bongkaran-app/) — aplikasi monitoring bongkaran BBM dan Q&Q (React + Vite), memakai design system AeroShift yang sama dengan aplikasi Tepat Setoran SPBU. Lihat README di direktori tersebut.
+
 ## Status
 
-Tahap awal. Baru identitas merek dan aset visual yang tersedia; implementasi aplikasi belum dimulai.
+Kerangka UI aplikasi bongkaran sudah tersedia dengan data contoh; belum terhubung database.
 
 ## Catatan
 
