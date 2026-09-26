@@ -3,7 +3,7 @@
  * Supabase belum dikonfigurasi (mis. `npm run dev` tanpa .env.local).
  * IndexedDB, bukan localStorage, karena satu laporan berisi belasan foto.
  */
-import { genId } from '@/lib/image'
+import { blobToDataUrl, genId } from '@/lib/image'
 import type { Photos, Plan, Report, ReportSummary } from '@/lib/sop'
 import type { Backend } from './types'
 
@@ -90,7 +90,7 @@ export const localBackend: Backend = {
     await set('index', (await this.listReports()).filter((r) => r.id !== id))
   },
 
-  uploadPhoto: async (_reportId, dataUrl, name) => ({ id: genId('p'), name, at: new Date().toISOString(), dataUrl }),
+  uploadPhoto: async (_reportId, blob, name) => ({ id: genId('p'), name, at: new Date().toISOString(), dataUrl: await blobToDataUrl(blob) }),
   deletePhoto: async () => {},
   signedUrls: async () => ({}),
   photoDataUrl: async (photo) => photo.dataUrl ?? '',

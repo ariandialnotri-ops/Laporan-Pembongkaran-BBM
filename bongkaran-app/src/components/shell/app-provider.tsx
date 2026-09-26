@@ -82,10 +82,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [status, userId, refresh])
 
-  // Data dari perangkat lain: muat ulang saat aplikasi kembali dibuka.
+  // Data dari perangkat lain: muat ulang saat aplikasi kembali dibuka,
+  // paling sering sekali per menit (kembali dari kamera juga memicu focus).
   useEffect(() => {
     if (backend.mode !== 'supabase' || !loaded) return
-    const onFocus = () => void refresh().catch(() => {})
+    let last = Date.now()
+    const onFocus = () => {
+      if (Date.now() - last < 60_000) return
+      last = Date.now()
+      void refresh().catch(() => {})
+    }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [loaded, refresh])
@@ -140,6 +146,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setReports([])
   }, [])
 
+  const rules = useMemo(() => effectiveRules(settings.rules), [settings.rules])
+
   const value = useMemo<AppState>(() => {
     const canManage = backend.mode === 'local' || session.role === 'pengawas'
     const displayName = session.nama || session.user?.email || 'Mode lokal'
@@ -155,7 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       initials: initialsOf(displayName),
       loaded,
       settings,
-      rules: effectiveRules(settings.rules),
+      rules,
       updateSettings,
       plans,
       savePlan,
@@ -170,7 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       canDeleteReport: (r) => canManage || (r.status === 'draft' && !!userId && r.createdBy === userId),
     }
-  }, [status, statusMessage, session, loaded, settings, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, refresh, initSession, signIn, signOut, userId])
+  }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, refresh, initSession, signIn, signOut, userId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

@@ -17,6 +17,7 @@ export function PhotoSlot({
   srcOf,
   onAdd,
   onRemove,
+  onBeforePick,
 }: {
   label: string
   photos: Photo[]
@@ -26,6 +27,8 @@ export function PhotoSlot({
   srcOf: (p: Photo) => string | undefined
   onAdd: (files: File[]) => void
   onRemove: (index: number) => void
+  /** Dipanggil tepat sebelum kamera/galeri terbuka: saat itu halaman bisa dimatikan oleh sistem. */
+  onBeforePick?: () => void
 }) {
   const id = useId()
   const done = photos.length > 0
@@ -45,7 +48,7 @@ export function PhotoSlot({
             return (
               <div key={p.id} className="glass-1 relative aspect-square overflow-hidden rounded-md">
                 {src ? (
-                  <img src={src} alt={`${label} ${i + 1}`} className="size-full object-cover" />
+                  <img src={src} alt={`${label} ${i + 1}`} loading="lazy" decoding="async" className="size-full object-cover" />
                 ) : (
                   <span className="flex size-full items-center justify-center text-on-surface-variant">
                     <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
@@ -90,6 +93,7 @@ export function PhotoSlot({
             capture="environment"
             multiple
             className="sr-only"
+            onClick={onBeforePick}
             onChange={(e) => {
               const files = Array.from(e.target.files ?? [])
               if (files.length) onAdd(files)

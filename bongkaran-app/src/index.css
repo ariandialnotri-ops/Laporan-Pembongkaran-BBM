@@ -502,6 +502,16 @@
 
 /* Every ambient and decorative animation above is non-essential, so it all
    stops here. Entrance animations resolve to their final state. */
+/* HP (layar sentuh): blur kaca lebih ringan. Latar orb sudah sangat kabur,
+   jadi tampilan hampir sama tetapi GPU jauh lebih ringan saat menggulir. */
+@media (pointer: coarse) {
+  :root {
+    --glass-1-blur: blur(10px) saturate(150%);
+    --glass-2-blur: blur(14px) saturate(170%);
+    --glass-3-blur: blur(18px) saturate(180%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

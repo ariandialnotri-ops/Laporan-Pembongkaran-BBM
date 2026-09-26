@@ -11,7 +11,7 @@ import { Pill } from '@/components/ui/pill'
 import { useApp } from '@/lib/app-state'
 import { TABLE53_CORRECTIONS, TABLE53_COVERAGE } from '@/lib/density'
 import { formatNumber, parseAngka } from '@/lib/format'
-import { compressImage } from '@/lib/image'
+import { blobToDataUrl, compressImage } from '@/lib/image'
 import type { Rules } from '@/lib/sop'
 import { TANKS } from '@/lib/tank'
 
@@ -28,7 +28,7 @@ export function Pengaturan() {
 
   const setRule = (key: keyof Rules, n: number) => app.updateSettings({ rules: { ...s.rules, [key]: n } })
   const onLogo = async (file?: File) => {
-    if (file) app.updateSettings({ logoDataUrl: await compressImage(file, { maxSize: 400, quality: 0.9 }) })
+    if (file) app.updateSettings({ logoDataUrl: await blobToDataUrl(await compressImage(file, { maxSize: 400, quality: 0.9 })) })
   }
 
   if (!app.loaded) return <Loading />
