@@ -5,7 +5,7 @@ import { Camera, X } from 'lucide-react'
  * A real file input with an object-URL preview, like the struk attachment in
  * Tepat Setoran. `capture` opens the rear camera on phones.
  */
-export function PhotoField({ label }: { label: string }) {
+export function PhotoField({ label, onFileChange }: { label: string; onFileChange?: (file: File | null) => void }) {
   const id = useId()
   const [preview, setPreview] = useState<string | null>(null)
   const current = useRef<string | null>(null)
@@ -14,6 +14,7 @@ export function PhotoField({ label }: { label: string }) {
     if (current.current) URL.revokeObjectURL(current.current)
     current.current = file ? URL.createObjectURL(file) : null
     setPreview(current.current)
+    onFileChange?.(file)
   }
 
   // Release the last object URL when the field unmounts.

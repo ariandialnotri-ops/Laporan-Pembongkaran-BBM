@@ -1,11 +1,16 @@
 import { useState, type ReactNode } from 'react'
-import { CalendarDays, ChevronRight, CircleCheck, CircleDashed, FilePlus2, FileText, Hourglass } from 'lucide-react'
+import { CalendarDays, ChevronRight, CircleCheck, CircleDashed, FilePlus2, FileText, Hourglass, TriangleAlert } from 'lucide-react'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
-import { currentUser, recentReports, type ReportStatus } from '@/data/mock'
+import { LoadError, Loading } from '@/components/bongkaran/load-state'
+import { currentUser, type ReportStatus } from '@/data/mock'
+import { createLaporan, isLive, listLaporan } from '@/lib/api'
+import { formatBulanTahun, formatTanggalPanjang, formatTanggalSingkat } from '@/lib/date'
+import type { JenisLaporan } from '@/lib/types'
+import { useQuery } from '@/lib/use-query'
 import { cn } from '@/lib/utils'
 
 const STATUS: Record<ReportStatus, { text: string; tone: 'success' | 'error' | 'neutral'; icon: typeof CircleCheck }> = {
@@ -32,13 +37,33 @@ const FILTERS: { id: Filter; label: string }[] = [
 export function Laporan() {
   const toast = useToast()
   const [filter, setFilter] = useState<Filter>('semua')
+  const [busy, setBusy] = useState(false)
+  const [state, reload] = useQuery(listLaporan)
+  const recentReports = state.status === 'ready' ? state.data : []
   const reports = filter === 'semua' ? recentReports : recentReports.filter((r) => r.status === filter)
+  const now = new Date()
+
+  const buat = async (jenis: JenisLaporan) => {
+    const judul =
+      jenis === 'berita_acara' ? `BA Bongkaran · ${formatTanggalPanjang(now)}` : `Laporan Harian · ${formatTanggalPanjang(now)}`
+    if (!isLive) return toast('Mode contoh: laporan tidak disimpan')
+    setBusy(true)
+    try {
+      await createLaporan({ judul, jenis, spbu: currentUser.spbu })
+      toast('Draf laporan dibuat')
+      reload()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Gagal membuat laporan', TriangleAlert)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <span className="text-tag uppercase text-primary">
-          {currentUser.spbu} • September 2026
+          {currentUser.spbu} • {formatBulanTahun(now)}
         </span>
         <div className="grid grid-cols-3 gap-space-xs text-center">
           {(['terkirim', 'menunggu', 'draft'] as const).map((s) => (
@@ -51,11 +76,11 @@ export function Laporan() {
           ))}
         </div>
         <div className="grid grid-cols-2 gap-space-xs">
-          <Button size="pill" onClick={() => toast('Draf berita acara dibuat')}>
+          <Button size="pill" disabled={busy} onClick={() => buat('berita_acara')}>
             <FilePlus2 aria-hidden="true" />
             Berita Acara
           </Button>
-          <Button variant="glass" size="pill" onClick={() => toast('Draf laporan harian dibuat')}>
+          <Button variant="glass" size="pill" disabled={busy} onClick={() => buat('harian')}>
             <CalendarDays aria-hidden="true" />
             Laporan Harian
           </Button>
@@ -100,7 +125,11 @@ export function Laporan() {
           ))}
         </div>
 
-        {reports.length === 0 ? (
+        {state.status === 'loading' ? (
+          <Loading />
+        ) : state.status === 'error' ? (
+          <LoadError error={state.error} onRetry={reload} />
+        ) : reports.length === 0 ? (
           <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
             Tidak ada laporan dengan status ini.
           </GlassCard>
@@ -116,9 +145,9 @@ export function Laporan() {
                       <FileText className="size-5" />
                     </span>
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-body-md font-semibold text-on-surface">{r.title}</span>
+                      <span className="truncate text-body-md font-semibold text-on-surface">{r.judul}</span>
                       <span className="truncate text-body-sm text-on-surface-variant">
-                        <span className="tabular">{r.date}</span> • {r.spbu}
+                        <span className="tabular">{formatTanggalSingkat(new Date(r.created_at))}</span> • {r.spbu}
                       </span>
                     </div>
                     <Pill tone={status.tone}>

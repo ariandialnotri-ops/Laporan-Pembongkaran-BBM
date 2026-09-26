@@ -19,9 +19,19 @@ import { StatTile } from '@/components/bongkaran/stat-tile'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { calendarWeek, currentUser, productStatuses, recentUnloadings, todaySummary, type CalendarDay } from '@/data/mock'
+import { LoadError, Loading } from '@/components/bongkaran/load-state'
+import { currentUser, type CalendarDay } from '@/data/mock'
+import { isLive, listBongkaran } from '@/lib/api'
+import { formatBulanTahun, formatTanggalPanjang, formatWaktuRelatif, greeting, startOfWeek } from '@/lib/date'
 import { formatLiter, formatSigned } from '@/lib/format'
+import { labelQQ } from '@/lib/qq'
+import { kalenderMinggu, ringkasHariIni, statusProduk } from '@/lib/ringkasan'
+import { useQuery } from '@/lib/use-query'
 import { cn } from '@/lib/utils'
+
+// Everything on this page comes from this week's records.
+const loadMingguIni = () => listBongkaran({ sinceIso: startOfWeek(new Date()).toISOString() })
+const loadTerbaru = () => listBongkaran({ limit: 5 })
 
 const DAY_CLASS: Record<CalendarDay['status'], string> = {
   sesuai: 'bg-tertiary-container text-on-tertiary',
@@ -36,6 +46,16 @@ const DAY_LABEL: Record<CalendarDay['status'], string> = {
 }
 
 export function Dashboard() {
+  const [minggu, reloadMinggu] = useQuery(loadMingguIni)
+  const [terbaru, reloadTerbaru] = useQuery(loadTerbaru)
+  const now = new Date()
+
+  if (minggu.status === 'loading') return <Loading />
+  if (minggu.status === 'error') return <LoadError error={minggu.error} onRetry={reloadMinggu} />
+
+  const todaySummary = ringkasHariIni(minggu.data, now)
+  const productStatuses = statusProduk(minggu.data)
+  const calendarWeek = kalenderMinggu(minggu.data, now)
   const perhatian = productStatuses.filter((p) => p.status === 'perhatian')
 
   return (
@@ -46,7 +66,7 @@ export function Dashboard() {
           <div className="flex items-center gap-space-xs">
             <span aria-hidden="true" className="size-2 rounded-full bg-tertiary-container animate-pulse" />
             <span className="text-tag uppercase text-primary">
-              {currentUser.greeting}, {currentUser.name}
+              {greeting(now)}, {currentUser.name}
             </span>
           </div>
           <button
@@ -82,7 +102,8 @@ export function Dashboard() {
             {currentUser.spbu}
           </Pill>
           <Pill tone="primary">{currentUser.role}</Pill>
-          <Pill tone="neutral">{currentUser.today}</Pill>
+          <Pill tone="neutral">{formatTanggalPanjang(now)}</Pill>
+          {!isLive && <Pill tone="neutral">Mode contoh</Pill>}
         </div>
 
         <Link to="/input" className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'w-full')}>
@@ -101,7 +122,7 @@ export function Dashboard() {
           <StatTile
             label="Q&Q sesuai"
             value={`${todaySummary.qqSesuai}/${todaySummary.qqTotal}`}
-            hint="Produk hari ini"
+            hint="Selesai diuji hari ini"
             icon={FlaskConical}
             tone="success"
           />
@@ -127,7 +148,7 @@ export function Dashboard() {
           <SectionHeader
             id="kalender-progress"
             title="Kalender Progress"
-            action={<span className="text-body-sm text-on-surface-variant">September 2026</span>}
+            action={<span className="text-body-sm text-on-surface-variant">{formatBulanTahun(now)}</span>}
           />
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
             <ol className="grid grid-cols-7 gap-1">
@@ -188,51 +209,59 @@ export function Dashboard() {
             </Link>
           }
         />
-        <div className="flex flex-col gap-space-xs">
-          {recentUnloadings.map((entry) => {
-            const selisih = entry.volumeReal - entry.volumeDo
-            return (
-              <GlassCard key={entry.id} level={1} className="transition-shadow duration-200 hover:shadow-md">
-                <div className="flex items-center gap-space-sm p-space-sm">
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      'flex size-11 shrink-0 items-center justify-center rounded-md',
-                      entry.qqStatus === 'perhatian' ? 'bg-error-container text-error' : 'bg-primary-fixed text-primary',
-                    )}
-                  >
-                    <Truck className="size-5" />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-body-md font-semibold text-on-surface">{entry.product}</span>
-                      <QQPill status={entry.qqStatus} label={entry.qqNote} />
-                    </div>
-                    <span className="truncate text-body-sm text-on-surface-variant">
-                      <span className="tabular">{entry.plate}</span> • {entry.time}
-                    </span>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end">
-                    <span className="tabular text-numeric-md font-bold text-on-surface">{formatLiter(entry.volumeReal)}</span>
+        {terbaru.status === 'loading' ? (
+          <Loading />
+        ) : terbaru.status === 'error' ? (
+          <LoadError error={terbaru.error} onRetry={reloadTerbaru} />
+        ) : terbaru.data.length === 0 ? (
+          <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+            Belum ada bongkaran tercatat.
+          </GlassCard>
+        ) : (
+          <div className="flex flex-col gap-space-xs">
+            {terbaru.data.map((entry) => {
+              const selisih = Number(entry.volume_realisasi) - Number(entry.volume_do)
+              return (
+                <GlassCard key={entry.id} level={1} className="transition-shadow duration-200 hover:shadow-md">
+                  <div className="flex items-center gap-space-sm p-space-sm">
                     <span
+                      aria-hidden="true"
                       className={cn(
-                        'tabular text-numeric-sm',
-                        selisih < 0 ? 'text-error' : 'text-on-surface-variant',
+                        'flex size-11 shrink-0 items-center justify-center rounded-md',
+                        entry.qq_status === 'perhatian' ? 'bg-error-container text-error' : 'bg-primary-fixed text-primary',
                       )}
                     >
-                      {formatSigned(selisih, 0, ' L')}
+                      <Truck className="size-5" />
                     </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="text-body-md font-semibold text-on-surface">{entry.produk}</span>
+                        <QQPill status={entry.qq_status} label={labelQQ(entry)} />
+                      </div>
+                      <span className="truncate text-body-sm text-on-surface-variant">
+                        <span className="tabular">{entry.no_polisi}</span> • {formatWaktuRelatif(entry.waktu_bongkar, now)}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span className="tabular text-numeric-md font-bold text-on-surface">
+                        {formatLiter(Number(entry.volume_realisasi))}
+                      </span>
+                      <span className={cn('tabular text-numeric-sm', selisih < 0 ? 'text-error' : 'text-on-surface-variant')}>
+                        {formatSigned(selisih, 0, ' L')}
+                      </span>
+                    </div>
+                    <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
                   </div>
-                  <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-                </div>
-              </GlassCard>
-            )
-          })}
-        </div>
+                </GlassCard>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       <p className="px-space-xs text-center text-tag text-on-surface-variant">
-        {currentUser.spbu} • {currentUser.spbuAddress} — data contoh, belum terhubung database
+        {currentUser.spbu} • {currentUser.spbuAddress}
+        {isLive ? '' : ' — data contoh, Supabase belum tersambung'}
       </p>
     </div>
   )

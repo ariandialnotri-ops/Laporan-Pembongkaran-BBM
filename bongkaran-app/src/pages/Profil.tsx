@@ -5,9 +5,28 @@ import { StatTile } from '@/components/bongkaran/stat-tile'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { currentUser } from '@/data/mock'
+import { countBongkaran, isLive, listLaporan } from '@/lib/api'
+import { useQuery } from '@/lib/use-query'
 import { cn } from '@/lib/utils'
 
+async function loadStats() {
+  if (!isLive) return currentUser.stats
+  const [bongkaran, laporan] = await Promise.all([countBongkaran(), listLaporan(500)])
+  const now = new Date()
+  const bulanIni = laporan.filter((l) => {
+    const d = new Date(l.created_at)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  }).length
+  return {
+    validated: bongkaran.total,
+    complianceRate: bongkaran.total > 0 ? `${Math.round((bongkaran.sesuai / bongkaran.total) * 100)}%` : '—',
+    reportsThisMonth: bulanIni,
+  }
+}
+
 export function Profil() {
+  const [state] = useQuery(loadStats)
+  const stats = state.status === 'ready' ? state.data : null
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col items-center gap-space-sm p-space-lg text-center">
@@ -41,9 +60,9 @@ export function Profil() {
           Statistik
         </h2>
         <div className="grid grid-cols-3 gap-space-xs">
-          <StatTile label="Divalidasi" value={currentUser.stats.validated} hint="Bongkaran" icon={Truck} />
-          <StatTile label="Kepatuhan" value={currentUser.stats.complianceRate} hint="Q&Q" icon={FlaskConical} tone="success" />
-          <StatTile label="Laporan" value={currentUser.stats.reportsThisMonth} hint="Bulan ini" icon={FileText} tone="primary" />
+          <StatTile label="Divalidasi" value={stats?.validated ?? '…'} hint="Bongkaran" icon={Truck} />
+          <StatTile label="Kepatuhan" value={stats?.complianceRate ?? '…'} hint="Q&Q" icon={FlaskConical} tone="success" />
+          <StatTile label="Laporan" value={stats?.reportsThisMonth ?? '…'} hint="Bulan ini" icon={FileText} tone="primary" />
         </div>
       </section>
 

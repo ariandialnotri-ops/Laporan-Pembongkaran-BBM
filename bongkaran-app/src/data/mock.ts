@@ -20,6 +20,10 @@ export function cariProduk(id: string) {
   return produkList.find((p) => p.id === id) ?? produkList[0]
 }
 
+export function cariProdukByName(name: string) {
+  return produkList.find((p) => p.name === name) ?? produkList[0]
+}
+
 /** Toleransi selisih bejana ukur 20 L terhadap meter pompa, dalam persen. */
 export const TOLERANSI_TERA_PERSEN = 0.5
 

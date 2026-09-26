@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowRight, Beaker, MapPin, Ruler, Send, Truck } from 'lucide-react'
+import { ArrowRight, Beaker, LoaderCircle, MapPin, Ruler, Send, Truck, TriangleAlert } from 'lucide-react'
 import { PhotoField } from '@/components/bongkaran/photo-field'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,10 @@ import {
   TOLERANSI_BONGKAR_PERSEN,
   TOLERANSI_TERA_PERSEN,
 } from '@/data/mock'
+import { createBongkaran, isLive, updateBongkaran, uploadBukti } from '@/lib/api'
+import { toDatetimeLocal } from '@/lib/date'
 import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
+import { nilaiQQ } from '@/lib/qq'
 
 const TABS = ['bongkaran', 'quality', 'quantity'] as const
 type Tab = (typeof TABS)[number]
@@ -30,33 +33,178 @@ function isTab(value: string | null): value is Tab {
   return TABS.includes(value as Tab)
 }
 
+const pesanGalat = (e: unknown) => (e instanceof Error ? e.message : 'Terjadi kesalahan')
+
 export function FormInput() {
   const [params] = useSearchParams()
   const initial = params.get('tab')
   const [tab, setTab] = useState<Tab>(isTab(initial) ? initial : 'bongkaran')
   const toast = useToast()
 
+  // The record being filled. Created on the first save, then updated per step.
+  const [recordId, setRecordId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [formKey, setFormKey] = useState(0)
+
+  const [waktu, setWaktu] = useState(() => toDatetimeLocal(new Date()))
+  const [plat, setPlat] = useState('')
   const [produkId, setProdukId] = useState(produkList[0].id)
-  const [volDo, setVolDo] = useState('8000')
-  const [volReal, setVolReal] = useState('7992')
-  const [densityCorr, setDensityCorr] = useState('748')
-  const [tera, setTera] = useState('19,92')
-  const [meterAwal, setMeterAwal] = useState('184220,50')
-  const [meterAkhir, setMeterAkhir] = useState('184240,50')
+  const [volDo, setVolDo] = useState('')
+  const [volReal, setVolReal] = useState('')
+  const [catatan, setCatatan] = useState('')
+  const [fotoDo, setFotoDo] = useState<File | null>(null)
+
+  const [suhu, setSuhu] = useState('')
+  const [densityObs, setDensityObs] = useState('')
+  const [densityCorr, setDensityCorr] = useState('')
+  const [pengawas, setPengawas] = useState(pengawasList[0].id)
+
+  const [tera, setTera] = useState('')
+  const [meterAwal, setMeterAwal] = useState('')
+  const [meterAkhir, setMeterAkhir] = useState('')
+  const [fotoTera, setFotoTera] = useState<File | null>(null)
 
   const produk = cariProduk(produkId)
-  const bongkar = hitungBongkar(parseAngka(volDo), parseAngka(volReal))
-  const density = hitungDensity(parseAngka(densityCorr), produk.densityMin, produk.densityMax)
-  const kuantitas = hitungTera(parseAngka(tera), parseAngka(meterAwal), parseAngka(meterAkhir))
+  const nDo = parseAngka(volDo)
+  const nReal = parseAngka(volReal)
+  const nDensity = parseAngka(densityCorr)
+  const nTera = parseAngka(tera)
+  const nAwal = parseAngka(meterAwal)
+  const nAkhir = parseAngka(meterAkhir)
 
-  const next = (to: Tab, message: string) => {
-    toast(message)
+  const bongkar = hitungBongkar(nDo, nReal)
+  const density = hitungDensity(nDensity, produk.densityMin, produk.densityMax)
+  const kuantitas = hitungTera(nTera, nAwal, nAkhir)
+
+  const pindah = (to: Tab) => {
     setTab(to)
+    setError(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const run = async (task: () => Promise<void>) => {
+    setSaving(true)
+    setError(null)
+    try {
+      await task()
+    } catch (e) {
+      setError(pesanGalat(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const simpanBongkaran = () => {
+    if (!plat.trim()) return setError('Isi nomor polisi mobil tangki.')
+    if (nDo === null || nDo <= 0 || nReal === null || nReal < 0) return setError('Isi volume DO dan volume realisasi.')
+    if (!isLive) {
+      toast('Mode contoh: data tidak disimpan')
+      return pindah('quality')
+    }
+    return run(async () => {
+      const foto_do_path = fotoDo ? await uploadBukti(fotoDo, 'segel-do') : null
+      const row = {
+        spbu: currentUser.spbu,
+        waktu_bongkar: new Date(waktu).toISOString(),
+        no_polisi: plat.trim().toUpperCase(),
+        produk: produk.name,
+        volume_do: nDo,
+        volume_realisasi: nReal,
+        catatan: catatan.trim() || null,
+      }
+      if (recordId) {
+        await updateBongkaran(recordId, foto_do_path ? { ...row, foto_do_path } : row)
+      } else {
+        setRecordId(await createBongkaran({ ...row, foto_do_path }))
+      }
+      toast('Data bongkaran tersimpan')
+      pindah('quality')
+    })
+  }
+
+  const simpanQuality = () => {
+    if (!recordId && isLive) return setError('Simpan tahap Bongkaran lebih dulu.')
+    if (nDensity === null) return setError('Isi density terkoreksi.')
+    if (!isLive) {
+      toast('Mode contoh: data tidak disimpan')
+      return pindah('quantity')
+    }
+    return run(async () => {
+      const p = pengawasList.find((x) => x.id === pengawas)
+      await updateBongkaran(recordId!, {
+        suhu_observasi: parseAngka(suhu),
+        density_observasi: parseAngka(densityObs),
+        density_koreksi: nDensity,
+        pengawas: p ? `${p.name} – ${p.shift}` : null,
+        tahap: 'quality',
+      })
+      toast('Data quality tersimpan')
+      pindah('quantity')
+    })
+  }
+
+  const kirim = () => {
+    if (!recordId && isLive) return setError('Simpan tahap Bongkaran dan Quality lebih dulu.')
+    if (nTera === null || nAwal === null || nAkhir === null || nAkhir <= nAwal) {
+      return setError('Isi hasil tera dan angka meter (akhir harus lebih besar dari awal).')
+    }
+    if (!isLive) return toast('Mode contoh: data tidak disimpan')
+    return run(async () => {
+      const foto_tera_path = fotoTera ? await uploadBukti(fotoTera, 'tera') : null
+      const qq = nilaiQQ({
+        produk: produk.name,
+        volume_do: nDo ?? 0,
+        volume_realisasi: nReal ?? 0,
+        density_koreksi: nDensity,
+        tera_bejana: nTera,
+        meter_awal: nAwal,
+        meter_akhir: nAkhir,
+      })
+      await updateBongkaran(recordId!, {
+        tera_bejana: nTera,
+        meter_awal: nAwal,
+        meter_akhir: nAkhir,
+        ...(foto_tera_path ? { foto_tera_path } : {}),
+        tahap: 'selesai',
+        qq_status: qq.status,
+        qq_catatan: qq.catatan,
+      })
+      toast(qq.status === 'sesuai' ? 'Laporan Q&Q terkirim · Sesuai' : `Laporan Q&Q terkirim · ${qq.catatan}`)
+      reset()
+    })
+  }
+
+  const reset = () => {
+    setRecordId(null)
+    setWaktu(toDatetimeLocal(new Date()))
+    setPlat('')
+    setVolDo('')
+    setVolReal('')
+    setCatatan('')
+    setFotoDo(null)
+    setSuhu('')
+    setDensityObs('')
+    setDensityCorr('')
+    setTera('')
+    setMeterAwal('')
+    setMeterAkhir('')
+    setFotoTera(null)
+    setFormKey((k) => k + 1)
+    pindah('bongkaran')
+  }
+
+  const errorBox = error ? (
+    <GlassCard level={1} role="alert" className="flex items-start gap-space-sm bg-error-container/70 p-space-sm">
+      <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
+      <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
+    </GlassCard>
+  ) : null
+
+  const spinner = saving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null
+
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex flex-col">
+    <Tabs key={formKey} value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex flex-col">
       <TabsList count={TABS.length} index={TABS.indexOf(tab)} aria-label="Bagian formulir" className="animate-entrance-1">
         <TabsTrigger value="bongkaran">
           <Truck aria-hidden="true" />
@@ -71,6 +219,16 @@ export function FormInput() {
           Quantity
         </TabsTrigger>
       </TabsList>
+
+      {!isLive ? (
+        <Pill tone="neutral" className="mx-auto mt-space-sm">
+          Mode contoh · Supabase belum tersambung
+        </Pill>
+      ) : recordId ? (
+        <Pill tone="cyan" className="mx-auto mt-space-sm">
+          Draf tersimpan · {plat.toUpperCase()}
+        </Pill>
+      ) : null}
 
       <TabsContent value="bongkaran" className="flex flex-col gap-space-md">
         <GlassCard level={2} className="animate-entrance-2 flex items-center gap-space-sm p-space-md">
@@ -89,11 +247,18 @@ export function FormInput() {
 
         <GlassCard level={2} className="animate-entrance-3 flex flex-col gap-space-md p-space-md">
           <Field label="Tanggal & waktu bongkar" htmlFor="tanggal">
-            <Input id="tanggal" type="datetime-local" defaultValue="2026-09-26T07:40" />
+            <Input id="tanggal" type="datetime-local" value={waktu} onChange={(e) => setWaktu(e.target.value)} />
           </Field>
 
           <Field label="No. polisi mobil tangki" htmlFor="plat">
-            <Input id="plat" placeholder="Contoh: L 9021 XZ" autoCapitalize="characters" autoComplete="off" />
+            <Input
+              id="plat"
+              placeholder="Contoh: L 9021 XZ"
+              autoCapitalize="characters"
+              autoComplete="off"
+              value={plat}
+              onChange={(e) => setPlat(e.target.value)}
+            />
           </Field>
 
           <Field label="Produk" htmlFor="produk">
@@ -113,7 +278,15 @@ export function FormInput() {
 
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Volume DO" htmlFor="volDo">
-              <Input id="volDo" numeric inputMode="decimal" suffix="L" value={volDo} onChange={(e) => setVolDo(e.target.value)} />
+              <Input
+                id="volDo"
+                numeric
+                inputMode="decimal"
+                suffix="L"
+                placeholder="8000"
+                value={volDo}
+                onChange={(e) => setVolDo(e.target.value)}
+              />
             </Field>
             <Field label="Volume realisasi" htmlFor="volReal">
               <Input
@@ -121,6 +294,7 @@ export function FormInput() {
                 numeric
                 inputMode="decimal"
                 suffix="L"
+                placeholder="7992"
                 value={volReal}
                 onChange={(e) => setVolReal(e.target.value)}
               />
@@ -134,19 +308,27 @@ export function FormInput() {
             ]}
             total={['Selisih', bongkar ? `${formatSigned(bongkar.selisih, 0, ' L')} (${formatSigned(bongkar.persen, 2, '%')})` : '—']}
           />
-          <StatusBanner {...bongkar?.banner ?? IDLE} />
+          <StatusBanner {...(bongkar?.banner ?? IDLE)} />
         </GlassCard>
 
         <GlassCard level={2} className="animate-entrance-4 flex flex-col gap-space-md p-space-md">
-          <PhotoField label="Foto segel & surat jalan (DO)" />
+          <PhotoField label="Foto segel & surat jalan (DO)" onFileChange={setFotoDo} />
           <Field label="Catatan" htmlFor="catatan">
-            <Textarea id="catatan" placeholder="Catatan tambahan (opsional)" rows={3} />
+            <Textarea
+              id="catatan"
+              placeholder="Catatan tambahan (opsional)"
+              rows={3}
+              value={catatan}
+              onChange={(e) => setCatatan(e.target.value)}
+            />
           </Field>
         </GlassCard>
 
-        <Button size="lg" className="animate-entrance-5 w-full" onClick={() => next('quality', 'Data bongkaran tersimpan')}>
+        {errorBox}
+        <Button size="lg" className="animate-entrance-5 w-full" disabled={saving} onClick={simpanBongkaran}>
+          {spinner}
           Simpan & lanjut ke Quality
-          <ArrowRight aria-hidden="true" />
+          {!saving && <ArrowRight aria-hidden="true" />}
         </Button>
       </TabsContent>
 
@@ -156,10 +338,18 @@ export function FormInput() {
         <GlassCard level={2} className="animate-entrance-3 flex flex-col gap-space-md p-space-md">
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Suhu observasi" htmlFor="suhu">
-              <Input id="suhu" numeric inputMode="decimal" suffix="°C" placeholder="28,5" />
+              <Input id="suhu" numeric inputMode="decimal" suffix="°C" placeholder="28,5" value={suhu} onChange={(e) => setSuhu(e.target.value)} />
             </Field>
             <Field label="Density observasi" htmlFor="densityObs">
-              <Input id="densityObs" numeric inputMode="decimal" suffix="kg/m³" placeholder="742" />
+              <Input
+                id="densityObs"
+                numeric
+                inputMode="decimal"
+                suffix="kg/m³"
+                placeholder="742"
+                value={densityObs}
+                onChange={(e) => setDensityObs(e.target.value)}
+              />
             </Field>
           </div>
 
@@ -169,15 +359,16 @@ export function FormInput() {
               numeric
               inputMode="decimal"
               suffix="kg/m³"
+              placeholder="748"
               value={densityCorr}
               onChange={(e) => setDensityCorr(e.target.value)}
             />
           </Field>
 
-          <StatusBanner {...density ?? IDLE} />
+          <StatusBanner {...(density ?? IDLE)} />
 
           <Field label="Petugas pengawas" htmlFor="pengawas">
-            <Select defaultValue={pengawasList[0].id}>
+            <Select value={pengawas} onValueChange={setPengawas}>
               <SelectTrigger id="pengawas">
                 <SelectValue />
               </SelectTrigger>
@@ -192,9 +383,11 @@ export function FormInput() {
           </Field>
         </GlassCard>
 
-        <Button size="lg" className="animate-entrance-4 w-full" onClick={() => next('quantity', 'Data quality tersimpan')}>
+        {errorBox}
+        <Button size="lg" className="animate-entrance-4 w-full" disabled={saving} onClick={simpanQuality}>
+          {spinner}
           Simpan & lanjut ke Quantity
-          <ArrowRight aria-hidden="true" />
+          {!saving && <ArrowRight aria-hidden="true" />}
         </Button>
       </TabsContent>
 
@@ -203,15 +396,29 @@ export function FormInput() {
 
         <GlassCard level={2} className="animate-entrance-3 flex flex-col gap-space-md p-space-md">
           <Field label="Hasil tera bejana 20 L" htmlFor="tera">
-            <Input id="tera" numeric inputMode="decimal" suffix="L" value={tera} onChange={(e) => setTera(e.target.value)} />
+            <Input id="tera" numeric inputMode="decimal" suffix="L" placeholder="19,92" value={tera} onChange={(e) => setTera(e.target.value)} />
           </Field>
 
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Meter pompa awal" htmlFor="meterAwal">
-              <Input id="meterAwal" numeric inputMode="decimal" value={meterAwal} onChange={(e) => setMeterAwal(e.target.value)} />
+              <Input
+                id="meterAwal"
+                numeric
+                inputMode="decimal"
+                placeholder="184220,50"
+                value={meterAwal}
+                onChange={(e) => setMeterAwal(e.target.value)}
+              />
             </Field>
             <Field label="Meter pompa akhir" htmlFor="meterAkhir">
-              <Input id="meterAkhir" numeric inputMode="decimal" value={meterAkhir} onChange={(e) => setMeterAkhir(e.target.value)} />
+              <Input
+                id="meterAkhir"
+                numeric
+                inputMode="decimal"
+                placeholder="184240,50"
+                value={meterAkhir}
+                onChange={(e) => setMeterAkhir(e.target.value)}
+              />
             </Field>
           </div>
 
@@ -222,15 +429,16 @@ export function FormInput() {
             ]}
             total={['Selisih', kuantitas ? formatSigned(kuantitas.persen, 2, '%') : '—']}
           />
-          <StatusBanner {...kuantitas?.banner ?? IDLE} />
+          <StatusBanner {...(kuantitas?.banner ?? IDLE)} />
         </GlassCard>
 
         <GlassCard level={2} className="animate-entrance-4 p-space-md">
-          <PhotoField label="Foto hasil tera" />
+          <PhotoField label="Foto hasil tera" onFileChange={setFotoTera} />
         </GlassCard>
 
-        <Button size="lg" className="animate-entrance-5 w-full" onClick={() => toast('Laporan Q&Q terkirim')}>
-          <Send aria-hidden="true" />
+        {errorBox}
+        <Button size="lg" className="animate-entrance-5 w-full" disabled={saving} onClick={kirim}>
+          {spinner ?? <Send aria-hidden="true" />}
           Kirim laporan Q&Q
         </Button>
       </TabsContent>
