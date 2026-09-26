@@ -41,6 +41,9 @@ function stripDataUrls(photos: Photos): Photos {
   return Object.fromEntries(Object.entries(photos).map(([slot, list]) => [slot, list.map((p) => ({ id: p.id, name: p.name, at: p.at, path: p.path }))]))
 }
 
+// Ringkasan lama (dibuat sebelum kolom hitungan ada) diisi nilai kosong.
+const SUMMARY_DEFAULTS: Pick<ReportSummary, 'volumeDO' | 'gainLoss' | 'densityAnomaly' | 'doneCount'> = { volumeDO: null, gainLoss: null, densityAnomaly: false, doneCount: 0 }
+
 export function createSupabaseBackend(sb: SupabaseClient): Backend {
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
@@ -121,7 +124,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       const rows = check(
         await sb.from('bbm_reports').select('id,status,summary,created_by').order('created_at', { ascending: false }).limit(500),
       ) as Pick<ReportRow, 'id' | 'status' | 'summary' | 'created_by'>[]
-      return rows.map((r) => ({ ...r.summary, id: r.id, status: r.status, createdBy: r.created_by }))
+      return rows.map((r) => ({ ...SUMMARY_DEFAULTS, ...r.summary, id: r.id, status: r.status, createdBy: r.created_by }))
     },
     async getReport(id) {
       const r = check(await sb.from('bbm_reports').select('*').eq('id', id).maybeSingle()) as ReportRow | null
