@@ -1,45 +1,68 @@
-import { produkList, type CalendarDay, type ProductStatus } from '@/data/mock'
-import { labelQQ } from '@/lib/qq'
-import { addDays, hariSingkat, sameDay, startOfWeek } from '@/lib/date'
-import type { Bongkaran } from '@/lib/types'
+import { addDays, hariSingkat, sameDay, startOfWeek, todayIso } from '@/lib/date'
+import { PRODUK_OPTIONS, type ReportSummary } from '@/lib/sop'
 
-/** Today's totals from a newest-first list of unloadings. */
-export function ringkasHariIni(rows: Bongkaran[], now = new Date()) {
-  const today = rows.filter((r) => sameDay(new Date(r.waktu_bongkar), now))
-  const selesai = today.filter((r) => r.tahap === 'selesai')
+/** Status Q&Q di pill: sesuai (selesai), perhatian (anomali), belum (draft / belum ada). */
+export type QQStatus = 'sesuai' | 'perhatian' | 'belum'
+
+export interface CalendarDay {
+  label: string
+  date: number
+  status: 'sesuai' | 'catatan' | 'belum'
+  isToday?: boolean
+}
+
+export interface ProductStatus {
+  name: string
+  status: QQStatus
+  note: string
+}
+
+export function qqOf(r: Pick<ReportSummary, 'status' | 'densityAnomaly'>): QQStatus {
+  if (r.status === 'selesai') return 'sesuai'
+  if (r.status === 'anomali' || r.densityAnomaly) return 'perhatian'
+  return 'belum'
+}
+
+export function labelQQ(r: Pick<ReportSummary, 'status' | 'densityAnomaly' | 'doneCount'>, totalSteps: number) {
+  if (r.status === 'selesai') return 'Q&Q Sesuai'
+  if (r.status === 'anomali') return 'Anomali density'
+  if (r.densityAnomaly) return 'Anomali density'
+  return `Tahap ${Math.min(r.doneCount + 1, totalSteps)}/${totalSteps}`
+}
+
+/** Angka hari ini dari daftar laporan. */
+export function ringkasHariIni(rows: ReportSummary[], now = new Date()) {
+  const today = rows.filter((r) => r.tanggal === todayIso(now))
+  const selesai = today.filter((r) => r.status === 'selesai')
   return {
-    totalLiter: today.reduce((sum, r) => sum + Number(r.volume_realisasi), 0),
+    totalLiter: selesai.reduce((sum, r) => sum + (r.volumeDO ?? 0), 0),
     mobilTangki: today.length,
-    spbu: new Set(today.map((r) => r.spbu)).size,
-    qqSesuai: selesai.filter((r) => r.qq_status === 'sesuai').length,
+    gainLoss: selesai.reduce((sum, r) => sum + (r.gainLoss ?? 0), 0),
+    qqSesuai: selesai.length,
     qqTotal: today.length,
+    perluCek: today.filter((r) => qqOf(r) === 'perhatian'),
   }
 }
 
-/** Latest verdict per product within `rows` (already limited to the period). */
-export function statusProduk(rows: Bongkaran[]): ProductStatus[] {
-  return produkList.map((p) => {
-    const last = rows.find((r) => r.produk === p.name)
-    if (!last) return { id: p.id, name: p.name, status: 'belum', note: 'Belum Input' }
-    return {
-      id: p.id,
-      name: p.name,
-      status: last.qq_status,
-      note: last.qq_status === 'sesuai' ? 'Sesuai' : labelQQ(last),
-    }
+/** Status terakhir per produk minggu ini. */
+export function statusProduk(rows: ReportSummary[]): ProductStatus[] {
+  return PRODUK_OPTIONS.map((name) => {
+    const last = rows.find((r) => r.produk === name)
+    if (!last) return { name, status: 'belum', note: 'Belum input' }
+    const status = qqOf(last)
+    return { name, status, note: status === 'sesuai' ? 'Sesuai' : status === 'perhatian' ? 'Anomali' : 'Dalam proses' }
   })
 }
 
-/** Monday–Sunday strip: green when every record that day is sesuai, red when any needs attention. */
-export function kalenderMinggu(rows: Bongkaran[], now = new Date()): CalendarDay[] {
+/** Senin–Minggu: sesuai bila ada bongkaran selesai tanpa anomali, catatan bila ada anomali. */
+export function kalenderMinggu(rows: ReportSummary[], now = new Date()): CalendarDay[] {
   const monday = startOfWeek(now)
   return Array.from({ length: 7 }, (_, i) => {
     const day = addDays(monday, i)
-    const onDay = rows.filter((r) => sameDay(new Date(r.waktu_bongkar), day))
+    const onDay = rows.filter((r) => r.tanggal === todayIso(day))
     let status: CalendarDay['status'] = 'belum'
-    if (onDay.some((r) => r.qq_status === 'perhatian')) status = 'catatan'
-    else if (onDay.length > 0 && onDay.every((r) => r.qq_status === 'sesuai')) status = 'sesuai'
-    else if (onDay.length > 0) status = 'catatan'
+    if (onDay.some((r) => qqOf(r) === 'perhatian')) status = 'catatan'
+    else if (onDay.some((r) => r.status === 'selesai')) status = 'sesuai'
     return { label: hariSingkat(day), date: day.getDate(), status, isToday: sameDay(day, now) }
   })
 }

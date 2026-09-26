@@ -15,11 +15,21 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/profil', label: 'Profil', title: 'Profil Pengguna', icon: UserRound },
 ]
 
+/** Halaman di luar dock, dibuka dari Beranda dan Profil. */
+const EXTRA_TITLES: [string, string][] = [
+  ['/plan', 'Plan Kirim'],
+  ['/kalkulator', 'Kalkulator'],
+  ['/pengaturan', 'Pengaturan SPBU'],
+  ['/anggota', 'Anggota SPBU'],
+]
+
 export function isRouteActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 export function titleFor(pathname: string) {
+  const extra = EXTRA_TITLES.find(([href]) => isRouteActive(pathname, href))
+  if (extra) return extra[1]
   return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'Bongkaran BBM'
 }

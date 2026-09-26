@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Fuel } from 'lucide-react'
-import { currentUser } from '@/data/mock'
+import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
 
 export function AppHeader() {
   const { pathname } = useLocation()
+  const app = useApp()
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
@@ -19,21 +20,15 @@ export function AppHeader() {
           </Link>
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>
-            <span className="text-tag uppercase text-primary">{currentUser.spbu}</span>
+            <span className="truncate text-tag uppercase text-primary">{app.settings.namaSpbu || 'SPBU'}</span>
           </div>
         </div>
 
-        <Link
-          to="/profil"
-          className="glass-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition-transform duration-200 active:scale-95"
-        >
-          <span
-            aria-hidden="true"
-            className="tabular flex size-8 items-center justify-center rounded-full bg-primary-fixed text-body-sm font-bold text-on-primary-fixed"
-          >
-            {currentUser.initials}
+        <Link to="/profil" className="glass-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition-transform duration-200 active:scale-95">
+          <span aria-hidden="true" className="tabular flex size-8 items-center justify-center rounded-full bg-primary-fixed text-body-sm font-bold text-on-primary-fixed">
+            {app.initials}
           </span>
-          <span className="hidden text-body-sm font-semibold text-on-surface sm:inline">{currentUser.name}</span>
+          <span className="hidden max-w-40 truncate text-body-sm font-semibold text-on-surface sm:inline">{app.displayName}</span>
           <span className="sr-only">Buka profil</span>
         </Link>
       </div>

@@ -57,3 +57,21 @@ export function parseAngka(input: string): number | null {
   const value = Number(normalised)
   return Number.isFinite(value) ? value : null
 }
+
+/** Density 4 desimal: `0.7567` -> `"0,7567"`, null -> `"-"`. */
+export function formatDensity(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-'
+  return formatDecimal(value, 4)
+}
+
+/** Selisih density bertanda: `"+0,0006"`. */
+export function formatDensitySigned(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-'
+  return formatSigned(value, 4)
+}
+
+/** Angka opsional: null/NaN -> `"-"`. */
+export function formatMaybe(value: number | null | undefined, fractionDigits = 0) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-'
+  return formatDecimal(value, fractionDigits)
+}
