@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react'
-import { ToastProvider } from '@/components/ui/toast'
 import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <ToastProvider>
+    <>
       <a
         href="#konten"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:font-semibold focus:text-on-primary"
@@ -23,6 +22,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <DockNav />
-    </ToastProvider>
+    </>
   )
 }

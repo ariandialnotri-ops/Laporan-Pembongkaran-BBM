@@ -67,3 +67,33 @@ export function greeting(d: Date) {
   if (h < 19) return 'Selamat Sore'
   return 'Selamat Malam'
 }
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** "2026-09-26" (tanggal lokal). */
+export function todayIso(d = new Date()) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** "14:05" (jam lokal). */
+export function nowHm(d = new Date()) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/** "2026-09-26" -> "26 Sep 2026"; kosong -> "-". */
+export function formatTanggalIso(iso: string | null | undefined) {
+  if (!iso) return '-'
+  const d = new Date(`${iso}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? iso : formatTanggalSingkat(d)
+}
+
+/** Selisih menit dari jam "HH:MM" a ke b; melewati tengah malam dianggap hari berikutnya. */
+export function minutesBetween(a: string, b: string) {
+  if (!a || !b) return null
+  const [ah, am] = a.split(':').map(Number)
+  const [bh, bm] = b.split(':').map(Number)
+  if ([ah, am, bh, bm].some((x) => !Number.isFinite(x))) return null
+  let diff = bh * 60 + bm - (ah * 60 + am)
+  if (diff < 0) diff += 24 * 60
+  return diff
+}

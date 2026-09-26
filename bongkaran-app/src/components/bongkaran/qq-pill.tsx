@@ -1,6 +1,6 @@
 import { CircleCheck, CircleDashed, TriangleAlert } from 'lucide-react'
 import { Pill } from '@/components/ui/pill'
-import type { QQStatus } from '@/data/mock'
+import type { QQStatus } from '@/lib/ringkasan'
 
 const TONE = { sesuai: 'success', perhatian: 'error', belum: 'neutral' } as const
 const ICON = { sesuai: CircleCheck, perhatian: TriangleAlert, belum: CircleDashed }

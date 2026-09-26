@@ -28,54 +28,89 @@ npm run lint
 
 ## Layar
 
-| Rute       | Isi |
-|------------|-----|
-| `/`        | Beranda — total bongkaran hari ini, stat tile, aksi cepat, kalender progress, status Q&Q, riwayat |
-| `/input`   | Form Bongkaran / Quality / Quantity (segmented control; `?tab=quality` membuka tab itu langsung) |
-| `/laporan` | Laporan & Berita Acara — ringkasan status, template, riwayat dengan filter |
-| `/profil`  | Profil pengguna, statistik, menu akun |
+| Rute         | Isi |
+|--------------|-----|
+| `/`          | Beranda — total bongkaran hari ini, stat tile, aksi cepat, kalender progress, status Q&Q, riwayat |
+| `/input`     | Mulai bongkaran baru dan daftar bongkaran berjalan |
+| `/input/:id` | Form bongkaran 14 langkah SOP dalam tiga fase (Bongkaran → Quality → Quantity) + tab Finish |
+| `/plan`      | Plan kirim harian: SO, produk, Sold To, dan LO (jumlah DO per LO) |
+| `/kalkulator`| Density @15°C (ASTM 53) dan volume tangki pendam dari tinggi deepstick/ATG |
+| `/laporan`   | Berita Acara — ringkasan status dan riwayat dengan filter |
+| `/profil`    | Profil pengguna, statistik, menu Plan/Kalkulator/Pengaturan/Anggota |
+| `/pengaturan`| Identitas SPBU, nama default petugas/pengawas, aturan toleransi, data acuan |
+| `/anggota`   | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
 
-## Perhitungan langsung di form
+## Alur SOP bongkaran
+
+Setiap langkah wajib foto evidence dan data isian; langkah berikutnya terkunci
+sampai langkah sebelumnya lengkap. Semua isian tersimpan otomatis.
+
+| Fase | Langkah |
+|------|---------|
+| Bongkaran | 1 MT tiba · 2 Dokumen LO (pilih SO & LO dari plan) · 3 Buku tera · 4 ATG sebelum · 5 Safety · 6 Segel · 7 Deepstick tangki sebelum · 8 Water content & draining · 9 Deepstick kompartemen MT |
+| Quality   | 10 Sampel atas/bawah · 11 Density (dihentikan bila selisih D15 > toleransi) |
+| Quantity  | 12 Selang & fillport · 13 ATG setelah (min. 10 menit setelah selesai) · 14 Deepstick tangki setelah |
+
+Selisih deepstick MT terhadap tera > 10 mm butuh izin penanggung jawab.
+Finish menghasilkan **Berita Acara Pembongkaran (Quality & Quantity)** sebagai
+PDF atau JPG (lengkap dengan foto), dan teks laporan untuk grup WhatsApp SPBU.
+Density di luar toleransi menutup bongkaran sebagai BA anomali.
+
+## Perhitungan
 
 ```
-Bongkaran : selisih = realisasi − DO,  % = selisih / DO
-Quality   : density terkoreksi dicek terhadap standar produk
-Quantity  : meter   = meter akhir − meter awal
-            % tera  = (bejana − meter) / meter
+Density @15°C : tabel ASTM-IP 53 (interpolasi bilinear), cadangan rumus ASTM D1250 Tabel 53B
+Volume tangki : interpolasi linear tabel kalibrasi per tangki (src/data/tankTables.json)
+Gain / loss   : real stok ATG − (stok awal ATG + volume DO)
+Deepstick     : volume setelah − volume sebelum, dibanding volume DO
 ```
 
-Toleransi (`TOLERANSI_BONGKAR_PERSEN`, `TOLERANSI_TERA_PERSEN`) dan rentang
-density per produk ada di `src/data/mock.ts` sebagai **nilai contoh** —
-sesuaikan dengan ketentuan yang berlaku.
+Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO
+8.000 L) bisa diubah di Pengaturan. Data acuan tabel ada di `src/data/`
+(`table53.json`, `tankTables.json`).
 
 ## Struktur
 
 ```
 src/
   components/ui/         primitif kaca: glass-card, pill, button, input, select, tabs, toast, spring-value
-  components/shell/      header, dock navigasi, ambient orbs, app-shell
-  components/bongkaran/  komponen domain: stat-tile, qq-pill, status-banner, photo-field
-  pages/                 Dashboard, FormInput, Laporan, Profil
-  lib/                   format angka Indonesia, navigasi, cn()
-  data/mock.ts           data contoh — ganti saat menyambung database
+  components/shell/      header, dock navigasi, ambient orbs, app-shell, app-provider (state global)
+  components/bongkaran/  langkah SOP, slot foto, panel finish, layout cetak BA, stat-tile, qq-pill
+  pages/                 Dashboard, FormInput, FormBongkar, Plan, Kalkulator, Laporan, Profil, Pengaturan, Anggota, Login
+  lib/sop.ts             definisi 14 langkah, validasi & hitungan bongkaran
+  lib/density.ts         density @15°C (ASTM 53)
+  lib/tank.ts            volume tangki dari ketinggian
+  lib/pdf.ts, jpg.ts, wa.ts   keluaran Berita Acara
+  lib/backend/           Supabase atau IndexedDB lokal (dipilih otomatis)
+  data/                  tabel ASTM 53 dan tabel kalibrasi tangki
 ```
 
 ## Backend: Supabase
 
-Skema ada di `supabase/migrations/`:
+Tanpa env Supabase aplikasi berjalan di **mode lokal** (data disimpan di
+IndexedDB perangkat). Dengan env terisi, data tersinkron dan wajib login.
+
+Skema yang dipakai aplikasi ada di
+`supabase/migrations/20260926120000_bbm_init.sql` dan
+`20260926120500_bbm_private_helpers.sql`:
 
 | Objek | Isi |
 |-------|-----|
-| `bongkaran` | Satu baris per mobil tangki; tahap Bongkaran → Quality → Quantity mengisi kolom bertahap, lalu `qq_status` dinilai (`sesuai` / `perhatian`) |
-| `laporan` | Berita acara dan laporan harian (draft / menunggu / terkirim) |
-| bucket `bukti-bongkaran` | Foto segel/DO dan hasil tera (privat) |
+| `bbm_members` | Anggota dan peran (`pengawas` / `petugas`) |
+| `bbm_settings` | Pengaturan SPBU |
+| `bbm_plans` | Plan kirim (SO & LO) |
+| `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
+| bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
 
-RLS aktif. Karena aplikasi belum punya login, peran `anon` boleh membaca,
-menambah, dan mengubah data (tidak boleh menghapus). **Pasang Supabase Auth
-dan ganti kebijakan ke `authenticated` sebelum dipakai luas.**
+RLS aktif: hanya anggota yang bisa membaca/menulis; petugas hanya bisa
+menghapus draft miliknya, pengawas mengelola semuanya. Pengguna pertama yang
+login otomatis menjadi pengawas, lalu menambah anggota lain di `/anggota`
+(akun dibuat dulu di Supabase → Authentication).
+
+Tabel lama `bongkaran`, `laporan`, dan bucket `bukti-bongkaran` (migrasi
+`2026092600*`) tidak lagi dipakai aplikasi.
 
 Lokal: salin `.env.example` ke `.env.local` lalu isi URL dan publishable key.
-Tanpa env itu, aplikasi berjalan dengan data contoh.
 
 ## Deploy: Vercel
 

@@ -2,108 +2,85 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   Beaker,
-  Bell,
-  CalendarDays,
+  Calculator,
   ChevronRight,
+  ClipboardList,
   ClipboardPlus,
   Droplet,
   FileText,
   FlaskConical,
   MapPin,
+  Scale,
   Truck,
   type LucideIcon,
 } from 'lucide-react'
+import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { LoadError, Loading } from '@/components/bongkaran/load-state'
-import { currentUser, type CalendarDay } from '@/data/mock'
-import { isLive, listBongkaran } from '@/lib/api'
-import { formatBulanTahun, formatTanggalPanjang, formatWaktuRelatif, greeting, startOfWeek } from '@/lib/date'
+import { useApp } from '@/lib/app-state'
+import { formatBulanTahun, formatTanggalIso, formatTanggalPanjang, greeting, startOfWeek, todayIso } from '@/lib/date'
 import { formatLiter, formatSigned } from '@/lib/format'
-import { labelQQ } from '@/lib/qq'
-import { kalenderMinggu, ringkasHariIni, statusProduk } from '@/lib/ringkasan'
-import { useQuery } from '@/lib/use-query'
+import { kalenderMinggu, labelQQ, qqOf, ringkasHariIni, statusProduk, type CalendarDay } from '@/lib/ringkasan'
+import { STEPS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
-// Everything on this page comes from this week's records.
-const loadMingguIni = () => listBongkaran({ sinceIso: startOfWeek(new Date()).toISOString() })
-const loadTerbaru = () => listBongkaran({ limit: 5 })
-
 const DAY_CLASS: Record<CalendarDay['status'], string> = {
-  sesuai: 'bg-tertiary-container text-on-tertiary',
+  sesuai: 'bg-primary-fixed text-on-primary-fixed',
   catatan: 'bg-error-container text-on-error-container',
   belum: 'inset-field text-on-surface-variant',
 }
 
 const DAY_LABEL: Record<CalendarDay['status'], string> = {
   sesuai: 'sesuai',
-  catatan: 'ada catatan',
-  belum: 'belum input',
+  catatan: 'ada anomali',
+  belum: 'belum ada bongkaran selesai',
 }
 
 export function Dashboard() {
-  const [minggu, reloadMinggu] = useQuery(loadMingguIni)
-  const [terbaru, reloadTerbaru] = useQuery(loadTerbaru)
+  const app = useApp()
   const now = new Date()
+  if (!app.loaded) return <Loading />
 
-  if (minggu.status === 'loading') return <Loading />
-  if (minggu.status === 'error') return <LoadError error={minggu.error} onRetry={reloadMinggu} />
-
-  const todaySummary = ringkasHariIni(minggu.data, now)
-  const productStatuses = statusProduk(minggu.data)
-  const calendarWeek = kalenderMinggu(minggu.data, now)
-  const perhatian = productStatuses.filter((p) => p.status === 'perhatian')
+  const mingguIni = app.reports.filter((r) => r.tanggal >= todayIso(startOfWeek(now)))
+  const today = ringkasHariIni(app.reports, now)
+  const productStatuses = statusProduk(mingguIni)
+  const calendarWeek = kalenderMinggu(mingguIni, now)
+  const terbaru = app.reports.slice(0, 5)
+  const roleLabel = app.backend.mode === 'local' ? 'Mode lokal' : app.session.role === 'pengawas' ? 'Pengawas' : 'Petugas'
 
   return (
     <div className="flex flex-col gap-space-md">
-      {/* Today's unloading — the one number a supervisor opens this app for. */}
+      {/* Bongkaran hari ini — angka pertama yang dicari pengawas saat membuka aplikasi. */}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-space-xs">
-            <span aria-hidden="true" className="size-2 rounded-full bg-tertiary-container animate-pulse" />
-            <span className="text-tag uppercase text-primary">
-              {greeting(now)}, {currentUser.name}
-            </span>
-          </div>
-          <button
-            type="button"
-            aria-label="Notifikasi, ada yang belum dibaca"
-            className="glass-1 relative flex size-11 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
-          >
-            <Bell aria-hidden="true" className="size-5" />
-            <span aria-hidden="true" className="absolute right-2.5 top-2.5 size-2 rounded-full bg-error ring-2 ring-white" />
-          </button>
+        <div className="flex items-center gap-space-xs">
+          <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-primary-container" />
+          <span className="text-tag uppercase text-primary">
+            {greeting(now)}
+            {app.session.user ? `, ${app.displayName.split(/[\s@]/)[0]}` : app.settings.namaPetugasDefault ? `, ${app.settings.namaPetugasDefault.split(' ')[0]}` : ''}
+          </span>
         </div>
 
-        <div className="flex items-end justify-between gap-space-sm">
-          <div className="flex min-w-0 items-center gap-space-sm">
-            <span
-              aria-hidden="true"
-              className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary shadow-sm"
-            >
-              <Truck className="size-6" />
-            </span>
-            <div className="flex min-w-0 flex-col">
-              <span className="text-tag uppercase text-on-surface-variant">Total bongkaran hari ini</span>
-              <span className="tabular text-numeric-lg font-bold text-on-surface sm:text-headline-xl">
-                {formatLiter(todaySummary.totalLiter)}
-              </span>
-            </div>
+        <div className="flex min-w-0 items-center gap-space-sm">
+          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary shadow-sm">
+            <Truck className="size-6" />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-tag uppercase text-on-surface-variant">Total bongkaran hari ini</span>
+            <span className="tabular text-numeric-lg font-bold text-on-surface sm:text-headline-xl">{formatLiter(today.totalLiter)}</span>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-space-xs">
           <Pill tone="info">
             <MapPin aria-hidden="true" className="text-primary" />
-            {currentUser.spbu}
+            {app.settings.namaSpbu || 'SPBU'}
           </Pill>
-          <Pill tone="primary">{currentUser.role}</Pill>
+          <Pill tone="primary">{roleLabel}</Pill>
           <Pill tone="neutral">{formatTanggalPanjang(now)}</Pill>
-          {!isLive && <Pill tone="neutral">Mode contoh</Pill>}
         </div>
 
         <Link to="/input" className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'w-full')}>
@@ -117,53 +94,39 @@ export function Dashboard() {
           Angka hari ini
         </h2>
         <div className="grid grid-cols-2 gap-space-xs lg:grid-cols-4">
-          <StatTile label="Mobil tangki" value={todaySummary.mobilTangki} hint="Selesai bongkar" icon={Truck} />
-          <StatTile label="SPBU" value={todaySummary.spbu} hint="Menerima BBM" icon={MapPin} tone="primary" />
-          <StatTile
-            label="Q&Q sesuai"
-            value={`${todaySummary.qqSesuai}/${todaySummary.qqTotal}`}
-            hint="Selesai diuji hari ini"
-            icon={FlaskConical}
-            tone="success"
-          />
+          <StatTile label="Mobil tangki" value={today.mobilTangki} hint="Datang hari ini" icon={Truck} />
+          <StatTile label="Gain / loss" value={formatSigned(today.gainLoss, 0, ' L')} hint="Bongkaran selesai" icon={Scale} tone={today.gainLoss < 0 ? 'error' : 'primary'} />
+          <StatTile label="Q&Q sesuai" value={`${today.qqSesuai}/${today.qqTotal}`} hint="Selesai hari ini" icon={FlaskConical} tone="primary" />
           <StatTile
             label="Perlu cek"
-            value={perhatian.length}
-            hint={perhatian.length > 0 ? perhatian.map((p) => p.name).join(', ') : 'Semua aman'}
+            value={today.perluCek.length}
+            hint={today.perluCek.length > 0 ? today.perluCek.map((r) => r.nopol).join(', ') : 'Semua aman'}
             icon={Beaker}
-            tone={perhatian.length > 0 ? 'error' : 'success'}
+            tone={today.perluCek.length > 0 ? 'error' : 'primary'}
           />
         </div>
       </section>
 
       <nav aria-label="Aksi cepat" className="animate-entrance-3 grid grid-cols-4 gap-space-xs">
         <QuickAction to="/input" icon={ClipboardPlus} label="Input Bongkaran" />
-        <QuickAction to="/input?tab=quality" icon={Beaker} label="Input Q&Q" />
-        <QuickAction href="#kalender-progress" icon={CalendarDays} label="Kalender" />
+        <QuickAction to="/plan" icon={ClipboardList} label="Plan Kirim" />
+        <QuickAction to="/kalkulator" icon={Calculator} label="Kalkulator" />
         <QuickAction to="/laporan" icon={FileText} label="Berita Acara" />
       </nav>
 
       <div className="grid gap-space-md lg:grid-cols-2">
         <section aria-labelledby="kalender-progress" className="animate-entrance-3 flex flex-col gap-space-sm">
-          <SectionHeader
-            id="kalender-progress"
-            title="Kalender Progress"
-            action={<span className="text-body-sm text-on-surface-variant">{formatBulanTahun(now)}</span>}
-          />
+          <SectionHeader id="kalender-progress" title="Kalender Progress" action={<span className="text-body-sm text-on-surface-variant">{formatBulanTahun(now)}</span>} />
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
             <ol className="grid grid-cols-7 gap-1">
               {calendarWeek.map((day) => (
                 <li key={day.date} className="flex flex-col items-center gap-1.5">
-                  <span className={cn('text-tag uppercase text-on-surface-variant', day.isToday && 'text-primary')}>
-                    {day.label}
-                  </span>
+                  <span className={cn('text-tag uppercase text-on-surface-variant', day.isToday && 'text-primary')}>{day.label}</span>
                   <span
                     aria-label={`${day.label} ${day.date}, ${DAY_LABEL[day.status]}${day.isToday ? ', hari ini' : ''}`}
                     className={cn(
                       'tabular flex size-9 items-center justify-center rounded-full text-numeric-sm font-bold',
-                      day.isToday
-                        ? 'bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,102,255,0.3)]'
-                        : DAY_CLASS[day.status],
+                      day.isToday ? 'bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,102,255,0.3)]' : DAY_CLASS[day.status],
                     )}
                   >
                     {day.date}
@@ -172,9 +135,9 @@ export function Dashboard() {
               ))}
             </ol>
             <div className="flex flex-wrap gap-x-space-md gap-y-1 border-t border-outline-variant/40 pt-space-sm">
-              <Legend className="bg-tertiary-container" label="Sesuai" />
-              <Legend className="bg-error-container ring-1 ring-error/30" label="Ada catatan" />
-              <Legend className="inset-field ring-1 ring-outline-variant" label="Belum input" />
+              <Legend className="bg-primary-fixed" label="Sesuai" />
+              <Legend className="bg-error-container ring-1 ring-error/30" label="Ada anomali" />
+              <Legend className="inset-field ring-1 ring-outline-variant" label="Belum ada" />
             </div>
           </GlassCard>
         </section>
@@ -183,11 +146,8 @@ export function Dashboard() {
           <SectionHeader id="status-qq" title="Status Kualitas & Kuantitas" />
           <GlassCard level={2} className="flex flex-col p-space-2xs">
             {productStatuses.map((p) => (
-              <div key={p.id} className="flex min-h-14 items-center gap-space-sm rounded-md px-space-sm py-space-xs">
-                <span
-                  aria-hidden="true"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary-fixed/50 text-secondary"
-                >
+              <div key={p.name} className="flex min-h-14 items-center gap-space-sm rounded-md px-space-sm py-space-xs">
+                <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-fixed/60 text-primary">
                   <Droplet className="size-4" />
                 </span>
                 <span className="flex-1 truncate text-body-md font-semibold text-on-surface">{p.name}</span>
@@ -209,50 +169,43 @@ export function Dashboard() {
             </Link>
           }
         />
-        {terbaru.status === 'loading' ? (
-          <Loading />
-        ) : terbaru.status === 'error' ? (
-          <LoadError error={terbaru.error} onRetry={reloadTerbaru} />
-        ) : terbaru.data.length === 0 ? (
+        {terbaru.length === 0 ? (
           <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
             Belum ada bongkaran tercatat.
           </GlassCard>
         ) : (
           <div className="flex flex-col gap-space-xs">
-            {terbaru.data.map((entry) => {
-              const selisih = Number(entry.volume_realisasi) - Number(entry.volume_do)
+            {terbaru.map((r) => {
+              const qq = qqOf(r)
               return (
-                <GlassCard key={entry.id} level={1} className="transition-shadow duration-200 hover:shadow-md">
-                  <div className="flex items-center gap-space-sm p-space-sm">
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'flex size-11 shrink-0 items-center justify-center rounded-md',
-                        entry.qq_status === 'perhatian' ? 'bg-error-container text-error' : 'bg-primary-fixed text-primary',
-                      )}
-                    >
-                      <Truck className="size-5" />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-body-md font-semibold text-on-surface">{entry.produk}</span>
-                        <QQPill status={entry.qq_status} label={labelQQ(entry)} />
+                <Link key={r.id} to={`/input/${r.id}`}>
+                  <GlassCard level={1} className="transition-shadow duration-200 hover:shadow-md">
+                    <div className="flex items-center gap-space-sm p-space-sm">
+                      <span
+                        aria-hidden="true"
+                        className={cn('flex size-11 shrink-0 items-center justify-center rounded-md', qq === 'perhatian' ? 'bg-error-container text-error' : 'bg-primary-fixed text-primary')}
+                      >
+                        <Truck className="size-5" />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-body-md font-semibold text-on-surface">{r.produk || 'Produk belum dipilih'}</span>
+                          <QQPill status={qq} label={labelQQ(r, STEPS.length)} />
+                        </div>
+                        <span className="truncate text-body-sm text-on-surface-variant">
+                          <span className="tabular">{r.nopol || 'MT baru'}</span> • {formatTanggalIso(r.tanggal)} {r.jam}
+                        </span>
                       </div>
-                      <span className="truncate text-body-sm text-on-surface-variant">
-                        <span className="tabular">{entry.no_polisi}</span> • {formatWaktuRelatif(entry.waktu_bongkar, now)}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end">
+                        <span className="tabular text-numeric-md font-bold text-on-surface">{r.volumeDO ? formatLiter(r.volumeDO) : '—'}</span>
+                        {r.gainLoss !== null && (
+                          <span className={cn('tabular text-numeric-sm', r.gainLoss < 0 ? 'text-error' : 'text-on-surface-variant')}>{formatSigned(r.gainLoss, 0, ' L')}</span>
+                        )}
+                      </div>
+                      <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
                     </div>
-                    <div className="flex shrink-0 flex-col items-end">
-                      <span className="tabular text-numeric-md font-bold text-on-surface">
-                        {formatLiter(Number(entry.volume_realisasi))}
-                      </span>
-                      <span className={cn('tabular text-numeric-sm', selisih < 0 ? 'text-error' : 'text-on-surface-variant')}>
-                        {formatSigned(selisih, 0, ' L')}
-                      </span>
-                    </div>
-                    <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-                  </div>
-                </GlassCard>
+                  </GlassCard>
+                </Link>
               )
             })}
           </div>
@@ -260,8 +213,9 @@ export function Dashboard() {
       </section>
 
       <p className="px-space-xs text-center text-tag text-on-surface-variant">
-        {currentUser.spbu} • {currentUser.spbuAddress}
-        {isLive ? '' : ' — data contoh, Supabase belum tersambung'}
+        {app.settings.namaSpbu}
+        {app.settings.alamatSpbu ? ` • ${app.settings.alamatSpbu}` : ''}
+        {app.backend.mode === 'local' ? ' — mode lokal, data hanya di perangkat ini' : ''}
       </p>
     </div>
   )
@@ -270,24 +224,14 @@ export function Dashboard() {
 const QUICK_ACTION_CLASS =
   'glass-1 rim-light flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-lg p-space-xs text-center transition-transform duration-200 active:scale-95'
 
-/** `to` routes through the router; `href` is an in-page anchor. */
-function QuickAction({ to, href, icon: Icon, label }: { to?: string; href?: string; icon: LucideIcon; label: string }) {
-  const body = (
-    <>
+function QuickAction({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) {
+  return (
+    <Link to={to} className={QUICK_ACTION_CLASS}>
       <span className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
         <Icon aria-hidden="true" className="size-5" />
       </span>
       <span className="text-body-sm font-semibold leading-tight text-on-surface">{label}</span>
-    </>
-  )
-  return to ? (
-    <Link to={to} className={QUICK_ACTION_CLASS}>
-      {body}
     </Link>
-  ) : (
-    <a href={href} className={QUICK_ACTION_CLASS}>
-      {body}
-    </a>
   )
 }
 
