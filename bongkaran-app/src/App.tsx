@@ -24,7 +24,7 @@ function Gate() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    document.title = `${titleFor(pathname)} · Bongkaran BBM`
+    document.title = `${titleFor(pathname)} · FLOQ`
     window.scrollTo(0, 0)
   }, [pathname])
 

@@ -1,0 +1,8 @@
+{
+  "name": "FLOQ — Fuel Logistic Quality & Quantity",
+  "short_name": "FLOQ",
+  "start_url": "/",
+  "background_color": "#f5f5f7",
+  "theme_color": "#e9eff6",
+  "icons": [{ "src": "/floq-icon-256.png", "sizes": "256x256", "type": "image/png" }]
+}

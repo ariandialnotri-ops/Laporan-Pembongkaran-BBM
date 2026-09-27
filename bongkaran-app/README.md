@@ -1,7 +1,11 @@
-# Bongkaran BBM & Q&Q — Monitoring App
+# FLOQ — Fuel Logistic Quality & Quantity
 
-Aplikasi pemantauan bongkaran BBM dan Quality/Quantity (Q&Q) di SPBU untuk
-Kepala Shift, Pengawas, dan Area Business Head.
+Aplikasi evidence dan pemantauan bongkaran BBM serta Quality/Quantity (Q&Q) di
+SPBU untuk Kepala Shift, Pengawas, dan Area Business Head.
+
+Logo dan ikon ada di `public/` (`floq-logo.webp` untuk halaman login,
+`floq-icon.webp` untuk header, `favicon.png`, `apple-touch-icon.png`, dan
+`floq-icon-256.png` untuk `manifest.webmanifest`).
 
 UI memakai design system **AeroShift** yang sama dengan aplikasi
 **Tepat Setoran SPBU**: kartu kaca (glassmorphism) bergaya iOS di atas kanvas

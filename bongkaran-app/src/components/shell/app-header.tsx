@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Fuel } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
 
@@ -13,10 +12,10 @@ export function AppHeader() {
         <div className="flex min-w-0 items-center gap-space-sm">
           <Link
             to="/"
-            aria-label="Beranda"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
+            aria-label="FLOQ — Beranda"
+            className="shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
           >
-            <Fuel aria-hidden="true" className="size-5" />
+            <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
           </Link>
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>

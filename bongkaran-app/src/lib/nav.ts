@@ -31,5 +31,5 @@ export function isRouteActive(pathname: string, href: string) {
 export function titleFor(pathname: string) {
   const extra = EXTRA_TITLES.find(([href]) => isRouteActive(pathname, href))
   if (extra) return extra[1]
-  return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'Bongkaran BBM'
+  return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'FLOQ'
 }
