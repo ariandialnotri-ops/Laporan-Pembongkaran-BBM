@@ -31,7 +31,7 @@ function Shell({ children }: { children: ReactNode }) {
       <Waves />
       <div className="flex w-full max-w-sm flex-col gap-space-lg">
         <h1 className="animate-entrance-1 flex justify-center">
-          <img src="/floq-login.webp" alt="FLOQ — Fuel Logistic Quality & Quantity" width={672} height={428} className="h-auto w-60" />
+          <img src="/floq-login.webp" alt="FLOQ, Fuel Logistic Quality & Quantity" width={672} height={428} className="h-auto w-60" />
         </h1>
         {children}
       </div>

@@ -7,12 +7,12 @@ export function AppHeader() {
   const app = useApp()
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
+    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
           <Link
             to="/"
-            aria-label="FLOQ — Beranda"
+            aria-label="FLOQ, buka HOME"
             className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
           >
             <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
