@@ -31,7 +31,7 @@ function Shell({ children }: { children: ReactNode }) {
       <Waves />
       <div className="flex w-full max-w-sm flex-col gap-space-lg">
         <h1 className="animate-entrance-1 flex justify-center">
-          <img src="/floq-logo.webp" alt="FLOQ — Fuel Logistic Quality & Quantity" width={692} height={584} className="h-auto w-56" />
+          <img src="/floq-login.webp" alt="FLOQ — Fuel Logistic Quality & Quantity" width={672} height={428} className="h-auto w-60" />
         </h1>
         {children}
       </div>
@@ -80,7 +80,7 @@ export function Login() {
           </Button>
         </form>
       </GlassCard>
-      <p className="animate-entrance-3 text-center text-body-sm text-on-surface-variant">Akun dibuat oleh pengawas SPBU. Hubungi pengawas bila belum punya akun.</p>
+      <p className="animate-entrance-3 text-center text-body-sm text-on-surface-variant">&copy; {new Date().getFullYear()} FLOQ · Created by Ariandi Alnotri</p>
     </Shell>
   )
 }
