@@ -62,8 +62,8 @@ function Num({ id, value, onChange, placeholder, suffix }: { id?: string; value:
   return <Input id={id} numeric inputMode="decimal" autoComplete="off" value={value} placeholder={placeholder} suffix={suffix} onChange={(e) => onChange(e.target.value)} />
 }
 
-function Fixed({ value, placeholder }: { value: string; placeholder?: string }) {
-  return <Input value={value} placeholder={placeholder} readOnly tabIndex={-1} className="opacity-80" />
+function Fixed({ id, value, placeholder }: { id?: string; value: string; placeholder?: string }) {
+  return <Input id={id} value={value} placeholder={placeholder} readOnly tabIndex={-1} className="opacity-80" />
 }
 
 function StepPhotos({ step, report, addPhotos, removePhoto, photoBusy, srcOf, beforePick, readOnly, only }: StepProps & { only?: string[] }) {
@@ -307,8 +307,8 @@ export function StepContent(props: StepProps) {
             <Section key={c.id}>
               <span className="text-tag uppercase text-primary">Kompartemen {c.no}</span>
               <div className="grid grid-cols-2 gap-space-sm">
-                <Field label="Tinggi tera">
-                  <Fixed value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
+                <Field label="Tinggi tera" htmlFor={`tera-fix-${c.id}`}>
+                  <Fixed id={`tera-fix-${c.id}`} value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
                   <Num id={`dip-${c.id}`} suffix="mm" value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
@@ -459,14 +459,14 @@ function LoStep(props: StepProps) {
           <Field label="No. Sold To" htmlFor="soldto">
             <Input id="soldto" autoComplete="off" value={d.soldTo} onChange={(e) => setData({ soldTo: e.target.value })} />
           </Field>
-          <Field label="Produk">
-            <Fixed value={d.produk} placeholder="dari SO" />
+          <Field label="Produk" htmlFor="lo-produk">
+            <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />
           </Field>
-          <Field label="Nomor SO">
-            <Fixed value={d.noSO} placeholder="dari Plan" />
+          <Field label="Nomor SO" htmlFor="lo-so">
+            <Fixed id="lo-so" value={d.noSO} placeholder="dari Plan" />
           </Field>
-          <Field label="Nomor LO">
-            <Fixed value={d.noLOs.join(', ')} placeholder="dari Plan" />
+          <Field label="Nomor LO" htmlFor="lo-lo">
+            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder="dari Plan" />
           </Field>
         </div>
         <Field label="Jumlah DO" htmlFor="jdo">

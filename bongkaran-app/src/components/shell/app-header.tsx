@@ -13,7 +13,7 @@ export function AppHeader() {
           <Link
             to="/"
             aria-label="FLOQ — Beranda"
-            className="shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
           >
             <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
           </Link>
@@ -23,7 +23,7 @@ export function AppHeader() {
           </div>
         </div>
 
-        <Link to="/profil" className="glass-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition-transform duration-200 active:scale-95">
+        <Link to="/profil" className="glass-1 flex min-h-11 items-center gap-2 rounded-full py-1 pl-1.5 pr-3 transition-transform duration-200 active:scale-95">
           <span aria-hidden="true" className="tabular flex size-8 items-center justify-center rounded-full bg-primary-fixed text-body-sm font-bold text-on-primary-fixed">
             {app.initials}
           </span>

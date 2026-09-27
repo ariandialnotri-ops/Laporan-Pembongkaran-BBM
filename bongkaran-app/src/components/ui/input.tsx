@@ -12,9 +12,17 @@ export function Input({
   ...props
 }: React.ComponentProps<'input'> & { numeric?: boolean; suffix?: string }) {
   return (
+    // Sentuhan di padding atau satuan (mm, °C) tetap memfokuskan input.
     <div
+      onMouseDown={(e) => {
+        const input = e.currentTarget.querySelector('input')
+        if (input && e.target !== input) {
+          e.preventDefault()
+          input.focus()
+        }
+      }}
       className={cn(
-        'inset-field flex h-12 items-center gap-2 rounded-md px-3.5 transition-shadow duration-200',
+        'inset-field flex h-12 cursor-text items-center gap-2 rounded-md px-3.5 transition-shadow duration-200',
         'focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/40',
         className,
       )}
@@ -22,7 +30,7 @@ export function Input({
       <input
         data-slot="input"
         className={cn(
-          'w-full min-w-0 bg-transparent text-body-lg text-on-surface placeholder:text-outline focus:outline-none focus-visible:outline-none',
+          'h-full w-full min-w-0 bg-transparent text-body-lg text-on-surface placeholder:text-outline focus:outline-none focus-visible:outline-none',
           numeric && 'tabular text-numeric-md font-semibold',
           'disabled:cursor-not-allowed disabled:opacity-50',
         )}
