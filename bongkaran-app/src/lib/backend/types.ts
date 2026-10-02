@@ -1,3 +1,4 @@
+import type { DailyRecord } from '@/lib/daily'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 
 export type Role = 'pengawas' | 'petugas'
@@ -41,6 +42,11 @@ export interface Backend {
   deleteReport(id: string): Promise<void>
 
   /** Foto sudah dikompres; mode Supabase langsung mengunggah blob tanpa menyimpan salinan di memori. */
+  /** Catatan harian (stok shift, Q&Q harian) sejak tanggal tertentu. */
+  listDaily(sinceIso: string): Promise<DailyRecord[]>
+  saveDaily(rec: DailyRecord): Promise<void>
+  deleteDaily(id: string): Promise<void>
+
   uploadPhoto(reportId: string, blob: Blob, name: string): Promise<Photo>
   deletePhoto(photo: Photo): Promise<void>
   /** URL tampilan thumbnail per id foto (mode Supabase). */

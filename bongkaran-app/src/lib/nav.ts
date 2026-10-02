@@ -21,6 +21,8 @@ const EXTRA_TITLES: [string, string][] = [
   ['/kalkulator', 'Kalkulator'],
   ['/pengaturan', 'Pengaturan SPBU'],
   ['/anggota', 'Anggota SPBU'],
+  ['/qq', 'Q&Q Harian'],
+  ['/stok', 'Stok Shift'],
 ]
 
 export function isRouteActive(pathname: string, href: string) {

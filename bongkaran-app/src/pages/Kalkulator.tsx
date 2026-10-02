@@ -41,7 +41,7 @@ export function Kalkulator() {
         </div>
         <div className="inset-field flex items-end justify-between gap-2 rounded-md p-space-sm">
           <span className="text-body-sm font-bold text-on-surface">Density @15°C</span>
-          <SpringValue className="tabular inline-block text-numeric-lg font-bold text-primary">{d15 ? formatDensity(d15.value) : '—'}</SpringValue>
+          <SpringValue className="tabular inline-block text-numeric-lg font-bold text-primary">{d15 ? formatDensity(d15.value) : '-'}</SpringValue>
         </div>
         <StatusBanner
           {...(d15
@@ -81,7 +81,7 @@ export function Kalkulator() {
         <div className="inset-field flex items-end justify-between gap-2 rounded-md p-space-sm">
           <span className="text-body-sm font-bold text-on-surface">Volume</span>
           <SpringValue className="tabular inline-block text-numeric-lg font-bold text-primary">
-            {vol?.volume !== undefined ? `${formatNumber(vol.volume, 1)} L` : '—'}
+            {vol?.volume !== undefined ? `${formatNumber(vol.volume, 1)} L` : '-'}
           </SpringValue>
         </div>
         <StatusBanner
@@ -89,7 +89,7 @@ export function Kalkulator() {
             ? { tone: 'error', title: vol.error }
             : vol?.anomaly
               ? { tone: 'error', title: 'Data tabel tidak naik berurutan di sekitar ketinggian ini', detail: 'Cek tabel kalibrasi asli' }
-              : { tone: 'idle', title: `Kapasitas ${formatNumber(tank.capacity)} L`, detail: `Tabel ${tank.startMm}–${formatNumber(tank.maxMm)} mm per ${tank.stepMm} mm • kalibrasi ${tank.tanggalKalibrasi || '-'}` })}
+              : { tone: 'idle', title: `Kapasitas ${formatNumber(tank.capacity)} L`, detail: `Tabel ${tank.startMm}–${formatNumber(tank.maxMm)} mm per ${tank.stepMm} mm, kalibrasi ${tank.tanggalKalibrasi || '-'}` })}
         />
       </GlassCard>
     </div>

@@ -17,6 +17,8 @@ const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ defaul
 const Laporan = lazy(() => import('@/pages/Laporan').then((m) => ({ default: m.Laporan })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
+const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
+const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
 
 function Gate() {
@@ -45,6 +47,8 @@ function Gate() {
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
           <Route path="/anggota" element={<Anggota />} />
+          <Route path="/qq" element={<QqHarian />} />
+          <Route path="/stok" element={<StokShift />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </Suspense>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AppContext, type AppState, type SessionStatus } from '@/lib/app-state'
 import { backend, type SessionInfo } from '@/lib/backend'
+import type { DailyRecord } from '@/lib/daily'
+import { addDays, todayIso } from '@/lib/date'
 import { DEFAULT_RULES, effectiveRules, type Plan, type ReportSummary, type Settings } from '@/lib/sop'
 import { TANK_SPBU } from '@/lib/tank'
 
@@ -12,6 +14,10 @@ const DEFAULT_SETTINGS: Settings = {
   namaPetugasDefault: '',
   namaPengawasDefault: '',
   pinPenanggungJawab: '',
+  namaAbhDefault: '',
+  namaSecurityDefault: '',
+  perusahaanPengangkut: 'PERTAMINA PATRA NIAGA',
+  nozzles: [],
   rules: DEFAULT_RULES,
 }
 
@@ -34,6 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [plans, setPlans] = useState<Plan[]>([])
   const [reports, setReports] = useState<ReportSummary[]>([])
+  const [daily, setDaily] = useState<DailyRecord[]>([])
   const settingsDirty = useRef(false)
 
   const initSession = useCallback(
@@ -58,9 +65,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [initSession])
 
   const refresh = useCallback(async () => {
-    const [p, r] = await Promise.all([backend.listPlans(), backend.listReports()])
+    const [p, r, d] = await Promise.all([backend.listPlans(), backend.listReports(), backend.listDaily(todayIso(addDays(new Date(), -120)))])
     setPlans(p)
     setReports(r.sort((a, b) => b.createdAt - a.createdAt))
+    setDaily(d)
   }, [])
 
   const userId = session.user?.id ?? null
@@ -103,11 +111,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
   useEffect(() => {
     if (!settingsDirty.current) return
-    const t = setTimeout(() => {
+    const flush = () => {
+      if (!settingsDirty.current) return
       settingsDirty.current = false
       backend.saveSettings(settings).catch((e: Error) => setStatusMessage(`Gagal menyimpan pengaturan: ${e.message}`))
-    }, 700)
-    return () => clearTimeout(t)
+    }
+    const t = setTimeout(flush, 700)
+    // Muat ulang/tutup tab sebelum jeda habis: simpan saat itu juga.
+    const onHide = () => document.visibilityState === 'hidden' && flush()
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHide)
+    }
   }, [settings])
 
   const savePlan = useCallback(
@@ -135,6 +153,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refresh],
   )
 
+  const saveDaily = useCallback(
+    async (rec: DailyRecord) => {
+      setDaily((prev) => upsertById(prev, rec))
+      try {
+        await backend.saveDaily(rec)
+      } catch (e) {
+        await refresh().catch(() => {})
+        throw e
+      }
+    },
+    [refresh],
+  )
+  const deleteDaily = useCallback(
+    async (rec: DailyRecord) => {
+      setDaily((prev) => prev.filter((x) => x.id !== rec.id))
+      try {
+        await backend.deleteDaily(rec.id)
+      } catch (e) {
+        await refresh().catch(() => {})
+        throw e
+      }
+    },
+    [refresh],
+  )
+
   const upsertSummary = useCallback((summary: ReportSummary) => setReports((prev) => upsertById(prev, summary)), [])
   const removeSummary = useCallback((id: string) => setReports((prev) => prev.filter((r) => r.id !== id)), [])
 
@@ -144,6 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLoaded(false)
     setPlans([])
     setReports([])
+    setDaily([])
   }, [])
 
   const rules = useMemo(() => effectiveRules(settings.rules), [settings.rules])
@@ -171,6 +215,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       reports,
       upsertSummary,
       removeSummary,
+      daily,
+      saveDaily,
+      deleteDaily,
       usedLoIds,
       refresh,
       retrySession: () => void initSession(),
@@ -178,7 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOut,
       canDeleteReport: (r) => canManage || (r.status === 'draft' && !!userId && r.createdBy === userId),
     }
-  }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, refresh, initSession, signIn, signOut, userId])
+  }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, daily, saveDaily, deleteDaily, refresh, initSession, signIn, signOut, userId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

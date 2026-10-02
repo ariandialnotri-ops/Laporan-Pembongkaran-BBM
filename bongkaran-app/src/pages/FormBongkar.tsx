@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Beaker, CircleCheck, Flag, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
-import { BaPrintLayout } from '@/components/bongkaran/ba-print-layout'
+import { ArrowLeft, ArrowRight, Beaker, Flag, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { FinishPanel } from '@/components/bongkaran/finish-panel'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
 import { StepContent } from '@/components/bongkaran/sop-steps'
@@ -12,8 +11,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib/draft-backup'
-import { compressImage, downloadDataUrl } from '@/lib/image'
-import { evaluateAll, summarize, suggestNoBA, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
+import { compressImage } from '@/lib/image'
+import { evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +48,7 @@ export function FormBongkar() {
         // Perubahan terakhir belum sempat terkirim (halaman dimuat ulang): pakai cadangan perangkat.
         const backup = app.backend.mode === 'supabase' && r.status === 'draft' ? readBackup(id) : null
         if (!backup) clearBackup(id)
-        setLoaded(backup ? { report: backup, restored: true } : { report: r, restored: false })
+        setLoaded(backup ? { report: normalizeReport(backup), restored: true } : { report: normalizeReport(r), restored: false })
       },
       (e: unknown) => alive && setLoadError(e instanceof Error ? e : new Error(String(e))),
     )
@@ -71,10 +70,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
-  const [generating, setGenerating] = useState<'pdf' | 'jpg' | null>(null)
-  const [printData, setPrintData] = useState<Record<string, string> | null>(null)
+  const [generating, setGenerating] = useState<'pdf' | 'jpg' | 'xlsx' | null>(null)
   const [error, setError] = useState<string[] | null>(null)
-  const printRef = useRef<HTMLDivElement>(null)
 
   const rules = app.rules
   const evaluation = useMemo(() => evaluateAll(report, rules), [report, rules])
@@ -255,29 +252,19 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     for (const p of Object.values(report.photos).flat()) out[p.id] = await app.backend.photoDataUrl(p)
     return out
   }
-  const downloadPdf = async () => {
-    setGenerating('pdf')
+  // Laporan mengikuti template Excel referensi; modul dimuat saat dibutuhkan.
+  const runExport = async (kind: 'pdf' | 'jpg' | 'xlsx') => {
+    setGenerating(kind)
     try {
-      const { generateBaPdf } = await import('@/lib/pdf')
-      generateBaPdf({ report, derived: evaluation.derived, settings: app.settings, rules, photoData: await photoData() }).save(`${fileBase}.pdf`)
+      await flush()
+      const ex = await import('@/lib/report/export')
+      const x = evaluation.derived
+      if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`)
+      else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`)
+      else await ex.exportBaPdf(report, x, app.settings, await photoData(), `${fileBase}.pdf`)
     } catch (e) {
-      toast(`Gagal membuat PDF: ${pesan(e)}`, TriangleAlert)
+      toast(`Gagal membuat ${kind === 'xlsx' ? 'Excel' : kind.toUpperCase()}: ${pesan(e)}`, TriangleAlert)
     } finally {
-      setGenerating(null)
-    }
-  }
-  const downloadJpg = async () => {
-    setGenerating('jpg')
-    try {
-      setPrintData(await photoData())
-      await new Promise((r) => setTimeout(r, 80))
-      const { nodeToJpeg } = await import('@/lib/jpg')
-      if (!printRef.current) throw new Error('layout belum siap')
-      downloadDataUrl(await nodeToJpeg(printRef.current), `${fileBase}.jpg`)
-    } catch (e) {
-      toast(`Gagal membuat JPG: ${pesan(e)}`, TriangleAlert)
-    } finally {
-      setPrintData(null)
       setGenerating(null)
     }
   }
@@ -354,8 +341,9 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
           setData={setData}
           onFinish={finish}
           onReopen={reopen}
-          onPdf={downloadPdf}
-          onJpg={downloadJpg}
+          onPdf={() => runExport('pdf')}
+          onJpg={() => runExport('jpg')}
+          onXlsx={() => runExport('xlsx')}
           generating={generating}
           waText={waText}
         />
@@ -370,34 +358,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
             </div>
             <span className="text-headline-md font-bold text-on-surface">{stepState!.title}</span>
             <span className="text-body-sm text-on-surface-variant">{stepState!.desc}</span>
-            <ol aria-label={`Langkah ${phase!.label}`} className="flex flex-wrap gap-1.5 pt-space-2xs">
-              {phase!.steps.map((sid) => {
-                const s = evaluation.steps.find((x) => x.id === sid)!
-                const n = ORDER.indexOf(sid) + 1
-                const active = sid === view
-                return (
-                  <li key={sid}>
-                    <button
-                      type="button"
-                      disabled={s.locked}
-                      onClick={() => go(sid)}
-                      aria-current={active ? 'step' : undefined}
-                      aria-label={`Langkah ${n}: ${s.title}${s.complete ? ', lengkap' : ''}`}
-                      className={cn(
-                        'tabular touch-44 flex size-8 items-center justify-center rounded-full text-numeric-sm font-bold transition-all duration-200',
-                        active && 'bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,102,255,0.3)]',
-                        !active && s.complete && 'bg-primary-fixed text-on-primary-fixed',
-                        !active && !s.complete && s.anomaly && 'bg-error-container text-on-error-container',
-                        !active && !s.complete && !s.anomaly && 'inset-field text-on-surface-variant',
-                        s.locked && 'opacity-40',
-                      )}
-                    >
-                      {s.complete && !active ? <CircleCheck aria-hidden="true" className="size-4" /> : n}
-                    </button>
-                  </li>
-                )
-              })}
-            </ol>
+            <StepRail steps={evaluation.steps} view={view} onGo={go} />
           </GlassCard>
 
           <div className="animate-entrance-3 flex flex-col gap-space-md">
@@ -458,11 +419,50 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         )}
       </div>
 
-      {printData && (
-        <div aria-hidden="true" className="pointer-events-none fixed left-[-99999px] top-0 -z-10">
-          <BaPrintLayout ref={printRef} report={report} derived={evaluation.derived} settings={app.settings} rules={rules} photoData={printData} />
-        </div>
-      )}
     </div>
+  )
+}
+
+/**
+ * Semua 14 langkah dalam satu baris yang bisa digeser. Langkah aktif selalu
+ * digulir ke tengah; pemisah tipis menandai batas Bongkaran, Quality, Quantity.
+ */
+function StepRail({ steps, view, onGo }: { steps: StepState[]; view: StepId | 'finish'; onGo: (id: StepId) => void }) {
+  const ref = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const el = ref.current?.querySelector<HTMLElement>('[aria-current="step"]')
+    el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+  }, [view])
+  return (
+    <ol ref={ref} aria-label="Langkah 1 sampai 14" className="-mx-space-md flex snap-x items-center gap-1.5 overflow-x-auto px-space-md pb-1 pt-space-2xs [scrollbar-width:none]">
+      {ORDER.map((sid, i) => {
+        const s = steps.find((x) => x.id === sid)!
+        const n = i + 1
+        const active = sid === view
+        const batas = i > 0 && phaseOf(ORDER[i - 1]).id !== phaseOf(sid).id
+        return (
+          <li key={sid} className="flex shrink-0 snap-center items-center gap-1.5">
+            {batas && <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-outline-variant" />}
+            <button
+              type="button"
+              disabled={s.locked}
+              onClick={() => onGo(sid)}
+              aria-current={active ? 'step' : undefined}
+              aria-label={`Langkah ${n}: ${s.title}${s.complete ? ', lengkap' : s.locked ? ', terkunci' : ''}`}
+              className={cn(
+                'tabular touch-44 flex size-9 items-center justify-center rounded-full text-numeric-sm font-bold transition-colors duration-200',
+                active && 'bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,102,255,0.3)]',
+                !active && s.complete && 'bg-primary-fixed text-on-primary-fixed',
+                !active && !s.complete && s.anomaly && 'bg-error-container text-on-error-container',
+                !active && !s.complete && !s.anomaly && 'inset-field text-on-surface-variant',
+                s.locked && 'opacity-40',
+              )}
+            >
+              {n}
+            </button>
+          </li>
+        )
+      })}
+    </ol>
   )
 }

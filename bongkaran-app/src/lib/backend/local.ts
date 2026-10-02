@@ -4,6 +4,8 @@
  * IndexedDB, bukan localStorage, karena satu laporan berisi belasan foto.
  */
 import { blobToDataUrl, genId } from '@/lib/image'
+import type { DailyRecord } from '@/lib/daily'
+import { normalizePlan } from '@/lib/plan'
 import type { Photos, Plan, Report, ReportSummary } from '@/lib/sop'
 import type { Backend } from './types'
 
@@ -30,6 +32,8 @@ function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest)
         tx.oncomplete = () => resolve(req.result as T)
         tx.onerror = () => reject(tx.error)
         tx.onabort = () => reject(tx.error)
+        // Commit segera: transaksi yang belum ter-commit dibatalkan browser saat halaman ditutup/dimuat ulang.
+        if (mode === 'readwrite') tx.commit?.()
       }),
   )
 }
@@ -60,7 +64,7 @@ export const localBackend: Backend = {
   getSettings: () => get('settings').then((s) => (s as never) ?? null),
   saveSettings: (settings) => set('settings', settings).then(() => {}),
 
-  listPlans: () => get<Plan[]>('plans').then((p) => p ?? []),
+  listPlans: () => get<Plan[]>('plans').then((p) => (p ?? []).map((x) => normalizePlan(x))),
   async savePlan(plan) {
     await set('plans', upsertById(await this.listPlans(), plan))
   },
@@ -88,6 +92,14 @@ export const localBackend: Backend = {
     await Promise.all([del(`report:${id}`), del(`photos:${id}`)])
     savedPhotos.delete(id)
     await set('index', (await this.listReports()).filter((r) => r.id !== id))
+  },
+
+  listDaily: (since) => get<DailyRecord[]>('daily').then((d) => (d ?? []).filter((r) => r.tanggal >= since)),
+  async saveDaily(rec) {
+    await set('daily', upsertById((await get<DailyRecord[]>('daily')) ?? [], rec))
+  },
+  async deleteDaily(id) {
+    await set('daily', ((await get<DailyRecord[]>('daily')) ?? []).filter((r) => r.id !== id))
   },
 
   uploadPhoto: async (_reportId, blob, name) => ({ id: genId('p'), name, at: new Date().toISOString(), dataUrl: await blobToDataUrl(blob) }),

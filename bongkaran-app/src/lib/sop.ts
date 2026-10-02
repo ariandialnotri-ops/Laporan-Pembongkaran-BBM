@@ -6,6 +6,7 @@ import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { minutesBetween, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
+import { shiftKey, type Shift } from '@/lib/shift'
 import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
 
 export interface Photo {
@@ -25,8 +26,12 @@ export interface Compartment {
   id: string
   no: string
   tinggiTera: string
+  /** Kapasitas kompartemen (L) dari buku tera, dipakai menghitung selisih liter. */
+  kapasitas: string
+  /** Laporan lama: liter per mm. */
   kepekaan: string
   dipAktual: string
+  noSegel: string
 }
 
 export interface DensityTest {
@@ -50,6 +55,30 @@ export interface TeraApproval {
   snapshot: { no: string; selisihMm: number | null }[]
 }
 
+/** Totalisator satu nozzle selama pembongkaran (penjualan selama bongkar). */
+export interface Totalisator {
+  nozzleId: string
+  nozzle: string
+  awal: string
+  akhir: string
+}
+
+export type SignerKey = 'penerima' | 'security' | 'supir' | 'pengawas' | 'abh'
+export interface Signature {
+  nama: string
+  /** PNG dataURL tanda tangan; kosong bila belum ditandatangani. */
+  img: string
+  at: string
+}
+
+export const SIGNERS: { key: SignerKey; label: string; wajib: boolean }[] = [
+  { key: 'penerima', label: 'Penerima', wajib: true },
+  { key: 'security', label: 'Security', wajib: true },
+  { key: 'supir', label: 'Supir Tangki', wajib: true },
+  { key: 'pengawas', label: 'Pengawas', wajib: false },
+  { key: 'abh', label: 'Area Business Head', wajib: false },
+]
+
 export interface ReportData {
   planId: string
   noSO: string
@@ -59,9 +88,17 @@ export interface ReportData {
   jamDatang: string
   nopol: string
   namaDriver: string
+  /** Laporan lama memakai Sold To; laporan baru Ship To. */
   soldTo: string
+  shipTo: string
   produk: string
+  /** Laporan lama: jumlah DO x liter per DO. */
   jumlahDO: string
+  /** Volume DO/LO yang diterima (liter). */
+  volumeDO: string
+  /** Nomor segel dari data LO di Plan Kirim, untuk dicocokkan di tahap segel. */
+  segelLO: string[]
+  perusahaanPengangkut: string
   densityObsDepot: string
   suhuObsDepot: string
   density15Depot: string
@@ -84,7 +121,9 @@ export interface ReportData {
   jamBacaAtg: string
   atgAfter: AtgReading
   penjualanSelamaBongkar: string
+  totalisator: Totalisator[]
   dipAfterMm: string
+  ttd: Partial<Record<SignerKey, Signature>>
   noBA: string
   namaPetugas: string
   namaPengawas: string
@@ -102,21 +141,48 @@ export interface Report {
   data: ReportData
 }
 
+export type LoStatus = 'os' | 'planned' | 'delivery' | 'alih' | 'deleted' | 'delivered' | 'closed'
+
 export interface PlanLo {
   id: string
+  /** Kosong selama permintaan masih diproses depot. */
   noLO: string
-  jumlahDO: number
+  produk: string
+  /** Volume liter. */
+  volume: number
+  status: LoStatus
+  /** Nomor segel per produk sesuai dokumen LO. */
+  segel: string[]
+  /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
+  supplyPoint?: string
+  noLOLama?: string
+  supplyPointLama?: string
+  /** Plan lama: jumlah DO. */
+  jumlahDO?: number
 }
 
 export interface Plan {
   id: string
   createdAt: number
+  /** Tanggal kirim. */
   tanggal: string
+  ms2Tanggal: string
+  ms2Jam: string
+  /** Shift permintaan minyak lewat MS2 (hanya shift 1 & 2). */
+  ms2Shift: '' | '1' | '2'
+  poSap: string
+  shipTo: string
+  supplyPoint: string
+  /** Kosong sampai depot menerbitkan SO. */
   noSO: string
+  /** Plan lama: satu produk per SO. */
   produk: string
+  /** Plan lama: Sold To. */
   soldTo: string
   los: PlanLo[]
 }
+
+export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']
 
 /** Ringkasan per laporan untuk daftar, beranda, dan penanda LO terpakai. */
 export interface ReportSummary {
@@ -136,6 +202,18 @@ export interface ReportSummary {
   volumeDO: number | null
   gainLoss: number | null
   densityAnomaly: boolean
+  /** Klasifikasi shift dari jam datang MT. */
+  shift: Shift | null
+  tanggalShift: string
+  tankId: string
+  stokAwal: number | null
+  realStok: number | null
+  /** Volume penerimaan aktual (ATG akhir - ATG awal + penjualan selama bongkar). */
+  terimaAktual: number | null
+  /** Rata-rata density 15°C hasil uji di SPBU dan density 15°C dokumen depot. */
+  d15: number | null
+  d15Depot: number | null
+  densityOk: boolean | null
 }
 
 export interface Rules {
@@ -153,7 +231,17 @@ export interface Settings {
   namaPetugasDefault: string
   namaPengawasDefault: string
   pinPenanggungJawab: string
+  namaAbhDefault: string
+  namaSecurityDefault: string
+  perusahaanPengangkut: string
+  nozzles: Nozzle[]
   rules: Rules
+}
+
+export interface Nozzle {
+  id: string
+  nama: string
+  produk: string
 }
 
 export const PRODUK_OPTIONS = ['Pertalite', 'Pertamax', 'Pertamax Turbo', 'Biosolar', 'Pertamina Dex']
@@ -193,7 +281,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'mt',
     title: 'Foto Mobil Tangki',
-    desc: 'Foto mobil tangki bagian depan, nomor polisi harus terlihat jelas.',
+    desc: 'Foto mobil tangki bagian depan dengan nomor polisi terlihat jelas, lalu isi nomor polisinya.',
     photos: [{ key: 'mt_depan', label: 'Mobil tangki tampak depan (nopol terlihat)' }],
   },
   {
@@ -205,7 +293,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'tera',
     title: 'Buku Tera Mobil Tangki',
-    desc: 'Foto buku tera MT, isi tinggi tera dan kepekaan tiap kompartemen.',
+    desc: 'Foto buku tera MT, isi tinggi tera dan kapasitas tiap kompartemen.',
     photos: [{ key: 'buku_tera', label: 'Buku tera mobil tangki' }],
   },
   {
@@ -223,11 +311,8 @@ export const STEPS: StepDef[] = [
   {
     id: 'segel',
     title: 'Segel Kompartemen',
-    desc: 'Foto segel kompartemen atas dan bawah, pastikan sesuai list DO/LO.',
-    photos: [
-      { key: 'segel_atas', label: 'Segel kompartemen atas' },
-      { key: 'segel_bawah', label: 'Segel kompartemen bawah' },
-    ],
+    desc: 'Foto segel kompartemen atas dan bawah, cocokkan nomornya dengan nomor segel di data LO.',
+    photos: [{ key: 'segel', label: 'Segel kompartemen atas & bawah' }],
   },
   {
     id: 'dip_before',
@@ -268,11 +353,8 @@ export const STEPS: StepDef[] = [
   {
     id: 'hose',
     title: 'Hose & Fillport',
-    desc: 'Foto hose terpasang dengan baik dan fillport tangki pendam yang sesuai produk.',
-    photos: [
-      { key: 'hose', label: 'Hose terpasang' },
-      { key: 'fillport', label: 'Fillport tangki pendam' },
-    ],
+    desc: 'Foto hose MT yang terpasang pada fillport tangki pendam yang sesuai produk.',
+    photos: [{ key: 'hose_fillport', label: 'Hose MT terpasang pada fillport sesuai produk' }],
   },
   {
     id: 'atg_after',
@@ -283,13 +365,49 @@ export const STEPS: StepDef[] = [
   {
     id: 'dip_after',
     title: 'Dipping Manual Tangki Pendam (Sesudah)',
-    desc: 'Foto dipping manual tangki pendam setelah pembongkaran, isi ketinggian (mm).',
+    desc: 'Foto dipping manual tangki pendam setelah pembongkaran, isi ketinggian (mm), lalu tanda tangan penerima, security, dan supir tangki.',
     photos: [{ key: 'dip_after', label: 'Dipping tangki pendam setelah bongkar' }],
   },
 ]
 
 export function newCompartment(no = ''): Compartment {
-  return { id: genId('k'), no, tinggiTera: '', kepekaan: '', dipAktual: '' }
+  return { id: genId('k'), no, tinggiTera: '', kapasitas: '', kepekaan: '', dipAktual: '', noSegel: '' }
+}
+
+/** Foto slot gabungan; laporan lama menyimpan foto di dua slot terpisah. */
+export const LEGACY_PHOTO_SLOTS: Record<string, { key: string; label: string }[]> = {
+  segel: [
+    { key: 'segel_atas', label: 'Segel kompartemen atas' },
+    { key: 'segel_bawah', label: 'Segel kompartemen bawah' },
+  ],
+  hose_fillport: [
+    { key: 'hose', label: 'Hose terpasang' },
+    { key: 'fillport', label: 'Fillport tangki pendam' },
+  ],
+}
+
+export function slotHasPhoto(photos: Photos, key: string) {
+  if ((photos[key] ?? []).length) return true
+  const legacy = LEGACY_PHOTO_SLOTS[key]
+  return !!legacy && legacy.every((l) => (photos[l.key] ?? []).length)
+}
+
+/** Lengkapi field yang belum ada pada laporan lama. */
+export function normalizeReport(r: Report): Report {
+  const d = r.data
+  return {
+    ...r,
+    data: {
+      ...d,
+      shipTo: d.shipTo ?? d.soldTo ?? '',
+      volumeDO: d.volumeDO ?? '',
+      segelLO: d.segelLO ?? [],
+      perusahaanPengangkut: d.perusahaanPengangkut ?? '',
+      totalisator: d.totalisator ?? [],
+      ttd: d.ttd ?? {},
+      compartments: d.compartments.map((c) => ({ ...c, kapasitas: c.kapasitas ?? '', noSegel: c.noSegel ?? '' })),
+    },
+  }
 }
 
 export function newDensityTest(kompartemenId = ''): DensityTest {
@@ -316,8 +434,12 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
       nopol: '',
       namaDriver: '',
       soldTo: '',
+      shipTo: '',
       produk: '',
       jumlahDO: '',
+      volumeDO: '',
+      segelLO: [],
+      perusahaanPengangkut: settings.perusahaanPengangkut || 'PERTAMINA PATRA NIAGA',
       densityObsDepot: '',
       suhuObsDepot: '',
       density15Depot: '',
@@ -340,7 +462,14 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
       jamBacaAtg: '',
       atgAfter: { tinggi: '', volume: '', suhu: '' },
       penjualanSelamaBongkar: '',
+      totalisator: [],
       dipAfterMm: '',
+      ttd: {
+        penerima: { nama: settings.namaPetugasDefault, img: '', at: '' },
+        security: { nama: settings.namaSecurityDefault, img: '', at: '' },
+        pengawas: { nama: settings.namaPengawasDefault, img: '', at: '' },
+        abh: { nama: settings.namaAbhDefault, img: '', at: '' },
+      },
       noBA: '',
       namaPetugas: settings.namaPetugasDefault,
       namaPengawas: settings.namaPengawasDefault,
@@ -356,6 +485,10 @@ export interface CompartmentResult extends Compartment {
   selisihMm: number | null
   estLiter: number | null
   outOfLimit: boolean
+}
+
+export interface TotalisatorResult extends Totalisator {
+  jual: number | null
 }
 
 export interface DensityResult extends DensityTest {
@@ -375,6 +508,14 @@ export interface Derived {
   densityResults: DensityResult[]
   densityAnomaly: boolean
   volumeDO: number | null
+  /** Total selisih liter semua kompartemen (transport loss). */
+  transportLoss: number | null
+  /** Batas toleransi transport loss: -0,15% dari total kapasitas kompartemen. */
+  transportLossLimit: number | null
+  totalisator: TotalisatorResult[]
+  terimaAktual: number | null
+  shift: Shift | null
+  tanggalShift: string
   stokAwal: number | null
   penjualan: number
   stokTeoritis: number | null
@@ -398,8 +539,10 @@ export function deriveReport(report: Report, rules: Rules): Derived {
   const compartments = d.compartments.map((c) => {
     const tera = num(c.tinggiTera)
     const dip = num(c.dipAktual)
-    const kepekaan = num(c.kepekaan)
+    const kapasitas = num(c.kapasitas)
+    const kepekaan = kapasitas !== null && tera ? kapasitas / tera : num(c.kepekaan)
     const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari tera
+    // Sama dengan Berita Acara: selisih (mm) x kapasitas / tinggi tera.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
     const outOfLimit = selisihMm !== null && -selisihMm > rules.teraToleranceMm
     return { ...c, selisihMm, estLiter, outOfLimit }
@@ -414,9 +557,15 @@ export function deriveReport(report: Report, rules: Rules): Derived {
   })
 
   const jumlahDO = num(d.jumlahDO)
-  const volumeDO = jumlahDO !== null ? jumlahDO * rules.literPerDO : null
+  const volumeDO = num(d.volumeDO ?? '') ?? (jumlahDO !== null ? jumlahDO * rules.literPerDO : null)
   const stokAwal = num(d.atgBefore.volume)
-  const penjualan = num(d.penjualanSelamaBongkar) ?? 0
+  const totalisator = (d.totalisator ?? []).map((t) => {
+    const awal = num(t.awal)
+    const akhir = num(t.akhir)
+    return { ...t, jual: awal !== null && akhir !== null ? akhir - awal : null }
+  })
+  const jualNozzle = totalisator.filter((t) => t.jual !== null)
+  const penjualan = jualNozzle.length ? jualNozzle.reduce((n, t) => n + (t.jual ?? 0), 0) : (num(d.penjualanSelamaBongkar) ?? 0)
   const stokTeoritis = stokAwal !== null && volumeDO !== null ? stokAwal + volumeDO - penjualan : null
   const realStok = num(d.atgAfter.volume)
   const gainLoss = stokTeoritis !== null && realStok !== null ? realStok - stokTeoritis : null
@@ -427,8 +576,18 @@ export function deriveReport(report: Report, rules: Rules): Derived {
   const diterimaDip =
     dipBefore?.volume !== undefined && dipAfter?.volume !== undefined ? dipAfter.volume - dipBefore.volume + penjualan : null
 
+  const literComps = compartments.filter((c) => c.estLiter !== null)
+  const kapasitasTotal = d.compartments.reduce((n, c) => n + (num(c.kapasitas) ?? 0), 0)
+  const sk = shiftKey(d.tanggalDatang, d.jamDatang)
+
   return {
     tank: getTank(d.tankId),
+    transportLoss: literComps.length ? literComps.reduce((n, c) => n + (c.estLiter ?? 0), 0) : null,
+    transportLossLimit: kapasitasTotal ? kapasitasTotal * -0.0015 : null,
+    totalisator,
+    terimaAktual: realStok !== null && stokAwal !== null ? realStok - stokAwal + penjualan : null,
+    shift: sk?.shift ?? null,
+    tanggalShift: sk?.tanggal ?? d.tanggalDatang,
     d15Depot,
     depotCalc: density15(d.densityObsDepot, d.suhuObsDepot),
     compartments,
@@ -462,27 +621,30 @@ export interface StepEval {
 function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): StepEval {
   const d = report.data
   const issues = step.photos
-    .filter((p) => !p.optional && !(report.photos[p.key] ?? []).length)
+    .filter((p) => !p.optional && !slotHasPhoto(report.photos, p.key))
     .map((p) => `Foto "${p.label}" belum diupload`)
+  const nozzles = d.totalisator ?? []
   let anomaly = false
   let needsApproval = false
 
   switch (step.id) {
+    case 'mt':
+      if (!has(d.nopol)) issues.push('Isi nomor polisi mobil tangki')
+      break
     case 'lo':
       if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan Kirim')
       if (!has(d.tanggalDatang) || !has(d.jamDatang)) issues.push('Isi tanggal & jam kedatangan MT')
-      if (!has(d.nopol)) issues.push('Isi nomor polisi MT')
       if (!has(d.namaDriver)) issues.push('Isi nama lengkap driver')
-      if (!has(d.soldTo)) issues.push('Isi nomor Sold To')
-      if (!((num(d.jumlahDO) ?? 0) > 0)) issues.push('Isi jumlah DO')
+      if (!has(d.shipTo)) issues.push('Isi nomor Ship To')
+      if (!((x.volumeDO ?? 0) > 0)) issues.push('Isi volume DO (liter)')
       if (normalizeDensity(d.densityObsDepot) === null || num(d.suhuObsDepot) === null) issues.push('Isi density & temperature (OBS) depot')
       if (x.d15Depot === null) issues.push('Isi density at 15°C dari dokumen depot')
       if (d.compartments.length === 0 || d.compartments.some((c) => !has(c.no))) issues.push('Isi nomor kompartemen')
       if (!has(d.tanggalKeluar) || !has(d.jamKeluar)) issues.push('Isi tanggal & jam keluar MT dari depot')
       break
     case 'tera':
-      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kepekaan) ?? 0) > 0))) {
-        issues.push('Isi tinggi tera & kepekaan untuk semua kompartemen')
+      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0 || (num(c.kepekaan) ?? 0) > 0))) {
+        issues.push('Isi tinggi tera & kapasitas untuk semua kompartemen')
       }
       break
     case 'atg_before':
@@ -490,6 +652,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if ([d.atgBefore.tinggi, d.atgBefore.volume, d.atgBefore.suhu].some((v) => num(v) === null)) {
         issues.push('Isi ketinggian, volume, dan suhu pembacaan ATG')
       }
+      if (nozzles.some((t) => num(t.awal) === null)) issues.push('Isi totalisator awal semua nozzle produk ini')
       break
     case 'safety':
       if (!d.safetyApar) issues.push('Konfirmasi APAR DCP min. 9 kg tersedia')
@@ -497,7 +660,8 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!d.safetyAtribut) issues.push('Konfirmasi petugas memakai atribut safety')
       break
     case 'segel':
-      if (!d.segelSesuai) issues.push('Konfirmasi segel sesuai list DO/LO')
+      if (d.compartments.some((c) => !has(c.noSegel))) issues.push('Isi nomor segel tiap kompartemen')
+      if (!d.segelSesuai) issues.push('Konfirmasi nomor segel sesuai data LO')
       break
     case 'dip_before':
       if (num(d.dipBeforeMm) === null) issues.push('Isi ketinggian deepstick tangki pendam (mm)')
@@ -512,7 +676,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (d.compartments.some((c) => num(c.dipAktual) === null)) issues.push('Isi hasil deepstick semua kompartemen')
       else if (x.teraOutOfLimit && !d.teraApproval) {
         needsApproval = true
-        issues.push(`Selisih dengan buku tera melebihi ${rules.teraToleranceMm} mm — butuh izin penanggung jawab`)
+        issues.push(`Selisih dengan buku tera melebihi ${rules.teraToleranceMm} mm, butuh izin penanggung jawab`)
       }
       break
     case 'sampel':
@@ -524,23 +688,31 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (x.densityResults.some((r) => !r.kompartemenId || !r.d15)) issues.push('Lengkapi kompartemen, density, dan suhu pada setiap pengukuran')
       if (x.densityAnomaly) {
         anomaly = true
-        issues.push(`Selisih density melebihi toleransi ${String(rules.densityTolerance).replace('.', ',')} — pembongkaran tidak dapat dilanjutkan`)
+        issues.push(`Selisih density melebihi toleransi ${String(rules.densityTolerance).replace('.', ',')}, pembongkaran tidak dapat dilanjutkan`)
       }
       break
     case 'hose':
-      if (!d.fillportSesuai) issues.push('Konfirmasi fillport sesuai produk')
+      if (!d.fillportSesuai) issues.push('Konfirmasi hose terpasang pada fillport yang sesuai produk')
       break
     case 'atg_after':
       if (!has(d.jamSelesaiBongkar) || !has(d.jamBacaAtg)) issues.push('Isi jam selesai bongkar dan jam pembacaan ATG')
       else if ((x.settleMinutes ?? 0) < rules.atgSettleMinutes) {
-        issues.push(`ATG baru dibaca ${x.settleMinutes} menit setelah selesai bongkar — minimal ${rules.atgSettleMinutes} menit`)
+        issues.push(`ATG baru dibaca ${x.settleMinutes} menit setelah selesai bongkar, minimal ${rules.atgSettleMinutes} menit`)
       }
       if ([d.atgAfter.tinggi, d.atgAfter.volume, d.atgAfter.suhu].some((v) => num(v) === null)) {
         issues.push('Isi ketinggian, volume, dan suhu pembacaan ATG')
       }
+      if (nozzles.some((t) => num(t.akhir) === null)) issues.push('Isi totalisator akhir semua nozzle produk ini')
+      else if (x.totalisator.some((t) => (t.jual ?? 0) < 0)) issues.push('Totalisator akhir tidak boleh lebih kecil dari totalisator awal')
       break
     case 'dip_after':
       if (num(d.dipAfterMm) === null) issues.push('Isi ketinggian dipping tangki pendam (mm)')
+      for (const s of SIGNERS.filter((s) => s.wajib)) {
+        const t = d.ttd?.[s.key]
+        // Nama supir mengikuti nama driver di dokumen LO bila belum diubah.
+        if (!has(t?.nama || (s.key === 'supir' ? d.namaDriver : ''))) issues.push(`Isi nama ${s.label.toLowerCase()}`)
+        else if (!t?.img) issues.push(`Tanda tangan ${s.label.toLowerCase()} belum ada`)
+      }
       break
     default:
       break
@@ -583,6 +755,8 @@ export function evaluateAll(report: Report, rules: Rules): Evaluation {
 
 export function summarize(report: Report, ev: Evaluation): ReportSummary {
   const d = report.data
+  const x = ev.derived
+  const d15s = x.densityResults.map((r) => r.d15?.value).filter((v): v is number => typeof v === 'number')
   return {
     id: report.id,
     createdAt: report.createdAt,
@@ -600,6 +774,15 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     volumeDO: ev.derived.volumeDO,
     gainLoss: ev.derived.gainLoss,
     densityAnomaly: ev.densityAnomaly,
+    shift: x.shift,
+    tanggalShift: x.tanggalShift,
+    tankId: d.tankId,
+    stokAwal: x.stokAwal,
+    realStok: x.realStok,
+    terimaAktual: x.terimaAktual,
+    d15: d15s.length ? Math.round((d15s.reduce((n, v) => n + v, 0) / d15s.length) * 10000) / 10000 : null,
+    d15Depot: x.d15Depot,
+    densityOk: x.densityResults.length ? x.densityResults.every((r) => r.ok !== false) : null,
   }
 }
 

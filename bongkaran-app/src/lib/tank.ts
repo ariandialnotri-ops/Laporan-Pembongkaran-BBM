@@ -25,11 +25,14 @@ export const TANK_SPBU: string = data.spbu
 
 const VOLUMES: Record<string, number[]> = Object.fromEntries(data.tanks.map((t) => [t.id, t.volumes]))
 
+/** "Tangki 3"; nomor non-angka (mis. "PERTADEX 3 KL") ditampilkan apa adanya. */
+export const tankName = (no: string | number) => (/^\d+$/.test(String(no)) ? `Tangki ${no}` : String(no))
+
 export const TANKS: Tank[] = data.tanks.map((t) => ({
   id: t.id,
   produk: t.produk,
   tankNo: String(t.tankNo),
-  label: `Tangki ${t.tankNo} – ${t.produk}`,
+  label: `${tankName(t.tankNo)} (${t.produk})`,
   customer: t.customer ?? null,
   tanggalKalibrasi: t.tanggalKalibrasi ?? null,
   catatan: (t as { catatan?: string | null }).catatan ?? null,

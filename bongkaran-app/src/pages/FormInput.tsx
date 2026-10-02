@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronRight, ClipboardList, LoaderCircle, MapPin, Truck, TriangleAlert } from 'lucide-react'
+import { ArrowRight, Beaker, ChevronRight, ClipboardList, Fuel, LoaderCircle, MapPin, Truck, TriangleAlert } from 'lucide-react'
 import { SectionHeader } from '@/components/bongkaran/section-header'
+import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
+import { loPickable } from '@/lib/plan'
 import { blankReport, evaluateAll, STEPS, summarize } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -18,9 +20,11 @@ export function FormInput() {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const drafts = app.reports.filter((r) => r.status === 'draft')
-  const openPlans = app.plans.filter((p) => p.los.some((lo) => !app.usedLoIds.has(lo.id))).length
+  const openPlans = app.plans.filter((p) => p.noSO && p.los.some((lo) => loPickable(lo, app.usedLoIds))).length
+  const stok = useStokShift()
 
   const mulai = async () => {
+    if (stok.missing) return toast('Isi stok awal shift ini terlebih dahulu', TriangleAlert)
     setBusy(true)
     try {
       const report = blankReport(app.settings, app.session.user?.id ?? null)
@@ -49,7 +53,7 @@ export function FormInput() {
 
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
         <span className="text-body-md text-on-surface">
-          Mulai saat mobil tangki tiba. Form memandu {STEPS.length} tahap SOP — Bongkaran, Quality, lalu Quantity — dan otomatis membuat Berita Acara.
+          Mulai saat mobil tangki tiba. Form memandu {STEPS.length} tahap SOP (Bongkaran, Quality, lalu Quantity) dan otomatis membuat Berita Acara.
         </span>
         <div className="flex flex-wrap gap-space-xs">
           <Pill tone={openPlans > 0 ? 'cyan' : 'error'}>
@@ -58,7 +62,8 @@ export function FormInput() {
           </Pill>
           {app.backend.mode === 'local' && <Pill>Mode lokal</Pill>}
         </div>
-        <Button size="lg" className="w-full" disabled={busy} onClick={mulai}>
+        <StokGate />
+        <Button size="lg" className="w-full" disabled={busy || stok.missing} onClick={mulai}>
           {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Truck aria-hidden="true" />}
           Mulai bongkaran baru
           {!busy && <ArrowRight aria-hidden="true" />}
@@ -69,6 +74,23 @@ export function FormInput() {
           </Link>
         )}
       </GlassCard>
+
+      <div className="animate-entrance-3 grid grid-cols-2 gap-space-xs">
+        <Link to="/qq" className="glass-2 rim-light flex min-h-20 flex-col justify-between gap-space-xs rounded-lg p-space-sm active:scale-[0.98]">
+          <Beaker aria-hidden="true" className="size-5 text-primary" />
+          <span className="flex flex-col">
+            <span className="text-body-md font-bold text-on-surface">Q&Q Harian</span>
+            <span className="text-body-sm text-on-surface-variant">Density & bejana 20 L</span>
+          </span>
+        </Link>
+        <Link to="/stok" className="glass-2 rim-light flex min-h-20 flex-col justify-between gap-space-xs rounded-lg p-space-sm active:scale-[0.98]">
+          <Fuel aria-hidden="true" className="size-5 text-primary" />
+          <span className="flex flex-col">
+            <span className="text-body-md font-bold text-on-surface">Stok Shift</span>
+            <span className="text-body-sm text-on-surface-variant">{stok.missing ? 'Stok awal belum diisi' : 'Stok awal & pengeluaran'}</span>
+          </span>
+        </Link>
+      </div>
 
       <section aria-labelledby="bongkar-berjalan" className="animate-entrance-3 flex flex-col gap-space-sm">
         <SectionHeader id="bongkar-berjalan" title="Bongkaran Berjalan" />
@@ -97,7 +119,7 @@ export function FormInput() {
                         )}
                       </div>
                       <span className="truncate text-body-sm text-on-surface-variant">
-                        {r.produk || 'Produk belum dipilih'} • {formatTanggalIso(r.tanggal)} {r.jam}
+                        {r.produk || 'Produk belum dipilih'}, {formatTanggalIso(r.tanggal)} {r.jam}
                       </span>
                     </div>
                     <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
