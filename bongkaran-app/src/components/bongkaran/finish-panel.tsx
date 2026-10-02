@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { CircleCheck, Copy, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
+import { SignersSection } from '@/components/bongkaran/sop-steps'
 import { StatusBanner } from '@/components/bongkaran/status-banner'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -9,6 +10,7 @@ import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { formatLiter, formatSigned } from '@/lib/format'
+import { shiftLabel } from '@/lib/shift'
 import { suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +24,7 @@ export function FinishPanel({
   onReopen,
   onPdf,
   onJpg,
+  onXlsx,
   generating,
   waText,
 }: {
@@ -34,7 +37,8 @@ export function FinishPanel({
   onReopen: () => void
   onPdf: () => void
   onJpg: () => void
-  generating: 'pdf' | 'jpg' | null
+  onXlsx: () => void
+  generating: 'pdf' | 'jpg' | 'xlsx' | null
   waText: string
 }) {
   const toast = useToast()
@@ -71,27 +75,35 @@ export function FinishPanel({
           {!finished && <Pill>Belum ditutup</Pill>}
         </div>
         <span className="text-headline-md font-bold text-on-surface">
-          {d.nopol || 'MT'} · {d.produk || '-'}
+          {d.nopol || 'MT'}, {d.produk || '-'}
         </span>
+        <span className="text-body-sm text-on-surface-variant">Bongkaran {shiftLabel(x.shift)}</span>
         <StatusBanner
           tone={anomaly ? 'error' : densityOk ? 'success' : 'idle'}
-          title={anomaly ? 'Anomali density — pembongkaran dihentikan' : 'Quality & quantity lengkap'}
-          detail={anomaly ? 'Berita Acara dibuat dengan status ANOMALI' : `Density sesuai • ${x.compartments.length} kompartemen diperiksa`}
+          title={anomaly ? 'Anomali density, pembongkaran dihentikan' : 'Quality & quantity lengkap'}
+          detail={anomaly ? 'Berita Acara dibuat dengan status ANOMALI' : `Density sesuai, ${x.compartments.length} kompartemen diperiksa`}
         />
       </GlassCard>
 
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         <span className="text-tag uppercase text-primary">Rekap quantity</span>
         <Ladder
-          rows={[
-            ['Stok awal (ATG)', x.stokAwal !== null ? formatLiter(x.stokAwal) : '—'],
-            ['Volume DO diterima', formatLiter(x.volumeDO ?? 0)],
-            ['Stok akhir teoritis', x.stokTeoritis !== null ? formatLiter(x.stokTeoritis) : '—'],
-            ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '—'],
-          ]}
-          total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '—']}
+          rows={[['Batas toleransi (-0,15% kapasitas)', x.transportLossLimit !== null ? formatSigned(x.transportLossLimit, 2, ' L') : '-']]}
+          total={['Total transport loss', x.transportLoss !== null ? formatSigned(x.transportLoss, 2, ' L') : '-']}
         />
-        <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '—']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '—']} />
+        {x.transportLoss !== null && x.transportLossLimit !== null && x.transportLoss < x.transportLossLimit && (
+          <StatusBanner tone="error" title="Transport loss melebihi batas toleransi" detail="Akan ditandai merah di Berita Acara" />
+        )}
+        <Ladder
+          rows={[
+            ['Stok awal (ATG)', x.stokAwal !== null ? formatLiter(x.stokAwal) : '-'],
+            ['Volume DO diterima', formatLiter(x.volumeDO ?? 0)],
+            ['Stok akhir teoritis', x.stokTeoritis !== null ? formatLiter(x.stokTeoritis) : '-'],
+            ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
+          ]}
+          total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
+        />
+        <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>
 
       <GlassCard level={2} className="animate-entrance-3 p-space-md">
@@ -104,19 +116,13 @@ export function FinishPanel({
               </Button>
             </div>
           </Field>
-          <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Petugas penerima" htmlFor="petugas">
-              <Input id="petugas" value={d.namaPetugas} onChange={(e) => setData({ namaPetugas: e.target.value })} />
-            </Field>
-            <Field label="Pengawas SPBU" htmlFor="pengawas">
-              <Input id="pengawas" value={d.namaPengawas} onChange={(e) => setData({ namaPengawas: e.target.value })} />
-            </Field>
-          </div>
           <Field label="Catatan" htmlFor="catatan">
             <Textarea id="catatan" rows={3} placeholder="Catatan tambahan (opsional)" value={d.catatan} onChange={(e) => setData({ catatan: e.target.value })} />
           </Field>
         </fieldset>
       </GlassCard>
+
+      {finished && <SignersSection report={report} setData={setData} readOnly={readOnly} keys={['pengawas', 'abh']} title="Tanda tangan pengawas & ABH" />}
 
       {!finished ? (
         <Button size="lg" variant={anomaly ? 'danger' : 'primary'} className="w-full" onClick={() => onFinish(anomaly ? 'anomali' : 'selesai')}>
@@ -127,8 +133,12 @@ export function FinishPanel({
         <>
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
             <span className="text-tag uppercase text-primary">Berita Acara Pembongkaran (Q&Q)</span>
+            <Button size="pill" disabled={generating !== null} onClick={onXlsx}>
+              {generating === 'xlsx' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
+              Excel (template BA)
+            </Button>
             <div className="grid grid-cols-2 gap-space-xs">
-              <Button size="pill" disabled={generating !== null} onClick={onPdf}>
+              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
                 {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
                 PDF
               </Button>

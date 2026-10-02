@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ImagePlus, X } from 'lucide-react'
+import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApp } from '@/lib/app-state'
 import { TABLE53_CORRECTIONS, TABLE53_COVERAGE } from '@/lib/density'
 import { formatNumber, parseAngka } from '@/lib/format'
-import { blobToDataUrl, compressImage } from '@/lib/image'
-import type { Rules } from '@/lib/sop'
+import { blobToDataUrl, compressImage, genId } from '@/lib/image'
+import { PRODUK_OPTIONS, type Nozzle, type Rules } from '@/lib/sop'
 import { TANKS } from '@/lib/tank'
 
 export function Pengaturan() {
@@ -26,6 +27,7 @@ export function Pengaturan() {
     if (hash && app.loaded) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
   }, [hash, app.loaded])
 
+  const setNozzle = (id: string, patch: Partial<Nozzle>) => app.updateSettings({ nozzles: s.nozzles.map((x) => (x.id === id ? { ...x, ...patch } : x)) })
   const setRule = (key: keyof Rules, n: number) => app.updateSettings({ rules: { ...s.rules, [key]: n } })
   const onLogo = async (file?: File) => {
     if (file) app.updateSettings({ logoDataUrl: await blobToDataUrl(await compressImage(file, { maxSize: 400, quality: 0.9 })) })
@@ -60,7 +62,16 @@ export function Pengaturan() {
               <Field label="Pengawas (default)" htmlFor="set-pengawas">
                 <Input id="set-pengawas" value={s.namaPengawasDefault} onChange={(e) => app.updateSettings({ namaPengawasDefault: e.target.value })} />
               </Field>
+              <Field label="Security (default)" htmlFor="set-security">
+                <Input id="set-security" value={s.namaSecurityDefault} onChange={(e) => app.updateSettings({ namaSecurityDefault: e.target.value })} />
+              </Field>
+              <Field label="Area Business Head" htmlFor="set-abh">
+                <Input id="set-abh" value={s.namaAbhDefault} onChange={(e) => app.updateSettings({ namaAbhDefault: e.target.value })} />
+              </Field>
             </div>
+            <Field label="Perusahaan pengangkut (default)" htmlFor="set-pengangkut">
+              <Input id="set-pengangkut" value={s.perusahaanPengangkut} onChange={(e) => app.updateSettings({ perusahaanPengangkut: e.target.value })} />
+            </Field>
             <div className="flex items-center gap-space-sm">
               {s.logoDataUrl ? (
                 <span className="glass-1 flex h-12 items-center rounded-md px-space-sm">
@@ -78,6 +89,42 @@ export function Pengaturan() {
               )}
               <input ref={logoRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void onLogo(e.target.files?.[0])} />
             </div>
+          </GlassCard>
+        </section>
+
+        <section aria-labelledby="nozzle" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <SectionHeader id="nozzle" title="Nozzle Dispenser" />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <span className="text-body-sm text-on-surface-variant">Dipakai untuk totalisator penjualan selama bongkar dan uji bejana 20 liter di Q&Q Harian.</span>
+            {s.nozzles.map((nz, i) => (
+              <div key={nz.id} className="grid grid-cols-[1fr_1.3fr_auto] items-center gap-space-xs">
+                <Input aria-label={`Nama nozzle ${i + 1}`} value={nz.nama} onChange={(e) => setNozzle(nz.id, { nama: e.target.value })} />
+                <Select value={nz.produk} onValueChange={(v) => setNozzle(nz.id, { produk: v })}>
+                  <SelectTrigger aria-label={`Produk nozzle ${i + 1}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUK_OPTIONS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="ghost" size="icon" aria-label={`Hapus ${nz.nama}`} onClick={() => app.updateSettings({ nozzles: s.nozzles.filter((x) => x.id !== nz.id) })}>
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="soft"
+              size="sm"
+              className="self-start"
+              onClick={() => app.updateSettings({ nozzles: [...s.nozzles, { id: genId('nz'), nama: `Nozzle ${s.nozzles.length + 1}`, produk: s.nozzles.at(-1)?.produk ?? PRODUK_OPTIONS[0] }] })}
+            >
+              <Plus aria-hidden="true" />
+              Tambah nozzle
+            </Button>
           </GlassCard>
         </section>
 
@@ -108,7 +155,7 @@ export function Pengaturan() {
       <section aria-labelledby="data-acuan" className="animate-entrance-3 flex flex-col gap-space-sm">
         <SectionHeader id="data-acuan" title="Data Acuan" />
         <GlassCard level={2} className="flex flex-col gap-space-xs p-space-md">
-          <span className="text-tag uppercase text-primary">Tabel ASTM 53 · Density reduction to 15°C</span>
+          <span className="text-tag uppercase text-primary">Tabel ASTM 53, density reduction to 15°C</span>
           <span className="text-body-sm text-on-surface">Cakupan densitas observasi {TABLE53_COVERAGE}. Di luar cakupan dipakai rumus ASTM D1250 Tabel 53B.</span>
           {TABLE53_CORRECTIONS.length > 0 && (
             <span className="text-body-sm text-on-surface-variant">
@@ -122,7 +169,7 @@ export function Pengaturan() {
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-md font-semibold text-on-surface">{t.label}</span>
                 <span className="tabular text-numeric-sm text-on-surface-variant">
-                  {t.startMm}–{formatNumber(t.maxMm)} mm • {formatNumber(t.capacity)} L • kalibrasi {t.tanggalKalibrasi || '-'}
+                  {t.startMm}-{formatNumber(t.maxMm)} mm, {formatNumber(t.capacity)} L, kalibrasi {t.tanggalKalibrasi || '-'}
                 </span>
               </div>
               {t.anomalyLevels.length > 0 ? <Pill tone="error">{t.anomalyLevels.length} titik janggal</Pill> : <Pill tone="primary">OK</Pill>}

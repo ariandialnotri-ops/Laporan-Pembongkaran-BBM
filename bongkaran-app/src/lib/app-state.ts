@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Backend, SessionInfo } from '@/lib/backend'
+import type { DailyRecord } from '@/lib/daily'
 import type { Plan, ReportSummary, Rules, Settings } from '@/lib/sop'
 
 export type SessionStatus = 'loading' | 'login' | 'nomember' | 'ready' | 'error'
@@ -26,6 +27,10 @@ export interface AppState {
   reports: ReportSummary[]
   upsertSummary: (summary: ReportSummary) => void
   removeSummary: (id: string) => void
+  /** Catatan stok shift & Q&Q harian 120 hari terakhir. */
+  daily: DailyRecord[]
+  saveDaily: (rec: DailyRecord) => Promise<void>
+  deleteDaily: (rec: DailyRecord) => Promise<void>
   /** LO yang sudah dipakai laporan lain: loId -> ringkasan laporan. */
   usedLoIds: Map<string, ReportSummary>
   refresh: () => Promise<void>

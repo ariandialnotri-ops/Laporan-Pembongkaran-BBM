@@ -4,13 +4,17 @@
  * bucket privat "bbm-evidence"; database hanya menyimpan metadata foto.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { DailyRecord } from '@/lib/daily'
 import { blobToDataUrl, genId } from '@/lib/image'
+import { normalizePlan } from '@/lib/plan'
 import type { Photo, Photos, Plan, Report, ReportStatus, ReportSummary, Settings } from '@/lib/sop'
 import type { Backend, Member, Role } from './types'
 
 const BUCKET = 'bbm-evidence'
 
-type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; created_at: string }
+type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint'>
+type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; meta: Partial<PlanMeta> | null; created_at: string }
+type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift: number; data: DailyRecord['data']; created_at: string; updated_at: string; created_by: string | null }
 type ReportRow = {
   id: string
   status: ReportStatus
@@ -49,15 +53,17 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
 
-  const toPlan = (r: PlanRow): Plan => ({
-    id: r.id,
-    tanggal: r.tanggal ?? '',
-    noSO: r.no_so,
-    produk: r.produk,
-    soldTo: r.sold_to ?? '',
-    los: r.los ?? [],
-    createdAt: Date.parse(r.created_at),
-  })
+  const toPlan = (r: PlanRow): Plan =>
+    normalizePlan({
+      ...(r.meta ?? {}),
+      id: r.id,
+      tanggal: r.tanggal ?? '',
+      noSO: r.no_so,
+      produk: r.produk,
+      soldTo: r.sold_to ?? '',
+      los: r.los ?? [],
+      createdAt: Date.parse(r.created_at),
+    })
 
   return {
     mode: 'supabase',
@@ -116,6 +122,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
           produk: p.produk,
           sold_to: p.soldTo || null,
           los: p.los,
+          meta: { ms2Tanggal: p.ms2Tanggal, ms2Jam: p.ms2Jam, ms2Shift: p.ms2Shift, poSap: p.poSap, shipTo: p.shipTo, supplyPoint: p.supplyPoint } satisfies PlanMeta,
           created_at: new Date(p.createdAt).toISOString(),
         }),
       )
@@ -163,6 +170,39 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus laporan ini (hanya pengawas, atau pembuat laporan selama masih draft).')
       const files = check(await sb.storage.from(BUCKET).list(id, { limit: 1000 }))
       if (files?.length) await sb.storage.from(BUCKET).remove(files.map((f) => `${id}/${f.name}`))
+    },
+
+    async listDaily(since) {
+      const rows = check(await sb.from('bbm_daily').select('*').gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000)) as DailyRow[]
+      return rows.map(
+        (r) =>
+          ({
+            id: r.id,
+            kind: r.kind,
+            tanggal: r.tanggal,
+            shift: r.shift,
+            data: r.data,
+            createdAt: Date.parse(r.created_at),
+            updatedAt: Date.parse(r.updated_at),
+            createdBy: r.created_by,
+          }) as DailyRecord,
+      )
+    },
+    async saveDaily(rec) {
+      check(
+        await sb.from('bbm_daily').upsert({
+          id: rec.id,
+          kind: rec.kind,
+          tanggal: rec.tanggal,
+          shift: rec.shift,
+          data: rec.data,
+          created_at: new Date(rec.createdAt).toISOString(),
+        }),
+      )
+    },
+    async deleteDaily(id) {
+      const rows = check(await sb.from('bbm_daily').delete().eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
     },
 
     async uploadPhoto(reportId, blob, name) {

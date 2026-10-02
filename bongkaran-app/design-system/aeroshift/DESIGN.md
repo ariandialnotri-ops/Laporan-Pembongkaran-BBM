@@ -1,5 +1,5 @@
 ---
-name: AeroShift SPBU
+name: AeroShift SPBU (FLOQ)
 colors:
   surface: '#f8f9ff'
   surface-dim: '#cadbf6'
@@ -131,6 +131,35 @@ spacing:
   space-xl: 2rem
   space-2xl: 3rem
 ---
+
+## FLOQ: Penerapan di Aplikasi Bongkaran
+
+Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, aplikasi evidence bongkaran BBM dan Q&Q SPBU. Bagian lain di dokumen ini adalah design system AeroShift yang menjadi dasarnya. Bila ada perbedaan, bagian ini yang dipakai.
+
+### Identitas
+- **Nama:** FLOQ. Tagline: *Fuel Logistic Quality & Quantity*.
+- **Aset logo** (di `public/`):
+  - `floq-login.webp`: ikon FQ + tagline, untuk halaman login dan layar memuat. Wordmark "FLOQ" sengaja tidak dipakai di layar ini.
+  - `floq-icon.webp`: ikon aplikasi kotak biru, 36 px di header kiri atas.
+  - `favicon.png`, `apple-touch-icon.png` (padat, untuk layar utama iPhone), `floq-icon-256.png` (manifest).
+- **Palet brand sheet:** latar `#F5F5F7`, teks utama `#1D1D1F`, teks sekunder `#AAAAAA`, aksen `#007AFF`. Aplikasi tetap memakai token AeroShift (primary `#0050CB`, primary-container `#0066FF`) yang senada dengan logo.
+- **Copyright** di bawah form login: `© <tahun> FLOQ · Created by Ariandi Alnotri` (tahun otomatis).
+- Teks brand tidak memakai tanda em-dash (`—`); pakai koma atau titik dua.
+
+### Struktur layar
+- Halaman utama berjudul **HOME**. Dock bawah: Beranda, Input, Laporan, Profil.
+- Form bongkaran: tab segmen **Bongkaran / Quality / Quantity / Finish**, 14 langkah SOP, titik langkah bernomor, satu kartu kaca per kelompok isian.
+- Login: logo di tengah, kartu kaca berisi form, gelombang biru lembut (3 lapis, opasitas 0,14 / 0,20 / 0,28) di bawah layar.
+
+### Penyesuaian dari AeroShift
+- **Orb latar (Level 0):** hanya keluarga biru (`primary-fixed`, `surface-container-highest`, `primary-fixed-dim`), opasitas rendah dan **diam tanpa animasi**. Orb mint/cyan dihapus karena melelahkan mata, dan animasi orb memberatkan HP.
+- **Blur kaca di layar sentuh** (`pointer: coarse`): Level 1/2/3 memakai `blur(10px)` / `blur(14px)` / `blur(18px)` (bukan 20/28/36 px) agar ringan saat menggulir.
+- **Kurangi Transparansi** (`prefers-reduced-transparency: reduce`): kartu kaca dan header menjadi permukaan padat (`#F7F9FD`, `#FBFCFE`, `#FFFFFF`) tanpa backdrop blur.
+- **Label kecil (`text-tag`):** 12 px / line-height 16 px, huruf besar, tracking `+0.05em` (sebelumnya 11 px).
+- **Kolom input:** tinggi 48 px dan seluruh kotak (termasuk padding dan satuan seperti `mm`, `°C`) memfokuskan input. Teks 16 px agar iOS tidak zoom.
+- **Target sentuh:** minimal 44 × 44 px, termasuk ikon header, chip profil, dan titik langkah (area sentuh diperluas dengan utilitas `touch-44`).
+- **Placeholder select:** warna `on-surface-variant` (kontras ≥ 4,5:1).
+- **Keluaran Berita Acara** (PDF/JPG): gaya cetak terpisah dengan warna hex inline, biru `#0050CB`, tanpa efek kaca.
 
 ## Brand & Style
 

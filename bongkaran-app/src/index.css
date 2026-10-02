@@ -190,8 +190,8 @@
   --text-numeric-sm--line-height: 16px;
   --text-numeric-sm--font-weight: 500;
 
-  --text-tag: 11px;
-  --text-tag--line-height: 14px;
+  --text-tag: 12px;
+  --text-tag--line-height: 16px;
   --text-tag--font-weight: 700;
   --text-tag--letter-spacing: 0.05em;
 
@@ -509,6 +509,46 @@
     --glass-1-blur: blur(10px) saturate(150%);
     --glass-2-blur: blur(14px) saturate(170%);
     --glass-3-blur: blur(18px) saturate(180%);
+  }
+}
+
+/* Bottom sheet: naik dari bawah, keluar lebih cepat dari masuknya. */
+@keyframes sheetIn {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sheetOut {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.sheet-content[data-state='open'] { animation: sheetIn 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-content[data-state='closed'] { animation: sheetOut 0.2s cubic-bezier(0.4, 0, 1, 1); }
+.sheet-overlay[data-state='open'] { animation: fadeIn 0.25s ease-out; }
+.sheet-overlay[data-state='closed'] { animation: fadeOut 0.18s ease-in; }
+
+/* Pengguna yang meminta transparansi dikurangi (setelan aksesibilitas iOS/
+   macOS) mendapat permukaan padat: teks tetap terbaca tanpa efek kaca. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-1-bg: #f7f9fd;
+    --glass-2-bg: #fbfcfe;
+    --glass-3-bg: #ffffff;
+    --glass-1-blur: none;
+    --glass-2-blur: none;
+    --glass-3-blur: none;
+  }
+  [data-glass-bar] {
+    background: var(--color-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

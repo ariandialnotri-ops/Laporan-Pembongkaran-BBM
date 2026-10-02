@@ -53,3 +53,92 @@ export function Ladder({ rows, total }: { rows: [string, ReactNode][]; total?: [
     </dl>
   )
 }
+
+/** Pilihan tunggal berbentuk tombol pil (mis. shift 1/2), tiap opsi minimal 44 px. */
+export function Choice<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: string }[]
+  label: string
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inset-field grid auto-cols-fr grid-flow-col gap-1 rounded-md p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'min-h-10 rounded-[0.6rem] px-3 text-body-sm font-semibold transition-colors duration-200',
+            value === o.value ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-on-surface-variant',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Daftar nomor (mis. nomor segel): ketik lalu Enter atau tombol Tambah. */
+export function TagInput({ id, values, onChange, placeholder }: { id: string; values: string[]; onChange: (v: string[]) => void; placeholder?: string }) {
+  const add = (input: HTMLInputElement) => {
+    const parts = input.value
+      .split(/[,;\s]+/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+    if (!parts.length) return
+    onChange([...values, ...parts.filter((p) => !values.includes(p))])
+    input.value = ''
+  }
+  return (
+    <div className="flex flex-col gap-space-xs">
+      {values.length > 0 && (
+        <ul aria-label="Nomor tersimpan" className="flex flex-wrap gap-space-xs">
+          {values.map((v) => (
+            <li key={v} className="tabular flex h-9 items-center gap-1 rounded-full bg-primary-fixed pl-3 text-body-sm font-semibold text-on-primary-fixed">
+              {v}
+              <button
+                type="button"
+                aria-label={`Hapus ${v}`}
+                onClick={() => onChange(values.filter((x) => x !== v))}
+                className="touch-44 flex size-9 items-center justify-center rounded-full"
+              >
+                <span aria-hidden="true" className="text-body-md leading-none">×</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-space-xs">
+        <input
+          id={id}
+          autoComplete="off"
+          inputMode="numeric"
+          placeholder={placeholder}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              add(e.currentTarget)
+            }
+          }}
+          className="inset-field tabular h-12 min-w-0 flex-1 rounded-md px-3.5 text-body-lg text-on-surface placeholder:text-on-surface-variant focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <button
+          type="button"
+          onClick={(e) => add((e.currentTarget.previousElementSibling as HTMLInputElement) ?? null)}
+          className="h-12 shrink-0 rounded-md bg-surface-container-low px-4 text-body-sm font-semibold text-primary active:scale-95"
+        >
+          Tambah
+        </button>
+      </div>
+    </div>
+  )
+}

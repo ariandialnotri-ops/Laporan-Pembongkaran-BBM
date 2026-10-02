@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { CircleCheck, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
+import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -12,7 +13,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso, minutesBetween, nowHm } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
+import { genId } from '@/lib/image'
+import { loPickable, loStatus, loStatusMeta } from '@/lib/plan'
+import { shiftLabel } from '@/lib/shift'
 import {
+  SIGNERS,
   newCompartment,
   newDensityTest,
   type AtgReading,
@@ -25,7 +30,9 @@ import {
   type ReportSummary,
   type Rules,
   type Settings,
+  type SignerKey,
   type StepDef,
+  type Totalisator,
 } from '@/lib/sop'
 import { TANKS, tankForProduk, type VolumeResult } from '@/lib/tank'
 import { cn } from '@/lib/utils'
@@ -62,8 +69,8 @@ function Num({ id, value, onChange, placeholder, suffix }: { id?: string; value:
   return <Input id={id} numeric inputMode="decimal" autoComplete="off" value={value} placeholder={placeholder} suffix={suffix} onChange={(e) => onChange(e.target.value)} />
 }
 
-function Fixed({ value, placeholder }: { value: string; placeholder?: string }) {
-  return <Input value={value} placeholder={placeholder} readOnly tabIndex={-1} className="opacity-80" />
+function Fixed({ id, value, placeholder }: { id?: string; value: string; placeholder?: string }) {
+  return <Input id={id} value={value} placeholder={placeholder} readOnly tabIndex={-1} className="opacity-80" />
 }
 
 function StepPhotos({ step, report, addPhotos, removePhoto, photoBusy, srcOf, beforePick, readOnly, only }: StepProps & { only?: string[] }) {
@@ -98,7 +105,7 @@ function volumeBanner(result: VolumeResult | null, label: string, compareTo?: nu
     title: `${label}: ${formatLiter(result.volume, 1)}`,
     detail: [diff !== null ? `Selisih ${compareLabel} ${formatSigned(diff, 0, ' L')}` : null, result.anomaly ? 'cek tabel asli di sekitar ketinggian ini' : null]
       .filter(Boolean)
-      .join(' • ') || undefined,
+      .join(', ') || undefined,
   }
 }
 
@@ -109,6 +116,18 @@ export function StepContent(props: StepProps) {
   const x = evaluation.derived
 
   switch (step.id) {
+    case 'mt':
+      return (
+        <>
+          <StepPhotos {...props} />
+          <Section>
+            <Field label="No. polisi mobil tangki" htmlFor="nopol">
+              <Input id="nopol" autoCapitalize="characters" autoComplete="off" placeholder="Contoh: AG 8123 UK" value={d.nopol} onChange={(e) => setData({ nopol: e.target.value.toUpperCase() })} />
+            </Field>
+          </Section>
+        </>
+      )
+
     case 'lo':
       return <LoStep {...props} />
 
@@ -126,8 +145,8 @@ export function StepContent(props: StepProps) {
                   <Field label="Tinggi tera" htmlFor={`tera-${c.id}`}>
                     <Num id={`tera-${c.id}`} suffix="mm" placeholder="1250" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
-                  <Field label="Kepekaan" htmlFor={`kep-${c.id}`}>
-                    <Num id={`kep-${c.id}`} suffix="L/mm" placeholder="6,5" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
+                  <Field label="Kapasitas kompartemen" htmlFor={`kap-${c.id}`}>
+                    <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                 </div>
               </div>
@@ -151,7 +170,7 @@ export function StepContent(props: StepProps) {
           <Section>
             {step.id === 'atg_before' && (
               <Field label="Tangki pendam" htmlFor="tangki">
-                <Select value={d.tankId || undefined} onValueChange={(v) => setData({ tankId: v })}>
+                <Select value={d.tankId} onValueChange={(v) => setData({ tankId: v })}>
                   <SelectTrigger id="tangki">
                     <SelectValue placeholder="Pilih tangki" />
                   </SelectTrigger>
@@ -176,7 +195,7 @@ export function StepContent(props: StepProps) {
                 <Num id={`${key}-s`} suffix="°C" value={reading.suhu} onChange={(v) => setReading({ suhu: v })} />
               </Field>
             </div>
-            {step.id === 'atg_after' && (
+            {step.id === 'atg_after' && !d.totalisator.length && (
               <Field label="Penjualan selama bongkar (opsional)" htmlFor="jual">
                 <Num id="jual" suffix="L" placeholder="0" value={d.penjualanSelamaBongkar} onChange={(v) => setData({ penjualanSelamaBongkar: v })} />
               </Field>
@@ -187,6 +206,7 @@ export function StepContent(props: StepProps) {
               <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', parseAngka(reading.volume), 'ATG vs tabel')} />
             )}
           </Section>
+          <TotalisatorSection {...props} fase={step.id === 'atg_before' ? 'awal' : 'akhir'} />
           {step.id === 'atg_after' && (
             <Section>
               <Ladder
@@ -195,9 +215,9 @@ export function StepContent(props: StepProps) {
                   ['Volume DO diterima', formatLiter(x.volumeDO ?? 0)],
                   ['Penjualan selama bongkar', formatLiter(x.penjualan)],
                   ['Stok akhir teoritis', formatLiter(x.stokTeoritis ?? 0)],
-                  ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '—'],
+                  ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
                 ]}
-                total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '—']}
+                total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
               />
             </Section>
           )}
@@ -224,16 +244,7 @@ export function StepContent(props: StepProps) {
       )
 
     case 'segel':
-      return (
-        <>
-          <StepPhotos {...props} />
-          <Section>
-            <CheckRow checked={d.segelSesuai} onChange={(v) => setData({ segelSesuai: v })}>
-              Segel kompartemen atas & bawah utuh dan sesuai list DO/LO
-            </CheckRow>
-          </Section>
-        </>
-      )
+      return <SegelStep {...props} />
 
     case 'dip_before':
     case 'dip_after': {
@@ -251,13 +262,14 @@ export function StepContent(props: StepProps) {
             {step.id === 'dip_after' && (
               <Ladder
                 rows={[
-                  ['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '—'],
+                  ['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-'],
                   ['Volume DO', formatLiter(x.volumeDO ?? 0)],
                 ]}
-                total={['Gain / loss (deepstick)', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '—']}
+                total={['Gain / loss (deepstick)', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']}
               />
             )}
           </Section>
+          {step.id === 'dip_after' && <SignersSection report={report} setData={setData} readOnly={props.readOnly} keys={['penerima', 'security', 'supir', 'pengawas', 'abh']} />}
         </>
       )
     }
@@ -307,8 +319,8 @@ export function StepContent(props: StepProps) {
             <Section key={c.id}>
               <span className="text-tag uppercase text-primary">Kompartemen {c.no}</span>
               <div className="grid grid-cols-2 gap-space-sm">
-                <Field label="Tinggi tera">
-                  <Fixed value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
+                <Field label="Tinggi tera" htmlFor={`tera-fix-${c.id}`}>
+                  <Fixed id={`tera-fix-${c.id}`} value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
                   <Num id={`dip-${c.id}`} suffix="mm" value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
@@ -351,7 +363,7 @@ export function StepContent(props: StepProps) {
           <StepPhotos {...props} />
           <Section>
             <CheckRow checked={d.fillportSesuai} onChange={(v) => setData({ fillportSesuai: v })}>
-              Hose terpasang baik dan fillport sesuai produk ({d.produk || '-'} → {x.tank ? x.tank.label : 'tangki belum dipilih'})
+              Hose MT terpasang baik pada fillport yang sesuai produk ({d.produk || '-'} ke {x.tank ? x.tank.label : 'tangki belum dipilih'})
             </CheckRow>
           </Section>
         </>
@@ -363,31 +375,34 @@ export function StepContent(props: StepProps) {
 }
 
 function LoStep(props: StepProps) {
-  const { report, evaluation, setData, rules, plans, usedLoIds } = props
+  const { report, evaluation, setData, plans, usedLoIds, settings } = props
   const d = report.data
   const x = evaluation.derived
   const plan = plans.find((p) => p.id === d.planId) ?? null
+  // LO milik laporan ini tetap dapat dipilih walau statusnya sudah Delivered.
+  const own = (lo: PlanLo) => usedLoIds.get(lo.id)?.id === report.id
   const selectable = plans
-    .filter((p) => p.id === d.planId || p.los.some((lo) => !usedLoIds.has(lo.id)))
+    .filter((p) => p.id === d.planId || (p.noSO.trim() && p.los.some((lo) => loPickable(lo, usedLoIds))))
     .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''))
 
   const selectPlan = (planId: string) => {
     const p = plans.find((pl) => pl.id === planId)
-    setData({
-      planId,
-      noSO: p?.noSO ?? '',
-      produk: p?.produk ?? '',
-      soldTo: p?.soldTo || d.soldTo,
-      loIds: [],
-      noLOs: [],
-      jumlahDO: '',
-      tankId: tankForProduk(p?.produk)?.id ?? '',
-    })
+    setData({ planId, noSO: p?.noSO ?? '', shipTo: p?.shipTo || d.shipTo, loIds: [], noLOs: [], produk: '', volumeDO: '', segelLO: [], tankId: '' })
   }
   const toggleLo = (lo: PlanLo, checked: boolean) => {
     const loIds = checked ? [...d.loIds, lo.id] : d.loIds.filter((id) => id !== lo.id)
     const picked = plan!.los.filter((l) => loIds.includes(l.id))
-    setData({ loIds, noLOs: picked.map((l) => l.noLO), jumlahDO: picked.length ? String(picked.reduce((s, l) => s + (Number(l.jumlahDO) || 0), 0)) : '' })
+    const produk = picked[0]?.produk ?? ''
+    const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    setData({
+      loIds,
+      noLOs: picked.map((l) => l.noLO),
+      produk,
+      volumeDO: picked.length ? String(picked.reduce((s, l) => s + l.volume, 0)) : '',
+      segelLO: [...new Set(picked.flatMap((l) => l.segel))],
+      tankId: produk !== d.produk ? (tankForProduk(produk)?.id ?? '') : d.tankId,
+      totalisator: produk !== d.produk ? nozzles.map((n) => ({ nozzleId: n.id, nozzle: n.nama, awal: '', akhir: '' })) : d.totalisator,
+    })
   }
   const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
   const removeComp = (id: string) =>
@@ -395,7 +410,7 @@ function LoStep(props: StepProps) {
 
   const depotBanner = x.depotCalc
     ? x.d15Depot !== null && Math.abs(x.d15Depot - x.depotCalc.value) > 0.0005
-      ? { tone: 'error' as BannerTone, title: 'Density 15°C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)} • dokumen ${formatDensity(x.d15Depot)}` }
+      ? { tone: 'error' as BannerTone, title: 'Density 15°C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
       : { tone: 'success' as BannerTone, title: `Hitungan D15 depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
     : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek D15' }
 
@@ -405,17 +420,17 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">SO & LO dari Plan Kirim</span>
         {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Plan Kirim masih kosong" detail="SO/LO tidak bisa diketik manual — minta pengawas mengisi Plan Kirim" />
+          <StatusBanner tone="error" title="Plan Kirim masih kosong" detail="SO/LO tidak bisa diketik manual. Isi SO & LO di menu Plan Kirim." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
-            <Select value={d.planId || undefined} onValueChange={selectPlan}>
+            <Select value={d.planId} onValueChange={selectPlan}>
               <SelectTrigger id="so">
                 <SelectValue placeholder="Pilih SO yang datang" />
               </SelectTrigger>
               <SelectContent>
                 {selectable.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.noSO} · {p.produk} · {formatTanggalIso(p.tanggal)}
+                    SO {p.noSO}, {p.supplyPoint || '-'}, kirim {formatTanggalIso(p.tanggal)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -426,12 +441,17 @@ function LoStep(props: StepProps) {
           <div className="flex flex-col gap-space-xs">
             <span className="text-tag uppercase text-on-surface-variant">Nomor LO yang datang</span>
             {plan.los.map((lo) => {
-              const usedBy = usedLoIds.get(lo.id)
-              const elsewhere = usedBy && usedBy.id !== report.id
+              const checked = d.loIds.includes(lo.id)
+              const mine = own(lo)
+              const st = loStatus(lo, usedLoIds)
+              const blocked = !checked && !mine && !loPickable(lo, usedLoIds)
+              const lainProduk = !checked && !!d.produk && d.loIds.length > 0 && lo.produk !== d.produk
               return (
-                <CheckRow key={lo.id} checked={d.loIds.includes(lo.id)} disabled={!!elsewhere} onChange={(v) => toggleLo(lo, v)}>
-                  <span className="tabular">LO {lo.noLO}</span> — {lo.jumlahDO} DO ({formatLiter(lo.jumlahDO * rules.literPerDO)})
-                  {elsewhere && <span className="text-on-surface-variant"> · sudah dibongkar {usedBy.nopol}</span>}
+                <CheckRow key={lo.id} checked={checked} disabled={blocked || lainProduk} onChange={(v) => toggleLo(lo, v)}>
+                  <span className="tabular font-semibold">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>, {lo.produk} {formatLiter(lo.volume)}
+                  {lo.noLOLama && <span className="tabular text-on-surface-variant"> (alih supply dari LO {lo.noLOLama})</span>}
+                  {blocked && <span className="text-on-surface-variant">. Status {loStatusMeta(st).label}</span>}
+                  {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
                 </CheckRow>
               )
             })}
@@ -445,34 +465,37 @@ function LoStep(props: StepProps) {
             <Input id="jam-datang" type="time" value={d.jamDatang} onChange={(e) => setData({ jamDatang: e.target.value })} />
           </Field>
         </div>
+        <span className="text-body-sm text-on-surface-variant">
+          Tercatat sebagai bongkaran <b className="text-on-surface">{shiftLabel(x.shift)}</b>
+        </span>
       </Section>
 
       <Section>
         <span className="text-tag uppercase text-primary">Data LO mobil tangki</span>
-        <Field label="No. polisi mobil tangki" htmlFor="nopol">
-          <Input id="nopol" autoCapitalize="characters" autoComplete="off" placeholder="Contoh: AG 8123 UK" value={d.nopol} onChange={(e) => setData({ nopol: e.target.value.toUpperCase() })} />
-        </Field>
+        <div className="inset-field tabular rounded-md px-3.5 py-3 text-body-md text-on-surface">MT {d.nopol || '-'}</div>
         <Field label="Nama lengkap driver" htmlFor="driver">
           <Input id="driver" autoComplete="off" value={d.namaDriver} onChange={(e) => setData({ namaDriver: e.target.value })} />
         </Field>
+        <Field label="Perusahaan pengangkut" htmlFor="pengangkut">
+          <Input id="pengangkut" autoComplete="off" value={d.perusahaanPengangkut} onChange={(e) => setData({ perusahaanPengangkut: e.target.value })} />
+        </Field>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="No. Sold To" htmlFor="soldto">
-            <Input id="soldto" autoComplete="off" value={d.soldTo} onChange={(e) => setData({ soldTo: e.target.value })} />
+          <Field label="No. Ship To" htmlFor="shipto">
+            <Input id="shipto" autoComplete="off" inputMode="numeric" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
           </Field>
-          <Field label="Produk">
-            <Fixed value={d.produk} placeholder="dari SO" />
+          <Field label="Produk" htmlFor="lo-produk">
+            <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />
           </Field>
-          <Field label="Nomor SO">
-            <Fixed value={d.noSO} placeholder="dari Plan" />
+          <Field label="Nomor SO" htmlFor="lo-so">
+            <Fixed id="lo-so" value={d.noSO} placeholder="dari Plan" />
           </Field>
-          <Field label="Nomor LO">
-            <Fixed value={d.noLOs.join(', ')} placeholder="dari Plan" />
+          <Field label="Nomor LO" htmlFor="lo-lo">
+            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder="dari Plan" />
           </Field>
         </div>
-        <Field label="Jumlah DO" htmlFor="jdo">
-          <Num id="jdo" suffix="DO" value={d.jumlahDO} onChange={(v) => setData({ jumlahDO: v })} />
+        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan Kirim.' : undefined}>
+          <Num id="volumedo" suffix="L" value={d.volumeDO} onChange={(v) => setData({ volumeDO: v })} />
         </Field>
-        <Ladder rows={[['Per DO', formatLiter(rules.literPerDO)]]} total={['Volume DO', formatLiter(x.volumeDO ?? 0)]} />
       </Section>
 
       <Section>
@@ -541,7 +564,7 @@ function DensityStep(props: StepProps) {
         </div>
         <span className="tabular text-numeric-lg font-bold text-on-surface">{formatDensity(x.d15Depot)}</span>
         <span className="text-body-sm text-on-surface-variant">
-          {d.produk || 'Produk'} · selisih di atas toleransi menghentikan pembongkaran
+          {d.produk || 'Produk'}. Selisih di atas toleransi menghentikan pembongkaran.
         </span>
       </GlassCard>
       <StepPhotos {...props} />
@@ -554,7 +577,7 @@ function DensityStep(props: StepProps) {
             </Button>
           </div>
           <Field label="Kompartemen">
-            <Select value={r.kompartemenId || undefined} onValueChange={(v) => setTest(r.id, { kompartemenId: v })}>
+            <Select value={r.kompartemenId} onValueChange={(v) => setTest(r.id, { kompartemenId: v })}>
               <SelectTrigger>
                 <SelectValue placeholder="Pilih kompartemen" />
               </SelectTrigger>
@@ -577,17 +600,17 @@ function DensityStep(props: StepProps) {
           </div>
           <Ladder
             rows={[
-              ['Density @15°C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '—'],
+              ['Density @15°C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
               ['D15 dokumen depot', formatDensity(x.d15Depot)],
             ]}
-            total={['Selisih', r.selisih !== null ? formatDensitySigned(r.selisih) : '—']}
+            total={['Selisih', r.selisih !== null ? formatDensitySigned(r.selisih) : '-']}
           />
           <StatusBanner
             {...(r.ok === null
               ? IDLE
               : {
                   tone: (r.ok ? 'success' : 'error') as BannerTone,
-                  title: r.ok ? 'Density sesuai' : 'Anomali density — bongkar dihentikan',
+                  title: r.ok ? 'Density sesuai' : 'Anomali density, bongkar dihentikan',
                   detail: r.d15 ? METHOD_LABEL[r.d15.method] : undefined,
                 })}
           />
@@ -614,12 +637,12 @@ function SettleTimer({ d, setData, rules }: { d: ReportData; setData: StepProps[
     banner =
       settle >= rules.atgSettleMinutes
         ? { tone: 'success', title: `ATG dibaca ${settle} menit setelah bongkar` }
-        : { tone: 'error', title: `Baru ${settle} menit — minimal ${rules.atgSettleMinutes} menit` }
+        : { tone: 'error', title: `Baru ${settle} menit, minimal ${rules.atgSettleMinutes} menit` }
   else if (elapsed !== null)
     banner =
       elapsed < rules.atgSettleMinutes
         ? { tone: 'idle', title: `Minyak distabilkan: ${elapsed} menit`, detail: `Tunggu ${rules.atgSettleMinutes - elapsed} menit lagi` }
-        : { tone: 'success', title: `Sudah ${elapsed} menit — ATG boleh dibaca` }
+        : { tone: 'success', title: `Sudah ${elapsed} menit, ATG boleh dibaca` }
   return (
     <Section>
       <div className="grid grid-cols-2 gap-space-sm">
@@ -648,7 +671,7 @@ function ApprovalCard({ report, setData, settings, rules, evaluation }: StepProp
   if (d.teraApproval) {
     return (
       <Section>
-        <StatusBanner tone="success" title={`Diizinkan: ${d.teraApproval.nama}`} detail={`${d.teraApproval.jabatan} • ${new Date(d.teraApproval.waktu).toLocaleString('id-ID')}`} />
+        <StatusBanner tone="success" title={`Diizinkan: ${d.teraApproval.nama}`} detail={`${d.teraApproval.jabatan}, ${new Date(d.teraApproval.waktu).toLocaleString('id-ID')}`} />
         <span className="text-body-sm text-on-surface-variant">Alasan: {d.teraApproval.alasan}</span>
         <Button variant="glass" size="pill" className="self-start" onClick={() => setData({ teraApproval: null })}>
           Batalkan izin
@@ -694,5 +717,184 @@ function ApprovalCard({ report, setData, settings, rules, evaluation }: StepProp
         Beri izin lanjut
       </Button>
     </GlassCard>
+  )
+}
+
+/** Totalisator nozzle produk ini: awal di tahap ATG sebelum, akhir di tahap ATG setelah. */
+function TotalisatorSection({ report, setData, settings, evaluation, readOnly, fase }: StepProps & { fase: 'awal' | 'akhir' }) {
+  const d = report.data
+  const rows = d.totalisator
+  const configured = settings.nozzles.filter((n) => n.produk === d.produk)
+  const setRow = (i: number, patch: Partial<Totalisator>) => setData({ totalisator: rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) })
+  const results = evaluation.derived.totalisator
+  return (
+    <Section>
+      <div className="flex flex-col">
+        <span className="text-tag uppercase text-primary">Penjualan selama pembongkaran</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {fase === 'awal' ? 'Catat totalisator awal setiap nozzle ' : 'Catat totalisator akhir setiap nozzle '}
+          {d.produk || 'produk ini'}.
+        </span>
+      </div>
+      {rows.length === 0 && (
+        <span className="text-body-sm text-on-surface-variant">
+          {configured.length ? 'Nozzle belum dimuat untuk bongkaran ini.' : 'Belum ada nozzle untuk produk ini di Pengaturan. Tambahkan manual bila ada penjualan saat bongkar.'}
+        </span>
+      )}
+      {rows.map((r, i) => (
+        <div key={r.nozzleId} className="grid grid-cols-[1fr_1fr] items-end gap-space-sm">
+          {r.nozzleId.startsWith('manual') && !readOnly ? (
+            <Field label="Nozzle" htmlFor={`nz-${r.nozzleId}`}>
+              <Input id={`nz-${r.nozzleId}`} value={r.nozzle} placeholder="Nozzle 1" onChange={(e) => setRow(i, { nozzle: e.target.value })} />
+            </Field>
+          ) : (
+            <div className="flex min-h-12 flex-col justify-center">
+              <span className="text-body-md font-semibold text-on-surface">{r.nozzle}</span>
+              {fase === 'akhir' && results[i]?.jual !== null && (
+                <span className="tabular text-body-sm text-on-surface-variant">Terjual {formatLiter(results[i].jual ?? 0, 2)}</span>
+              )}
+            </div>
+          )}
+          <Field label={fase === 'awal' ? 'Totalisator awal' : 'Totalisator akhir'} htmlFor={`tot-${fase}-${r.nozzleId}`}>
+            <Num id={`tot-${fase}-${r.nozzleId}`} value={fase === 'awal' ? r.awal : r.akhir} onChange={(v) => setRow(i, fase === 'awal' ? { awal: v } : { akhir: v })} />
+          </Field>
+        </div>
+      ))}
+      {!readOnly && (
+        <div className="flex flex-wrap gap-space-xs">
+          {configured.length > 0 && rows.length === 0 && (
+            <Button variant="soft" size="sm" onClick={() => setData({ totalisator: configured.map((n) => ({ nozzleId: n.id, nozzle: n.nama, awal: '', akhir: '' })) })}>
+              Muat nozzle {d.produk}
+            </Button>
+          )}
+          {fase === 'awal' && (
+            <Button variant="soft" size="sm" onClick={() => setData({ totalisator: [...rows, { nozzleId: genId('manual'), nozzle: `Nozzle ${rows.length + 1}`, awal: '', akhir: '' }] })}>
+              <Plus aria-hidden="true" />
+              Nozzle
+            </Button>
+          )}
+          {fase === 'awal' && rows.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setData({ totalisator: rows.slice(0, -1) })}>
+              <Trash2 aria-hidden="true" />
+              Hapus terakhir
+            </Button>
+          )}
+        </div>
+      )}
+      {fase === 'akhir' && rows.length > 0 && (
+        <Ladder rows={[]} total={['Total penjualan', formatLiter(evaluation.derived.penjualan, 2)]} />
+      )}
+    </Section>
+  )
+}
+
+/** Tahap segel: satu foto atas & bawah, nomor segel tiap kompartemen dicocokkan dengan data LO. */
+function SegelStep(props: StepProps) {
+  const { report, setData } = props
+  const d = report.data
+  const daftar = d.segelLO
+  const setSegel = (id: string, noSegel: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, noSegel } : c)) })
+  const asing = d.compartments.filter((c) => c.noSegel.trim() && daftar.length > 0 && !daftar.includes(c.noSegel.trim()))
+  return (
+    <>
+      <div role="note" className="flex flex-col gap-space-xs rounded-lg border border-error/40 bg-error-container/60 p-space-md">
+        <span className="flex items-center gap-space-xs text-body-md font-bold text-on-error-container">
+          <TriangleAlert aria-hidden="true" className="size-5 shrink-0 text-error" />
+          Cocokkan nomor segel dengan dokumen LO
+        </span>
+        {daftar.length ? (
+          <span className="tabular text-body-md font-semibold text-on-error-container">{daftar.join(', ')}</span>
+        ) : (
+          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (Plan Kirim). Cocokkan langsung dengan dokumen LO fisik.</span>
+        )}
+        <span className="text-body-sm text-on-error-container">Segel rusak atau nomor berbeda: hentikan bongkar dan hubungi pengawas.</span>
+      </div>
+      <StepPhotos {...props} />
+      <Section>
+        <span className="text-tag uppercase text-primary">Nomor segel per kompartemen</span>
+        <datalist id="segel-lo">
+          {daftar.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+        <div className="grid grid-cols-2 gap-space-sm">
+          {d.compartments.map((c, i) => (
+            <Field key={c.id} label={`Kompartemen ${c.no || '-'}`} htmlFor={`segel-${c.id}`}>
+              <Input
+                id={`segel-${c.id}`}
+                list="segel-lo"
+                autoComplete="off"
+                inputMode="numeric"
+                placeholder={daftar[i] ?? 'Nomor segel'}
+                value={c.noSegel}
+                onChange={(e) => setSegel(c.id, e.target.value)}
+              />
+            </Field>
+          ))}
+        </div>
+        {daftar.length > 0 && d.compartments.some((c) => !c.noSegel) && (
+          <Button
+            variant="soft"
+            size="sm"
+            className="self-start"
+            onClick={() => setData({ compartments: d.compartments.map((c, i) => ({ ...c, noSegel: c.noSegel || daftar[i] || '' })) })}
+          >
+            Isi sesuai urutan data LO
+          </Button>
+        )}
+        {asing.length > 0 && (
+          <StatusBanner tone="error" title="Nomor segel tidak ada di data LO" detail={asing.map((c) => `Kompartemen ${c.no}: ${c.noSegel}`).join(', ')} />
+        )}
+        <CheckRow checked={d.segelSesuai} onChange={(v) => setData({ segelSesuai: v })}>
+          Segel kompartemen atas & bawah utuh dan nomornya sesuai data LO
+        </CheckRow>
+      </Section>
+    </>
+  )
+}
+
+/** Nama dan tanda tangan digital penerima, security, supir tangki, pengawas, dan ABH. */
+export function SignersSection({
+  report,
+  setData,
+  readOnly,
+  keys,
+  title = 'Tanda tangan',
+}: {
+  report: Report
+  setData: (patch: Partial<ReportData>) => void
+  readOnly: boolean
+  keys: SignerKey[]
+  title?: string
+}) {
+  const d = report.data
+  const ttd = d.ttd ?? {}
+  const set = (k: SignerKey, patch: { nama?: string; img?: string }) => {
+    const cur = ttd[k] ?? { nama: k === 'supir' ? d.namaDriver : '', img: '', at: '' }
+    setData({ ttd: { ...ttd, [k]: { ...cur, ...patch, at: patch.img ? new Date().toISOString() : cur.at } } })
+  }
+  return (
+    <Section>
+      <div className="flex flex-col">
+        <span className="text-tag uppercase text-primary">{title}</span>
+        <span className="text-body-sm text-on-surface-variant">Penerima, security, dan supir tangki wajib. Pengawas dan ABH dapat menandatangani nanti dari laporan.</span>
+      </div>
+      {SIGNERS.filter((s) => keys.includes(s.key)).map((s) => {
+        const t = ttd[s.key]
+        const nama = t?.nama || (s.key === 'supir' ? d.namaDriver : '')
+        return (
+          <div key={s.key} className="flex flex-col gap-space-xs border-t border-outline-variant/50 pt-space-sm first:border-t-0 first:pt-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-body-md font-semibold text-on-surface">{s.label}</span>
+              {t?.img ? <Pill tone="success">Sudah tanda tangan</Pill> : <Pill tone={s.wajib ? 'error' : 'neutral'}>{s.wajib ? 'Wajib' : 'Bisa nanti'}</Pill>}
+            </div>
+            <Field label={`Nama ${s.label.toLowerCase()}`} htmlFor={`ttd-nama-${s.key}`}>
+              <Input id={`ttd-nama-${s.key}`} autoComplete="off" disabled={readOnly && !!t?.img} value={nama} onChange={(e) => set(s.key, { nama: e.target.value })} />
+            </Field>
+            <SignaturePad label={s.label} value={t?.img ?? ''} disabled={readOnly && !!t?.img} onChange={(img) => set(s.key, { img, nama })} />
+          </div>
+        )
+      })}
+    </Section>
   )
 }

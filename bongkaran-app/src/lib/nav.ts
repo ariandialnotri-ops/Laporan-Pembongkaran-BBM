@@ -9,7 +9,7 @@ export type NavItem = {
 
 /** Four docks, like Tepat Setoran. Five would crowd the floating bar. */
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Beranda', title: 'Beranda Bongkaran', icon: ChartNoAxesCombined },
+  { href: '/', label: 'Beranda', title: 'HOME', icon: ChartNoAxesCombined },
   { href: '/input', label: 'Input', title: 'Input Bongkaran & Q&Q', icon: ClipboardPlus },
   { href: '/laporan', label: 'Laporan', title: 'Laporan & Berita Acara', icon: FileText },
   { href: '/profil', label: 'Profil', title: 'Profil Pengguna', icon: UserRound },
@@ -21,6 +21,8 @@ const EXTRA_TITLES: [string, string][] = [
   ['/kalkulator', 'Kalkulator'],
   ['/pengaturan', 'Pengaturan SPBU'],
   ['/anggota', 'Anggota SPBU'],
+  ['/qq', 'Q&Q Harian'],
+  ['/stok', 'Stok Shift'],
 ]
 
 export function isRouteActive(pathname: string, href: string) {
@@ -31,5 +33,5 @@ export function isRouteActive(pathname: string, href: string) {
 export function titleFor(pathname: string) {
   const extra = EXTRA_TITLES.find(([href]) => isRouteActive(pathname, href))
   if (extra) return extra[1]
-  return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'Bongkaran BBM'
+  return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'FLOQ'
 }

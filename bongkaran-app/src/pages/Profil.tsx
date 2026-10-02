@@ -56,7 +56,7 @@ export function Profil() {
         </h2>
         <div className="grid grid-cols-3 gap-space-xs">
           <StatTile label="Selesai" value={selesai} hint="Bongkaran" icon={Truck} />
-          <StatTile label="Kepatuhan" value={selesai + anomali > 0 ? `${Math.round((selesai / (selesai + anomali)) * 100)}%` : '—'} hint="Q&Q sesuai" icon={FlaskConical} tone="primary" />
+          <StatTile label="Kepatuhan" value={selesai + anomali > 0 ? `${Math.round((selesai / (selesai + anomali)) * 100)}%` : '-'} hint="Q&Q sesuai" icon={FlaskConical} tone="primary" />
           <StatTile label="Laporan" value={bulanIni} hint="Bulan ini" icon={FileText} tone="primary" />
         </div>
       </section>

@@ -12,7 +12,7 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<t
       className={cn(
         'inset-field flex h-12 w-full items-center justify-between gap-2 rounded-md px-3.5 text-left text-body-lg text-on-surface',
         'transition-shadow duration-200 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        'data-[placeholder]:text-outline',
+        'data-[placeholder]:text-on-surface-variant',
         className,
       )}
       {...props}
