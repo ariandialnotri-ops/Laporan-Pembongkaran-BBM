@@ -18,6 +18,8 @@ const Laporan = lazy(() => import('@/pages/Laporan').then((m) => ({ default: m.L
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
+const QqRingkasan = lazy(() => import('@/pages/QqRingkasan').then((m) => ({ default: m.QqRingkasan })))
+const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
 
@@ -42,12 +44,14 @@ function Gate() {
           <Route path="/input" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
           <Route path="/laporan" element={<Laporan />} />
+          <Route path="/laporan/persediaan" element={<Persediaan />} />
           <Route path="/profil" element={<Profil />} />
           <Route path="/plan" element={<Plan />} />
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
           <Route path="/anggota" element={<Anggota />} />
-          <Route path="/qq" element={<QqHarian />} />
+          <Route path="/qq" element={<QqRingkasan />} />
+          <Route path="/qq/uji" element={<QqHarian />} />
           <Route path="/stok" element={<StokShift />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>

@@ -418,9 +418,9 @@ function LoStep(props: StepProps) {
     <>
       <StepPhotos {...props} />
       <Section>
-        <span className="text-tag uppercase text-primary">SO & LO dari Plan Kirim</span>
+        <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
         {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Plan Kirim masih kosong" detail="SO/LO tidak bisa diketik manual. Isi SO & LO di menu Plan Kirim." />
+          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Bongkar, tab Plan SO & LO." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -493,7 +493,7 @@ function LoStep(props: StepProps) {
             <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder="dari Plan" />
           </Field>
         </div>
-        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan Kirim.' : undefined}>
+        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan.' : undefined}>
           <Num id="volumedo" suffix="L" value={d.volumeDO} onChange={(v) => setData({ volumeDO: v })} />
         </Field>
       </Section>
@@ -805,7 +805,7 @@ function SegelStep(props: StepProps) {
         {daftar.length ? (
           <span className="tabular text-body-md font-semibold text-on-error-container">{daftar.join(', ')}</span>
         ) : (
-          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (Plan Kirim). Cocokkan langsung dengan dokumen LO fisik.</span>
+          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (tab Plan SO & LO). Cocokkan langsung dengan dokumen LO fisik.</span>
         )}
         <span className="text-body-sm text-on-error-container">Segel rusak atau nomor berbeda: hentikan bongkar dan hubungi pengawas.</span>
       </div>

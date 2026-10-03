@@ -33,19 +33,24 @@ npm run lint
 
 ## Layar
 
-| Rute         | Isi |
-|--------------|-----|
-| `/`          | HOME: total bongkaran hari ini, pengingat stok awal shift, aksi cepat, ringkasan status SO & LO, kalender mingguan (ketuk tanggal untuk detail penerimaan, kualitas, kuantitas), dashboard Kualitas (D15 3 bongkaran terakhir per produk) dan Kuantitas (tera bejana per nozzle), riwayat |
-| `/input`     | Mulai bongkaran baru (terkunci sampai stok awal shift diisi) dan daftar bongkaran berjalan |
-| `/input/:id` | Form bongkaran 14 langkah SOP dalam tiga fase (Bongkaran, Quality, Quantity) + tab Finish |
-| `/plan`      | Permintaan MS2 (tanggal/jam, shift 1/2, supply point, Ship To, PO SAP opsional, produk & volume liter). SO dan LO diisi dari daftar; status LO Proses, OS, Planned, On Delivery, Alih Supply (LO lama & baru), Deleted, Delivered, Closed; nomor segel per LO |
-| `/stok`      | Stok awal tiap produk di awal shift (wajib) dan pengeluaran dispenser di akhir shift |
-| `/qq`        | Q&Q harian: density & suhu per produk (pump test untuk kualitas), tera bejana 20 L per nozzle (merah bila di bawah -60 ml) |
-| `/kalkulator`| Density @15°C (ASTM 53) dan volume tangki pendam dari tinggi deepstick/ATG |
-| `/laporan`   | Berita Acara dan Catatan Persediaan BBM (Excel/PDF sesuai template), filter tanggal dan status |
-| `/profil`    | Profil pengguna, statistik, menu Plan/Kalkulator/Pengaturan/Anggota |
-| `/pengaturan`| Identitas SPBU, nama default petugas/pengawas/security/ABH, perusahaan pengangkut, daftar nozzle dispenser, aturan toleransi, data acuan |
-| `/anggota`   | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
+Dock bawah berisi 5 menu. Menu yang berisi beberapa halaman memakai sub-tab
+di bawah header, dengan satu kalimat penjelasan sub-tab aktif.
+
+| Menu | Rute | Isi |
+|------|------|-----|
+| Beranda | `/` | HOME: kartu shift, daftar **Perlu dikerjakan** (stok awal, uji Q&Q shift, bongkaran berjalan, LO dikirim/belum terbit, nozzle lewat batas, bongkaran perlu dicek), angka hari ini, kalender (ketuk tanggal untuk detail) |
+| Bongkar | `/input` | Sub-tab **Bongkaran**: mulai bongkaran baru (terkunci sampai stok awal shift diisi) dan bongkaran berjalan |
+| | `/input/:id` | Form bongkaran 14 langkah SOP (Bongkaran, Quality, Quantity) + tab Finish |
+| | `/plan` | Sub-tab **Plan SO & LO**: status LO, daftar plan, edit SO/LO/segel; permintaan MS2 baru dibuka di bottom sheet |
+| Q&Q | `/qq` | Sub-tab **Ringkasan**: status uji shift ini, kualitas (D15 3 bongkaran terakhir per produk), kuantitas (tera bejana per nozzle) |
+| | `/qq/uji` | Sub-tab **Uji Harian**: density & suhu per produk, tera bejana 20 L per nozzle (merah bila di bawah -60 ml) |
+| | `/stok` | Sub-tab **Stok Shift**: stok awal tiap produk (wajib) dan pengeluaran dispenser |
+| Laporan | `/laporan` | Sub-tab **Berita Acara**: saring tanggal & status; kartu di HP, tabel rekap di layar lebar |
+| | `/laporan/persediaan` | Sub-tab **Persediaan BBM**: pratinjau per shift, unduh Excel/PDF sesuai template |
+| Profil | `/profil` | Akun, statistik, Kalkulator, Pengaturan, Anggota |
+| | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam dari tinggi deepstick/ATG |
+| | `/pengaturan` | Identitas SPBU, nama default petugas/pengawas/security/ABH, perusahaan pengangkut, nozzle dispenser, toleransi, data acuan |
+| | `/anggota` | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
 
 ## Alur SOP bongkaran
 
@@ -101,9 +106,9 @@ Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO
 ```
 src/
   components/ui/         primitif kaca: glass-card, pill, button, input, select, tabs, toast, spring-value
-  components/shell/      header, dock navigasi, ambient orbs, app-shell, app-provider (state global)
+  components/shell/      header, dock navigasi, sub-tab menu, ambient orbs, app-shell, app-provider (state global)
   components/bongkaran/  langkah SOP, slot foto, panel finish, tanda tangan, filter tanggal, stok-gate, stat-tile, qq-pill
-  pages/                 Dashboard, FormInput, FormBongkar, Plan, StokShift, QqHarian, Kalkulator, Laporan, Profil, Pengaturan, Anggota, Login
+  pages/                 Dashboard, FormInput, FormBongkar, Plan, QqRingkasan, QqHarian, StokShift, Laporan, Persediaan, Kalkulator, Profil, Pengaturan, Anggota, Login
   lib/sop.ts             definisi 14 langkah, validasi & hitungan bongkaran
   lib/plan.ts            status SO/LO
   lib/shift.ts           pembagian shift

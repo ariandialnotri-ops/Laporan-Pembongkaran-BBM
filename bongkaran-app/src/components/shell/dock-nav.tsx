@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { isRouteActive, NAV_ITEMS } from '@/lib/nav'
+import { isNavActive, NAV_ITEMS } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 /**
@@ -16,7 +16,7 @@ export function DockNav() {
     >
       <div className="glass-2 pointer-events-auto mx-auto mb-space-sm flex max-w-md items-center justify-between rounded-full p-space-2xs">
         {NAV_ITEMS.map((item) => {
-          const active = isRouteActive(pathname, item.href)
+          const active = isNavActive(pathname, item)
           const Icon = item.icon
           return (
             <Link
@@ -24,12 +24,12 @@ export function DockNav() {
               to={item.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex min-h-11 flex-1 flex-col items-center justify-center rounded-full px-space-2xs py-space-xs transition-all duration-200 active:scale-95',
+                'flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-full px-0 py-space-xs transition-all duration-200 active:scale-95',
                 active ? 'bg-primary/10 font-semibold text-primary' : 'text-on-surface-variant hover:text-on-surface',
               )}
             >
               <Icon aria-hidden="true" className="size-[22px]" />
-              <span className="mt-0.5 text-tag uppercase">{item.label}</span>
+              <span className="mt-0.5 max-w-full truncate text-tag uppercase tracking-normal max-[359px]:text-[10px]">{item.label}</span>
             </Link>
           )
         })}

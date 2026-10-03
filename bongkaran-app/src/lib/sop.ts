@@ -287,7 +287,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'lo',
     title: 'Dokumen LO & Data Bongkaran',
-    desc: 'Foto dokumen LO, pilih SO & LO yang datang dari Plan Kirim, lalu isi data LO mobil tangki.',
+    desc: 'Foto dokumen LO, pilih SO & LO yang datang dari Plan, lalu isi data LO mobil tangki.',
     photos: [{ key: 'dok_lo', label: 'Dokumen LO mobil tangki' }],
   },
   {
@@ -632,7 +632,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.nopol)) issues.push('Isi nomor polisi mobil tangki')
       break
     case 'lo':
-      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan Kirim')
+      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan')
       if (!has(d.tanggalDatang) || !has(d.jamDatang)) issues.push('Isi tanggal & jam kedatangan MT')
       if (!has(d.namaDriver)) issues.push('Isi nama lengkap driver')
       if (!has(d.shipTo)) issues.push('Isi nomor Ship To')

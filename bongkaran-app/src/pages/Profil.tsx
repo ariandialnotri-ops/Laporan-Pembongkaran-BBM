@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Calculator, ChevronRight, ClipboardList, Database, FileText, FlaskConical, LogOut, MapPin, Settings2, ShieldCheck, Truck, Users } from 'lucide-react'
+import { Calculator, ChevronRight, Database, FileText, FlaskConical, LogOut, MapPin, Settings2, ShieldCheck, Truck, Users } from 'lucide-react'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -62,9 +62,8 @@ export function Profil() {
       </section>
 
       <section aria-labelledby="operasional" className="animate-entrance-3 flex flex-col gap-space-sm">
-        <SectionHeader id="operasional" title="Operasional" />
+        <SectionHeader id="operasional" title="Alat bantu" />
         <GlassCard level={2} className="flex flex-col p-space-2xs">
-          <MenuRow to="/plan" icon={ClipboardList} label="Plan Kirim (SO & LO)" />
           <MenuRow to="/kalkulator" icon={Calculator} label="Kalkulator Density & Tangki" />
         </GlassCard>
       </section>

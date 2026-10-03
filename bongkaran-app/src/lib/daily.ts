@@ -93,3 +93,4 @@ export function totalPumpTest(d: QqData) {
 }
 
 export const stokRecordId = (tanggal: string, shift: Shift) => `stok_${tanggal}_${shift}`
+export const qqRecordId = (tanggal: string, shift: Shift) => `qq_${tanggal}_${shift}`

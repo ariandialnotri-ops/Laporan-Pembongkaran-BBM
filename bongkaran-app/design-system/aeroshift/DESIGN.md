@@ -147,7 +147,17 @@ Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, a
 - Teks brand tidak memakai tanda em-dash (`—`); pakai koma atau titik dua.
 
 ### Struktur layar
-- Halaman utama berjudul **HOME**. Dock bawah: Beranda, Input, Laporan, Profil.
+- Halaman utama berjudul **HOME**. Dock bawah berisi 5 menu, satu pekerjaan per menu: **Beranda** (apa yang harus dikerjakan sekarang), **Bongkar**, **Q&Q**, **Laporan**, **Profil**.
+- Menu yang berisi beberapa halaman memakai **sub-tab** (segmented control berbentuk rute, sama dengan Tabs) di bawah header, ditambah satu kalimat penjelasan sub-tab aktif:
+  - Bongkar: Bongkaran / Plan SO & LO
+  - Q&Q: Ringkasan / Uji Harian / Stok Shift
+  - Laporan: Berita Acara / Persediaan BBM
+- Tidak ada tab bertingkat tiga: di dalam sub-tab, isi dipisah dengan judul bagian, bukan tab lagi.
+- HOME hanya berisi kartu shift, daftar **Perlu dikerjakan** (kewajiban shift dan hal yang perlu ditindaklanjuti, yang belum di atas), angka hari ini, dan kalender. Dashboard kualitas/kuantitas ada di Q&Q > Ringkasan.
+- Form panjang yang jarang dipakai (permintaan MS2, edit LO) dibuka di bottom sheet, bukan ditampilkan penuh di halaman.
+- Daftar Berita Acara: baris kartu di HP, tabel rekap (BBM, Nopol, Tanggal/Jam, SO/LO, Volume, Gain/Loss, Status) mulai lebar `md`.
+- Label dock 12 px; di bawah lebar 360 px turun ke 10 px agar lima label tetap utuh.
+- Lapisan: header 40, dock 50, sheet 60/61, dropdown Select 70, toast 80.
 - Form bongkaran: tab segmen **Bongkaran / Quality / Quantity / Finish**, 14 langkah SOP, titik langkah bernomor, satu kartu kaca per kelompok isian.
 - Login: logo di tengah, kartu kaca berisi form, gelombang biru lembut (3 lapis, opasitas 0,14 / 0,20 / 0,28) di bawah layar.
 

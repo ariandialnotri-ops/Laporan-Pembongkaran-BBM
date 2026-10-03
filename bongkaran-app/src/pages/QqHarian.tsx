@@ -12,14 +12,13 @@ import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { BEJANA_LIMIT_ML, bejanaStatus, newQqKualitas, newQqKuantitas, qqD15, totalPumpTest, type QqData, type QqRecord } from '@/lib/daily'
+import { BEJANA_LIMIT_ML, bejanaStatus, newQqKualitas, newQqKuantitas, qqD15, qqRecordId, totalPumpTest, type QqData, type QqRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
 import { shiftLabel, type Shift } from '@/lib/shift'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
-const qqId = (tanggal: string, shift: Shift) => `qq_${tanggal}_${shift}`
 
 /** Waktu simpan (di luar render). */
 const stamp = () => Date.now()
@@ -31,7 +30,7 @@ export function QqHarian() {
   const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
   const [range, setRange] = useDateRange('7d')
   const records = useMemo(() => app.daily.filter((d): d is QqRecord => d.kind === 'qq'), [app.daily])
-  const id = qqId(key.tanggal, key.shift)
+  const id = qqRecordId(key.tanggal, key.shift)
   const existing = records.find((r) => r.id === id) ?? null
   const [draft, setDraft] = useState<{ id: string; data: QqData } | null>(null)
   const [error, setError] = useState<string | null>(null)

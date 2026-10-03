@@ -138,6 +138,7 @@ export function Plan() {
   const [form, setForm] = useState<PlanForm>(() => blankPlanForm())
   const [rows, setRows] = useState<Row[]>(() => [blankRow()])
   const [error, setError] = useState<string | null>(null)
+  const [baru, setBaru] = useState(false)
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
 
@@ -180,6 +181,7 @@ export function Plan() {
       await app.savePlan(plan)
       setForm(blankPlanForm(form.tanggal))
       setRows([blankRow()])
+      setBaru(false)
       toast('Permintaan tersimpan. Isi SO & LO di daftar saat sudah terbit.')
     } catch (e) {
       setError(pesan(e))
@@ -279,6 +281,11 @@ export function Plan() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      <Button size="lg" className="animate-entrance-1 w-full" onClick={() => setBaru(true)}>
+        <Plus aria-hidden="true" />
+        Permintaan baru (MS2)
+      </Button>
+
       {/* Dashboard SO & LO per status */}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-baseline justify-between gap-2">
@@ -315,43 +322,6 @@ export function Plan() {
             LO berstatus <b className="text-on-surface">{loStatusMeta(statusFilter).label}</b>: {loStatusMeta(statusFilter).desc.toLowerCase()}.
           </span>
         )}
-      </GlassCard>
-
-      {/* Permintaan baru lewat MS2 */}
-      <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
-        <div className="flex flex-col">
-          <h2 className="text-headline-md font-bold text-on-surface">Permintaan baru (MS2)</h2>
-          <span className="text-body-sm text-on-surface-variant">Nomor SO dan LO diisi dari daftar plan setelah terbit dari depot.</span>
-        </div>
-        <PlanFields idp="plan" form={form} set={(p) => setForm({ ...form, ...p })} />
-        <div className="flex flex-col gap-space-xs">
-          <span className="text-tag uppercase text-on-surface-variant">Produk yang diminta</span>
-          {rows.map((r, i) => (
-            <div key={r.id} className="grid grid-cols-[1fr_8.5rem_auto] items-center gap-space-xs">
-              <ProdukSelect id={`plan-row-${i}`} label={`Produk ${i + 1}`} value={r.produk} onChange={(v) => setRows(rows.map((x) => (x.id === r.id ? { ...x, produk: v } : x)))} />
-              <Input
-                aria-label={`Volume produk ${i + 1}`}
-                numeric
-                inputMode="numeric"
-                suffix="L"
-                value={r.volume}
-                onChange={(e) => setRows(rows.map((x) => (x.id === r.id ? { ...x, volume: e.target.value } : x)))}
-              />
-              <Button variant="ghost" size="icon" aria-label={`Hapus produk ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((x) => x.id !== r.id))}>
-                <Trash2 aria-hidden="true" />
-              </Button>
-            </div>
-          ))}
-          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow()])}>
-            <Plus aria-hidden="true" />
-            Tambah produk
-          </Button>
-        </div>
-        <ErrorBox text={error} />
-        <Button size="lg" className="w-full" onClick={simpan}>
-          <ClipboardList aria-hidden="true" />
-          Simpan permintaan
-        </Button>
       </GlassCard>
 
       {dates.length === 0 && (
@@ -438,6 +408,46 @@ export function Plan() {
             })}
         </section>
       ))}
+
+      {/* Permintaan baru lewat MS2 */}
+      <Sheet
+        open={baru}
+        onOpenChange={setBaru}
+        title="Permintaan baru (MS2)"
+        description="Nomor SO dan LO diisi dari daftar plan setelah terbit dari depot."
+        footer={
+          <Button size="lg" className="flex-1" onClick={simpan}>
+            <ClipboardList aria-hidden="true" />
+            Simpan permintaan
+          </Button>
+        }
+      >
+        <PlanFields idp="plan" form={form} set={(p) => setForm({ ...form, ...p })} />
+        <div className="flex flex-col gap-space-xs">
+          <span className="text-tag uppercase text-on-surface-variant">Produk yang diminta</span>
+          {rows.map((r, i) => (
+            <div key={r.id} className="grid grid-cols-[1fr_8.5rem_auto] items-center gap-space-xs">
+              <ProdukSelect id={`plan-row-${i}`} label={`Produk ${i + 1}`} value={r.produk} onChange={(v) => setRows(rows.map((x) => (x.id === r.id ? { ...x, produk: v } : x)))} />
+              <Input
+                aria-label={`Volume produk ${i + 1}`}
+                numeric
+                inputMode="numeric"
+                suffix="L"
+                value={r.volume}
+                onChange={(e) => setRows(rows.map((x) => (x.id === r.id ? { ...x, volume: e.target.value } : x)))}
+              />
+              <Button variant="ghost" size="icon" aria-label={`Hapus produk ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((x) => x.id !== r.id))}>
+                <Trash2 aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow()])}>
+            <Plus aria-hidden="true" />
+            Tambah produk
+          </Button>
+        </div>
+        <ErrorBox text={error} />
+      </Sheet>
 
       {/* Edit data plan & nomor SO */}
       <Sheet
