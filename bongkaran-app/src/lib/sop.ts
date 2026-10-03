@@ -124,6 +124,8 @@ export interface ReportData {
   totalisator: Totalisator[]
   dipAfterMm: string
   ttd: Partial<Record<SignerKey, Signature>>
+  /** Uji sampel BBM dari tangki pendam minimal 2 jam setelah bongkar selesai. */
+  sample2Jam?: Sample2Jam | null
   noBA: string
   namaPetugas: string
   namaPengawas: string
@@ -185,6 +187,28 @@ export interface Plan {
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']
 
 /** Ringkasan per laporan untuk daftar, beranda, dan penanda LO terpakai. */
+export interface Sample2Jam {
+  tanggal: string
+  jam: string
+  densityObs: string
+  suhu: string
+  petugas: string
+  catatan: string
+  savedAt: string
+}
+
+/** Jeda minimal antara bongkar selesai dan pengambilan sampel tangki pendam. */
+export const SAMPLE_JEDA_MENIT = 120
+
+export interface Sample2JamResult {
+  d15: Density15 | null
+  /** Selisih terhadap D15 dokumen depot. */
+  selisih: number | null
+  ok: boolean | null
+  /** Menit sejak bongkar selesai. */
+  jedaMenit: number | null
+}
+
 export interface ReportSummary {
   id: string
   createdAt: number
@@ -214,6 +238,12 @@ export interface ReportSummary {
   d15: number | null
   d15Depot: number | null
   densityOk: boolean | null
+  /** Field berikut tidak ada pada ringkasan lama. */
+  jamSelesai?: string
+  noBA?: string
+  /** Penanda tangan yang belum tanda tangan. */
+  ttdKurang?: SignerKey[]
+  sample2Jam?: { tanggal: string; jam: string; d15: number | null; selisih: number | null; ok: boolean | null } | null
 }
 
 export interface Rules {
@@ -529,6 +559,17 @@ export interface Derived {
   diterimaDip: number | null
   gainLossDip: number | null
   settleMinutes: number | null
+  sample2Jam: Sample2JamResult | null
+}
+
+/** Menit dari bongkar selesai sampai sampel diambil (melewati tengah malam bila jam selesai < jam datang). */
+export function sampleJeda(d: Pick<ReportData, 'tanggalDatang' | 'jamDatang' | 'jamSelesaiBongkar'>, tanggal: string, jam: string): number | null {
+  if (!d.tanggalDatang || !d.jamSelesaiBongkar || !tanggal || !jam) return null
+  const selesai = new Date(`${d.tanggalDatang}T${d.jamSelesaiBongkar}:00`)
+  if (d.jamDatang && d.jamSelesaiBongkar < d.jamDatang) selesai.setDate(selesai.getDate() + 1)
+  const ambil = new Date(`${tanggal}T${jam}:00`)
+  const m = Math.round((ambil.getTime() - selesai.getTime()) / 60000)
+  return Number.isFinite(m) ? m : null
 }
 
 /** Semua angka turunan yang dipakai di form, Berita Acara, dan template WhatsApp. */
@@ -608,6 +649,20 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     diterimaDip,
     gainLossDip: diterimaDip !== null && volumeDO !== null ? diterimaDip - volumeDO : null,
     settleMinutes: minutesBetween(d.jamSelesaiBongkar, d.jamBacaAtg),
+    sample2Jam: deriveSample(d, d15Depot, rules),
+  }
+}
+
+function deriveSample(d: ReportData, d15Depot: number | null, rules: Rules): Sample2JamResult | null {
+  const s = d.sample2Jam
+  if (!s) return null
+  const res = density15(s.densityObs, s.suhu)
+  const selisih = res && d15Depot !== null ? Math.round((res.value - d15Depot) * 10000) / 10000 : null
+  return {
+    d15: res,
+    selisih,
+    ok: selisih !== null ? Math.abs(selisih) <= rules.densityTolerance + 1e-9 : null,
+    jedaMenit: sampleJeda(d, s.tanggal, s.jam),
   }
 }
 
@@ -783,6 +838,13 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     d15: d15s.length ? Math.round((d15s.reduce((n, v) => n + v, 0) / d15s.length) * 10000) / 10000 : null,
     d15Depot: x.d15Depot,
     densityOk: x.densityResults.length ? x.densityResults.every((r) => r.ok !== false) : null,
+    jamSelesai: d.jamSelesaiBongkar,
+    noBA: d.noBA,
+    ttdKurang: SIGNERS.filter((s) => !d.ttd?.[s.key]?.img).map((s) => s.key),
+    sample2Jam:
+      d.sample2Jam && x.sample2Jam
+        ? { tanggal: d.sample2Jam.tanggal, jam: d.sample2Jam.jam, d15: x.sample2Jam.d15?.value ?? null, selisih: x.sample2Jam.selisih, ok: x.sample2Jam.ok }
+        : null,
   }
 }
 

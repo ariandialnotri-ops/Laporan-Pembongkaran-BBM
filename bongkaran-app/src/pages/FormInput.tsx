@@ -62,7 +62,7 @@ export function FormInput() {
         </Button>
         {openPlans === 0 && (
           <Link to="/plan" className={cn(buttonVariants({ variant: 'glass', size: 'pill' }), 'self-center')}>
-            Buka Plan SO & LO
+            Buka Plan Pengiriman
           </Link>
         )}
       </GlassCard>

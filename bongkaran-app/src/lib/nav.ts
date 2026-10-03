@@ -1,74 +1,66 @@
-import { ChartNoAxesCombined, FileText, FlaskConical, Truck, UserRound, type LucideIcon } from 'lucide-react'
+import { ChartNoAxesCombined, ClipboardPlus, FileText, UserRound, type LucideIcon } from 'lucide-react'
 
 export type NavItem = {
   href: string
   label: string
   title: string
   icon: LucideIcon
-  /** Rute lain yang termasuk menu ini (dock tetap menyala saat dibuka). */
-  also?: string[]
 }
 
 /**
- * Lima menu, satu pekerjaan per menu: hari ini, bongkar mobil tangki,
- * uji Q&Q harian, laporan, akun. Isi yang berkaitan dipisah dengan sub-tab.
+ * Empat menu dengan peran tegas: Dashboard hanya menampilkan data,
+ * Input untuk semua pengisian, Laporan untuk semua riwayat & unduhan, Profil untuk akun & alat.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Beranda', title: 'HOME', icon: ChartNoAxesCombined },
-  { href: '/input', label: 'Bongkar', title: 'Bongkaran', icon: Truck, also: ['/plan'] },
-  { href: '/qq', label: 'Q&Q', title: 'Q&Q', icon: FlaskConical, also: ['/stok'] },
+  { href: '/', label: 'Dashboard', title: 'Dashboard', icon: ChartNoAxesCombined },
+  { href: '/input', label: 'Input', title: 'Input', icon: ClipboardPlus },
   { href: '/laporan', label: 'Laporan', title: 'Laporan', icon: FileText },
-  { href: '/profil', label: 'Profil', title: 'Profil', icon: UserRound, also: ['/kalkulator', '/pengaturan', '/anggota'] },
+  { href: '/profil', label: 'Profil', title: 'Profil', icon: UserRound },
 ]
 
-export type SectionTab = {
-  href: string
-  label: string
-  /** Satu kalimat: apa yang dikerjakan di sub-tab ini. */
-  hint: string
-}
-
-/** Sub-tab tiap menu. Hanya tampil di rute yang tepat sama (bukan di form bongkaran). */
-export const SECTION_TABS: SectionTab[][] = [
-  [
-    { href: '/input', label: 'Bongkaran', hint: 'Mulai saat mobil tangki tiba, atau lanjutkan bongkaran yang belum selesai.' },
-    { href: '/plan', label: 'Plan SO & LO', hint: 'Catat permintaan MS2, lalu isi nomor SO, LO, dan segel saat terbit.' },
-  ],
-  [
-    { href: '/qq', label: 'Ringkasan', hint: 'Hasil kualitas dan kuantitas terbaru tiap produk dan nozzle.' },
-    { href: '/qq/uji', label: 'Uji Harian', hint: 'Catat density, suhu, dan tera bejana 20 L untuk shift ini.' },
-    { href: '/stok', label: 'Stok Shift', hint: 'Isi stok awal tiap produk di awal shift, pengeluaran di akhir shift.' },
-  ],
-  [
-    { href: '/laporan', label: 'Berita Acara', hint: 'Berita Acara tiap bongkaran: buka, tanda tangani, atau unduh.' },
-    { href: '/laporan/persediaan', label: 'Persediaan BBM', hint: 'Catatan persediaan per produk, satu baris per shift.' },
-  ],
+/** Halaman di bawah menu dock: judul header dan menu induk (tujuan tombol kembali). */
+const PAGES: { href: string; title: string; parent: string }[] = [
+  { href: '/input/bongkar', title: 'Input Bongkaran', parent: '/input' },
+  { href: '/input/', title: 'Form Bongkaran', parent: '/input/bongkar' },
+  { href: '/plan', title: 'Plan Pengiriman', parent: '/input' },
+  { href: '/kualitas', title: 'Kualitas Harian', parent: '/input' },
+  { href: '/sample', title: 'Sample BBM 2 Jam', parent: '/input' },
+  { href: '/stok', title: 'Stok Awal Shift', parent: '/input' },
+  { href: '/laporan/persediaan', title: 'Catatan Persediaan BBM', parent: '/laporan' },
+  { href: '/laporan/ba', title: 'Berita Acara', parent: '/laporan' },
+  { href: '/laporan/bongkaran', title: 'Riwayat Pembongkaran MT', parent: '/laporan' },
+  { href: '/laporan/lo', title: 'Riwayat Tracking LO', parent: '/laporan' },
+  { href: '/laporan/kualitas', title: 'Riwayat Kualitas Harian', parent: '/laporan' },
+  { href: '/laporan/tera', title: 'Riwayat Tera', parent: '/laporan' },
+  { href: '/kalkulator', title: 'Kalkulator', parent: '/profil' },
+  { href: '/pengaturan', title: 'Pengaturan SPBU', parent: '/profil' },
+  { href: '/anggota', title: 'Anggota SPBU', parent: '/profil' },
 ]
 
-export function sectionTabsFor(pathname: string) {
-  return SECTION_TABS.find((tabs) => tabs.some((t) => t.href === pathname)) ?? null
-}
-
-/** Judul halaman yang tidak sama dengan menu induknya di dock. */
-const EXTRA_TITLES: [string, string][] = [
-  ['/plan', 'Bongkaran'],
-  ['/stok', 'Q&Q'],
-  ['/kalkulator', 'Kalkulator'],
-  ['/pengaturan', 'Pengaturan SPBU'],
-  ['/anggota', 'Anggota SPBU'],
-]
+const pageFor = (pathname: string) => PAGES.find((p) => (p.href.endsWith('/') ? pathname.startsWith(p.href) : pathname === p.href))
 
 export function isRouteActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function isNavActive(pathname: string, item: NavItem) {
-  return [item.href, ...(item.also ?? [])].some((href) => isRouteActive(pathname, href))
+/** Menu dock yang menyala: menu itu sendiri atau menu induk halaman. */
+export function activeNav(pathname: string): string {
+  let p = pathname
+  for (let i = 0; i < 4; i++) {
+    if (NAV_ITEMS.some((n) => n.href === p)) return p
+    const page = pageFor(p)
+    if (!page) break
+    p = page.parent
+  }
+  return NAV_ITEMS.find((n) => n.href !== '/' && isRouteActive(pathname, n.href))?.href ?? '/'
+}
+
+/** Tujuan tombol kembali di header, null untuk halaman menu dock. */
+export function parentOf(pathname: string) {
+  return pageFor(pathname)?.parent ?? null
 }
 
 export function titleFor(pathname: string) {
-  const extra = EXTRA_TITLES.find(([href]) => isRouteActive(pathname, href))
-  if (extra) return extra[1]
-  return NAV_ITEMS.find((item) => isRouteActive(pathname, item.href))?.title ?? 'FLOQ'
+  return pageFor(pathname)?.title ?? NAV_ITEMS.find((item) => item.href === pathname)?.title ?? 'FLOQ'
 }

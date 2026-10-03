@@ -420,7 +420,7 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
         {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Bongkar, tab Plan SO & LO." />
+          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -805,7 +805,7 @@ function SegelStep(props: StepProps) {
         {daftar.length ? (
           <span className="tabular text-body-md font-semibold text-on-error-container">{daftar.join(', ')}</span>
         ) : (
-          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (tab Plan SO & LO). Cocokkan langsung dengan dokumen LO fisik.</span>
+          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (Input, Plan Pengiriman). Cocokkan langsung dengan dokumen LO fisik.</span>
         )}
         <span className="text-body-sm text-on-error-container">Segel rusak atau nomor berbeda: hentikan bongkar dan hubungi pengawas.</span>
       </div>

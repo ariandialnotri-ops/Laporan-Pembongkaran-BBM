@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loading } from '@/components/bongkaran/load-state'
 import { AppProvider } from '@/components/shell/app-provider'
 import { AppShell } from '@/components/shell/app-shell'
@@ -7,21 +7,27 @@ import { ToastProvider } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
 import { Dashboard } from '@/pages/Dashboard'
-import { FormInput } from '@/pages/FormInput'
+import { InputMenu } from '@/pages/InputMenu'
 import { Login, NotMember, SessionState } from '@/pages/Login'
 
-// Halaman selain Beranda & Input dimuat saat dibuka, agar pembukaan awal ringan.
+// Halaman selain Dashboard & menu Input dimuat saat dibuka, agar pembukaan awal ringan.
 const Anggota = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.Anggota })))
+const BeritaAcara = lazy(() => import('@/pages/BeritaAcara').then((m) => ({ default: m.BeritaAcara })))
 const FormBongkar = lazy(() => import('@/pages/FormBongkar').then((m) => ({ default: m.FormBongkar })))
+const FormInput = lazy(() => import('@/pages/FormInput').then((m) => ({ default: m.FormInput })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
-const Laporan = lazy(() => import('@/pages/Laporan').then((m) => ({ default: m.Laporan })))
+const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
-const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
-const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
-const QqRingkasan = lazy(() => import('@/pages/QqRingkasan').then((m) => ({ default: m.QqRingkasan })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
-const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
+const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
+const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
+const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
+const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
+const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
+const RiwayatTera = lazy(() => import('@/pages/RiwayatTera').then((m) => ({ default: m.RiwayatTera })))
+const Sample2Jam = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2Jam })))
+const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 
 function Gate() {
   const app = useApp()
@@ -41,18 +47,26 @@ function Gate() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/input" element={<FormInput />} />
+          <Route path="/input" element={<InputMenu />} />
+          <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
-          <Route path="/laporan" element={<Laporan />} />
-          <Route path="/laporan/persediaan" element={<Persediaan />} />
-          <Route path="/profil" element={<Profil />} />
           <Route path="/plan" element={<Plan />} />
+          <Route path="/kualitas" element={<QqHarian />} />
+          <Route path="/sample" element={<Sample2Jam />} />
+          <Route path="/stok" element={<StokShift />} />
+          <Route path="/laporan" element={<LaporanMenu />} />
+          <Route path="/laporan/persediaan" element={<Persediaan />} />
+          <Route path="/laporan/ba" element={<BeritaAcara />} />
+          <Route path="/laporan/bongkaran" element={<RiwayatBongkaran />} />
+          <Route path="/laporan/lo" element={<RiwayatLo />} />
+          <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
+          <Route path="/laporan/tera" element={<RiwayatTera />} />
+          <Route path="/profil" element={<Profil />} />
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
           <Route path="/anggota" element={<Anggota />} />
-          <Route path="/qq" element={<QqRingkasan />} />
-          <Route path="/qq/uji" element={<QqHarian />} />
-          <Route path="/stok" element={<StokShift />} />
+          {/* Alamat lama */}
+          <Route path="/qq/*" element={<Navigate to="/kualitas" replace />} />
           <Route path="*" element={<Dashboard />} />
         </Routes>
       </Suspense>

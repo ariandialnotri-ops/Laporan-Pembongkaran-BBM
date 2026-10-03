@@ -95,7 +95,7 @@ export function Pengaturan() {
         <section aria-labelledby="nozzle" className="animate-entrance-2 flex flex-col gap-space-sm">
           <SectionHeader id="nozzle" title="Nozzle Dispenser" />
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-            <span className="text-body-sm text-on-surface-variant">Dipakai untuk totalisator penjualan selama bongkar dan uji bejana 20 liter di Q&Q, tab Uji Harian.</span>
+            <span className="text-body-sm text-on-surface-variant">Dipakai untuk totalisator penjualan selama bongkar dan uji bejana 20 liter di Input, Kualitas Harian.</span>
             {s.nozzles.map((nz, i) => (
               <div key={nz.id} className="grid grid-cols-[1fr_1.3fr_auto] items-center gap-space-xs">
                 <Input aria-label={`Nama nozzle ${i + 1}`} value={nz.nama} onChange={(e) => setNozzle(nz.id, { nama: e.target.value })} />

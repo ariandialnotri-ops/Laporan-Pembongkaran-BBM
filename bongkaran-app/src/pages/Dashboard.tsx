@@ -1,36 +1,21 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  Beaker,
-  ChevronLeft,
-  ChevronRight,
-  CircleCheck,
-  ClipboardList,
-  FlaskConical,
-  Fuel,
-  Ruler,
-  Scale,
-  TriangleAlert,
-  Truck,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, Cylinder, FlaskConical, Scale, Truck } from 'lucide-react'
+import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
-import { useStokShift } from '@/components/bongkaran/stok-gate'
-import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
+import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp } from '@/lib/app-state'
-import { bejanaStatus, qqD15, qqRecordId, type QqRecord } from '@/lib/daily'
-import { addDays, formatBulanTahun, formatTanggalIso, formatTanggalPanjang, greeting, startOfWeek, todayIso } from '@/lib/date'
+import { bejanaStatus, qqD15, type QqKualitas, type QqRecord } from '@/lib/daily'
+import { addDays, formatTanggalIso, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
-import { loStatus } from '@/lib/plan'
-import { detailTanggal, kalenderMinggu, kuantitasNozzle, labelQQ, qqOf, ringkasHariIni, type CalendarDay } from '@/lib/ringkasan'
-import { shiftLabel } from '@/lib/shift'
-import { STEPS } from '@/lib/sop'
+import { LO_STATUS, loStatus, type LoDisplayStatus } from '@/lib/plan'
+import { acuanD15, detailTanggal, kalenderMinggu, kualitasProduk, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
+import { PRODUK_OPTIONS, STEPS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 const DAY_CLASS: Record<CalendarDay['status'], string> = {
@@ -45,130 +30,69 @@ const DAY_LABEL: Record<CalendarDay['status'], string> = {
   belum: 'belum ada data',
 }
 
-type Tugas = {
-  key: string
-  to: string
-  icon: LucideIcon
-  title: string
-  detail: string
-  /** wajib: kewajiban shift; info: perlu diketahui; selesai: sudah beres. */
-  tone: 'wajib' | 'info' | 'selesai'
-}
+/** Status LO yang diringkas di kartu LO Tracking; Alih Supply & Deleted ada di riwayat. */
+const LO_DASH: LoDisplayStatus[] = ['proses', 'os', 'planned', 'delivery', 'delivered', 'closed']
 
 /**
- * HOME menjawab satu pertanyaan: apa yang harus dikerjakan sekarang.
- * Detail per bagian ada di menu dock masing-masing.
+ * Dashboard hanya menampilkan data: kalender progress, total bongkaran,
+ * hasil kualitas harian, kaleng sample 3 bongkaran terakhir, dan LO tracking.
+ * Semua pengisian ada di menu Input, semua riwayat di menu Laporan.
  */
 export function Dashboard() {
   const app = useApp()
   const now = new Date()
-  const stok = useStokShift()
   const [weekAnchor, setWeekAnchor] = useState(() => new Date())
   const [hari, setHari] = useState<string | null>(null)
-  const kuantitas = useMemo(() => kuantitasNozzle(app.daily, app.settings.nozzles), [app.daily, app.settings.nozzles])
+  const [range, setRange] = useDateRange('today')
+  const sampel = useMemo(() => kualitasProduk(app.reports), [app.reports])
+
+  // Uji kualitas harian terakhir tiap produk.
+  const harian = useMemo(() => {
+    const m = new Map<string, { k: QqKualitas; rec: QqRecord }>()
+    app.daily
+      .filter((d): d is QqRecord => d.kind === 'qq')
+      .sort((a, b) => (a.tanggal + a.shift + a.data.jam).localeCompare(b.tanggal + b.shift + b.data.jam))
+      .forEach((rec) => rec.data.kualitas.forEach((k) => k.produk && qqD15(k).d15 && m.set(k.produk, { k, rec })))
+    return m
+  }, [app.daily])
+
+  const loCounts = useMemo(() => {
+    const c = new Map<LoDisplayStatus, number>()
+    app.plans.forEach((p) =>
+      p.los.forEach((lo) => {
+        const k = loStatus(lo, app.usedLoIds)
+        c.set(k, (c.get(k) ?? 0) + 1)
+      }),
+    )
+    return c
+  }, [app.plans, app.usedLoIds])
 
   if (!app.loaded) return <Loading />
 
-  const today = ringkasHariIni(app.reports, now)
   const calendarWeek = kalenderMinggu(app.reports, weekAnchor, app.daily, now)
   const thisWeek = todayIso(startOfWeek(weekAnchor)) === todayIso(startOfWeek(now))
-  const nama = app.session.user ? app.displayName.split(/[\s@]/)[0] : app.settings.namaPetugasDefault.split(' ')[0]
-  const shiftNama = shiftLabel(stok.key.shift).split(' (')[0]
 
-  // Daftar kerja: kewajiban shift dulu, lalu hal yang perlu ditindaklanjuti.
-  const uji = app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(stok.key.tanggal, stok.key.shift))
-  const drafts = app.reports.filter((r) => r.status === 'draft')
-  const los = app.plans.flatMap((p) => p.los.map((lo) => loStatus(lo, app.usedLoIds)))
-  const lewat = kuantitas.flatMap((g) => g.nozzles).filter((n) => n.lewat)
-  const tugas: Tugas[] = [
-    stok.missing
-      ? { key: 'stok', to: '/stok', icon: Fuel, title: `Isi stok awal ${shiftNama}`, detail: 'Wajib sebelum bongkar dan uji Q&Q.', tone: 'wajib' }
-      : { key: 'stok', to: '/stok', icon: Fuel, title: `Stok awal ${shiftNama} terisi`, detail: 'Pengeluaran dispenser diisi di akhir shift.', tone: 'selesai' },
-    uji
-      ? { key: 'qq', to: '/qq', icon: FlaskConical, title: `Uji Q&Q ${shiftNama} selesai`, detail: `Diuji jam ${uji.data.jam || '-'}.`, tone: 'selesai' }
-      : { key: 'qq', to: '/qq/uji', icon: FlaskConical, title: `Uji Q&Q ${shiftNama}`, detail: 'Density, suhu, dan bejana 20 L.', tone: 'wajib' },
-  ]
-  if (drafts.length)
-    tugas.push({
-      key: 'draft',
-      to: drafts.length === 1 ? `/input/${drafts[0].id}` : '/input',
-      icon: Truck,
-      title: `Lanjutkan ${drafts.length} bongkaran`,
-      detail: drafts.map((r) => r.nopol || r.produk || 'MT baru').join(', '),
-      tone: 'wajib',
-    })
-  const kirim = los.filter((s) => s === 'delivery').length
-  if (kirim) tugas.push({ key: 'kirim', to: '/plan', icon: Truck, title: `${kirim} LO sedang dikirim`, detail: 'Siapkan tangki dan petugas bongkar.', tone: 'info' })
-  const proses = los.filter((s) => s === 'proses').length
-  if (proses) tugas.push({ key: 'proses', to: '/plan', icon: ClipboardList, title: `${proses} LO belum terbit`, detail: 'Isi nomor SO dan LO di Plan saat terbit.', tone: 'info' })
-  if (lewat.length)
-    tugas.push({ key: 'nozzle', to: '/qq', icon: Ruler, title: `${lewat.length} nozzle di bawah batas tera`, detail: lewat.map((n) => n.nozzle).join(', '), tone: 'wajib' })
-  if (today.perluCek.length)
-    tugas.push({ key: 'anomali', to: '/laporan', icon: TriangleAlert, title: `${today.perluCek.length} bongkaran perlu dicek`, detail: today.perluCek.map((r) => r.nopol).join(', '), tone: 'wajib' })
-  const urut = [...tugas.filter((t) => t.tone !== 'selesai'), ...tugas.filter((t) => t.tone === 'selesai')]
-  const sisa = tugas.filter((t) => t.tone === 'wajib').length
+  const periode = app.reports.filter((r) => r.status !== 'draft' && inRange(r.tanggal, range))
+  const totalLiter = periode.reduce((n, r) => n + (r.volumeDO ?? 0), 0)
+  const gainLoss = periode.reduce((n, r) => n + (r.gainLoss ?? 0), 0)
+  const perProduk = PRODUK_OPTIONS.map((p) => {
+    const rs = periode.filter((r) => r.produk === p)
+    return { produk: p, mt: rs.length, liter: rs.reduce((n, r) => n + (r.volumeDO ?? 0), 0) }
+  }).filter((x) => x.mt > 0)
+  const tol = app.rules.densityTolerance + 1e-9
 
   return (
-    <div className="flex flex-col gap-space-md">
-      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-col">
-            <span className="text-tag uppercase text-primary">
-              {greeting(now)}
-              {nama ? `, ${nama}` : ''}
-            </span>
-            <span className="text-body-sm text-on-surface-variant">{formatTanggalPanjang(now)}</span>
-          </div>
-          <span className="flex shrink-0 flex-col items-end">
-            <span className="rounded-full bg-primary-fixed px-3 py-1 text-body-sm font-semibold text-on-primary-fixed">{shiftNama}</span>
-            <span className="tabular mt-1 text-body-sm text-on-surface-variant">{shiftLabel(stok.key.shift).match(/\((.*)\)/)?.[1]}</span>
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <span className="text-tag uppercase text-on-surface-variant">Diterima hari ini</span>
-          <span className="tabular text-numeric-lg font-bold text-on-surface sm:text-headline-xl">{formatLiter(today.totalLiter)}</span>
-        </div>
-        {app.backend.mode === 'local' && <span className="text-body-sm text-on-surface-variant">Mode lokal: data hanya tersimpan di perangkat ini.</span>}
-        <Link to="/input" className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'w-full')}>
-          <Truck aria-hidden="true" />
-          Bongkar mobil tangki
-          <ArrowRight aria-hidden="true" />
-        </Link>
-      </GlassCard>
-
-      <section aria-labelledby="perlu-dikerjakan" className="animate-entrance-2 flex flex-col gap-space-xs">
-        <SectionHeader
-          id="perlu-dikerjakan"
-          title="Perlu dikerjakan"
-          action={<span className="tabular text-body-sm text-on-surface-variant">{sisa ? `${sisa} belum` : 'Semua beres'}</span>}
-        />
-        <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40">
-          {urut.map((t) => (
-            <TugasRow key={t.key} t={t} />
-          ))}
-        </GlassCard>
-      </section>
-
-      <section aria-labelledby="angka-hari-ini" className="animate-entrance-3 flex flex-col gap-space-xs">
-        <SectionHeader id="angka-hari-ini" title="Hari ini" />
-        <div className="grid grid-cols-2 gap-space-xs lg:grid-cols-4">
-          <StatTile label="Mobil tangki" value={today.mobilTangki} hint="Datang hari ini" icon={Truck} />
-          <StatTile label="Gain / loss" value={formatSigned(today.gainLoss, 0, ' L')} hint="Bongkaran selesai" icon={Scale} tone={today.gainLoss < 0 ? 'error' : 'primary'} />
-          <StatTile label="Q&Q sesuai" value={`${today.qqSesuai}/${today.qqTotal}`} hint="Bongkaran selesai" icon={FlaskConical} tone="primary" />
-          <StatTile label="Perlu cek" value={today.perluCek.length} hint={today.perluCek.length ? 'Lihat di Laporan' : 'Semua aman'} icon={Beaker} tone={today.perluCek.length > 0 ? 'error' : 'primary'} />
-        </div>
-      </section>
-
-      <section aria-labelledby="kalender" className="animate-entrance-4 flex flex-col gap-space-xs">
+    <div className="flex flex-col gap-space-lg">
+      <section aria-labelledby="kalender" className="animate-entrance-1 flex flex-col gap-space-xs">
         <SectionHeader
           id="kalender"
-          title="Kalender"
+          title="Kalender Progress"
           action={
             <div className="flex items-center gap-1">
               <button type="button" aria-label="Minggu sebelumnya" onClick={() => setWeekAnchor(addDays(weekAnchor, -7))} className="flex size-11 items-center justify-center rounded-full text-on-surface-variant active:scale-95">
                 <ChevronLeft aria-hidden="true" className="size-5" />
               </button>
-              <span className="whitespace-nowrap text-body-sm text-on-surface-variant">{formatBulanTahun(weekAnchor)}</span>
+              <span className="whitespace-nowrap text-body-sm text-on-surface-variant">{weekAnchor.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}</span>
               <button
                 type="button"
                 aria-label="Minggu berikutnya"
@@ -209,30 +133,109 @@ export function Dashboard() {
         </GlassCard>
       </section>
 
+      <section aria-labelledby="total-bongkaran" className="animate-entrance-2 flex flex-col gap-space-xs">
+        <SectionHeader id="total-bongkaran" title="Total Bongkaran" />
+        <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+          <DateFilter id="dash-range" value={range} onChange={setRange} />
+          <div className="flex flex-col">
+            <span className="text-tag uppercase text-on-surface-variant">{range.preset === 'today' ? 'Diterima hari ini' : 'Diterima pada periode ini'}</span>
+            <span className="tabular text-numeric-lg font-bold text-on-surface sm:text-headline-xl">{formatLiter(totalLiter)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-space-xs">
+            <StatTile label="Mobil tangki" value={periode.length} hint="Bongkaran selesai" icon={Truck} />
+            <StatTile label="Gain / loss" value={formatSigned(gainLoss, 0, ' L')} hint="Total periode" icon={Scale} tone={gainLoss < 0 ? 'error' : 'primary'} />
+          </div>
+          {perProduk.length > 0 && (
+            <ul className="flex flex-col divide-y divide-outline-variant/40 border-t border-outline-variant/40">
+              {perProduk.map((x) => (
+                <li key={x.produk} className="flex items-center justify-between gap-2 py-space-xs">
+                  <span className="text-body-md text-on-surface">{x.produk}</span>
+                  <span className="tabular text-body-sm text-on-surface-variant">
+                    {x.mt} MT, <span className="font-semibold text-on-surface">{formatNumber(x.liter)} L</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </GlassCard>
+      </section>
+
+      <section aria-labelledby="kualitas-harian" className="animate-entrance-3 flex flex-col gap-space-xs">
+        <SectionHeader id="kualitas-harian" title="Kualitas Harian" action={<FlaskConical aria-hidden="true" className="size-5 text-on-surface-variant" />} />
+        <p className="px-space-xs text-body-sm text-on-surface-variant">Uji density terakhir tiap produk, dibanding D15 bongkaran terakhir.</p>
+        <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 px-space-sm">
+          {PRODUK_OPTIONS.map((p) => {
+            const h = harian.get(p)
+            const d15 = h ? qqD15(h.k).d15?.value ?? null : null
+            const ref = h ? acuanD15(app.reports, p, h.rec.tanggal) : null
+            const selisih = d15 !== null && ref ? Math.round((d15 - ref.d15) * 10000) / 10000 : null
+            const ok = selisih !== null ? Math.abs(selisih) <= tol : null
+            return (
+              <div key={p} className="flex min-h-14 items-center gap-space-sm py-space-xs">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-body-md font-semibold text-on-surface">{p}</span>
+                  <span className="tabular truncate text-body-sm text-on-surface-variant">
+                    {h ? `${formatTanggalIso(h.rec.tanggal)}, shift ${h.rec.shift}` : 'Belum diuji'}
+                  </span>
+                </span>
+                {h && (
+                  <span className="tabular flex flex-col items-end">
+                    <span className="text-numeric-sm font-bold text-on-surface">{formatDensity(d15)}</span>
+                    <span className={cn('text-body-sm', ok === false ? 'font-semibold text-error' : 'text-on-surface-variant')}>{selisih !== null ? formatDensitySigned(selisih) : 'tanpa acuan'}</span>
+                  </span>
+                )}
+                {ok === null ? <Pill>{h ? 'Tanpa acuan' : 'Belum'}</Pill> : ok ? <Pill tone="success">Sesuai</Pill> : <Pill tone="error">Tidak sesuai</Pill>}
+              </div>
+            )
+          })}
+        </GlassCard>
+      </section>
+
+      <section aria-labelledby="kaleng-sample" className="animate-entrance-4 flex flex-col gap-space-xs">
+        <SectionHeader id="kaleng-sample" title="Kaleng Sample" action={<Cylinder aria-hidden="true" className="size-5 text-on-surface-variant" />} />
+        <p className="px-space-xs text-body-sm text-on-surface-variant">Density 15°C dari 3 bongkaran terakhir tiap produk, dibanding D15 dokumen depot.</p>
+        <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 px-space-sm">
+          {sampel.map((k) => (
+            <div key={k.produk} className="flex flex-col gap-space-xs py-space-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-body-md font-semibold text-on-surface">{k.produk}</span>
+                <QQPill status={k.status} label={k.status === 'sesuai' ? 'Sesuai' : k.status === 'perhatian' ? 'Ada anomali' : 'Belum ada sampel'} />
+              </div>
+              {k.samples.length > 0 && (
+                <ol className="grid grid-cols-3 gap-space-xs">
+                  {k.samples.map((s) => (
+                    <li key={s.id} className={cn('flex flex-col rounded-md px-space-xs py-1', s.ok === false ? 'bg-error-container/70' : 'bg-surface-container-low/80')}>
+                      <span className="tabular text-numeric-sm font-bold text-on-surface">{formatDensity(s.d15)}</span>
+                      <span className={cn('tabular text-body-sm', s.ok === false ? 'font-semibold text-error' : 'text-on-surface-variant')}>
+                        {s.selisih !== null ? formatDensitySigned(s.selisih) : '-'}
+                      </span>
+                      <span className="truncate text-body-sm text-on-surface-variant">{formatTanggalIso(s.tanggal)}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          ))}
+        </GlassCard>
+      </section>
+
+      <Link to="/laporan/lo" className="animate-entrance-5 glass-2 rim-light flex flex-col gap-space-sm rounded-lg p-space-md active:scale-[0.99]">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-headline-md font-bold text-on-surface">LO Tracking</h2>
+          <ChevronRight aria-hidden="true" className="size-5 text-on-surface-variant" />
+        </div>
+        <div className="grid grid-cols-3 gap-space-xs">
+          {LO_DASH.map((k) => (
+            <div key={k} className="flex min-w-0 flex-col rounded-md bg-surface-container-low/80 p-space-xs">
+              <span className="truncate text-tag uppercase text-on-surface-variant">{LO_STATUS.find((s) => s.key === k)!.label}</span>
+              <span className="tabular text-numeric-md font-bold text-on-surface">{loCounts.get(k) ?? 0}</span>
+            </div>
+          ))}
+        </div>
+      </Link>
+
       <DetailHari iso={hari} onClose={() => setHari(null)} />
     </div>
-  )
-}
-
-const TUGAS_ICON: Record<Tugas['tone'], string> = {
-  wajib: 'bg-error-container text-error',
-  info: 'bg-primary-fixed text-primary',
-  selesai: 'bg-surface-container text-on-surface-variant',
-}
-
-function TugasRow({ t }: { t: Tugas }) {
-  const Icon = t.tone === 'selesai' ? CircleCheck : t.icon
-  return (
-    <Link to={t.to} className="flex min-h-16 items-center gap-space-sm px-space-sm py-space-xs transition-colors first:rounded-t-lg last:rounded-b-lg hover:bg-surface-container-lowest/60">
-      <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', TUGAS_ICON[t.tone])}>
-        <Icon className="size-5" />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className={cn('text-body-md font-semibold', t.tone === 'selesai' ? 'text-on-surface-variant' : 'text-on-surface')}>{t.title}</span>
-        <span className="truncate text-body-sm text-on-surface-variant">{t.detail}</span>
-      </span>
-      <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-    </Link>
   )
 }
 

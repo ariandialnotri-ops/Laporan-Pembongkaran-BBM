@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { isNavActive, NAV_ITEMS } from '@/lib/nav'
+import { activeNav, NAV_ITEMS } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 /**
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
  */
 export function DockNav() {
   const { pathname } = useLocation()
+  const current = activeNav(pathname)
 
   return (
     <nav
@@ -16,7 +17,7 @@ export function DockNav() {
     >
       <div className="glass-2 pointer-events-auto mx-auto mb-space-sm flex max-w-md items-center justify-between rounded-full p-space-2xs">
         {NAV_ITEMS.map((item) => {
-          const active = isNavActive(pathname, item)
+          const active = current === item.href
           const Icon = item.icon
           return (
             <Link
@@ -29,7 +30,7 @@ export function DockNav() {
               )}
             >
               <Icon aria-hidden="true" className="size-[22px]" />
-              <span className="mt-0.5 max-w-full truncate text-tag uppercase tracking-normal max-[359px]:text-[10px]">{item.label}</span>
+              <span className="mt-0.5 max-w-full truncate text-tag uppercase tracking-normal">{item.label}</span>
             </Link>
           )
         })}

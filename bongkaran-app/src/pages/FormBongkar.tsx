@@ -280,7 +280,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       clearBackup(report.id)
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
-      navigate('/input')
+      navigate('/input/bongkar')
     } catch (e) {
       toast(pesan(e), TriangleAlert)
     }
@@ -407,7 +407,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       )}
 
       <div className="flex items-center justify-between gap-2 px-space-xs">
-        <Link to="/input" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+        <Link to="/input/bongkar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
           <ArrowLeft aria-hidden="true" />
           Daftar bongkaran
         </Link>

@@ -138,3 +138,14 @@ export function detailTanggal(iso: string, rows: ReportSummary[], daily: DailyRe
   }
 }
 
+
+/** D15 bongkaran terakhir suatu produk (sampai tanggal tertentu) sebagai acuan uji harian. */
+export function acuanD15(rows: ReportSummary[], produk: string, sampai?: string) {
+  let best: ReportSummary | null = null
+  for (const r of rows) {
+    if (r.produk !== produk || r.d15 === null || r.status === 'draft') continue
+    if (sampai && r.tanggal > sampai) continue
+    if (!best || r.tanggal + r.jam > best.tanggal + best.jam) best = r
+  }
+  return best ? { d15: best.d15 as number, tanggal: best.tanggal } : null
+}

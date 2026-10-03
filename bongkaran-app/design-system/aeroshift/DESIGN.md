@@ -147,16 +147,15 @@ Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, a
 - Teks brand tidak memakai tanda em-dash (`—`); pakai koma atau titik dua.
 
 ### Struktur layar
-- Halaman utama berjudul **HOME**. Dock bawah berisi 5 menu, satu pekerjaan per menu: **Beranda** (apa yang harus dikerjakan sekarang), **Bongkar**, **Q&Q**, **Laporan**, **Profil**.
-- Menu yang berisi beberapa halaman memakai **sub-tab** (segmented control berbentuk rute, sama dengan Tabs) di bawah header, ditambah satu kalimat penjelasan sub-tab aktif:
-  - Bongkar: Bongkaran / Plan SO & LO
-  - Q&Q: Ringkasan / Uji Harian / Stok Shift
-  - Laporan: Berita Acara / Persediaan BBM
-- Tidak ada tab bertingkat tiga: di dalam sub-tab, isi dipisah dengan judul bagian, bukan tab lagi.
-- HOME hanya berisi kartu shift, daftar **Perlu dikerjakan** (kewajiban shift dan hal yang perlu ditindaklanjuti, yang belum di atas), angka hari ini, dan kalender. Dashboard kualitas/kuantitas ada di Q&Q > Ringkasan.
-- Form panjang yang jarang dipakai (permintaan MS2, edit LO) dibuka di bottom sheet, bukan ditampilkan penuh di halaman.
-- Daftar Berita Acara: baris kartu di HP, tabel rekap (BBM, Nopol, Tanggal/Jam, SO/LO, Volume, Gain/Loss, Status) mulai lebar `md`.
-- Label dock 12 px; di bawah lebar 360 px turun ke 10 px agar lima label tetap utuh.
+- Dock bawah berisi 4 menu dengan peran tegas:
+  - **Dashboard**: hanya data, tanpa tombol aksi. Urutan: Kalender Progress (paling atas), Total Bongkaran (hari ini/periode), Kualitas Harian, Kaleng Sample (3 bongkaran terakhir per produk), LO Tracking.
+  - **Input**: semua pengisian. Kartu Input Bongkaran, Plan Pengiriman, Kualitas Harian, Sample BBM 2 Jam, dengan bar wajib Stok Awal Shift di atasnya.
+  - **Laporan**: semua riwayat dan unduhan. Kartu Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera.
+  - **Profil**: akun, pengaturan, dan Kalkulator (Kalkulator hanya ada di sini).
+- Halaman di bawah menu membuka satu pekerjaan; tombol kembali di kiri header (menggantikan logo) kembali ke menu induk.
+- Kartu menu: ikon biru, judul, satu kalimat isi, dan baris status (biru bila beres, merah dengan lencana jumlah bila ada yang perlu dikerjakan).
+- Riwayat memakai tabel rekap di layar lebar (judul huruf besar + chip "n dari total", kolom BBM berupa chip, kolom Aksi) dan kartu di HP, dari definisi kolom yang sama (`RecordTable`).
+- Form yang jarang dipakai (permintaan MS2, edit LO, input sampel 2 jam) dibuka di bottom sheet.
 - Lapisan: header 40, dock 50, sheet 60/61, dropdown Select 70, toast 80.
 - Form bongkaran: tab segmen **Bongkaran / Quality / Quantity / Finish**, 14 langkah SOP, titik langkah bernomor, satu kartu kaca per kelompok isian.
 - Login: logo di tengah, kartu kaca berisi form, gelombang biru lembut (3 lapis, opasitas 0,14 / 0,20 / 0,28) di bawah layar.
