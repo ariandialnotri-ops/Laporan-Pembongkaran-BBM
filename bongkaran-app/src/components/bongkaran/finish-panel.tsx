@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, Images, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import type { ExportKind } from '@/lib/report/export'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SignersSection } from '@/components/bongkaran/sop-steps'
 import { StatusBanner } from '@/components/bongkaran/status-banner'
@@ -23,6 +24,7 @@ export function FinishPanel({
   onFinish,
   onReopen,
   onPdf,
+  onPdfBa,
   onJpg,
   onXlsx,
   generating,
@@ -36,10 +38,13 @@ export function FinishPanel({
   onFinish: (status: ReportStatus) => void
   /** Hanya untuk BA anomali dan pengawas; BA selesai tidak dapat diubah. */
   onReopen?: () => void
+  /** PDF BA + lampiran foto evidence. */
   onPdf: () => void
+  /** PDF BA saja, tanpa foto (cepat). */
+  onPdfBa: () => void
   onJpg: () => void
   onXlsx: () => void
-  generating: 'pdf' | 'jpg' | 'xlsx' | null
+  generating: ExportKind | null
   waText: string
 }) {
   const toast = useToast()
@@ -139,15 +144,20 @@ export function FinishPanel({
               Excel (template BA)
             </Button>
             <div className="grid grid-cols-2 gap-space-xs">
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
-                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
-                PDF
+              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdfBa}>
+                {generating === 'pdf-ba' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
+                PDF BA saja
               </Button>
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onJpg}>
+              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
+                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Images aria-hidden="true" />}
+                PDF + foto
+              </Button>
+              <Button variant="glass" size="pill" className="col-span-2" disabled={generating !== null} onClick={onJpg}>
                 {generating === 'jpg' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <ImageIcon aria-hidden="true" />}
                 JPG
               </Button>
             </div>
+            <span className="text-body-sm text-on-surface-variant">PDF BA saja lebih cepat, tanpa lampiran foto evidence.</span>
           </GlassCard>
 
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">

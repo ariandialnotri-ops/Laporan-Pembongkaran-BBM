@@ -30,6 +30,10 @@ export interface Compartment {
   kapasitas: string
   /** Laporan lama: liter per mm. */
   kepekaan: string
+  /** Kepekaan dari buku tera MT, mm per liter. Bila diisi, selisih liter = selisih mm / kepekaan. */
+  kepekaanMmL?: string
+  /** Tinggi T2 (mm) dari buku tera MT. */
+  tinggiT2?: string
   dipAktual: string
   noSegel: string
 }
@@ -339,7 +343,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'tera',
     title: 'Buku Tera Mobil Tangki',
-    desc: 'Foto buku tera MT, isi tinggi tera dan kapasitas tiap kompartemen.',
+    desc: 'Foto buku tera MT, isi tinggi tera, T2, kapasitas, dan kepekaan tiap kompartemen.',
     photos: [{ key: 'buku_tera', label: 'Buku tera mobil tangki' }],
   },
   {
@@ -417,7 +421,7 @@ export const STEPS: StepDef[] = [
 ]
 
 export function newCompartment(no = ''): Compartment {
-  return { id: genId('k'), no, tinggiTera: '', kapasitas: '', kepekaan: '', dipAktual: '', noSegel: '' }
+  return { id: genId('k'), no, tinggiTera: '', tinggiT2: '', kapasitas: '', kepekaan: '', kepekaanMmL: '', dipAktual: '', noSegel: '' }
 }
 
 /** Foto slot gabungan; laporan lama menyimpan foto di dua slot terpisah. */
@@ -451,7 +455,7 @@ export function normalizeReport(r: Report): Report {
       perusahaanPengangkut: d.perusahaanPengangkut ?? '',
       totalisator: d.totalisator ?? [],
       ttd: d.ttd ?? {},
-      compartments: d.compartments.map((c) => ({ ...c, kapasitas: c.kapasitas ?? '', noSegel: c.noSegel ?? '' })),
+      compartments: d.compartments.map((c) => ({ ...c, kapasitas: c.kapasitas ?? '', kepekaanMmL: c.kepekaanMmL ?? '', tinggiT2: c.tinggiT2 ?? '', noSegel: c.noSegel ?? '' })),
     },
   }
 }
@@ -597,9 +601,11 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     const tera = num(c.tinggiTera)
     const dip = num(c.dipAktual)
     const kapasitas = num(c.kapasitas)
-    const kepekaan = kapasitas !== null && tera ? kapasitas / tera : num(c.kepekaan)
+    const mmPerL = num(c.kepekaanMmL ?? '')
+    // Liter per mm: dari kepekaan buku tera (mm/L), atau kapasitas / tinggi tera, atau kepekaan laporan lama.
+    const kepekaan = mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : num(c.kepekaan)
     const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari tera
-    // Sama dengan Berita Acara: selisih (mm) x kapasitas / tinggi tera.
+    // Sama dengan Berita Acara: selisih (mm) / kepekaan, atau selisih x kapasitas / tinggi tera.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
     const outOfLimit = selisihMm !== null && -selisihMm > rules.teraToleranceMm
     return { ...c, selisihMm, estLiter, outOfLimit }
@@ -716,6 +722,9 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
     case 'tera':
       if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0 || (num(c.kepekaan) ?? 0) > 0))) {
         issues.push('Isi tinggi tera & kapasitas untuk semua kompartemen')
+      }
+      if (d.compartments.some((c) => !((num(c.kepekaanMmL ?? '') ?? 0) > 0) || !((num(c.tinggiT2 ?? '') ?? 0) > 0))) {
+        issues.push('Isi kepekaan (mm/liter) & tinggi T2 dari buku tera untuk semua kompartemen')
       }
       break
     case 'atg_before':

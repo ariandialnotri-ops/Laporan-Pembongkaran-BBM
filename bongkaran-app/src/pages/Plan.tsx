@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CalendarClock, CalendarDays, ClipboardList, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CalendarClock, ClipboardList, Lock, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, LoEditSheet, ProdukSelect, SupplySelect, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
-import { SectionHeader } from '@/components/bongkaran/section-header'
+import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -12,9 +12,9 @@ import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
-import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
+import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
+import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
 import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +32,57 @@ const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
   supplyPoint: SUPPLY_POINTS[0],
   noSO: '',
 })
+
+type TRow = { plan: PlanT; lo: PlanLo; status: LoDisplayStatus }
+
+/** Tabel plan pengiriman: satu baris per LO, ketuk untuk ubah LO, SO, atau tambah LO. */
+const COLS: Col<TRow>[] = [
+  { header: 'Tgl kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobileCell: (x) => `Kirim ${formatTanggalIso(x.plan.tanggal)}`, mobile: 'sub' },
+  { header: 'No SO', cell: (x) => <span className="tabular whitespace-nowrap">{x.plan.noSO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>, mobile: 'hide' },
+  {
+    header: 'No LO',
+    cell: (x) =>
+      x.lo.noLOLama ? (
+        <span className="tabular inline-flex items-center gap-1 whitespace-nowrap">
+          <s className="text-on-surface-variant">{x.lo.noLOLama}</s>
+          <ArrowRight aria-label="menjadi" className="size-3.5" />
+          {x.lo.noLO}
+        </span>
+      ) : (
+        <span className="tabular whitespace-nowrap">{x.lo.noLO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>
+      ),
+    mobileCell: (x) => (x.lo.noLO ? `LO ${x.lo.noLO}` : `${x.lo.produk}, LO belum terbit`),
+    mobile: 'title',
+  },
+  { header: 'SO', cell: (x) => `SO ${x.plan.noSO || 'belum terbit'}`, mobile: 'sub', desktop: false },
+  { header: 'Produk', cell: (x) => <ProdukChip produk={x.lo.produk} />, mobile: 'hide' },
+  { header: 'Volume (L)', cell: (x) => formatNumber(x.lo.volume), align: 'right', mobile: 'hide' },
+  { header: 'Shift', cell: (x) => <span className="tabular">{x.lo.shift || x.plan.ms2Shift || '-'}</span>, mobile: 'hide' },
+  { header: 'Produk & volume', cell: (x) => `${x.lo.produk}, ${formatNumber(x.lo.volume)} L${x.lo.shift ? `, shift ${x.lo.shift}` : ''}`, mobile: 'sub', desktop: false },
+  { header: 'Supply point', cell: (x) => <span className="whitespace-nowrap">{planSupply(x.plan, x.lo) || '-'}</span>, mobile: 'hide' },
+  {
+    header: 'Permintaan MS2',
+    cell: (x) => (
+      <span className="tabular whitespace-nowrap text-on-surface-variant">
+        {formatTanggalIso(x.plan.ms2Tanggal)} {x.plan.ms2Jam}
+      </span>
+    ),
+    mobile: 'hide',
+  },
+  {
+    header: 'Status',
+    cell: (x) => {
+      const m = loStatusMeta(x.status)
+      return (
+        <Pill tone={m.tone}>
+          {x.status === 'closed' && <Lock aria-hidden="true" />}
+          {m.label}
+        </Pill>
+      )
+    },
+    mobile: 'badge',
+  },
+]
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -172,7 +223,13 @@ export function Plan() {
   const visible = inDate
     .filter((p) => !statusFilter || p.los.some((lo) => loStatus(lo, used) === statusFilter))
     .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || '') || b.createdAt - a.createdAt)
-  const dates = [...new Set(visible.map((p) => p.tanggal))]
+  const tabel: TRow[] = visible.flatMap((plan) => plan.los.filter((lo) => !statusFilter || loStatus(lo, used) === statusFilter).map((lo) => ({ plan, lo, status: loStatus(lo, used) })))
+  const bukaPlan = (plan: PlanT) =>
+    setEditPlan({
+      plan,
+      error: null,
+      form: { tanggal: plan.tanggal, ms2Tanggal: plan.ms2Tanggal, ms2Jam: plan.ms2Jam, ms2Shift: plan.ms2Shift, poSap: plan.poSap, shipTo: plan.shipTo, supplyPoint: plan.supplyPoint, noSO: plan.noSO },
+    })
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -248,90 +305,17 @@ export function Plan() {
         )}
       </GlassCard>
 
-      {dates.length === 0 && (
-        <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-          {statusFilter ? 'Tidak ada LO dengan status ini pada rentang tanggal terpilih.' : 'Belum ada plan pengiriman pada rentang tanggal ini.'}
-        </GlassCard>
-      )}
-
-      {dates.map((tgl) => (
-        <section key={tgl} aria-labelledby={`plan-${tgl}`} className="animate-entrance-3 flex flex-col gap-space-sm">
-          <SectionHeader id={`plan-${tgl}`} title={`Kirim ${formatTanggalIso(tgl)}`} action={<CalendarDays aria-hidden="true" className="size-5 text-on-surface-variant" />} />
-          {visible
-            .filter((p) => p.tanggal === tgl)
-            .map((plan) => {
-              const total = plan.los.filter((lo) => loStatus(lo, used) !== 'deleted').reduce((n, lo) => n + lo.volume, 0)
-              const los = statusFilter ? plan.los.filter((lo) => loStatus(lo, used) === statusFilter) : plan.los
-              return (
-                <GlassCard key={plan.id} level={1} className="flex flex-col gap-space-xs p-space-sm">
-                  <div className="flex items-start gap-space-sm">
-                    <div className="flex min-w-0 flex-1 flex-col pl-space-xs pt-1">
-                      <span className="tabular text-body-md font-semibold text-on-surface">{plan.noSO ? `SO ${plan.noSO}` : 'SO belum terbit'}</span>
-                      <span className="text-body-sm text-on-surface-variant">{[plan.supplyPoint, plan.shipTo && `Ship to ${plan.shipTo}`].filter(Boolean).join(', ')}</span>
-                      <span className="tabular text-body-sm text-on-surface-variant">
-                        MS2 {formatTanggalIso(plan.ms2Tanggal)} {plan.ms2Jam}
-                        {plan.ms2Shift ? `, shift ${plan.ms2Shift}` : ''}
-                        {plan.poSap ? `, PO ${plan.poSap}` : ''}
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Ubah plan ${plan.noSO ? `SO ${plan.noSO}` : formatTanggalIso(plan.tanggal)}`}
-                      onClick={() =>
-                        setEditPlan({
-                          plan,
-                          error: null,
-                          form: { tanggal: plan.tanggal, ms2Tanggal: plan.ms2Tanggal, ms2Jam: plan.ms2Jam, ms2Shift: plan.ms2Shift, poSap: plan.poSap, shipTo: plan.shipTo, supplyPoint: plan.supplyPoint, noSO: plan.noSO },
-                        })
-                      }
-                    >
-                      <Pencil aria-hidden="true" />
-                    </Button>
-                  </div>
-                  <ul className="flex flex-col gap-1">
-                    {los.map((lo) => {
-                      const st = loStatusMeta(loStatus(lo, used))
-                      return (
-                        <li key={lo.id}>
-                          <button
-                            type="button"
-                            onClick={() => bukaLo(plan, lo)}
-                            className="flex min-h-14 w-full items-center gap-space-sm rounded-md bg-surface-container-lowest/60 px-space-sm py-space-xs text-left transition-colors hover:bg-surface-container-lowest active:scale-[0.99]"
-                          >
-                            <div className="flex min-w-0 flex-1 flex-col">
-                              <span className="text-body-sm font-semibold text-on-surface">
-                                {lo.produk} <span className="tabular font-normal text-on-surface-variant">{formatLiter(lo.volume)}{lo.shift ? `, shift ${lo.shift}` : ''}</span>
-                              </span>
-                              {lo.noLOLama ? (
-                                <span className="tabular flex flex-wrap items-center gap-1 text-body-sm text-on-surface-variant">
-                                  <s>LO {lo.noLOLama}</s> ({lo.supplyPointLama})
-                                  <ArrowRight aria-label="menjadi" className="size-3.5" />
-                                  <b className="text-on-surface">LO {lo.noLO}</b> ({lo.supplyPoint})
-                                </span>
-                              ) : (
-                                <span className="tabular text-body-sm text-on-surface-variant">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>
-                              )}
-                              {lo.segel.length > 0 && <span className="tabular text-body-sm text-on-surface-variant">Segel {lo.segel.join(', ')}</span>}
-                            </div>
-                            <Pill tone={st.tone}>{st.label}</Pill>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                  <div className="flex items-center justify-between gap-2 pl-space-xs">
-                    <span className="tabular text-body-sm text-on-surface-variant">Total {formatNumber(total)} L</span>
-                    <Button variant="soft" size="sm" onClick={() => bukaLo(plan, null)}>
-                      <Plus aria-hidden="true" />
-                      Tambah LO
-                    </Button>
-                  </div>
-                </GlassCard>
-              )
-            })}
-        </section>
-      ))}
+      <div className="animate-entrance-2">
+        <RecordTable
+          title="Plan Pengiriman"
+          rows={tabel}
+          total={app.plans.reduce((n, p) => n + p.los.length, 0)}
+          cols={COLS}
+          rowKey={(x) => x.lo.id}
+          onRow={(x) => bukaLo(x.plan, x.lo)}
+          empty={statusFilter ? 'Tidak ada LO dengan status ini pada rentang tanggal terpilih.' : 'Belum ada plan pengiriman pada rentang tanggal ini.'}
+        />
+      </div>
 
       {/* Permintaan baru lewat MS2 */}
       <Sheet
@@ -401,7 +385,31 @@ export function Plan() {
         )}
       </Sheet>
 
-      <LoEditSheet target={editLo} onClose={() => setEditLo(null)} />
+      <LoEditSheet
+        target={editLo}
+        onClose={() => setEditLo(null)}
+        planActions={(plan) => (
+          <div className="flex flex-wrap gap-space-xs">
+            <Button
+              variant="soft"
+              size="sm"
+              onClick={() => {
+                setEditLo(null)
+                bukaPlan(plan)
+              }}
+            >
+              <Pencil aria-hidden="true" />
+              Ubah SO & MS2
+            </Button>
+            {editLo?.lo && (
+              <Button variant="soft" size="sm" onClick={() => setEditLo({ plan, lo: null })}>
+                <Plus aria-hidden="true" />
+                Tambah LO di SO ini
+              </Button>
+            )}
+          </div>
+        )}
+      />
     </div>
   )
 }

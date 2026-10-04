@@ -223,7 +223,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       retrySession: () => void initSession(),
       signIn,
       signOut,
-      canDeleteReport: (r) => canManage || (r.status === 'draft' && !!userId && r.createdBy === userId),
+      // Bongkaran selesai (closed) tidak dapat dihapus siapa pun.
+      canDeleteReport: (r) => r.status !== 'selesai' && (canManage || (r.status === 'draft' && !!userId && r.createdBy === userId)),
     }
   }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, daily, saveDaily, deleteDaily, refresh, initSession, signIn, signOut, userId])
 

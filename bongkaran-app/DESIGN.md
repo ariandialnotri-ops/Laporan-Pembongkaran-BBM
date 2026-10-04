@@ -129,8 +129,10 @@ Warna produk **tidak boleh** dipakai untuk status (sesuai/anomali).
 
 | Keluarga | Font | Untuk |
 |---|---|---|
-| UI | **Plus Jakarta Sans** (variable) | Semua teks |
-| Angka | **JetBrains Mono** (variable), `tabular-nums` | Liter, density, jam, nopol, nomor SO/LO (kelas `tabular`) |
+| UI | **Inter** (variable, `@fontsource-variable/inter`), mengikuti referensi stitch "Sistem Serba Bisa" | Semua teks |
+| Angka | **Inter** dengan `tabular-nums` | Liter, density, jam, nopol, nomor SO/LO (kelas `tabular`), digit sejajar per kolom |
+
+Ganti font cukup di `src/index.css`: `@import` font dan variabel `--font-jakarta` (teks) serta `--font-numeric` (angka).
 
 | Token | Ukuran / line-height | Berat | Untuk |
 |---|---|---|---|
@@ -263,14 +265,15 @@ Format tiap layar: **tujuan**, **isi berurutan**, **status khusus**.
 
 ### 9.2 Dashboard (hanya data)
 Urutan **wajib**:
-1. **Tanggal terkini** (mis. "Minggu, 4 Oktober 2026") + shift berjalan di kanan.
-2. **Kalender Progress** (1 minggu, Sen-Min), panah minggu sebelum/berikut + bulan-tahun singkat.
-   - Bulatan tanggal: biru muda = sesuai, merah muda = ada anomali, abu = belum ada data, biru padat = hari ini.
-   - Titik kuning di bawah tanggal = ada plan kirim.
+1. **Kartu operasional**: ikon kalender dalam bulatan biru muda, label "OPERASIONAL SPBU", tanggal ("Minggu, 4 Okt 2026"), dan pill shift berjalan dengan titik hijau berdenyut ("Shift 2 (14:00 - 21:59)").
+2. **Status Bongkaran Pekan Ini** (kartu putih, 1 minggu Sen-Min), di kanan "W40 - Okt 2026" dengan panah pekan sebelum/berikut.
+   - 7 kotak tinggi: label hari (SEN...MIN), tanggal 2 digit dalam bulatan, titik oranye di bawah bulatan = ada plan pengiriman, ikon status di bawah: centang hijau = sesuai, segitiga merah + kotak merah muda = anomali susut/D15, "—" = tidak ada data, "…" = hari ini masih berjalan.
+   - Hari ini: kotak biru muda, bulatan biru padat. Hari mendatang tanpa plan: pudar.
+   - Legenda: ● Plan pengiriman (oranye), ● Anomali susut/D15 (merah).
    - Ketuk tanggal → sheet: **Plan pengiriman** (produk, volume, shift, SO, LO, supply point, status), **Penerimaan** (bongkaran + Q&Q), **Kualitas** (D15 bongkar & uji harian), **Kuantitas** (tera bejana, stok awal per produk).
-3. **Total Bongkaran**: DateFilter (default Hari ini); 3 angka (Diterima, Transport loss, Discharge loss + %); tabel per produk (Produk + "n× bongkar", Diterima L, Transport, Discharge L & %); 2 kotak **SLA** rata-rata (Request MS2 → selesai bongkar, Gate out depot → selesai bongkar).
-4. **Plan Pengiriman Hari Ini**: per produk "x dari y LO dibongkar (+ n berjalan)", progress bar, "volume selesai dari volume plan".
-5. **Kualitas Harian**: daftar 5 produk: uji terakhir (tanggal, shift), D15, selisih vs D15 bongkaran terakhir, pill Sesuai/Tidak sesuai/Belum.
+3. **Bongkaran Hari Ini** (judul berganti "Total Bongkaran" bila rentang bukan hari ini): ikon truk + judul di dalam kartu, pill rentang ("Hari ini" + ikon filter) yang membuka DateFilter; 3 kotak (Diterima + "x dari y LO", Transport loss + %, Discharge loss + %); daftar per produk (titik warna produk, nama, "n MT", Vol. diterima) yang **dapat dibuka (dropdown)**: MT, diterima, transport loss L & %, discharge loss L & %, dan daftar MT (nopol, LO, waktu, diterima, T/D) yang menuju form; 2 kotak **SLA** ber-ikon (Req MS2 → selesai, Gate out → selesai).
+4. **Rencana vs Realisasi** (plan hari ini, "Target n L"): per produk kotak dengan "x dari y LO dibongkar (z%)", bar dua lapis (padat = dibongkar, pudar = on delivery/delivered), "n L dibongkar (n L berjalan)" vs "n L target".
+5. **Kualitas Harian (D15)**: pill toleransi; per produk kotak dengan garis warna produk, D15 acuan, D15 uji + selisih, pill Sesuai/Tidak sesuai/Belum.
 6. **Kaleng Sample**:
    - Kartu kepala: ikon, judul, keterangan toleransi, **tombol ⓘ** (pop up ketentuan 4 poin), 4 kotak ringkasan (Sampel sesuai, Ada anomali, Menunggu sample 2 jam, Pembaruan).
    - Kartu akordeon per produk: ikon warna produk, nama + chip spesifikasi, nama tangki; kanan: D15 terkini (selisih), Bongkar terakhir, pill status, chevron.
@@ -434,8 +437,8 @@ kontras tinggi untuk di bawah sinar matahari, sudut 12px, tanpa efek kaca"].
 
 Pertahankan struktur:
 - Dock bawah 4 menu: Dashboard, Input, Laporan, Profil. Header atas: logo / tombol kembali, judul, nama SPBU, inisial user.
-- Dashboard (hanya data, tanpa tombol input), urutan: tanggal terkini; Kalender Progress mingguan
-  (status per tanggal + titik plan kirim, ketuk = detail); Total Bongkaran per produk (diterima, transport loss,
+- Dashboard (hanya data, tanpa tombol input), urutan: kartu operasional (tanggal + shift); Status Bongkaran Pekan Ini
+  (7 kotak hari: status ikon + titik plan kirim, ketuk = detail); Total Bongkaran per produk (diterima, transport loss,
   discharge loss L & %, SLA request MS2 dan gate out); Plan Pengiriman Hari Ini per produk (progress dibongkar);
   Kualitas Harian per produk; Kaleng Sample (kartu per produk, 3 kaleng kiri terbaru kanan terlama, D15 sample 2 jam
   vs D15 depot, waktu bongkar, No SO, No LO, mobil tangki; slot kosong; pop up detail uji); LO Tracking (6 status).

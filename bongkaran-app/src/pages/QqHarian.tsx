@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -95,6 +96,12 @@ export function QqHarian() {
   const data: QqData = draft?.id === id ? draft.data : (existing?.data ?? fresh())
   const allPhotos = Object.values(data.foto ?? {}).flat()
   const srcOf = usePhotoSrc(allPhotos)
+  const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
+  const guard = useLeaveGuard({
+    active: belumSimpan > 0,
+    title: 'Keluar dari kualitas harian?',
+    detail: `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`,
+  })
 
   if (!app.loaded) return <Loading />
 
@@ -481,6 +488,7 @@ export function QqHarian() {
           })
         )}
       </section>
+      {guard.dialog}
     </div>
   )
 }

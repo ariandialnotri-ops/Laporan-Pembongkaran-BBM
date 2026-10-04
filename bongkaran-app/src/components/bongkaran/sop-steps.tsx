@@ -138,6 +138,7 @@ export function StepContent(props: StepProps) {
         <>
           <StepPhotos {...props} />
           <Section>
+            <span className="text-body-sm text-on-surface-variant">Salin tinggi tera, tinggi T2, kapasitas, dan kepekaan (mm/liter) sesuai buku tera MT.</span>
             {d.compartments.map((c) => (
               <div key={c.id} className="flex flex-col gap-space-xs">
                 <span className="text-tag uppercase text-primary">Kompartemen {c.no || '-'}</span>
@@ -145,8 +146,14 @@ export function StepContent(props: StepProps) {
                   <Field label="Tinggi tera" htmlFor={`tera-${c.id}`}>
                     <Num id={`tera-${c.id}`} suffix="mm" placeholder="1250" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
-                  <Field label="Kapasitas kompartemen" htmlFor={`kap-${c.id}`}>
+                  <Field label="Tinggi (T2)" htmlFor={`t2-${c.id}`}>
+                    <Num id={`t2-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiT2 ?? ''} onChange={(v) => setComp(c.id, { tinggiT2: v })} />
+                  </Field>
+                  <Field label="Kapasitas" htmlFor={`kap-${c.id}`}>
                     <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
+                  </Field>
+                  <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
+                    <Num id={`kpk-${c.id}`} suffix="mm/L" placeholder="0,25" value={c.kepekaanMmL ?? ''} onChange={(v) => setComp(c.id, { kepekaanMmL: v })} />
                   </Field>
                 </div>
               </div>
@@ -167,8 +174,8 @@ export function StepContent(props: StepProps) {
         <>
           {step.id === 'atg_after' && <SettleTimer d={d} setData={setData} rules={rules} />}
           <StepPhotos {...props} />
-          <Section>
-            {step.id === 'atg_before' && (
+          {step.id === 'atg_before' && (
+            <Section>
               <Field label="Tangki pendam" htmlFor="tangki">
                 <Select value={d.tankId} onValueChange={(v) => setData({ tankId: v })}>
                   <SelectTrigger id="tangki">
@@ -183,7 +190,13 @@ export function StepContent(props: StepProps) {
                   </SelectContent>
                 </Select>
               </Field>
-            )}
+            </Section>
+          )}
+          <Section>
+            <div className="flex flex-col">
+              <h3 className="text-body-lg font-bold text-on-surface">Pembacaan berdasarkan ATG</h3>
+              <span className="text-body-sm text-on-surface-variant">{step.id === 'atg_before' ? 'Sebelum bongkar' : 'Setelah bongkar'}, salin dari layar ATG.</span>
+            </div>
             <div className="grid grid-cols-3 gap-space-sm">
               <Field label="Tinggi" htmlFor={`${key}-t`}>
                 <Num id={`${key}-t`} suffix="mm" value={reading.tinggi} onChange={(v) => setReading({ tinggi: v })} />

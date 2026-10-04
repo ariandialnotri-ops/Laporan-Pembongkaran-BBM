@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@import "@fontsource-variable/plus-jakarta-sans";
-@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/inter";
 
 /* ===========================================================================
    AeroShift — glassmorphic design system, shared with Tepat Setoran SPBU.
@@ -9,8 +8,8 @@
 
 :root {
   /* --- Type families (also exported through @theme below) -------------- */
-  --font-jakarta: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-numeric: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-jakarta: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-numeric: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
 
   /* --- Surfaces ------------------------------------------------------- */
   --surface: #f8f9ff;
@@ -152,8 +151,8 @@
   --color-on-background: var(--on-background);
 
   /* --- Typography ------------------------------------------------------ */
-  --font-jakarta: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-numeric: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-jakarta: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-numeric: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --text-headline-xl: 36px;
   --text-headline-xl--line-height: 44px;

@@ -14,6 +14,13 @@ export function startOfWeek(d: Date) {
   return day
 }
 
+/** Nomor minggu ISO-8601 (minggu dimulai Senin). */
+export function isoWeek(d: Date) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7))
+  return Math.ceil(((t.getTime() - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
+}
+
 export function addDays(d: Date, n: number) {
   const next = new Date(d)
   next.setDate(d.getDate() + n)

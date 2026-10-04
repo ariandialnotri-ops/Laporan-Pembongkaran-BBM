@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Lock, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { Choice, Field, TagInput } from '@/components/bongkaran/form-bits'
 import { Button } from '@/components/ui/button'
@@ -73,7 +73,7 @@ const formOf = ({ plan, lo }: LoTarget): LoForm =>
  * Pop up ubah satu LO: nomor, produk, volume, shift, status, segel, alih supply.
  * LO Closed (sudah dibongkar) hanya bisa dilihat.
  */
-export function LoEditSheet({ target, onClose }: { target: LoTarget | null; onClose: () => void }) {
+export function LoEditSheet({ target, onClose, planActions }: { target: LoTarget | null; onClose: () => void; planActions?: (plan: Plan) => ReactNode }) {
   return (
     <Sheet
       open={!!target}
@@ -81,6 +81,7 @@ export function LoEditSheet({ target, onClose }: { target: LoTarget | null; onCl
       title={target?.lo ? (target.lo.noLO ? `LO ${target.lo.noLO}` : `${target.lo.produk}, LO belum terbit`) : 'Tambah LO'}
       description={target ? `${target.plan.noSO ? `SO ${target.plan.noSO}` : 'SO belum terbit'}, ${planSupply(target.plan, target.lo ?? undefined) || '-'}, kirim ${formatTanggalIso(target.plan.tanggal)}` : undefined}
     >
+      {target && planActions?.(target.plan)}
       {/* key: form diisi ulang tiap LO berbeda dibuka. */}
       {target && <Isi key={target.lo?.id ?? `baru-${target.plan.id}`} target={target} onClose={onClose} />}
     </Sheet>

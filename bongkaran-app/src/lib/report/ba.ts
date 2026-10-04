@@ -10,12 +10,15 @@ import type { CellSpec } from './xlsx'
 const HARI = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
 /** Kolom kompartemen 1-6 pada tabel kualitas (baris 12-17). */
 const QCOLS = ['G', 'H', 'K', 'L', 'M', 'N']
-/** Area tanda tangan (baris 64-67) per penandatangan di template. */
-export const BA_SIGN_AREA: Partial<Record<SignerKey, { from: string; to: string }>> = {
-  penerima: { from: 'D64', to: 'D67' },
-  security: { from: 'G64', to: 'G67' },
-  supir: { from: 'H64', to: 'K67' },
-  abh: { from: 'L64', to: 'M67' },
+/**
+ * Area tanda tangan (baris 64-67) per penandatangan di template. Kotak selebar `w` px
+ * di tengah kolom judulnya (sama dengan posisi nama di baris 68), rasio sekitar 5:2.
+ */
+export const BA_SIGN_AREA: Partial<Record<SignerKey, { from: string; to: string; w: number }>> = {
+  penerima: { from: 'D64', to: 'D67', w: 180 },
+  security: { from: 'G64', to: 'G67', w: 150 },
+  supir: { from: 'H64', to: 'K67', w: 240 },
+  abh: { from: 'L64', to: 'M67', w: 220 },
 }
 
 const n = (v: string | null | undefined) => (v ? parseAngka(v) : null)
@@ -26,7 +29,7 @@ const round = (v: number, d = 6) => Number(v.toFixed(d))
 export interface BaBuild {
   cells: Record<string, CellSpec>
   red: string[]
-  signatures: { key: SignerKey; from: string; to: string; img: string }[]
+  signatures: { key: SignerKey; from: string; to: string; w: number; img: string }[]
 }
 
 export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild {
@@ -82,7 +85,13 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
     const sel = dip !== null && tera !== null ? round(dip - tera, 4) : 0
     set(`L${row}`, sel)
     set(`M${row}`, kap)
-    if (dip !== null && tera && kap !== null) {
+    const mmPerL = c ? n(c.kepekaanMmL ?? '') : null
+    if (dip !== null && tera && mmPerL) {
+      // Kepekaan buku tera (mm/liter): selisih mm / kepekaan.
+      const liter = sel / mmPerL
+      totalLoss += liter
+      set(`N${row}`, round(liter, 6), `L${row}/${mmPerL}`)
+    } else if (dip !== null && tera && kap !== null) {
       const liter = sel * (kap / tera)
       totalLoss += liter
       set(`N${row}`, round(liter, 6), `L${row}*(M${row}/K${row})`)
@@ -133,7 +142,7 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
   set('H68', ttd.supir?.nama || d.namaDriver || null)
   set('L68', ttd.abh?.nama || null)
 
-  const signatures = (Object.entries(BA_SIGN_AREA) as [SignerKey, { from: string; to: string }][])
+  const signatures = (Object.entries(BA_SIGN_AREA) as [SignerKey, { from: string; to: string; w: number }][])
     .filter(([k]) => ttd[k]?.img)
     .map(([k, area]) => ({ key: k, ...area, img: ttd[k]!.img }))
 

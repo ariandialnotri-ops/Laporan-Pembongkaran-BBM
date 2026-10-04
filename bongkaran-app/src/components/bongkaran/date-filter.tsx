@@ -19,6 +19,8 @@ const PRESETS: { key: DatePreset; label: string }[] = [
   { key: 'custom', label: 'Pilih tanggal' },
 ]
 
+export const presetLabel = (p: DatePreset) => PRESETS.find((x) => x.key === p)?.label ?? ''
+
 export function rangeOf(preset: DatePreset, now = new Date()): DateRange {
   const today = todayIso(now)
   if (preset === 'today') return { preset, from: today, to: today }

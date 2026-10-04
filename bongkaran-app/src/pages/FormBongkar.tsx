@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Beaker, Flag, Lock, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import type { ExportKind } from '@/lib/report/export'
 import { FinishPanel } from '@/components/bongkaran/finish-panel'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
 import { StepContent } from '@/components/bongkaran/sop-steps'
@@ -70,7 +72,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
-  const [generating, setGenerating] = useState<'pdf' | 'jpg' | 'xlsx' | null>(null)
+  const [generating, setGenerating] = useState<ExportKind | null>(null)
   const [error, setError] = useState<string[] | null>(null)
 
   const rules = app.rules
@@ -253,7 +255,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     return out
   }
   // Laporan mengikuti template Excel referensi; modul dimuat saat dibutuhkan.
-  const runExport = async (kind: 'pdf' | 'jpg' | 'xlsx') => {
+  const runExport = async (kind: ExportKind) => {
     setGenerating(kind)
     try {
       await flush()
@@ -261,13 +263,22 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       const x = evaluation.derived
       if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`)
       else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`)
-      else await ex.exportBaPdf(report, x, app.settings, await photoData(), `${fileBase}.pdf`)
+      // PDF BA saja: tanpa memuat foto, jauh lebih cepat.
+      else if (kind === 'pdf-ba') await ex.exportBaPdf(report, x, app.settings, null, `${fileBase}.pdf`)
+      else await ex.exportBaPdf(report, x, app.settings, await photoData(), `${fileBase}_lampiran.pdf`)
     } catch (e) {
-      toast(`Gagal membuat ${kind === 'xlsx' ? 'Excel' : kind.toUpperCase()}: ${pesan(e)}`, TriangleAlert)
+      toast(`Gagal membuat ${kind === 'xlsx' ? 'Excel' : kind === 'jpg' ? 'JPG' : 'PDF'}: ${pesan(e)}`, TriangleAlert)
     } finally {
       setGenerating(null)
     }
   }
+  const selesaiLangkah = evaluation.steps.filter((s) => s.complete).length
+  const guard = useLeaveGuard({
+    active: !readOnly,
+    title: 'Keluar dari form bongkaran?',
+    detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
+    beforeLeave: flush,
+  })
   const waText = useMemo(() => buildWaText(report, evaluation.derived, app.settings), [report, evaluation, app.settings])
 
   const hapus = async () => {
@@ -280,6 +291,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       clearBackup(report.id)
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
+      guard.bypass()
       navigate('/input/bongkar')
     } catch (e) {
       toast(pesan(e), TriangleAlert)
@@ -342,6 +354,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
           onFinish={finish}
           onReopen={report.status === 'anomali' && app.canManage ? reopen : undefined}
           onPdf={() => runExport('pdf')}
+          onPdfBa={() => runExport('pdf-ba')}
           onJpg={() => runExport('jpg')}
           onXlsx={() => runExport('xlsx')}
           generating={generating}
@@ -425,7 +438,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
           </Button>
         )}
       </div>
-
+      {guard.dialog}
     </div>
   )
 }

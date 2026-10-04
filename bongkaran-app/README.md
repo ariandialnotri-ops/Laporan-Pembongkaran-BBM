@@ -9,8 +9,8 @@ Logo dan ikon ada di `public/` (`floq-login.webp` untuk halaman login,
 
 UI memakai design system **AeroShift** yang sama dengan aplikasi
 **Tepat Setoran SPBU**: kartu kaca (glassmorphism) bergaya iOS di atas kanvas
-gradasi dingin, dock navigasi melayang, Plus Jakarta Sans untuk antarmuka dan
-JetBrains Mono untuk semua angka. Brief lengkapnya ada di
+gradasi dingin, dock navigasi melayang, font Inter (angka memakai `tabular-nums`)
+mengikuti referensi stitch "Sistem Serba Bisa". Brief lengkapnya ada di
 [`design-system/aeroshift/DESIGN.md`](design-system/aeroshift/DESIGN.md).
 
 Spesifikasi tampilan FLOQ yang lengkap (token, komponen, setiap layar, cara mengganti desain, dan prompt untuk tool desain AI) ada di [`DESIGN.md`](DESIGN.md).
@@ -40,12 +40,12 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 
 | Menu | Rute | Isi |
 |------|------|-----|
-| Dashboard | `/` | Tanggal & shift terkini, Kalender Progress (titik = ada plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Total Bongkaran per produk dengan transport loss & discharge loss (L dan %), SLA rata-rata, Plan Pengiriman Hari Ini vs sudah dibongkar, Kualitas Harian, Kaleng Sample (D15 sample 2 jam dari 3 bongkaran terakhir), LO Tracking |
+| Dashboard | `/` | Kartu operasional (tanggal & shift), Status Bongkaran Pekan Ini (7 kotak hari dengan ikon status & titik plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Bongkaran Hari Ini per produk (dropdown: MT, diterima, transport loss, discharge loss L & %), SLA rata-rata, Rencana vs Realisasi, Kualitas Harian, Kaleng Sample (D15 sample 2 jam dari 3 bongkaran terakhir), LO Tracking |
 | Input | `/input` | Bar wajib Stok Awal Shift + kartu: |
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
-| | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet) dengan shift per produk, nomor SO/LO, segel, status LO. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi tera, tinggi T2, kapasitas, kepekaan (mm/liter) dari buku tera MT. Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet) dengan shift per produk; tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk ubah LO, ubah SO & MS2, atau tambah LO. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Sample BBM 2 Jam: uji density tangki pendam minimal 2 jam setelah bongkar selesai, dibanding D15 depot |
 | Laporan | `/laporan` | Kartu laporan: |
