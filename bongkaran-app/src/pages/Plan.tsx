@@ -1,25 +1,25 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CalendarDays, ClipboardList, Pencil, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CalendarClock, CalendarDays, ClipboardList, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
-import { Choice, Field, TagInput } from '@/components/bongkaran/form-bits'
+import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { ErrorBox, LoEditSheet, ProdukSelect, SupplySelect, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { LO_MANUAL_STATUS, LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
-import { PRODUK_OPTIONS, SUPPLY_POINTS, type LoStatus, type Plan as PlanT, type PlanLo } from '@/lib/sop'
+import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
+import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
-type Row = { id: string; produk: string; volume: string }
-const blankRow = (produk = PRODUK_OPTIONS[0]): Row => ({ id: genId('lo'), produk, volume: '8000' })
+type Row = { id: string; produk: string; volume: string; shift: '' | '1' | '2' }
+const blankRow = (shift: Row['shift'] = '', produk = PRODUK_OPTIONS[0]): Row => ({ id: genId('lo'), produk, volume: '8000', shift })
 
 type PlanForm = Pick<PlanT, 'tanggal' | 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint' | 'noSO'>
 const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
@@ -34,50 +34,6 @@ const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
 })
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
-
-function ErrorBox({ text }: { text: string | null }) {
-  if (!text) return null
-  return (
-    <div role="alert" className="flex items-start gap-space-sm rounded-md bg-error-container/70 p-space-sm">
-      <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
-      <span className="text-body-sm font-semibold text-on-error-container">{text}</span>
-    </div>
-  )
-}
-
-function ProdukSelect({ id, value, onChange, label = 'Produk' }: { id: string; value: string; onChange: (v: string) => void; label?: string }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id} aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {PRODUK_OPTIONS.map((p) => (
-          <SelectItem key={p} value={p}>
-            {p}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-function SupplySelect({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id={id}>
-        <SelectValue placeholder="Pilih supply point" />
-      </SelectTrigger>
-      <SelectContent>
-        {SUPPLY_POINTS.map((p) => (
-          <SelectItem key={p} value={p}>
-            {p}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
 
 /** Kolom data permintaan MS2: dipakai di form baru dan sheet edit. */
 function PlanFields({ form, set, idp, withSo }: { form: PlanForm; set: (p: Partial<PlanForm>) => void; idp: string; withSo?: boolean }) {
@@ -130,8 +86,6 @@ function validatePlan(f: PlanForm) {
   return null
 }
 
-type LoForm = { noLO: string; produk: string; volume: string; status: LoStatus; segel: string[]; alihLO: string; alihSP: string }
-
 export function Plan() {
   const app = useApp()
   const toast = useToast()
@@ -139,11 +93,12 @@ export function Plan() {
   const [rows, setRows] = useState<Row[]>(() => [blankRow()])
   const [error, setError] = useState<string | null>(null)
   const [baru, setBaru] = useState(false)
+  const [notifBisa, setNotifBisa] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'default')
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
 
   const [editPlan, setEditPlan] = useState<{ plan: PlanT; form: PlanForm; error: string | null } | null>(null)
-  const [editLo, setEditLo] = useState<{ plan: PlanT; lo: PlanLo | null; form: LoForm; error: string | null } | null>(null)
+  const [editLo, setEditLo] = useState<LoTarget | null>(null)
 
   const used = app.usedLoIds
   const inDate = useMemo(() => app.plans.filter((p) => inRange(p.tanggal, range)), [app.plans, range])
@@ -159,6 +114,7 @@ export function Plan() {
     return c
   }, [inDate, used])
   const soTerbit = inDate.filter((p) => p.noSO.trim()).length
+  const besok = planBesokKurang(app.plans)
 
   const simpan = async () => {
     const err = validatePlan(form)
@@ -174,7 +130,7 @@ export function Plan() {
       noSO: '',
       produk: '',
       soldTo: '',
-      los: valid.map((r) => ({ id: r.id, noLO: '', produk: r.produk, volume: parseAngka(r.volume) ?? 0, status: 'os', segel: [] })),
+      los: valid.map((r) => ({ id: r.id, noLO: '', produk: r.produk, volume: parseAngka(r.volume) ?? 0, shift: r.shift || form.ms2Shift, status: 'os', segel: [] })),
     }
     setError(null)
     try {
@@ -187,14 +143,6 @@ export function Plan() {
       setError(pesan(e))
     }
   }
-
-  const allLo = (exceptLoId?: string) =>
-    new Set(
-      app.plans
-        .flatMap((p) => p.los.filter((lo) => lo.id !== exceptLoId).flatMap((lo) => [lo.noLO, lo.noLOLama ?? '']))
-        .map((n) => n.trim().toUpperCase())
-        .filter(Boolean),
-    )
 
   const simpanPlanEdit = async () => {
     if (!editPlan) return
@@ -209,60 +157,7 @@ export function Plan() {
     }
   }
 
-  const bukaLo = (plan: PlanT, lo: PlanLo | null) =>
-    setEditLo({
-      plan,
-      lo,
-      error: null,
-      form: lo
-        ? { noLO: lo.noLO, produk: lo.produk, volume: String(lo.volume), status: lo.status, segel: lo.segel, alihLO: '', alihSP: planSupply(plan, lo) }
-        : { noLO: '', produk: PRODUK_OPTIONS[0], volume: '8000', status: 'os', segel: [], alihLO: '', alihSP: plan.supplyPoint },
-    })
-
-  const simpanLo = async () => {
-    if (!editLo) return
-    const { plan, lo, form: f } = editLo
-    const fail = (error: string) => setEditLo({ ...editLo, error })
-    const volume = parseAngka(f.volume)
-    if (!(volume && volume > 0)) return fail('Volume harus lebih dari 0 liter.')
-    const taken = allLo(lo?.id)
-    const alih = f.status === 'alih' && !!lo && lo.status !== 'alih'
-    if (alih) {
-      if (!lo.noLO.trim()) return fail('LO belum punya nomor, tidak bisa dialih supply.')
-      const baru = f.alihLO.trim().toUpperCase()
-      if (!baru) return fail('Isi nomor LO baru dari terminal tujuan.')
-      if (taken.has(baru) || baru === lo.noLO.trim().toUpperCase()) return fail(`Nomor LO ${f.alihLO} sudah terdaftar.`)
-      if (!f.alihSP || f.alihSP === planSupply(plan, lo)) return fail('Pilih supply point baru yang berbeda.')
-    } else if (f.noLO.trim() && taken.has(f.noLO.trim().toUpperCase())) {
-      return fail(`Nomor LO ${f.noLO} sudah terdaftar.`)
-    }
-    const next: PlanLo =
-      alih && lo
-        ? { ...lo, produk: f.produk, volume, segel: f.segel, status: 'alih', noLOLama: lo.noLO, supplyPointLama: planSupply(plan, lo), noLO: f.alihLO.trim(), supplyPoint: f.alihSP }
-        : { ...(lo ?? { id: genId('lo') }), noLO: f.noLO.trim(), produk: f.produk, volume, status: f.status, segel: f.segel }
-    const los = lo ? plan.los.map((x) => (x.id === lo.id ? next : x)) : [...plan.los, next]
-    try {
-      await app.savePlan({ ...plan, los })
-      setEditLo(null)
-      toast(alih ? `Alih supply: LO ${next.noLOLama} menjadi ${next.noLO}` : 'LO tersimpan')
-    } catch (e) {
-      fail(pesan(e))
-    }
-  }
-
-  const hapusLo = async () => {
-    if (!editLo?.lo) return
-    const { plan, lo } = editLo
-    if (!window.confirm(`Hapus baris ${lo.noLO ? `LO ${lo.noLO}` : lo.produk} dari plan ini? Untuk LO yang dibatalkan depot, pakai status Deleted.`)) return
-    try {
-      const sisa = plan.los.filter((x) => x.id !== lo.id)
-      if (sisa.length) await app.savePlan({ ...plan, los: sisa })
-      else await app.deletePlan(plan)
-      setEditLo(null)
-    } catch (e) {
-      setEditLo({ ...editLo, error: pesan(e) })
-    }
-  }
+  const bukaLo = (plan: PlanT, lo: PlanLo | null) => setEditLo({ plan, lo })
 
   const hapusPlan = async (plan: PlanT) => {
     if (!window.confirm(`Hapus plan ${plan.noSO ? `SO ${plan.noSO}` : `tanggal ${formatTanggalIso(plan.tanggal)}`}?`)) return
@@ -281,6 +176,35 @@ export function Plan() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      {besok && (
+        <div role="status" className="animate-entrance-1 flex flex-col gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-md">
+          <div className="flex items-start gap-space-sm">
+            <CalendarClock aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
+            <div className="flex flex-col">
+              <span className="text-body-md font-bold text-on-surface">Plan pengiriman besok belum dibuat</span>
+              <span className="text-body-sm text-on-surface-variant">Pengingat harian pukul 06:00 untuk kiriman {formatTanggalIso(besok)}.</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-space-xs">
+            <Button
+              size="pill"
+              onClick={() => {
+                setForm(blankPlanForm(besok))
+                setBaru(true)
+              }}
+            >
+              <Plus aria-hidden="true" />
+              Buat plan besok
+            </Button>
+            {notifBisa && (
+              <Button variant="glass" size="pill" onClick={() => void Notification.requestPermission().then(() => setNotifBisa(false))}>
+                Aktifkan notifikasi
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       <Button size="lg" className="animate-entrance-1 w-full" onClick={() => setBaru(true)}>
         <Plus aria-hidden="true" />
         Permintaan baru (MS2)
@@ -377,7 +301,7 @@ export function Plan() {
                           >
                             <div className="flex min-w-0 flex-1 flex-col">
                               <span className="text-body-sm font-semibold text-on-surface">
-                                {lo.produk} <span className="tabular font-normal text-on-surface-variant">{formatLiter(lo.volume)}</span>
+                                {lo.produk} <span className="tabular font-normal text-on-surface-variant">{formatLiter(lo.volume)}{lo.shift ? `, shift ${lo.shift}` : ''}</span>
                               </span>
                               {lo.noLOLama ? (
                                 <span className="tabular flex flex-wrap items-center gap-1 text-body-sm text-on-surface-variant">
@@ -425,23 +349,22 @@ export function Plan() {
         <PlanFields idp="plan" form={form} set={(p) => setForm({ ...form, ...p })} />
         <div className="flex flex-col gap-space-xs">
           <span className="text-tag uppercase text-on-surface-variant">Produk yang diminta</span>
-          {rows.map((r, i) => (
-            <div key={r.id} className="grid grid-cols-[1fr_8.5rem_auto] items-center gap-space-xs">
-              <ProdukSelect id={`plan-row-${i}`} label={`Produk ${i + 1}`} value={r.produk} onChange={(v) => setRows(rows.map((x) => (x.id === r.id ? { ...x, produk: v } : x)))} />
-              <Input
-                aria-label={`Volume produk ${i + 1}`}
-                numeric
-                inputMode="numeric"
-                suffix="L"
-                value={r.volume}
-                onChange={(e) => setRows(rows.map((x) => (x.id === r.id ? { ...x, volume: e.target.value } : x)))}
-              />
-              <Button variant="ghost" size="icon" aria-label={`Hapus produk ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((x) => x.id !== r.id))}>
-                <Trash2 aria-hidden="true" />
-              </Button>
-            </div>
-          ))}
-          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow()])}>
+          {rows.map((r, i) => {
+            const setRow = (p: Partial<Row>) => setRows(rows.map((x) => (x.id === r.id ? { ...x, ...p } : x)))
+            return (
+              <div key={r.id} className="flex flex-col gap-space-xs rounded-md bg-surface-container-low/60 p-space-xs">
+                <div className="grid grid-cols-[1fr_8.5rem_auto] items-center gap-space-xs">
+                  <ProdukSelect id={`plan-row-${i}`} label={`Produk ${i + 1}`} value={r.produk} onChange={(v) => setRow({ produk: v })} />
+                  <Input aria-label={`Volume produk ${i + 1}`} numeric inputMode="numeric" suffix="L" value={r.volume} onChange={(e) => setRow({ volume: e.target.value })} />
+                  <Button variant="ghost" size="icon" aria-label={`Hapus produk ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows(rows.filter((x) => x.id !== r.id))}>
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                </div>
+                <Choice label={`Shift permintaan produk ${i + 1}`} value={r.shift || form.ms2Shift} onChange={(v) => setRow({ shift: v })} options={SHIFT_PERMINTAAN} />
+              </div>
+            )
+          })}
+          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow(rows.at(-1)?.shift || form.ms2Shift)])}>
             <Plus aria-hidden="true" />
             Tambah produk
           </Button>
@@ -478,125 +401,7 @@ export function Plan() {
         )}
       </Sheet>
 
-      {/* Edit LO: nomor, produk, volume, status, segel, alih supply */}
-      <Sheet
-        open={!!editLo}
-        onOpenChange={(o) => !o && setEditLo(null)}
-        title={editLo?.lo ? (editLo.lo.noLO ? `LO ${editLo.lo.noLO}` : `${editLo.lo.produk}, LO belum terbit`) : 'Tambah LO'}
-        description={editLo ? `${editLo.plan.noSO ? `SO ${editLo.plan.noSO}` : 'SO belum terbit'}, ${planSupply(editLo.plan, editLo.lo ?? undefined)}` : undefined}
-        footer={
-          editLo && (
-            <>
-              {editLo.lo && app.canManage && !used.has(editLo.lo.id) && (
-                <Button variant="ghost" size="icon" aria-label="Hapus baris LO" onClick={hapusLo}>
-                  <Trash2 aria-hidden="true" />
-                </Button>
-              )}
-              <Button className="flex-1" onClick={simpanLo}>
-                Simpan LO
-              </Button>
-            </>
-          )
-        }
-      >
-        {editLo && (
-          <>
-            <LoEditor
-              value={editLo.form}
-              lo={editLo.lo}
-              usedBy={editLo.lo ? used.get(editLo.lo.id) : undefined}
-              currentSupply={planSupply(editLo.plan, editLo.lo ?? undefined)}
-              onChange={(p) => setEditLo({ ...editLo, form: { ...editLo.form, ...p }, error: null })}
-            />
-            <ErrorBox text={editLo.error} />
-          </>
-        )}
-      </Sheet>
+      <LoEditSheet target={editLo} onClose={() => setEditLo(null)} />
     </div>
-  )
-}
-
-function LoEditor({
-  value: f,
-  lo,
-  usedBy,
-  currentSupply,
-  onChange,
-}: {
-  value: LoForm
-  lo: PlanLo | null
-  usedBy: { nopol: string; status: string } | undefined
-  currentSupply: string
-  onChange: (p: Partial<LoForm>) => void
-}) {
-  const startAlih = f.status === 'alih' && !!lo && lo.status !== 'alih'
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-space-sm">
-        <Field label="Produk" htmlFor="lo-produk-edit">
-          <ProdukSelect id="lo-produk-edit" value={f.produk} onChange={(v) => onChange({ produk: v })} />
-        </Field>
-        <Field label="Volume" htmlFor="lo-vol-edit">
-          <Input id="lo-vol-edit" numeric inputMode="numeric" suffix="L" value={f.volume} onChange={(e) => onChange({ volume: e.target.value })} />
-        </Field>
-        <Field label="Nomor LO" htmlFor="lo-no-edit" className="col-span-2">
-          <Input id="lo-no-edit" autoComplete="off" inputMode="numeric" disabled={startAlih} value={f.noLO} onChange={(e) => onChange({ noLO: e.target.value })} />
-        </Field>
-      </div>
-
-      {usedBy ? (
-        <div className="inset-field rounded-md p-space-sm text-body-sm text-on-surface">
-          Status <b>{usedBy.status === 'draft' ? 'Delivered' : 'Closed'}</b> otomatis dari data bongkaran MT {usedBy.nopol || '-'}.
-        </div>
-      ) : (
-        <Field label="Status LO">
-          <div role="radiogroup" aria-label="Status LO" className="grid grid-cols-2 gap-space-xs">
-            {LO_MANUAL_STATUS.map((k) => {
-              const m = loStatusMeta(k)
-              const on = f.status === k
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => onChange({ status: k })}
-                  className={cn(
-                    'flex min-h-14 flex-col items-start justify-center rounded-md px-space-sm py-space-xs text-left transition-colors',
-                    on ? 'bg-primary text-on-primary' : 'inset-field text-on-surface',
-                  )}
-                >
-                  <span className="text-body-sm font-semibold">{m.label}</span>
-                  <span className={cn('text-tag normal-case tracking-normal', on ? 'text-on-primary' : 'text-on-surface-variant')}>{m.desc}</span>
-                </button>
-              )
-            })}
-          </div>
-          <span className="text-body-sm text-on-surface-variant">Delivered dan Closed terisi otomatis saat LO dipakai bongkaran.</span>
-        </Field>
-      )}
-
-      {startAlih && (
-        <div className="flex flex-col gap-space-sm rounded-md bg-secondary-fixed/40 p-space-sm">
-          <span className="flex items-center gap-space-xs text-body-sm font-semibold text-on-surface">
-            <Repeat aria-hidden="true" className="size-4" />
-            Adjustment alih supply dari {currentSupply}
-          </span>
-          <span className="text-body-sm text-on-surface-variant">LO {lo?.noLO} tetap ditampilkan sebagai LO lama di kartu plan.</span>
-          <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Nomor LO baru" htmlFor="lo-alih-no">
-              <Input id="lo-alih-no" autoComplete="off" inputMode="numeric" value={f.alihLO} onChange={(e) => onChange({ alihLO: e.target.value })} />
-            </Field>
-            <Field label="Supply point baru" htmlFor="lo-alih-sp">
-              <SupplySelect id="lo-alih-sp" value={f.alihSP} onChange={(v) => onChange({ alihSP: v })} />
-            </Field>
-          </div>
-        </div>
-      )}
-
-      <Field label="Nomor segel (sesuai dokumen LO)" htmlFor="lo-segel-edit" hint="Dipakai petugas untuk mencocokkan segel saat bongkar.">
-        <TagInput id="lo-segel-edit" values={f.segel} onChange={(v) => onChange({ segel: v })} placeholder="Ketik nomor segel" />
-      </Field>
-    </>
   )
 }

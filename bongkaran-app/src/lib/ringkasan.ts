@@ -151,29 +151,35 @@ export function acuanD15(rows: ReportSummary[], produk: string, sampai?: string)
   return best ? { d15: best.d15 as number, tanggal: best.tanggal } : null
 }
 
-export type Kaleng = ReportSummary & { kalengId: string; selisih: number | null }
+export type KalengStatus = 'sesuai' | 'perhatian' | 'menunggu' | 'belum'
+
+/** Kaleng = satu bongkaran selesai; nilai D15 dari uji sample tangki 2 jam setelah bongkar. */
+export type Kaleng = ReportSummary & { d15Sample: number | null; selisih: number | null; ok: boolean | null; menunggu: boolean }
 
 /**
- * Kaleng sample per produk: 3 bongkaran terakhir yang sudah diuji density
- * (kaleng 1 = terbaru), plus tanggal plan kirim berikutnya untuk slot kosong.
+ * Kaleng sample per produk: 3 bongkaran selesai terakhir (kaleng 1 = terbaru).
+ * Acuan mutu kaleng adalah hasil sample BBM 2 jam, dibanding D15 dokumen depot.
  */
-export function kalengSample(rows: ReportSummary[], plans: Plan[], used: Map<string, ReportSummary>, kode: (produk: string) => string) {
+export function kalengSample(rows: ReportSummary[], plans: Plan[], used: Map<string, ReportSummary>) {
   return PRODUK_OPTIONS.map((produk) => {
     const cans: Kaleng[] = rows
-      .filter((r) => r.produk === produk && r.d15 !== null && r.status !== 'draft')
+      .filter((r) => r.produk === produk && r.status === 'selesai')
       .sort((a, b) => (b.tanggal + b.jam).localeCompare(a.tanggal + a.jam) || b.createdAt - a.createdAt)
       .slice(0, 3)
-      .map((r, _, arr) => {
-        const ymd = r.tanggal.slice(2).replace(/-/g, '')
-        const sameDay = arr.filter((x) => x.tanggal === r.tanggal)
-        const urut = sameDay.length > 1 ? `-${sameDay.length - sameDay.indexOf(r)}` : ''
-        return {
-          ...r,
-          kalengId: `SPL-${kode(produk)}-${ymd}${urut}`,
-          selisih: r.d15Depot !== null ? Math.round((r.d15! - r.d15Depot) * 10000) / 10000 : null,
-        }
-      })
-    const status: QQStatus = !cans.length ? 'belum' : cans.every((c) => c.densityOk !== false) ? 'sesuai' : 'perhatian'
+      .map((r) => ({
+        ...r,
+        d15Sample: r.sample2Jam?.d15 ?? null,
+        selisih: r.sample2Jam?.selisih ?? null,
+        ok: r.sample2Jam?.ok ?? null,
+        menunggu: !r.sample2Jam,
+      }))
+    const status: KalengStatus = !cans.length
+      ? 'belum'
+      : cans.some((c) => c.ok === false)
+        ? 'perhatian'
+        : cans[0].menunggu
+          ? 'menunggu'
+          : 'sesuai'
     const today = todayIso()
     const next = plans
       .filter((p) => p.tanggal >= today && p.los.some((lo) => lo.produk === produk && ['os', 'planned', 'delivery'].includes(loStatus(lo, used))))

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
+import { PlanReminder } from './plan-reminder'
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <DockNav />
+      <PlanReminder />
     </>
   )
 }

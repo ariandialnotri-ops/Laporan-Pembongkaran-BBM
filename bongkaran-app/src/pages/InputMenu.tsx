@@ -5,7 +5,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
 import { useApp } from '@/lib/app-state'
 import { qqRecordId } from '@/lib/daily'
-import { loStatus } from '@/lib/plan'
+import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
 import { shiftLabel } from '@/lib/shift'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,7 @@ export function InputMenu() {
   const kirim = los.filter((s) => s === 'delivery').length
   const diuji = app.daily.some((d) => d.kind === 'qq' && d.id === qqRecordId(stok.key.tanggal, stok.key.shift))
   const sample = sampleMenunggu(app.reports)
+  const besok = planBesokKurang(app.plans)
   const sampleSiap = sample.filter((s) => s.siap).length
 
   const menus: MenuItem[] = [
@@ -39,8 +40,8 @@ export function InputMenu() {
       icon: ClipboardList,
       title: 'Plan Pengiriman',
       desc: 'Permintaan MS2, nomor SO, LO, dan segel',
-      status: proses ? `${proses} LO belum terbit` : kirim ? `${kirim} LO sedang dikirim` : 'Semua LO terisi',
-      badge: proses,
+      status: besok ? 'Plan besok belum dibuat' : proses ? `${proses} LO belum terbit` : kirim ? `${kirim} LO sedang dikirim` : 'Semua LO terisi',
+      badge: (besok ? 1 : 0) + proses,
     },
     {
       to: '/kualitas',

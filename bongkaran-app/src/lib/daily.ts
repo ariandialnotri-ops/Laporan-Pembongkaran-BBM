@@ -6,6 +6,7 @@ import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import type { Shift } from '@/lib/shift'
+import type { Photo } from '@/lib/sop'
 
 export interface StokItem {
   /** Ketinggian ATG/deepstick (mm). */
@@ -30,6 +31,8 @@ export interface QqKualitas {
   suhu: string
   /** Volume pump test untuk sampel uji kualitas (L). */
   pumpTest: string
+  /** Waktu baris ini terakhir disimpan; kosong bila belum/berubah setelah disimpan. */
+  savedAt?: string
 }
 
 export interface QqKuantitas {
@@ -41,6 +44,16 @@ export interface QqKuantitas {
   selisihMl: string
   /** Volume pump test uji kuantitas (L), standar 20. */
   pumpTest: string
+  savedAt?: string
+}
+
+/** Foto wajib di akhir tiap uji: struk pump test dan pengembalian minyak ke tangki. */
+export type QqFotoKey = 'kualitasStruk' | 'kualitasKembali' | 'kuantitasStruk' | 'kuantitasKembali'
+export const QQ_FOTO: Record<QqFotoKey, string> = {
+  kualitasStruk: 'Foto struk pump test',
+  kualitasKembali: 'Foto pengembalian minyak ke tangki',
+  kuantitasStruk: 'Foto struk pump test',
+  kuantitasKembali: 'Foto pengembalian minyak ke tangki',
 }
 
 export interface QqData {
@@ -49,6 +62,9 @@ export interface QqData {
   kualitas: QqKualitas[]
   kuantitas: QqKuantitas[]
   catatan: string
+  foto?: Partial<Record<QqFotoKey, Photo[]>>
+  /** Diisi saat uji diselesaikan (semua baris & foto lengkap). */
+  selesaiAt?: string
 }
 
 interface DailyBase {

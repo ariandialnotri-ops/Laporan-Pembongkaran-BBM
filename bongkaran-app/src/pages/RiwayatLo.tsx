@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Lock } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
+import { LoEditSheet, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
 import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -14,7 +16,8 @@ import type { Plan, PlanLo, ReportSummary } from '@/lib/sop'
 type Row = { plan: Plan; lo: PlanLo; status: LoDisplayStatus; report: ReportSummary | undefined }
 
 const COLS: Col<Row>[] = [
-  { header: 'Tanggal kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobile: 'sub' },
+  { header: 'Tgl permintaan kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobile: 'sub' },
+  { header: 'No SO', cell: (x) => <span className="tabular whitespace-nowrap">{x.plan.noSO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>, mobile: 'hide' },
   {
     header: 'No LO',
     cell: (x) => (
@@ -23,36 +26,36 @@ const COLS: Col<Row>[] = [
         {x.lo.noLO || <span className="italic text-on-surface-variant">belum terbit</span>}
       </span>
     ),
+    mobileCell: (x) => (x.lo.noLO ? `LO ${x.lo.noLO}` : 'LO belum terbit'),
     mobile: 'title',
   },
-  { header: 'BBM', cell: (x) => <ProdukChip produk={x.lo.produk} />, mobile: 'hide' },
+  { header: 'SO', cell: (x) => `SO ${x.plan.noSO || 'belum terbit'}`, mobile: 'sub', desktop: false },
+  { header: 'Produk', cell: (x) => <ProdukChip produk={x.lo.produk} />, mobile: 'hide' },
   { header: 'Volume (L)', cell: (x) => formatNumber(x.lo.volume), align: 'right', mobile: 'hide' },
-  {
-    header: 'SO / Supply point',
-    cell: (x) => (
-      <span className="tabular">
-        {x.plan.noSO ? `SO ${x.plan.noSO}` : 'SO belum terbit'}, {planSupply(x.plan, x.lo) || '-'}
-      </span>
-    ),
-    mobile: 'sub',
-  },
-  { header: 'Produk', cell: (x) => `${x.lo.produk}, ${formatNumber(x.lo.volume)} L`, mobile: 'sub', desktop: false },
-  { header: 'Nopol bongkar', cell: (x) => <span className="tabular whitespace-nowrap text-on-surface-variant">{x.report?.nopol || '-'}</span>, mobile: 'hide' },
+  { header: 'Produk & volume', cell: (x) => `${x.lo.produk}, ${formatNumber(x.lo.volume)} L${x.lo.shift ? `, shift ${x.lo.shift}` : ''}`, mobile: 'sub', desktop: false },
+  { header: 'Supply point', cell: (x) => <span className="whitespace-nowrap">{planSupply(x.plan, x.lo) || '-'}</span>, mobile: 'sub' },
+  { header: 'Nopol MT', cell: (x) => <span className="tabular whitespace-nowrap">{x.report?.nopol || '-'}</span>, mobile: 'hide' },
   {
     header: 'Status',
     cell: (x) => {
       const m = loStatusMeta(x.status)
-      return <Pill tone={m.tone}>{m.label}</Pill>
+      return (
+        <Pill tone={m.tone}>
+          {x.status === 'closed' && <Lock aria-hidden="true" />}
+          {m.label}
+        </Pill>
+      )
     },
     mobile: 'badge',
   },
 ]
 
-/** Laporan > Riwayat Tracking LO: perjalanan tiap LO dari permintaan sampai closed. */
+/** Laporan > Riwayat Tracking LO. Ketuk baris untuk ubah LO lewat pop up; LO Closed terkunci. */
 export function RiwayatLo() {
   const app = useApp()
   const [range, setRange] = useDateRange('month')
   const [status, setStatus] = useState<'semua' | LoDisplayStatus>('semua')
+  const [edit, setEdit] = useState<LoTarget | null>(null)
   if (!app.loaded) return <Loading />
 
   const all: Row[] = app.plans
@@ -72,11 +75,14 @@ export function RiwayatLo() {
           onChange={setStatus}
           options={[{ value: 'semua' as const, label: `Semua ${inDate.length}` }, ...LO_STATUS.map((s) => ({ value: s.key, label: `${s.label} ${n(s.key)}` }))]}
         />
-        {status !== 'semua' && <span className="text-body-sm text-on-surface-variant">{loStatusMeta(status).desc}.</span>}
+        <span className="text-body-sm text-on-surface-variant">
+          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
+        </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} to={() => '/plan'} empty="Tidak ada LO pada rentang ini." />
+        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} onRow={(x) => setEdit({ plan: x.plan, lo: x.lo })} empty="Tidak ada LO pada rentang ini." />
       </div>
+      <LoEditSheet target={edit} onClose={() => setEdit(null)} />
     </div>
   )
 }

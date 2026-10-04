@@ -155,6 +155,8 @@ export interface PlanLo {
   status: LoStatus
   /** Nomor segel per produk sesuai dokumen LO. */
   segel: string[]
+  /** Shift permintaan untuk produk ini (boleh beda antar produk dalam satu permintaan). */
+  shift?: '' | '1' | '2'
   /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
   supplyPoint?: string
   noLOLama?: string
@@ -249,6 +251,15 @@ export interface ReportSummary {
   kompartemen?: string[]
   airNihil?: boolean | null
   segelOk?: boolean
+  planId?: string
+  namaDriver?: string
+  /** Total selisih liter kompartemen (transport loss). */
+  transportLoss?: number | null
+  /** Discharge gain/loss dalam persen volume penerimaan (DO). */
+  gainLossPct?: number | null
+  /** Gate out depot (ISO tanggal + jam). */
+  tanggalKeluar?: string
+  jamKeluar?: string
 }
 
 export interface Rules {
@@ -848,6 +859,12 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     kompartemen: [...new Set(x.densityResults.map((r) => r.kompartemenNo).filter((n) => n && n !== '-'))],
     airNihil: d.airNihil,
     segelOk: d.segelSesuai,
+    planId: d.planId,
+    namaDriver: d.namaDriver,
+    transportLoss: x.transportLoss,
+    gainLossPct: x.gainLossPct,
+    tanggalKeluar: d.tanggalKeluar,
+    jamKeluar: d.jamKeluar,
     noBA: d.noBA,
     ttdKurang: SIGNERS.filter((s) => !d.ttd?.[s.key]?.img).map((s) => s.key),
     sample2Jam:

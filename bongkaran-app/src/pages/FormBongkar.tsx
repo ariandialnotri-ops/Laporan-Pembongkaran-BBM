@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Beaker, Flag, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Beaker, Flag, Lock, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { FinishPanel } from '@/components/bongkaran/finish-panel'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
 import { StepContent } from '@/components/bongkaran/sop-steps'
@@ -340,7 +340,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
           readOnly={readOnly}
           setData={setData}
           onFinish={finish}
-          onReopen={reopen}
+          onReopen={report.status === 'anomali' && app.canManage ? reopen : undefined}
           onPdf={() => runExport('pdf')}
           onJpg={() => runExport('jpg')}
           onXlsx={() => runExport('xlsx')}
@@ -407,10 +407,17 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       )}
 
       <div className="flex items-center justify-between gap-2 px-space-xs">
-        <Link to="/input/bongkar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          <ArrowLeft aria-hidden="true" />
-          Daftar bongkaran
-        </Link>
+        {readOnly ? (
+          <span className="flex items-center gap-1.5 px-space-xs text-body-sm text-on-surface-variant">
+            <Lock aria-hidden="true" className="size-4" />
+            Bongkaran selesai, data terkunci
+          </span>
+        ) : (
+          <Link to="/input/bongkar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            <ArrowLeft aria-hidden="true" />
+            Daftar bongkaran
+          </Link>
+        )}
         {app.canDeleteReport(report) && (
           <Button variant="ghost" size="sm" className="text-error" onClick={hapus}>
             <Trash2 aria-hidden="true" />

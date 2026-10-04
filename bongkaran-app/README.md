@@ -38,19 +38,19 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 
 | Menu | Rute | Isi |
 |------|------|-----|
-| Dashboard | `/` | Kalender Progress (ketuk tanggal untuk detail), Total Bongkaran hari ini/periode per produk, Kualitas Harian (uji terakhir per produk), Kaleng Sample (D15 3 bongkaran terakhir per produk), LO Tracking |
+| Dashboard | `/` | Tanggal & shift terkini, Kalender Progress (titik = ada plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Total Bongkaran per produk dengan transport loss & discharge loss (L dan %), SLA rata-rata, Plan Pengiriman Hari Ini vs sudah dibongkar, Kualitas Harian, Kaleng Sample (D15 sample 2 jam dari 3 bongkaran terakhir), LO Tracking |
 | Input | `/input` | Bar wajib Stok Awal Shift + kartu: |
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), nomor SO/LO, segel, status LO |
-| | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet) dengan shift per produk, nomor SO/LO, segel, status LO. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Sample BBM 2 Jam: uji density tangki pendam minimal 2 jam setelah bongkar selesai, dibanding D15 depot |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |
-| | `/laporan/bongkaran` | Riwayat Pembongkaran MT: BBM, nopol, tanggal/jam, volume, keterangan, status, progress tindakan |
-| | `/laporan/lo` | Riwayat Tracking LO: status tiap LO dari permintaan sampai closed |
+| | `/laporan/bongkaran` | Riwayat Pembongkaran MT: produk, tanggal penerimaan, SO, LO, nopol & supir, volume, transport loss, discharge loss (L, %), SLA (request MS2 / gate out sampai selesai bongkar), keterangan, progress |
+| | `/laporan/lo` | Riwayat Tracking LO: tanggal permintaan kirim, SO, LO, produk, volume, supply point, nopol MT, status; ketuk baris untuk ubah lewat pop up (LO Closed terkunci) |
 | | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan sample 2 jam |
 | | `/laporan/tera` | Riwayat Tera: bejana 20 L per nozzle, batas -60 ml |
 | Profil | `/profil` | Akun, statistik, Kalkulator, Pengaturan, Anggota |

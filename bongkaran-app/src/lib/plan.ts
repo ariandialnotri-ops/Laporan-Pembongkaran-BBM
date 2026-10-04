@@ -20,6 +20,12 @@ export const LO_STATUS: { key: LoDisplayStatus; label: string; desc: string; ton
 /** Status yang dapat dipilih manual; Delivered & Closed mengikuti data bongkaran. */
 export const LO_MANUAL_STATUS: LoStatus[] = ['os', 'planned', 'delivery', 'alih', 'deleted']
 
+/** Pilihan shift permintaan pengiriman (hanya shift 1 dan 2). */
+export const SHIFT_PERMINTAAN = [
+  { value: '1' as const, label: 'Shift 1' },
+  { value: '2' as const, label: 'Shift 2' },
+]
+
 export const loStatusMeta = (k: LoDisplayStatus) => LO_STATUS.find((s) => s.key === k)!
 
 /**
@@ -65,10 +71,24 @@ export function normalizePlan(p: Partial<Plan> & { id: string; los?: Partial<Pla
       volume: lo.volume ?? (lo.jumlahDO ? lo.jumlahDO * literPerDO : 0),
       status: lo.status ?? 'os',
       segel: lo.segel ?? [],
+      shift: lo.shift ?? p.ms2Shift ?? '',
       supplyPoint: lo.supplyPoint,
       noLOLama: lo.noLOLama,
       supplyPointLama: lo.supplyPointLama,
       jumlahDO: lo.jumlahDO,
     })),
   }
+}
+
+/** Jam pengingat harian membuat plan pengiriman untuk besok. */
+export const JAM_PENGINGAT_PLAN = 6
+
+/** Tanggal besok (ISO) bila sudah lewat 06:00 dan plan untuk besok belum dibuat; selain itu null. */
+export function planBesokKurang(plans: Plan[], now = new Date()) {
+  if (now.getHours() < JAM_PENGINGAT_PLAN) return null
+  const b = new Date(now)
+  b.setDate(b.getDate() + 1)
+  const besok = `${b.getFullYear()}-${String(b.getMonth() + 1).padStart(2, '0')}-${String(b.getDate()).padStart(2, '0')}`
+  const ada = plans.some((p) => p.tanggal === besok && p.los.some((lo) => lo.status !== 'deleted'))
+  return ada ? null : besok
 }

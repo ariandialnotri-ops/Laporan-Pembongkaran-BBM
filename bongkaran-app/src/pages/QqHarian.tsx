@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
-import { Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
+import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
 import { Button } from '@/components/ui/button'
@@ -12,17 +13,64 @@ import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { BEJANA_LIMIT_ML, bejanaStatus, newQqKualitas, newQqKuantitas, qqD15, qqRecordId, totalPumpTest, type QqData, type QqRecord } from '@/lib/daily'
+import {
+  BEJANA_LIMIT_ML,
+  bejanaStatus,
+  newQqKualitas,
+  newQqKuantitas,
+  QQ_FOTO,
+  qqD15,
+  qqRecordId,
+  totalPumpTest,
+  type QqData,
+  type QqFotoKey,
+  type QqKualitas,
+  type QqKuantitas,
+  type QqRecord,
+} from '@/lib/daily'
 import { formatTanggalIso, nowHm } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
+import { compressImage } from '@/lib/image'
+import { acuanD15 } from '@/lib/ringkasan'
 import { shiftLabel, type Shift } from '@/lib/shift'
-import { PRODUK_OPTIONS } from '@/lib/sop'
+import { PRODUK_OPTIONS, type Photo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
-
-/** Waktu simpan (di luar render). */
+/** Waktu (di luar render). */
 const stamp = () => Date.now()
+const isoNow = () => new Date().toISOString()
+const jamDari = (iso?: string) => (iso ? new Date(iso).toTimeString().slice(0, 5) : '')
+const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+const kualitasValid = (k: QqKualitas) => (!qqD15(k).d15 ? 'Lengkapi density dan suhu.' : null)
+const kuantitasValid = (n: QqKuantitas) => (bejanaStatus(n.selisihMl) === 'kosong' ? 'Isi hasil bejana (0 bila tepat).' : null)
+
+function upsert<T extends { id: string }>(list: T[], item: T) {
+  return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
+}
+
+/** URL tampilan foto: dataURL (mode lokal / baru diambil) atau signed URL Supabase. */
+function usePhotoSrc(photos: Photo[]) {
+  const app = useApp()
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const kunci = photos.map((p) => p.id).join(',')
+  useEffect(() => {
+    const butuh = photos.filter((p) => !p.dataUrl && p.path && !urls[p.id])
+    if (!butuh.length) return
+    let alive = true
+    app.backend
+      .signedUrls(butuh)
+      .then((u) => alive && setUrls((cur) => ({ ...cur, ...u })))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kunci, app.backend])
+  return (p: Photo) => p.dataUrl || urls[p.id]
+}
+
+/** Input > Kualitas Harian: uji density per produk dan tera bejana 20 L per nozzle, disimpan per baris. */
 export function QqHarian() {
   const app = useApp()
   const toast = useToast()
@@ -33,17 +81,9 @@ export function QqHarian() {
   const id = qqRecordId(key.tanggal, key.shift)
   const existing = records.find((r) => r.id === id) ?? null
   const [draft, setDraft] = useState<{ id: string; data: QqData } | null>(null)
+  const [rowError, setRowError] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  // D15 bongkaran terakhir per produk sebagai acuan uji harian.
-  const acuan = useMemo(() => {
-    const m = new Map<string, { d15: number; tanggal: string }>()
-    for (const r of [...app.reports].sort((a, b) => a.createdAt - b.createdAt)) if (r.d15 !== null && r.produk) m.set(r.produk, { d15: r.d15, tanggal: r.tanggal })
-    return m
-  }, [app.reports])
-
-  if (!app.loaded) return <Loading />
+  const [busy, setBusy] = useState<string | null>(null)
 
   const fresh = (): QqData => ({
     petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName,
@@ -53,43 +93,144 @@ export function QqHarian() {
     catatan: '',
   })
   const data: QqData = draft?.id === id ? draft.data : (existing?.data ?? fresh())
+  const allPhotos = Object.values(data.foto ?? {}).flat()
+  const srcOf = usePhotoSrc(allPhotos)
+
+  if (!app.loaded) return <Loading />
+
   const setData = (patch: Partial<QqData>) => {
     setError(null)
     setDraft({ id, data: { ...data, ...patch } })
   }
-  const setK = (i: number, patch: Partial<QqData['kualitas'][number]>) => setData({ kualitas: data.kualitas.map((k, j) => (j === i ? { ...k, ...patch } : k)) })
-  const setN = (i: number, patch: Partial<QqData['kuantitas'][number]>) => setData({ kuantitas: data.kuantitas.map((k, j) => (j === i ? { ...k, ...patch } : k)) })
+  // Mengubah baris membatalkan tanda "tersimpan" sampai disimpan lagi.
+  const setK = (i: number, patch: Partial<QqKualitas>) => setData({ kualitas: data.kualitas.map((k, j) => (j === i ? { ...k, ...patch, savedAt: undefined } : k)) })
+  const setN = (i: number, patch: Partial<QqKuantitas>) => setData({ kuantitas: data.kuantitas.map((k, j) => (j === i ? { ...k, ...patch, savedAt: undefined } : k)) })
 
-  const simpan = async () => {
-    if (!data.kualitas.length && !data.kuantitas.length) return setError('Isi minimal satu uji kualitas atau kuantitas.')
-    if (data.kualitas.some((k) => !qqD15(k).d15)) return setError('Lengkapi density dan suhu setiap uji kualitas.')
-    if (data.kuantitas.some((n) => bejanaStatus(n.selisihMl) === 'kosong')) return setError('Isi hasil bejana setiap nozzle (0 bila tepat).')
-    setSaving(true)
+  /** Simpan ke server berdasar data yang sudah tersimpan (baris lain yang belum disimpan tidak ikut). */
+  const persist = async (mutate: (base: QqData) => QqData) => {
+    const base: QqData = existing?.data ?? { ...data, kualitas: [], kuantitas: [], foto: {}, selesaiAt: undefined }
+    const next = mutate({ ...base, petugas: data.petugas, jam: data.jam })
+    const rec: QqRecord = {
+      id,
+      kind: 'qq',
+      tanggal: key.tanggal,
+      shift: key.shift,
+      data: next,
+      createdAt: existing?.createdAt ?? stamp(),
+      updatedAt: stamp(),
+      createdBy: existing?.createdBy ?? app.session.user?.id ?? null,
+    }
+    await app.saveDaily(rec)
+  }
+
+  const simpanKualitas = async (i: number) => {
+    const row = data.kualitas[i]
+    const err = kualitasValid(row)
+    if (err) return setRowError({ ...rowError, [row.id]: err })
+    const saved = { ...row, savedAt: isoNow() }
+    setBusy(row.id)
     try {
-      const rec: QqRecord = {
-        id,
-        kind: 'qq',
-        tanggal: key.tanggal,
-        shift: key.shift,
-        data,
-        createdAt: existing?.createdAt ?? stamp(),
-        updatedAt: stamp(),
-        createdBy: existing?.createdBy ?? app.session.user?.id ?? null,
-      }
-      await app.saveDaily(rec)
-      setDraft(null)
-      const lewat = data.kuantitas.filter((n) => bejanaStatus(n.selisihMl) === 'lewat').length
-      toast(lewat ? `Q&Q tersimpan, ${lewat} nozzle melewati batas` : 'Q&Q harian tersimpan', lewat ? TriangleAlert : undefined)
+      await persist((b) => ({ ...b, kualitas: upsert(b.kualitas, saved) }))
+      setDraft({ id, data: { ...data, kualitas: data.kualitas.map((k) => (k.id === row.id ? saved : k)) } })
+      setRowError({ ...rowError, [row.id]: '' })
+      toast(`Uji ${row.produk} tersimpan`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setRowError({ ...rowError, [row.id]: pesan(e) })
     } finally {
-      setSaving(false)
+      setBusy(null)
+    }
+  }
+
+  const simpanKuantitas = async (i: number) => {
+    const row = data.kuantitas[i]
+    const err = kuantitasValid(row)
+    if (err) return setRowError({ ...rowError, [row.id]: err })
+    const saved = { ...row, savedAt: isoNow() }
+    setBusy(row.id)
+    try {
+      await persist((b) => ({ ...b, kuantitas: upsert(b.kuantitas, saved) }))
+      setDraft({ id, data: { ...data, kuantitas: data.kuantitas.map((k) => (k.id === row.id ? saved : k)) } })
+      setRowError({ ...rowError, [row.id]: '' })
+      const lewat = bejanaStatus(row.selisihMl) === 'lewat'
+      toast(lewat ? `${row.nozzle} tersimpan, di bawah batas ${BEJANA_LIMIT_ML} ml` : `${row.nozzle} tersimpan`, lewat ? TriangleAlert : undefined)
+    } catch (e) {
+      setRowError({ ...rowError, [row.id]: pesan(e) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const hapusBaris = async (kind: 'kualitas' | 'kuantitas', rowId: string) => {
+    const tersimpan = (existing?.data[kind] as { id: string }[] | undefined)?.some((x) => x.id === rowId)
+    if (kind === 'kualitas') setData({ kualitas: data.kualitas.filter((x) => x.id !== rowId) })
+    else setData({ kuantitas: data.kuantitas.filter((x) => x.id !== rowId) })
+    if (tersimpan) {
+      try {
+        await persist((b) => ({ ...b, [kind]: (b[kind] as { id: string }[]).filter((x) => x.id !== rowId) }) as QqData)
+      } catch (e) {
+        setError(pesan(e))
+      }
+    }
+  }
+
+  // Foto langsung diunggah & disimpan, supaya tidak hilang bila HP menutup aplikasi.
+  const tambahFoto = async (k: QqFotoKey, files: File[]) => {
+    setBusy(k)
+    try {
+      const baru: Photo[] = []
+      for (const f of files) {
+        const blob = await compressImage(f)
+        baru.push(await app.backend.uploadPhoto(`daily-${id}`, blob, `${k}.jpg`))
+      }
+      const foto = { ...(data.foto ?? {}), [k]: [...(data.foto?.[k] ?? []), ...baru] }
+      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: [...(b.foto?.[k] ?? []), ...baru] } }))
+      setDraft({ id, data: { ...data, foto } })
+    } catch (e) {
+      setError(`Gagal menyimpan foto: ${pesan(e)}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+  const hapusFoto = async (k: QqFotoKey, index: number) => {
+    const target = data.foto?.[k]?.[index]
+    if (!target) return
+    const foto = { ...(data.foto ?? {}), [k]: (data.foto?.[k] ?? []).filter((_, j) => j !== index) }
+    setDraft({ id, data: { ...data, foto } })
+    try {
+      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: (b.foto?.[k] ?? []).filter((p) => p.id !== target.id) } }))
+      await app.backend.deletePhoto(target)
+    } catch (e) {
+      setError(pesan(e))
+    }
+  }
+
+  const fotoKurang = (keys: QqFotoKey[]) => keys.filter((k) => !(data.foto?.[k]?.length))
+  const selesaikan = async () => {
+    if (!data.kualitas.length && !data.kuantitas.length) return setError('Isi minimal satu uji kualitas atau tera.')
+    if (data.kualitas.some((k) => !k.savedAt) || data.kuantitas.some((n) => !n.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk/nozzle).')
+    const kurang = [...(data.kualitas.length ? fotoKurang(['kualitasStruk', 'kualitasKembali']) : []), ...(data.kuantitas.length ? fotoKurang(['kuantitasStruk', 'kuantitasKembali']) : [])]
+    if (kurang.length) return setError(`Foto wajib belum ada: ${[...new Set(kurang.map((k) => `${QQ_FOTO[k]} (${k.startsWith('kualitas') ? 'kualitas' : 'tera'})`))].join(', ')}.`)
+    if (!data.petugas.trim()) return setError('Isi nama petugas.')
+    setBusy('selesai')
+    try {
+      await persist(() => ({ ...data, selesaiAt: isoNow() }))
+      setDraft(null)
+      toast('Uji Q&Q harian selesai')
+    } catch (e) {
+      setError(pesan(e))
+    } finally {
+      setBusy(null)
     }
   }
 
   const pump = totalPumpTest(data)
   const history = records.filter((r) => inRange(r.tanggal, range)).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
   const isNow = key.tanggal === now.tanggal && key.shift === now.shift
+  const selesai = !!existing?.data.selesaiAt && !draft
+
+  const fotoSlot = (k: QqFotoKey) => (
+    <PhotoSlot key={k} label={QQ_FOTO[k]} photos={data.foto?.[k] ?? []} busy={busy === k} srcOf={srcOf} onAdd={(f) => void tambahFoto(k, f)} onRemove={(i) => void hapusFoto(k, i)} />
+  )
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -101,7 +242,7 @@ export function QqHarian() {
             <h2 className="text-headline-md font-bold text-on-surface">Uji Q&Q {shiftLabel(key.shift).split(' (')[0]}</h2>
             <span className="text-body-sm text-on-surface-variant">{formatTanggalIso(key.tanggal)}</span>
           </div>
-          {existing ? <Pill tone="success">Tersimpan</Pill> : <Pill>Belum diuji</Pill>}
+          {existing?.data.selesaiAt ? <Pill tone="success">Selesai</Pill> : existing ? <Pill tone="cyan">Sebagian tersimpan</Pill> : <Pill>Belum diuji</Pill>}
         </div>
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Tanggal" htmlFor="qq-tgl">
@@ -121,13 +262,16 @@ export function QqHarian() {
             { value: '3', label: 'Shift 3' },
           ]}
         />
+        <Field label="Petugas" htmlFor="qq-petugas">
+          <Input id="qq-petugas" value={data.petugas} onChange={(e) => setData({ petugas: e.target.value })} />
+        </Field>
       </GlassCard>
 
       <section aria-labelledby="uji-kualitas" className="flex flex-col gap-space-sm">
-        <SectionHeader id="uji-kualitas" title="Uji kualitas" />
+        <SectionHeader id="uji-kualitas" title="Uji kualitas (density)" />
         {data.kualitas.map((k, i) => {
           const { obs, d15 } = qqD15(k)
-          const ref = acuan.get(k.produk)
+          const ref = acuanD15(app.reports, k.produk, key.tanggal)
           const selisih = d15 && ref ? Math.round((d15.value - ref.d15) * 10000) / 10000 : null
           const ok = selisih === null ? null : Math.abs(selisih) <= app.rules.densityTolerance + 1e-9
           return (
@@ -147,7 +291,7 @@ export function QqHarian() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Button variant="ghost" size="icon" aria-label={`Hapus uji ${k.produk}`} onClick={() => setData({ kualitas: data.kualitas.filter((x) => x.id !== k.id) })}>
+                <Button variant="ghost" size="icon" aria-label={`Hapus uji ${k.produk}`} onClick={() => void hapusBaris('kualitas', k.id)}>
                   <Trash2 aria-hidden="true" />
                 </Button>
               </div>
@@ -165,16 +309,20 @@ export function QqHarian() {
               <Ladder
                 rows={[
                   ['Density observasi', formatDensity(obs)],
-                  ['Density @15°C (ASTM 53)', d15 ? formatDensity(d15.value) : '-'],
+                  ['Density @15°C', d15 ? formatDensity(d15.value) : '-'],
                   [`Acuan D15 bongkaran ${ref ? formatTanggalIso(ref.tanggal) : 'terakhir'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
                 ]}
                 total={['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-']}
               />
-              {ok !== null && (
-                <Pill tone={ok ? 'success' : 'error'} className="self-start">
-                  {ok ? 'Sesuai toleransi' : `Melebihi toleransi ${String(app.rules.densityTolerance).replace('.', ',')}`}
-                </Pill>
-              )}
+              <SimpanBaris
+                ok={ok}
+                okText={ok ? 'Sesuai toleransi' : `Melebihi toleransi ${formatDensity(app.rules.densityTolerance)}`}
+                savedAt={k.savedAt}
+                busy={busy === k.id}
+                error={rowError[k.id]}
+                onSave={() => void simpanKualitas(i)}
+                label={`Simpan uji ${k.produk}`}
+              />
             </GlassCard>
           )
         })}
@@ -182,13 +330,23 @@ export function QqHarian() {
           <Plus aria-hidden="true" />
           Uji produk lain
         </Button>
+        {data.kualitas.length > 0 && (
+          <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
+            <span className="flex items-center gap-space-xs text-body-sm font-bold text-on-surface">
+              <Flag aria-hidden="true" className="size-4 text-primary" />
+              Langkah terakhir uji kualitas
+            </span>
+            {fotoSlot('kualitasStruk')}
+            {fotoSlot('kualitasKembali')}
+          </GlassCard>
+        )}
       </section>
 
       <section aria-labelledby="uji-kuantitas" className="flex flex-col gap-space-sm">
-        <SectionHeader id="uji-kuantitas" title="Uji kuantitas (bejana 20 L)" />
+        <SectionHeader id="uji-kuantitas" title="Tera takaran (bejana 20 L)" />
         <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
           <span className="text-body-sm text-on-surface-variant">
-            Isi selisih bejana ukur 20 liter dalam ml. Lebih kecil dari {formatNumber(BEJANA_LIMIT_ML)} ml ditandai merah.
+            Isi selisih bejana ukur 20 liter dalam ml, lalu simpan tiap nozzle. Lebih kecil dari {formatNumber(BEJANA_LIMIT_ML)} ml ditandai merah.
           </span>
           {data.kuantitas.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada nozzle. Tambahkan di Pengaturan atau langsung di bawah.</span>}
           {data.kuantitas.map((n, i) => {
@@ -200,10 +358,11 @@ export function QqHarian() {
                     {n.nozzle || `Nozzle ${i + 1}`}
                     <span className="font-normal text-on-surface-variant">, {n.produk}</span>
                   </span>
-                  {st === 'lewat' && <Pill tone="error">Lewat batas</Pill>}
-                  {st === 'ok' && <Pill tone="success">Sesuai</Pill>}
+                  <Button variant="ghost" size="icon" aria-label={`Hapus ${n.nozzle}`} onClick={() => void hapusBaris('kuantitas', n.id)}>
+                    <Trash2 aria-hidden="true" />
+                  </Button>
                 </div>
-                <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-space-xs">
+                <div className="grid grid-cols-2 gap-space-xs">
                   <Field label="Selisih bejana" htmlFor={`qn-ml-${n.id}`}>
                     <Input
                       id={`qn-ml-${n.id}`}
@@ -219,10 +378,16 @@ export function QqHarian() {
                   <Field label="Pump test" htmlFor={`qn-v-${n.id}`}>
                     <Input id={`qn-v-${n.id}`} numeric inputMode="decimal" suffix="L" value={n.pumpTest} onChange={(e) => setN(i, { pumpTest: e.target.value })} />
                   </Field>
-                  <Button variant="ghost" size="icon" aria-label={`Hapus ${n.nozzle}`} onClick={() => setData({ kuantitas: data.kuantitas.filter((x) => x.id !== n.id) })}>
-                    <Trash2 aria-hidden="true" />
-                  </Button>
                 </div>
+                <SimpanBaris
+                  ok={st === 'kosong' ? null : st === 'ok'}
+                  okText={st === 'lewat' ? 'Di bawah batas' : 'Sesuai'}
+                  savedAt={n.savedAt}
+                  busy={busy === n.id}
+                  error={rowError[n.id]}
+                  onSave={() => void simpanKuantitas(i)}
+                  label={`Simpan ${n.nozzle}`}
+                />
               </div>
             )
           })}
@@ -249,28 +414,35 @@ export function QqHarian() {
             </Button>
           </div>
         </GlassCard>
+        {data.kuantitas.length > 0 && (
+          <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
+            <span className="flex items-center gap-space-xs text-body-sm font-bold text-on-surface">
+              <Flag aria-hidden="true" className="size-4 text-primary" />
+              Langkah terakhir tera takaran
+            </span>
+            {fotoSlot('kuantitasStruk')}
+            {fotoSlot('kuantitasKembali')}
+          </GlassCard>
+        )}
       </section>
 
       <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
         <Ladder
           rows={[
             ['Pump test uji kualitas', `${formatNumber(pump.kualitas, 1)} L`],
-            ['Pump test uji kuantitas', `${formatNumber(pump.kuantitas, 1)} L`],
+            ['Pump test tera takaran', `${formatNumber(pump.kuantitas, 1)} L`],
           ]}
           total={['Total pump test', `${formatNumber(pump.kualitas + pump.kuantitas, 1)} L`]}
         />
-        <Field label="Petugas" htmlFor="qq-petugas">
-          <Input id="qq-petugas" value={data.petugas} onChange={(e) => setData({ petugas: e.target.value })} />
-        </Field>
         {error && (
           <div role="alert" className="flex items-start gap-space-sm rounded-md bg-error-container/70 p-space-sm">
             <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
             <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
           </div>
         )}
-        <Button size="lg" className="w-full" disabled={saving} onClick={simpan}>
-          <Save aria-hidden="true" />
-          Simpan Q&Q
+        <Button size="lg" className="w-full" disabled={busy !== null || selesai} onClick={selesaikan}>
+          {selesai ? <CircleCheck aria-hidden="true" /> : <Save aria-hidden="true" />}
+          {selesai ? `Uji selesai ${jamDari(existing?.data.selesaiAt)}` : 'Selesaikan uji'}
         </Button>
       </GlassCard>
 
@@ -297,6 +469,7 @@ export function QqHarian() {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="text-body-md font-semibold text-on-surface">
                     {formatTanggalIso(r.tanggal)}, shift {r.shift}
+                    {!r.data.selesaiAt && <span className="font-normal text-on-surface-variant"> (belum selesai)</span>}
                   </span>
                   <span className="truncate text-body-sm text-on-surface-variant">
                     {r.data.kualitas.map((k) => `${k.produk} ${qqD15(k).d15 ? formatDensity(qqD15(k).d15!.value) : '-'}`).join(', ') || 'Tanpa uji kualitas'}
@@ -308,6 +481,51 @@ export function QqHarian() {
           })
         )}
       </section>
+    </div>
+  )
+}
+
+/** Status hasil + tombol simpan untuk satu baris uji. */
+function SimpanBaris({
+  ok,
+  okText,
+  savedAt,
+  busy,
+  error,
+  onSave,
+  label,
+}: {
+  ok: boolean | null
+  okText: string
+  savedAt?: string
+  busy: boolean
+  error?: string
+  onSave: () => void
+  label: string
+}) {
+  return (
+    <div className="flex flex-col gap-space-xs">
+      <div className="flex flex-wrap items-center justify-between gap-space-xs">
+        <span className="flex flex-wrap items-center gap-space-xs">
+          {ok !== null && <Pill tone={ok ? 'success' : 'error'}>{okText}</Pill>}
+          {savedAt ? (
+            <span className="flex items-center gap-1 text-body-sm text-primary">
+              <CircleCheck aria-hidden="true" className="size-4" />
+              Tersimpan {jamDari(savedAt)}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-body-sm text-on-surface-variant">
+              <CircleDot aria-hidden="true" className="size-4" />
+              Belum disimpan
+            </span>
+          )}
+        </span>
+        <Button size="sm" variant={savedAt ? 'glass' : 'primary'} disabled={busy} onClick={onSave} aria-label={label}>
+          <Save aria-hidden="true" />
+          Simpan
+        </Button>
+      </div>
+      {error && <span className="text-body-sm font-semibold text-error">{error}</span>}
     </div>
   )
 }

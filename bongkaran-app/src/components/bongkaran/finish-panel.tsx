@@ -34,7 +34,8 @@ export function FinishPanel({
   readOnly: boolean
   setData: (patch: Partial<ReportData>) => void
   onFinish: (status: ReportStatus) => void
-  onReopen: () => void
+  /** Hanya untuk BA anomali dan pengawas; BA selesai tidak dapat diubah. */
+  onReopen?: () => void
   onPdf: () => void
   onJpg: () => void
   onXlsx: () => void
@@ -101,7 +102,7 @@ export function FinishPanel({
             ['Stok akhir teoritis', x.stokTeoritis !== null ? formatLiter(x.stokTeoritis) : '-'],
             ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
           ]}
-          total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
+          total={['Discharge gain/loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')} dari volume DO)` : '-']}
         />
         <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>
@@ -169,10 +170,12 @@ export function FinishPanel({
             </div>
           </GlassCard>
 
-          <Button variant="ghost" size="sm" className="self-center" onClick={onReopen}>
-            <RotateCcw aria-hidden="true" />
-            Buka kembali untuk koreksi
-          </Button>
+          {onReopen && (
+            <Button variant="ghost" size="sm" className="self-center" onClick={onReopen}>
+              <RotateCcw aria-hidden="true" />
+              Buka kembali untuk koreksi (pengawas)
+            </Button>
+          )}
         </>
       )}
     </div>

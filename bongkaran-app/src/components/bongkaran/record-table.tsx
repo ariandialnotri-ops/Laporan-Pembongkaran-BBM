@@ -28,6 +28,7 @@ export function RecordTable<T>({
   cols,
   rowKey,
   to,
+  onRow,
   empty,
 }: {
   title: string
@@ -37,6 +38,8 @@ export function RecordTable<T>({
   cols: Col<T>[]
   rowKey: (row: T) => string
   to?: (row: T) => string
+  /** Klik baris membuka pop up (mis. ubah data) alih-alih pindah halaman. */
+  onRow?: (row: T) => void
   empty: string
 }) {
   const navigate = useNavigate()
@@ -80,10 +83,22 @@ export function RecordTable<T>({
                     ))}
                   </div>
                   {badgeCol && <span className="shrink-0">{badgeCol.cell(row)}</span>}
-                  {to && <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />}
+                  {(to || onRow) && <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />}
                 </div>
               )
-              return <li key={rowKey(row)}>{to ? <Link to={to(row)}>{body}</Link> : body}</li>
+              return (
+                <li key={rowKey(row)}>
+                  {to ? (
+                    <Link to={to(row)}>{body}</Link>
+                  ) : onRow ? (
+                    <button type="button" onClick={() => onRow(row)} className="w-full text-left">
+                      {body}
+                    </button>
+                  ) : (
+                    body
+                  )}
+                </li>
+              )
             })}
           </ul>
 
@@ -97,7 +112,7 @@ export function RecordTable<T>({
                       {c.header}
                     </th>
                   ))}
-                  {to && (
+                  {(to || onRow) && (
                     <th scope="col" className="px-space-md py-space-sm text-right font-semibold">
                       Aksi
                     </th>
@@ -106,7 +121,11 @@ export function RecordTable<T>({
               </thead>
               <tbody className="divide-y divide-outline-variant/40">
                 {rows.map((row) => (
-                  <tr key={rowKey(row)} onClick={to ? () => navigate(to(row)) : undefined} className={cn(to && 'cursor-pointer transition-colors hover:bg-primary-fixed/30')}>
+                  <tr
+                    key={rowKey(row)}
+                    onClick={to ? () => navigate(to(row)) : onRow ? () => onRow(row) : undefined}
+                    className={cn((to || onRow) && 'cursor-pointer transition-colors hover:bg-primary-fixed/30')}
+                  >
                     {tableCols.map((c) => (
                       <td key={c.header} className={cn('px-space-sm py-space-sm text-on-surface first:pl-space-md', c.align === 'right' && 'tabular text-right', c.className)}>
                         {c.cell(row)}
@@ -122,6 +141,21 @@ export function RecordTable<T>({
                         >
                           <ChevronRight aria-hidden="true" className="size-5" />
                         </Link>
+                      </td>
+                    )}
+                    {!to && onRow && (
+                      <td className="px-space-md py-space-sm text-right">
+                        <button
+                          type="button"
+                          aria-label="Ubah"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onRow(row)
+                          }}
+                          className="inline-flex size-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-lowest hover:text-primary"
+                        >
+                          <ChevronRight aria-hidden="true" className="size-5" />
+                        </button>
                       </td>
                     )}
                   </tr>

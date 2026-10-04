@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
 import { parentOf, titleFor } from '@/lib/nav'
@@ -7,6 +7,7 @@ export function AppHeader() {
   const { pathname } = useLocation()
   const app = useApp()
   const parent = parentOf(pathname)
+  const navigate = useNavigate()
 
   return (
     <header data-glass-bar className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
@@ -14,13 +15,15 @@ export function AppHeader() {
         <div className="flex min-w-0 items-center gap-space-sm">
           {/* Halaman turunan: tombol kembali ke menu induk menggantikan logo. */}
           {parent ? (
-            <Link
-              to={parent}
+            <button
+              type="button"
               aria-label="Kembali"
+              // Kembali ke halaman asal (mis. Riwayat), bukan ke form; tanpa riwayat, ke menu induk.
+              onClick={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate(parent, { replace: true }))}
               className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
             >
               <ChevronLeft aria-hidden="true" className="size-6" />
-            </Link>
+            </button>
           ) : (
             <Link
               to="/"
