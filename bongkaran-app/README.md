@@ -13,6 +13,8 @@ gradasi dingin, dock navigasi melayang, Plus Jakarta Sans untuk antarmuka dan
 JetBrains Mono untuk semua angka. Brief lengkapnya ada di
 [`design-system/aeroshift/DESIGN.md`](design-system/aeroshift/DESIGN.md).
 
+Spesifikasi tampilan FLOQ yang lengkap (token, komponen, setiap layar, cara mengganti desain, dan prompt untuk tool desain AI) ada di [`DESIGN.md`](DESIGN.md).
+
 ## Stack
 
 - React 19 + Vite 8 + TypeScript
