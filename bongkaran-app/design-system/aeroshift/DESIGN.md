@@ -152,6 +152,7 @@ Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, a
   - **Input**: semua pengisian. Kartu Input Bongkaran, Plan Pengiriman, Kualitas Harian, Sample BBM 2 Jam, dengan bar wajib Stok Awal Shift di atasnya.
   - **Laporan**: semua riwayat dan unduhan. Kartu Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera.
   - **Profil**: akun, pengaturan, dan Kalkulator (Kalkulator hanya ada di sini).
+- **Kaleng Sample** (Dashboard): kartu ringkasan (produk, sampel sesuai, anomali/belum ada, pembaruan), lalu satu kartu akordeon per produk berisi 3 kaleng (kiri terbaru, kanan terlama; slot kosong bergaris putus-putus dengan tanggal plan kirim berikutnya). Kaleng 1 bergaris warna produk (merah bila anomali). Ketuk kaleng untuk bottom sheet detail uji: penerimaan, parameter density, segel & retensi, tanda tangan. Warna produk Pertamina (Pertalite hijau, Pertamax biru, Turbo merah, Biosolar kuning, Dex teal) hanya untuk ikon, chip spesifikasi, dan isi kaleng; status tetap memakai token AeroShift.
 - Halaman di bawah menu membuka satu pekerjaan; tombol kembali di kiri header (menggantikan logo) kembali ke menu induk.
 - Kartu menu: ikon biru, judul, satu kalimat isi, dan baris status (biru bila beres, merah dengan lencana jumlah bila ada yang perlu dikerjakan).
 - Riwayat memakai tabel rekap di layar lebar (judul huruf besar + chip "n dari total", kolom BBM berupa chip, kolom Aksi) dan kartu di HP, dari definisi kolom yang sama (`RecordTable`).

@@ -244,6 +244,11 @@ export interface ReportSummary {
   /** Penanda tangan yang belum tanda tangan. */
   ttdKurang?: SignerKey[]
   sample2Jam?: { tanggal: string; jam: string; d15: number | null; selisih: number | null; ok: boolean | null } | null
+  /** Untuk kartu kaleng sample: penerima/petugas uji, nomor kompartemen yang diuji, hasil uji air. */
+  petugas?: string
+  kompartemen?: string[]
+  airNihil?: boolean | null
+  segelOk?: boolean
 }
 
 export interface Rules {
@@ -839,6 +844,10 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     d15Depot: x.d15Depot,
     densityOk: x.densityResults.length ? x.densityResults.every((r) => r.ok !== false) : null,
     jamSelesai: d.jamSelesaiBongkar,
+    petugas: d.ttd?.penerima?.nama || d.namaPetugas,
+    kompartemen: [...new Set(x.densityResults.map((r) => r.kompartemenNo).filter((n) => n && n !== '-'))],
+    airNihil: d.airNihil,
+    segelOk: d.segelSesuai,
     noBA: d.noBA,
     ttdKurang: SIGNERS.filter((s) => !d.ttd?.[s.key]?.img).map((s) => s.key),
     sample2Jam:

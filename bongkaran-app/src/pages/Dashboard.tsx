@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Cylinder, FlaskConical, Scale, Truck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FlaskConical, Scale, Truck } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
+import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -14,7 +15,7 @@ import { bejanaStatus, qqD15, type QqKualitas, type QqRecord } from '@/lib/daily
 import { addDays, formatTanggalIso, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { LO_STATUS, loStatus, type LoDisplayStatus } from '@/lib/plan'
-import { acuanD15, detailTanggal, kalenderMinggu, kualitasProduk, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
+import { acuanD15, detailTanggal, kalenderMinggu, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
 import { PRODUK_OPTIONS, STEPS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -44,7 +45,6 @@ export function Dashboard() {
   const [weekAnchor, setWeekAnchor] = useState(() => new Date())
   const [hari, setHari] = useState<string | null>(null)
   const [range, setRange] = useDateRange('today')
-  const sampel = useMemo(() => kualitasProduk(app.reports), [app.reports])
 
   // Uji kualitas harian terakhir tiap produk.
   const harian = useMemo(() => {
@@ -191,33 +191,9 @@ export function Dashboard() {
         </GlassCard>
       </section>
 
-      <section aria-labelledby="kaleng-sample" className="animate-entrance-4 flex flex-col gap-space-xs">
-        <SectionHeader id="kaleng-sample" title="Kaleng Sample" action={<Cylinder aria-hidden="true" className="size-5 text-on-surface-variant" />} />
-        <p className="px-space-xs text-body-sm text-on-surface-variant">Density 15°C dari 3 bongkaran terakhir tiap produk, dibanding D15 dokumen depot.</p>
-        <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 px-space-sm">
-          {sampel.map((k) => (
-            <div key={k.produk} className="flex flex-col gap-space-xs py-space-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-body-md font-semibold text-on-surface">{k.produk}</span>
-                <QQPill status={k.status} label={k.status === 'sesuai' ? 'Sesuai' : k.status === 'perhatian' ? 'Ada anomali' : 'Belum ada sampel'} />
-              </div>
-              {k.samples.length > 0 && (
-                <ol className="grid grid-cols-3 gap-space-xs">
-                  {k.samples.map((s) => (
-                    <li key={s.id} className={cn('flex flex-col rounded-md px-space-xs py-1', s.ok === false ? 'bg-error-container/70' : 'bg-surface-container-low/80')}>
-                      <span className="tabular text-numeric-sm font-bold text-on-surface">{formatDensity(s.d15)}</span>
-                      <span className={cn('tabular text-body-sm', s.ok === false ? 'font-semibold text-error' : 'text-on-surface-variant')}>
-                        {s.selisih !== null ? formatDensitySigned(s.selisih) : '-'}
-                      </span>
-                      <span className="truncate text-body-sm text-on-surface-variant">{formatTanggalIso(s.tanggal)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
-          ))}
-        </GlassCard>
-      </section>
+      <div className="animate-entrance-4">
+        <KalengSample />
+      </div>
 
       <Link to="/laporan/lo" className="animate-entrance-5 glass-2 rim-light flex flex-col gap-space-sm rounded-lg p-space-md active:scale-[0.99]">
         <div className="flex items-center justify-between gap-2">
