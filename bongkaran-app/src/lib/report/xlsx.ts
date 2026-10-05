@@ -25,6 +25,8 @@ export interface CellSpec {
   value: CellValue
   /** undefined = rumus template dipertahankan; null = rumus dihapus; string = rumus baru. */
   formula?: string | null
+  /** Format angka pengganti (kode Excel); gaya sel lain (garis, font) tetap dari template. */
+  fmt?: string
 }
 
 export interface ImageSpec {
@@ -101,7 +103,42 @@ export class Workbook {
         row.insertBefore(cell, cellsInRow.find((x) => refParts(x.getAttribute('r')!).c > c) ?? null)
       }
       writeCell(d, cell, spec)
+      if (spec.fmt) cell.setAttribute('s', String(await this.styleWithFmt(Number(cell.getAttribute('s') ?? 0), spec.fmt)))
     }
+  }
+
+  private fmtStyles = new Map<string, number>()
+  /** Salinan gaya sel (cellXfs) dengan format angka lain; hasilnya di-cache per gaya+format. */
+  private async styleWithFmt(base: number, code: string) {
+    const key = `${base}|${code}`
+    const hit = this.fmtStyles.get(key)
+    if (hit !== undefined) return hit
+    const st = await this.doc('xl/styles.xml')
+    const root = st.documentElement
+    let numFmts = st.getElementsByTagNameNS(MAIN, 'numFmts')[0]
+    if (!numFmts) {
+      numFmts = st.createElementNS(MAIN, 'numFmts')
+      root.insertBefore(numFmts, root.firstElementChild)
+    }
+    const list = [...numFmts.getElementsByTagNameNS(MAIN, 'numFmt')]
+    let id = Number(list.find((n) => n.getAttribute('formatCode') === code)?.getAttribute('numFmtId') ?? NaN)
+    if (!Number.isFinite(id)) {
+      id = Math.max(163, ...list.map((n) => Number(n.getAttribute('numFmtId')) || 0)) + 1
+      const n = st.createElementNS(MAIN, 'numFmt')
+      n.setAttribute('numFmtId', String(id))
+      n.setAttribute('formatCode', code)
+      numFmts.appendChild(n)
+    }
+    numFmts.setAttribute('count', String(numFmts.getElementsByTagNameNS(MAIN, 'numFmt').length))
+    const cellXfs = st.getElementsByTagNameNS(MAIN, 'cellXfs')[0]
+    const xfs = [...cellXfs.getElementsByTagNameNS(MAIN, 'xf')]
+    const xf = (xfs[base] ?? xfs[0]).cloneNode(true) as Element
+    xf.setAttribute('numFmtId', String(id))
+    xf.setAttribute('applyNumberFormat', '1')
+    cellXfs.appendChild(xf)
+    cellXfs.setAttribute('count', String(xfs.length + 1))
+    this.fmtStyles.set(key, xfs.length)
+    return xfs.length
   }
 
   /** Hapus tautan ke workbook lain dan calcChain; Excel menghitung ulang saat dibuka. */

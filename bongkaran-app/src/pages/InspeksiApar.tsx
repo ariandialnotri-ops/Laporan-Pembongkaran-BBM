@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CircleCheck, CloudCheck, FireExtinguisher, Flag, LoaderCircle, Pencil, Settings2, TriangleAlert } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -34,7 +34,7 @@ export function InspeksiApar() {
   const id = aparRecordId(tanggal)
   const records = useMemo(() => app.daily.filter((d): d is AparRecord => d.kind === 'apar'), [app.daily])
   const existing = records.find((r) => r.id === id) ?? null
-  const [draft, setDraft] = useState<{ id: string; data: AparData } | null>(null)
+  const [draft, setDraft] = useState<{ id: string; tanggal: string; data: AparData } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -60,11 +60,23 @@ export function InspeksiApar() {
   const selesai = !!data.selesaiAt
   const srcOf = usePhotoSrc(data.units.flatMap((u) => u.foto))
 
-  // Simpan otomatis 700 ms setelah perubahan terakhir.
-  const latest = useRef({ existing, id, tanggal })
-  latest.current = { existing, id, tanggal }
-  const persist = async (next: AparData) => {
-    const { existing: ex, id: rid, tanggal: tgl } = latest.current
+  // Simpan otomatis 700 ms setelah perubahan terakhir, selalu ke tanggal milik draf itu
+  // (bukan tanggal yang sedang dipilih), sehingga ganti tanggal tidak memindahkan isian.
+  const latest = useRef(records)
+  latest.current = records
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const berjalan = useRef<Promise<unknown>>(Promise.resolve())
+  // Cleanup layout effect berjalan lebih dulu saat halaman ditutup: tanda untuk menyimpan langsung.
+  const aktif = useRef(true)
+  useLayoutEffect(() => {
+    aktif.current = true
+    return () => {
+      aktif.current = false
+    }
+  }, [])
+  const persist = async (tgl: string, next: AparData) => {
+    const rid = aparRecordId(tgl)
+    const ex = latest.current.find((r) => r.id === rid)
     const rec: AparRecord = {
       id: rid,
       kind: 'apar',
@@ -78,17 +90,27 @@ export function InspeksiApar() {
     await app.saveDaily(rec)
   }
   useEffect(() => {
-    if (!draft || draft.id !== id || draft.data.selesaiAt) return
-    const t = setTimeout(() => {
+    if (!draft || draft.data.selesaiAt) return
+    timer.current = setTimeout(() => {
+      timer.current = null
       setSave('saving')
-      persist(draft.data)
+      const job = persist(draft.tanggal, draft.data)
+      berjalan.current = job.catch(() => {})
+      job
         .then(() => setSave('saved'))
         .catch((e) => {
           setSave('error')
           setError(`Gagal menyimpan: ${pesan(e)}`)
         })
     }, 700)
-    return () => clearTimeout(t)
+    return () => {
+      if (timer.current) {
+        clearTimeout(timer.current)
+        // Halaman ditinggalkan sebelum jeda habis: simpan sekarang.
+        if (!aktif.current) void persist(draft.tanggal, draft.data).catch(() => {})
+      }
+      timer.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft])
 
@@ -96,7 +118,7 @@ export function InspeksiApar() {
 
   const setData = (patch: Partial<AparData>) => {
     setError(null)
-    setDraft({ id, data: { ...data, ...patch } })
+    setDraft({ id, tanggal, data: { ...data, ...patch } })
   }
   const setUnit = (unitId: string, patch: Partial<AparCek>) => setData({ units: data.units.map((u) => (u.unitId === unitId ? { ...u, ...patch } : u)) })
   const setCek = (u: AparCek, key: CekKey, v: CekNilai) => setUnit(u.unitId, { cek: { ...u.cek, [key]: v } })
@@ -130,9 +152,13 @@ export function InspeksiApar() {
       if (h.temuan.length && !u.foto.length) return setError(`${u.kode || 'Unit'}: foto bukti temuan wajib.`)
     }
     setBusy('selesai')
+    // Batalkan simpan otomatis yang tertunda agar tidak menimpa status selesai.
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
     try {
+      await berjalan.current
       const next = { ...data, selesaiAt: isoNow() }
-      await persist(next)
+      await persist(tanggal, next)
       setDraft(null)
       toast('Inspeksi APAR & APAB selesai')
     } catch (e) {
@@ -219,7 +245,7 @@ export function InspeksiApar() {
             </div>
           )}
           {selesai ? (
-            <Button variant="glass" size="lg" onClick={() => setDraft({ id, data: { ...data, selesaiAt: undefined } })}>
+            <Button variant="glass" size="lg" onClick={() => setDraft({ id, tanggal, data: { ...data, selesaiAt: undefined } })}>
               <Pencil aria-hidden="true" />
               Buka untuk koreksi
             </Button>

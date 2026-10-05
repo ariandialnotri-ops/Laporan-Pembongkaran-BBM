@@ -10,6 +10,8 @@ import type { CellSpec } from './xlsx'
 const HARI = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
 /** Kolom kompartemen 1-6 pada tabel kualitas (baris 12-17). */
 const QCOLS = ['G', 'H', 'K', 'L', 'M', 'N']
+/** Format kapasitas kompartemen seperti sel M24 template. */
+const KAPASITAS_FMT = '_-* #,##0_-;\\-* #,##0_-;_-* "-"_-;_-@_-'
 /**
  * Area tanda tangan (baris 64-67) per penandatangan di template. Kotak selebar `w` px
  * di tengah kolom judulnya (sama dengan posisi nama di baris 68), rasio sekitar 5:2.
@@ -84,7 +86,8 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
     set(`K${row}`, tera)
     const sel = dip !== null && tera !== null ? round(dip - tera, 4) : 0
     set(`L${row}`, sel)
-    set(`M${row}`, kap)
+    // Template: M24 tanpa desimal, M25-M29 tiga desimal; disamakan (liter bulat).
+    cells[`M${row}`] = { value: kap, fmt: KAPASITAS_FMT }
     const kep = c ? n(c.kepekaan) : null
     const mmPerL = c ? n(c.kepekaanMmL ?? '') : null
     if (dip !== null && tera && kep) {

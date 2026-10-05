@@ -135,8 +135,8 @@ function strokeSide(ctx: CanvasRenderingContext2D, spec: string, x1: number, y1:
   ctx.restore()
 }
 
-export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: { red?: string[]; overlays?: Overlay[]; scale?: number } = {}) {
-  const { red = [], overlays = [], scale = 2 } = opts
+export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: { red?: string[]; overlays?: Overlay[]; scale?: number; formats?: Record<string, string> } = {}) {
+  const { red = [], overlays = [], scale = 2, formats = {} } = opts
   const l = getLayout(sheet)
   const { c1, r1, c2, r2 } = l.area
   const { width, height } = sheetSize(sheet)
@@ -200,7 +200,7 @@ export async function drawSheet(sheet: SheetKey, values: Record<string, CellValu
     const v = valueOf(b.ref)
     if (v === null || v === '') continue
     const st = b.st
-    const { text, align } = formatCell(v, st?.fmt ?? 'General')
+    const { text, align } = formatCell(v, formats[b.ref] ?? st?.fmt ?? 'General')
     if (!text) continue
     const px = ((st?.sz ?? 11) * 96) / 72
     ctx.font = `${st?.i ? 'italic ' : ''}${st?.b ? 700 : 400} ${px}px ${FONT[st?.ff ?? 'Calibri'] ?? st?.ff}`

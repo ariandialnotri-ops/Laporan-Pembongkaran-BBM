@@ -67,11 +67,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return backend.onAuthChange(() => void initSession())
   }, [initSession])
 
-  const refresh = useCallback(async () => {
-    const [p, r, d] = await Promise.all([backend.listPlans(), backend.listReports(), backend.listDaily(todayIso(addDays(new Date(), -120)))])
+  // Penulisan yang sedang berjalan / nomor urut penulisan: sinkron otomatis tidak boleh
+  // menimpa perubahan lokal dengan data server yang diambil sebelum perubahan itu tersimpan.
+  const inflight = useRef(0)
+  const writeSeq = useRef(0)
+  const tulis = useCallback(async <T,>(job: () => Promise<T>) => {
+    inflight.current++
+    writeSeq.current++
+    try {
+      return await job()
+    } finally {
+      inflight.current--
+      writeSeq.current++
+    }
+  }, [])
+  const ambil = () => Promise.all([backend.listPlans(), backend.listReports(), backend.listDaily(todayIso(addDays(new Date(), -120)))])
+  const terapkan = ([p, r, d]: Awaited<ReturnType<typeof ambil>>) => {
     setPlans(p)
     setReports(r.sort((a, b) => b.createdAt - a.createdAt))
     setDaily(d)
+  }
+  const refresh = useCallback(async () => {
+    terapkan(await ambil())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const userId = session.user?.id ?? null
@@ -98,10 +116,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // selama aplikasi terlihat. Jeda minimal 10 detik agar hemat kuota & baterai.
   const lastSync = useRef(0)
   const sync = useCallback(() => {
-    if (backend.mode !== 'supabase' || Date.now() - lastSync.current < 10_000) return
+    if (backend.mode !== 'supabase' || inflight.current > 0 || Date.now() - lastSync.current < 10_000) return
     lastSync.current = Date.now()
-    void refresh().catch(() => {})
-  }, [refresh])
+    const seq = writeSeq.current
+    ambil()
+      .then((hasil) => {
+        // Ada penulisan selama pengambilan: lewati, sinkron berikutnya membawa data terbaru.
+        if (writeSeq.current === seq && inflight.current === 0) terapkan(hasil)
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     if (backend.mode !== 'supabase' || !loaded) return
     lastSync.current = Date.now()
@@ -146,54 +171,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (plan: Plan) => {
       setPlans((prev) => upsertById(prev, plan))
       try {
-        await backend.savePlan(plan)
+        await tulis(() => backend.savePlan(plan))
       } catch (e) {
         await refresh().catch(() => {})
         throw e
       }
     },
-    [refresh],
+    [refresh, tulis],
   )
   const deletePlan = useCallback(
     async (plan: Plan) => {
       setPlans((prev) => prev.filter((p) => p.id !== plan.id))
       try {
-        await backend.deletePlan(plan.id)
+        await tulis(() => backend.deletePlan(plan.id))
       } catch (e) {
         await refresh().catch(() => {})
         throw e
       }
     },
-    [refresh],
+    [refresh, tulis],
   )
 
   const saveDaily = useCallback(
     async (rec: DailyRecord) => {
       setDaily((prev) => upsertById(prev, rec))
       try {
-        await backend.saveDaily(rec)
+        await tulis(() => backend.saveDaily(rec))
       } catch (e) {
         await refresh().catch(() => {})
         throw e
       }
     },
-    [refresh],
+    [refresh, tulis],
   )
   const deleteDaily = useCallback(
     async (rec: DailyRecord) => {
       setDaily((prev) => prev.filter((x) => x.id !== rec.id))
       try {
-        await backend.deleteDaily(rec.id)
+        await tulis(() => backend.deleteDaily(rec.id))
       } catch (e) {
         await refresh().catch(() => {})
         throw e
       }
     },
-    [refresh],
+    [refresh, tulis],
   )
 
-  const upsertSummary = useCallback((summary: ReportSummary) => setReports((prev) => upsertById(prev, summary)), [])
-  const removeSummary = useCallback((id: string) => setReports((prev) => prev.filter((r) => r.id !== id)), [])
+  const upsertSummary = useCallback((summary: ReportSummary) => {
+    writeSeq.current++
+    setReports((prev) => upsertById(prev, summary))
+  }, [])
+  const removeSummary = useCallback((id: string) => {
+    writeSeq.current++
+    setReports((prev) => prev.filter((r) => r.id !== id))
+  }, [])
 
   const signIn = useCallback((email: string, password: string) => backend.signIn(email, password), [])
   const signOut = useCallback(async () => {

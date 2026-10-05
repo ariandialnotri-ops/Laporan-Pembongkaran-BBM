@@ -115,7 +115,8 @@ export async function exportPersediaanXlsx(data: PersediaanExport, filename: str
 async function baRender(report: Report, x: Derived, settings: Settings) {
   const ba = buildBa(report, x, settings)
   const overlays = await Promise.all(ba.signatures.map(async (s) => ({ from: s.from, to: s.to, w: s.w, src: await trimSignature(s.img) })))
-  return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays })
+  const formats = Object.fromEntries(Object.entries(ba.cells).flatMap(([k, v]) => (v.fmt ? [[k, v.fmt]] : [])))
+  return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays, formats })
 }
 
 export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string) {

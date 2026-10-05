@@ -10,7 +10,7 @@ import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { formatTanggalIso, todayIso } from '@/lib/date'
+import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { density15, normalizeDensity } from '@/lib/density'
 import { formatDensity, formatDensitySigned } from '@/lib/format'
 import { sampleMenunggu } from '@/lib/sample'
@@ -24,6 +24,13 @@ const jamSekarang = () => {
 }
 
 type Draft = { r: ReportSummary; s: Sample; error: string | null }
+
+/** Tanggal & jam selesai bongkar; bila jam selesai lebih kecil dari jam datang, bongkar melewati tengah malam. */
+function selesaiBongkar(r: ReportSummary) {
+  const jam = r.jamSelesai || r.jam
+  const lewat = !!r.jamSelesai && r.jam && r.jamSelesai < r.jam
+  return { tanggal: lewat ? todayIso(addDays(new Date(`${r.tanggal}T00:00:00`), 1)) : r.tanggal, jam }
+}
 
 /**
  * Input > Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar
@@ -57,7 +64,8 @@ export function Sample2Jam() {
     if (!draft) return
     const fail = (error: string) => setDraft({ ...draft, error })
     if (!draft.s.tanggal || !draft.s.jam) return fail('Isi tanggal dan jam uji.')
-    if (draft.s.tanggal + draft.s.jam < draft.r.tanggal + (draft.r.jamSelesai || draft.r.jam)) return fail(`Jam uji harus setelah bongkar selesai (${formatTanggalIso(draft.r.tanggal)} ${draft.r.jamSelesai || draft.r.jam}).`)
+    const selesai = selesaiBongkar(draft.r)
+    if (`${draft.s.tanggal} ${draft.s.jam}` < `${selesai.tanggal} ${selesai.jam}`) return fail(`Jam uji harus setelah bongkar selesai (${formatTanggalIso(selesai.tanggal)} ${selesai.jam}).`)
     if (normalizeDensity(draft.s.densityObs) === null || !draft.s.suhu.trim()) return fail('Isi density dan suhu sampel.')
     if (!d15) return fail('Density atau suhu di luar jangkauan tabel ASTM 53.')
     if (!draft.s.petugas.trim()) return fail('Isi nama petugas.')
