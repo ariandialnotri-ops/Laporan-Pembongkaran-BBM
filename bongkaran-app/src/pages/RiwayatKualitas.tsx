@@ -15,7 +15,7 @@ import { PRODUK_OPTIONS } from '@/lib/sop'
 
 type Row = {
   key: string
-  jenis: 'Uji harian' | 'Sample 2 jam'
+  jenis: 'Uji harian' | 'Pasca penerimaan'
   tanggal: string
   waktu: string
   produk: string
@@ -56,7 +56,7 @@ const COLS: Col<Row>[] = [
   },
 ]
 
-/** Laporan > Riwayat Kualitas Harian: uji density harian per shift dan sample BBM 2 jam setelah penerimaan. */
+/** Laporan > Riwayat Kualitas Harian: uji density harian per shift dan uji kualitas pasca penerimaan. */
 export function RiwayatKualitas() {
   const app = useApp()
   const [range, setRange] = useDateRange('7d')
@@ -92,7 +92,7 @@ export function RiwayatKualitas() {
       .filter((r) => r.sample2Jam)
       .map((r) => ({
         key: `s_${r.id}`,
-        jenis: 'Sample 2 jam' as const,
+        jenis: 'Pasca penerimaan' as const,
         tanggal: r.sample2Jam!.tanggal,
         waktu: `${r.sample2Jam!.jam}, ${r.nopol}`,
         produk: r.produk,
@@ -123,7 +123,7 @@ export function RiwayatKualitas() {
           options={[
             { value: 'semua' as const, label: 'Semua uji' },
             { value: 'Uji harian' as const, label: 'Uji harian' },
-            { value: 'Sample 2 jam' as const, label: 'Sample 2 jam' },
+            { value: 'Pasca penerimaan' as const, label: 'Uji pasca penerimaan' },
           ]}
         />
         <ChipFilter label="Produk" value={produk} onChange={setProduk} options={[{ value: 'semua', label: 'Semua produk' }, ...PRODUK_OPTIONS.map((p) => ({ value: p, label: p }))]} />

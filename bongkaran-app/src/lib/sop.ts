@@ -8,6 +8,7 @@ import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { shiftKey, type Shift } from '@/lib/shift'
 import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
+import type { AparUnit } from '@/lib/apar'
 
 export interface Photo {
   id: string
@@ -25,14 +26,14 @@ export type ReportStatus = 'draft' | 'selesai' | 'anomali'
 export interface Compartment {
   id: string
   no: string
+  /** Tinggi T2 mobil tangki (mm) dari buku tera MT: acuan deepstick. */
   tinggiTera: string
   /** Kapasitas kompartemen (L) dari buku tera, dipakai menghitung selisih liter. */
   kapasitas: string
-  /** Laporan lama: liter per mm. */
+  /** Kepekaan dari buku tera MT (liter per mm): selisih liter = kepekaan x selisih mm. */
   kepekaan: string
-  /** Kepekaan dari buku tera MT, mm per liter. Bila diisi, selisih liter = selisih mm / kepekaan. */
+  /** Data lama (versi sebelumnya): kepekaan mm per liter dan tinggi T2 terpisah. */
   kepekaanMmL?: string
-  /** Tinggi T2 (mm) dari buku tera MT. */
   tinggiT2?: string
   dipAktual: string
   noSegel: string
@@ -128,7 +129,7 @@ export interface ReportData {
   totalisator: Totalisator[]
   dipAfterMm: string
   ttd: Partial<Record<SignerKey, Signature>>
-  /** Uji sampel BBM dari tangki pendam minimal 2 jam setelah bongkar selesai. */
+  /** Uji kualitas pasca penerimaan: sampel tangki pendam setelah bongkar selesai (jam diatur petugas). */
   sample2Jam?: Sample2Jam | null
   noBA: string
   namaPetugas: string
@@ -285,6 +286,10 @@ export interface Settings {
   namaSecurityDefault: string
   perusahaanPengangkut: string
   nozzles: Nozzle[]
+  /** Proteksi kebakaran: jumlah pulau pompa, APAR (termasuk cadangan), dan APAB. */
+  jumlahPulau: number
+  apar: AparUnit[]
+  apab: AparUnit[]
   rules: Rules
 }
 
@@ -343,7 +348,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'tera',
     title: 'Buku Tera Mobil Tangki',
-    desc: 'Foto buku tera MT, isi tinggi tera, T2, kapasitas, dan kepekaan tiap kompartemen.',
+    desc: 'Foto buku tera MT, isi tinggi T2, kapasitas, dan kepekaan tiap kompartemen.',
     photos: [{ key: 'buku_tera', label: 'Buku tera mobil tangki' }],
   },
   {
@@ -382,7 +387,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'dip_mt',
     title: 'Deepstick Kompartemen MT vs Buku Tera',
-    desc: 'Isi ketinggian minyak tiap kompartemen hasil deepstick, dibandingkan dengan tinggi tera.',
+    desc: 'Isi ketinggian minyak tiap kompartemen hasil deepstick, dibandingkan dengan tinggi T2 buku tera.',
     photos: [{ key: 'dip_mt', label: 'Deepstick ketinggian minyak mobil tangki' }],
   },
   {
@@ -421,7 +426,7 @@ export const STEPS: StepDef[] = [
 ]
 
 export function newCompartment(no = ''): Compartment {
-  return { id: genId('k'), no, tinggiTera: '', tinggiT2: '', kapasitas: '', kepekaan: '', kepekaanMmL: '', dipAktual: '', noSegel: '' }
+  return { id: genId('k'), no, tinggiTera: '', kapasitas: '', kepekaan: '', dipAktual: '', noSegel: '' }
 }
 
 /** Foto slot gabungan; laporan lama menyimpan foto di dua slot terpisah. */
@@ -455,7 +460,14 @@ export function normalizeReport(r: Report): Report {
       perusahaanPengangkut: d.perusahaanPengangkut ?? '',
       totalisator: d.totalisator ?? [],
       ttd: d.ttd ?? {},
-      compartments: d.compartments.map((c) => ({ ...c, kapasitas: c.kapasitas ?? '', kepekaanMmL: c.kepekaanMmL ?? '', tinggiT2: c.tinggiT2 ?? '', noSegel: c.noSegel ?? '' })),
+      compartments: d.compartments.map((c) => {
+        const base = { ...c, kapasitas: c.kapasitas ?? '', kepekaan: c.kepekaan ?? '', noSegel: c.noSegel ?? '' }
+        // Draf versi sebelumnya: T2 menjadi acuan tunggal dan angka kepekaan dipakai sebagai pengali.
+        // Laporan selesai tidak diubah agar angka Berita Acara tetap sama.
+        if (r.status !== 'draft' || (!c.tinggiT2 && !c.kepekaanMmL)) return base
+        const { tinggiT2, kepekaanMmL, ...rest } = base
+        return { ...rest, tinggiTera: tinggiT2 || c.tinggiTera, kepekaan: c.kepekaan || kepekaanMmL || '' }
+      }),
     },
   }
 }
@@ -602,10 +614,10 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     const dip = num(c.dipAktual)
     const kapasitas = num(c.kapasitas)
     const mmPerL = num(c.kepekaanMmL ?? '')
-    // Liter per mm: dari kepekaan buku tera (mm/L), atau kapasitas / tinggi tera, atau kepekaan laporan lama.
-    const kepekaan = mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : num(c.kepekaan)
-    const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari tera
-    // Sama dengan Berita Acara: selisih (mm) / kepekaan, atau selisih x kapasitas / tinggi tera.
+    // Liter per mm: kepekaan buku tera; laporan lama: 1 / kepekaan mm per liter, atau kapasitas / tinggi.
+    const kepekaan = num(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
+    const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari T2
+    // Sama dengan Berita Acara: kepekaan x selisih (mm). Contoh 0,3 L/mm x -5 mm = -1,5 L.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
     const outOfLimit = selisihMm !== null && -selisihMm > rules.teraToleranceMm
     return { ...c, selisihMm, estLiter, outOfLimit }
@@ -720,11 +732,8 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.tanggalKeluar) || !has(d.jamKeluar)) issues.push('Isi tanggal & jam keluar MT dari depot')
       break
     case 'tera':
-      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0 || (num(c.kepekaan) ?? 0) > 0))) {
-        issues.push('Isi tinggi tera & kapasitas untuk semua kompartemen')
-      }
-      if (d.compartments.some((c) => !((num(c.kepekaanMmL ?? '') ?? 0) > 0) || !((num(c.tinggiT2 ?? '') ?? 0) > 0))) {
-        issues.push('Isi kepekaan (mm/liter) & tinggi T2 dari buku tera untuk semua kompartemen')
+      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((num(c.kepekaan) ?? 0) > 0))) {
+        issues.push('Isi tinggi T2, kapasitas, dan kepekaan (L/mm) dari buku tera MT untuk semua kompartemen')
       }
       break
     case 'atg_before':
@@ -756,7 +765,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (d.compartments.some((c) => num(c.dipAktual) === null)) issues.push('Isi hasil deepstick semua kompartemen')
       else if (x.teraOutOfLimit && !d.teraApproval) {
         needsApproval = true
-        issues.push(`Selisih dengan buku tera melebihi ${rules.teraToleranceMm} mm, butuh izin penanggung jawab`)
+        issues.push(`Selisih dengan tinggi T2 buku tera melebihi ${rules.teraToleranceMm} mm, butuh izin penanggung jawab`)
       }
       break
     case 'sampel':

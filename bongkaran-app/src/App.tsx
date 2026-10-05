@@ -15,6 +15,7 @@ const Anggota = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.A
 const BeritaAcara = lazy(() => import('@/pages/BeritaAcara').then((m) => ({ default: m.BeritaAcara })))
 const FormBongkar = lazy(() => import('@/pages/FormBongkar').then((m) => ({ default: m.FormBongkar })))
 const FormInput = lazy(() => import('@/pages/FormInput').then((m) => ({ default: m.FormInput })))
+const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
@@ -22,6 +23,7 @@ const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ defaul
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
+const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ default: m.RiwayatApar })))
 const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
 const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
 const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
@@ -54,6 +56,7 @@ function Gate() {
           <Route path="/kualitas" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
           <Route path="/stok" element={<StokShift />} />
+          <Route path="/apar" element={<InspeksiApar />} />
           <Route path="/laporan" element={<LaporanMenu />} />
           <Route path="/laporan/persediaan" element={<Persediaan />} />
           <Route path="/laporan/ba" element={<BeritaAcara />} />
@@ -61,6 +64,7 @@ function Gate() {
           <Route path="/laporan/lo" element={<RiwayatLo />} />
           <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
           <Route path="/laporan/tera" element={<RiwayatTera />} />
+          <Route path="/laporan/apar" element={<RiwayatApar />} />
           <Route path="/profil" element={<Profil />} />
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />

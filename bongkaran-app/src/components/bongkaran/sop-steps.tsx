@@ -138,22 +138,19 @@ export function StepContent(props: StepProps) {
         <>
           <StepPhotos {...props} />
           <Section>
-            <span className="text-body-sm text-on-surface-variant">Salin tinggi tera, tinggi T2, kapasitas, dan kepekaan (mm/liter) sesuai buku tera MT.</span>
+            <span className="text-body-sm text-on-surface-variant">Salin tinggi T2, kapasitas, dan kepekaan sesuai buku tera MT. Selisih liter = kepekaan x selisih mm deepstick (contoh 0,3 L/mm x -5 mm = -1,5 L).</span>
             {d.compartments.map((c) => (
               <div key={c.id} className="flex flex-col gap-space-xs">
                 <span className="text-tag uppercase text-primary">Kompartemen {c.no || '-'}</span>
                 <div className="grid grid-cols-2 gap-space-sm">
-                  <Field label="Tinggi tera" htmlFor={`tera-${c.id}`}>
-                    <Num id={`tera-${c.id}`} suffix="mm" placeholder="1250" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
-                  </Field>
-                  <Field label="Tinggi (T2)" htmlFor={`t2-${c.id}`}>
-                    <Num id={`t2-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiT2 ?? ''} onChange={(v) => setComp(c.id, { tinggiT2: v })} />
+                  <Field label="Tinggi T2 mobil tangki" htmlFor={`tera-${c.id}`} className="col-span-2">
+                    <Num id={`tera-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
                   <Field label="Kapasitas" htmlFor={`kap-${c.id}`}>
                     <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                   <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
-                    <Num id={`kpk-${c.id}`} suffix="mm/L" placeholder="0,25" value={c.kepekaanMmL ?? ''} onChange={(v) => setComp(c.id, { kepekaanMmL: v })} />
+                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
                   </Field>
                 </div>
               </div>
@@ -332,7 +329,7 @@ export function StepContent(props: StepProps) {
             <Section key={c.id}>
               <span className="text-tag uppercase text-primary">Kompartemen {c.no}</span>
               <div className="grid grid-cols-2 gap-space-sm">
-                <Field label="Tinggi tera" htmlFor={`tera-fix-${c.id}`}>
+                <Field label="Tinggi T2" htmlFor={`tera-fix-${c.id}`}>
                   <Fixed id={`tera-fix-${c.id}`} value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
@@ -344,7 +341,7 @@ export function StepContent(props: StepProps) {
                   ? IDLE
                   : {
                       tone: (c.outOfLimit ? 'error' : 'success') as BannerTone,
-                      title: c.outOfLimit ? `Kurang lebih dari ${rules.teraToleranceMm} mm` : 'Sesuai buku tera',
+                      title: c.outOfLimit ? `Kurang lebih dari ${rules.teraToleranceMm} mm` : 'Sesuai tinggi T2 buku tera',
                       detail: `Selisih ${formatSigned(c.selisihMm, 0, ' mm')}${c.estLiter !== null ? ` ≈ ${formatSigned(c.estLiter, 1, ' L')}` : ''}`,
                     })}
               />

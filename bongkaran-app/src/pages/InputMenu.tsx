@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, CircleCheck, ClipboardList, FlaskConical, Fuel, TestTube, Truck } from 'lucide-react'
+import { ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, TestTube, Truck } from 'lucide-react'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
 import { useApp } from '@/lib/app-state'
-import { qqRecordId } from '@/lib/daily'
+import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
 import { shiftLabel } from '@/lib/shift'
@@ -24,7 +24,9 @@ export function InputMenu() {
   const diuji = app.daily.some((d) => d.kind === 'qq' && d.id === qqRecordId(stok.key.tanggal, stok.key.shift))
   const sample = sampleMenunggu(app.reports)
   const besok = planBesokKurang(app.plans)
-  const sampleSiap = sample.filter((s) => s.siap).length
+  const unitApar = (app.settings.apar?.length ?? 0) + (app.settings.apab?.length ?? 0)
+  const bulan = stok.key.tanggal.slice(0, 7)
+  const aparBulanIni = app.daily.find((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt && d.tanggal.startsWith(bulan))
 
   const menus: MenuItem[] = [
     {
@@ -54,10 +56,18 @@ export function InputMenu() {
     {
       to: '/sample',
       icon: TestTube,
-      title: 'Sample BBM 2 Jam',
-      desc: 'Uji tangki pendam 2 jam setelah penerimaan',
-      status: sample.length ? `${sampleSiap} siap, ${sample.length - sampleSiap} menunggu 2 jam` : 'Tidak ada yang menunggu',
-      badge: sampleSiap,
+      title: 'Uji Kualitas Pasca Penerimaan',
+      desc: 'Wajib setelah setiap penerimaan BBM, jam uji diatur petugas',
+      status: sample.length ? `${sample.length} penerimaan belum diuji` : 'Semua penerimaan sudah diuji',
+      badge: sample.length,
+    },
+    {
+      to: '/apar',
+      icon: FireExtinguisher,
+      title: 'Inspeksi APAR & APAB',
+      desc: 'Pemeriksaan alat pemadam per unit, termasuk cadangan',
+      status: !unitApar ? 'Atur unit di Pengaturan SPBU' : aparBulanIni ? `Bulan ini sudah (${aparBulanIni.tanggal.slice(8)}/${aparBulanIni.tanggal.slice(5, 7)})` : 'Bulan ini belum diinspeksi',
+      badge: unitApar && !aparBulanIni ? 1 : 0,
     },
   ]
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, CalendarClock, ClipboardList, Lock, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CalendarClock, ClipboardList, Lock, Plus, Trash2 } from 'lucide-react'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, LoEditSheet, ProdukSelect, SupplySelect, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
@@ -87,7 +87,7 @@ const COLS: Col<TRow>[] = [
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Kolom data permintaan MS2: dipakai di form baru dan sheet edit. */
-function PlanFields({ form, set, idp, withSo }: { form: PlanForm; set: (p: Partial<PlanForm>) => void; idp: string; withSo?: boolean }) {
+function PlanFields({ form, set, idp }: { form: PlanForm; set: (p: Partial<PlanForm>) => void; idp: string }) {
   return (
     <div className="grid grid-cols-2 gap-space-sm">
       <Field label="Tanggal kirim" htmlFor={`${idp}-tgl`}>
@@ -108,11 +108,6 @@ function PlanFields({ form, set, idp, withSo }: { form: PlanForm; set: (p: Parti
       <Field label="No. PO SAP" htmlFor={`${idp}-po`}>
         <Input id={`${idp}-po`} autoComplete="off" placeholder="opsional" value={form.poSap} onChange={(e) => set({ poSap: e.target.value })} />
       </Field>
-      {withSo && (
-        <Field label="Nomor SO" htmlFor={`${idp}-so`} className="col-span-2" hint="Isi setelah SO terbit dari depot.">
-          <Input id={`${idp}-so`} autoComplete="off" inputMode="numeric" value={form.noSO} onChange={(e) => set({ noSO: e.target.value })} />
-        </Field>
-      )}
     </div>
   )
 }
@@ -137,7 +132,6 @@ export function Plan() {
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
 
-  const [editPlan, setEditPlan] = useState<{ plan: PlanT; form: PlanForm; error: string | null } | null>(null)
   const [editLo, setEditLo] = useState<LoTarget | null>(null)
 
   useSyncOnOpen()
@@ -193,41 +187,14 @@ export function Plan() {
     }
   }
 
-  const simpanPlanEdit = async () => {
-    if (!editPlan) return
-    const err = validatePlan(editPlan.form)
-    if (err) return setEditPlan({ ...editPlan, error: err })
-    try {
-      await app.savePlan({ ...editPlan.plan, ...editPlan.form, noSO: editPlan.form.noSO.trim(), shipTo: editPlan.form.shipTo.trim(), poSap: editPlan.form.poSap.trim() })
-      setEditPlan(null)
-      toast('Plan diperbarui')
-    } catch (e) {
-      setEditPlan({ ...editPlan, error: pesan(e) })
-    }
-  }
 
   const bukaLo = (plan: PlanT, lo: PlanLo | null) => setEditLo({ plan, lo })
 
-  const hapusPlan = async (plan: PlanT) => {
-    if (!window.confirm(`Hapus plan ${plan.noSO ? `SO ${plan.noSO}` : `tanggal ${formatTanggalIso(plan.tanggal)}`}?`)) return
-    try {
-      await app.deletePlan(plan)
-      setEditPlan(null)
-    } catch (e) {
-      toast(pesan(e), TriangleAlert)
-    }
-  }
 
   const visible = inDate
     .filter((p) => !statusFilter || p.los.some((lo) => loStatus(lo, used) === statusFilter))
     .sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || '') || b.createdAt - a.createdAt)
   const tabel: TRow[] = visible.flatMap((plan) => plan.los.filter((lo) => !statusFilter || loStatus(lo, used) === statusFilter).map((lo) => ({ plan, lo, status: loStatus(lo, used) })))
-  const bukaPlan = (plan: PlanT) =>
-    setEditPlan({
-      plan,
-      error: null,
-      form: { tanggal: plan.tanggal, ms2Tanggal: plan.ms2Tanggal, ms2Jam: plan.ms2Jam, ms2Shift: plan.ms2Shift, poSap: plan.poSap, shipTo: plan.shipTo, supplyPoint: plan.supplyPoint, noSO: plan.noSO },
-    })
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -354,60 +321,7 @@ export function Plan() {
         <ErrorBox text={error} />
       </Sheet>
 
-      {/* Edit data plan & nomor SO */}
-      <Sheet
-        open={!!editPlan}
-        onOpenChange={(o) => !o && setEditPlan(null)}
-        title={editPlan?.plan.noSO ? `SO ${editPlan.plan.noSO}` : 'Ubah plan'}
-        description="Data permintaan MS2 dan nomor SO."
-        footer={
-          editPlan && (
-            <>
-              {app.canManage && !editPlan.plan.los.some((lo) => used.has(lo.id)) && (
-                <Button variant="ghost" size="icon" aria-label="Hapus plan" onClick={() => hapusPlan(editPlan.plan)}>
-                  <Trash2 aria-hidden="true" />
-                </Button>
-              )}
-              <Button className="flex-1" onClick={simpanPlanEdit}>
-                Simpan
-              </Button>
-            </>
-          )
-        }
-      >
-        {editPlan && (
-          <>
-            <PlanFields idp="edit-plan" withSo form={editPlan.form} set={(p) => setEditPlan({ ...editPlan, form: { ...editPlan.form, ...p }, error: null })} />
-            <ErrorBox text={editPlan.error} />
-          </>
-        )}
-      </Sheet>
-
-      <LoEditSheet
-        target={editLo}
-        onClose={() => setEditLo(null)}
-        planActions={(plan) => (
-          <div className="flex flex-wrap gap-space-xs">
-            <Button
-              variant="soft"
-              size="sm"
-              onClick={() => {
-                setEditLo(null)
-                bukaPlan(plan)
-              }}
-            >
-              <Pencil aria-hidden="true" />
-              Ubah SO & MS2
-            </Button>
-            {editLo?.lo && (
-              <Button variant="soft" size="sm" onClick={() => setEditLo({ plan, lo: null })}>
-                <Plus aria-hidden="true" />
-                Tambah LO di SO ini
-              </Button>
-            )}
-          </div>
-        )}
-      />
+      <LoEditSheet target={editLo} onClose={() => setEditLo(null)} />
     </div>
   )
 }

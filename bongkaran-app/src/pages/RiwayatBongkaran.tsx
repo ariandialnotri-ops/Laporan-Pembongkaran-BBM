@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 /** Keterangan hasil bongkar, seperti kolom keterangan pada rekap transaksi. */
 function keterangan(r: ReportSummary): { text: string; tone: 'neutral' | 'error' } {
   if (r.densityAnomaly) return { text: 'Anomali density', tone: 'error' }
-  if (r.sample2Jam?.ok === false) return { text: 'Sample 2 jam beda', tone: 'error' }
+  if (r.sample2Jam?.ok === false) return { text: 'Uji pasca terima beda', tone: 'error' }
   if (r.gainLoss !== null && r.gainLoss < 0) return { text: `Loss ${formatSigned(r.gainLoss, 0, ' L')}`, tone: 'error' }
   return { text: 'Normal', tone: 'neutral' }
 }
@@ -24,7 +24,7 @@ function keterangan(r: ReportSummary): { text: string; tone: 'neutral' | 'error'
 function progress(r: ReportSummary) {
   if (r.status === 'draft') return `Tahap ${Math.min(r.doneCount + 1, STEPS.length)} dari ${STEPS.length}`
   if (r.status === 'anomali') return 'Tindak lanjut anomali'
-  if (!r.sample2Jam) return 'Menunggu sample 2 jam'
+  if (!r.sample2Jam) return 'Menunggu uji pasca penerimaan'
   if (r.ttdKurang?.length) return 'Menunggu tanda tangan'
   return 'Selesai'
 }

@@ -9,13 +9,14 @@ import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned } from '@/lib/format'
 import { produkMeta } from '@/lib/produk'
 import { kalengSample, type Kaleng, type KalengStatus } from '@/lib/ringkasan'
+import { sampleMenunggu } from '@/lib/sample'
 import { tankForProduk, tankName } from '@/lib/tank'
 import { cn } from '@/lib/utils'
 
 const STATUS: Record<KalengStatus, { label: string; tone: 'success' | 'error' | 'neutral' | 'cyan'; icon: typeof CircleCheck }> = {
   sesuai: { label: 'Sesuai', tone: 'success', icon: CircleCheck },
   perhatian: { label: 'Ada anomali', tone: 'error', icon: TriangleAlert },
-  menunggu: { label: 'Menunggu sample', tone: 'cyan', icon: Clock },
+  menunggu: { label: 'D15 belum ada', tone: 'cyan', icon: Clock },
   belum: { label: 'Belum ada sampel', tone: 'neutral', icon: CircleDashed },
 }
 
@@ -23,7 +24,7 @@ const jamDari = (ms: number) => new Date(ms).toTimeString().slice(0, 5)
 
 /**
  * Kaleng Sample: 3 bongkaran selesai terakhir per produk (kiri terbaru, kanan terlama).
- * Mutu kaleng dinilai dari sample BBM 2 jam setelah bongkar, dibanding D15 dokumen depot.
+ * Isi kaleng = sample mobil tangki yang diuji saat bongkar, dibanding D15 dokumen depot.
  */
 export function KalengSample() {
   const app = useApp()
@@ -34,7 +35,8 @@ export function KalengSample() {
 
   const sesuai = data.filter((d) => d.status === 'sesuai').length
   const anomali = data.filter((d) => d.status === 'perhatian').length
-  const menunggu = data.filter((d) => d.status === 'menunggu').length
+  // Uji pasca penerimaan (tangki pendam) terpisah dari kaleng, tetapi tetap wajib.
+  const pasca = sampleMenunggu(app.reports).length
   const terbaru = Math.max(0, ...data.flatMap((d) => d.cans.map((c) => c.updatedAt)))
   const tol = formatDensity(app.rules.densityTolerance)
 
@@ -50,7 +52,7 @@ export function KalengSample() {
               Kaleng Sample
             </h2>
             <span className="text-body-sm text-on-surface-variant">
-              D15 sample 2 jam dari 3 bongkaran terakhir tiap produk, dibanding D15 depot (toleransi ±<span className="tabular">{tol}</span>).
+              D15 sample mobil tangki (diuji saat bongkar) dari 3 bongkaran terakhir tiap produk, dibanding D15 depot (toleransi ±<span className="tabular">{tol}</span>).
             </span>
           </div>
           <button
@@ -65,7 +67,7 @@ export function KalengSample() {
         <dl className="grid grid-cols-2 gap-space-xs border-t border-outline-variant/40 pt-space-sm lg:grid-cols-4">
           <Ringkas label="Sampel sesuai" value={`${sesuai} dari ${data.length} produk`} tone="ok" />
           <Ringkas label="Ada anomali" value={`${anomali} produk`} tone={anomali ? 'bad' : undefined} />
-          <Ringkas label="Menunggu sample 2 jam" value={`${menunggu} produk`} tone={menunggu ? 'wait' : undefined} />
+          <Ringkas label="Belum uji pasca penerimaan" value={`${pasca} penerimaan`} tone={pasca ? 'wait' : undefined} />
           <Ringkas label="Pembaruan" value={terbaru ? `${new Date(terbaru).toDateString() === new Date().toDateString() ? 'Hari ini' : formatTanggalIso(todayIso(new Date(terbaru)))}, ${jamDari(terbaru)}` : '-'} />
         </dl>
       </GlassCard>
@@ -105,7 +107,7 @@ export function KalengSample() {
                     <span className="flex flex-col md:items-end">
                       <span className="text-tag uppercase text-on-surface-variant">D15 terkini</span>
                       {latest.menunggu ? (
-                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">Menunggu sample</span>
+                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">D15 belum ada</span>
                       ) : (
                         <span className="tabular text-body-sm font-bold text-on-surface">
                           {formatDensity(latest.d15Sample)}{' '}
@@ -171,8 +173,8 @@ export function KalengSample() {
 
       <Sheet open={sop} onOpenChange={setSop} title="Ketentuan kaleng sample" description="Pemantauan mutu BBM tiap penerimaan.">
         <ol className="flex list-decimal flex-col gap-space-xs pl-5 text-body-md text-on-surface">
-          <li>Setiap penerimaan mobil tangki diambil sampel dari kompartemen, diuji density dan suhu, lalu dibanding D15 dokumen depot.</li>
-          <li>Minimal 2 jam setelah bongkar selesai, ambil sample dari tangki pendam dan uji density (menu Input, Sample BBM 2 Jam). Hasil inilah acuan mutu kaleng sample.</li>
+          <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu D15-nya dibanding D15 dokumen depot. Sampel inilah isi kaleng sample.</li>
+          <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (menu Input). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
           <li>
             Selisih D15 maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
           </li>
@@ -211,14 +213,14 @@ function Can({ label, produk, besar }: { label: string; produk: string; besar?: 
   )
 }
 
-/** D15 sample 2 jam, atau tanda menunggu bila sample belum diambil. */
+/** D15 sample mobil tangki (uji saat bongkar), dibanding D15 depot. */
 function NilaiSample({ k, besar }: { k: Kaleng; besar?: boolean }) {
   if (k.menunggu)
     return (
       <span className="flex flex-col">
         <span className="flex items-center gap-1 text-body-sm font-semibold text-on-secondary-fixed-variant">
           <Clock aria-hidden="true" className="size-4" />
-          Menunggu sample 2 jam
+          D15 sample MT belum ada
         </span>
         <span className="tabular text-body-sm text-on-surface-variant">D15 depot {formatDensity(k.d15Depot)}</span>
       </span>

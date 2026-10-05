@@ -40,28 +40,32 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 
 | Menu | Rute | Isi |
 |------|------|-----|
-| Dashboard | `/` | Kartu operasional (tanggal & shift), Status Bongkaran Pekan Ini (7 kotak hari dengan ikon status & titik plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Bongkaran Hari Ini per produk (dropdown: MT, diterima, transport loss, discharge loss L & %), SLA rata-rata, Rencana vs Realisasi, Kualitas Harian, Kaleng Sample (D15 sample 2 jam dari 3 bongkaran terakhir), LO Tracking |
+| Dashboard | `/` | Kartu operasional (tanggal & shift), Status Bongkaran Pekan Ini (7 kotak hari dengan ikon status & titik plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Bongkaran Hari Ini per produk (dropdown: MT, diterima, transport loss, discharge loss L & %), SLA rata-rata, Rencana vs Realisasi, Kualitas Harian, Kaleng Sample (D15 sample mobil tangki saat bongkar dari 3 bongkaran terakhir), LO Tracking |
 | Input | `/input` | Bar wajib Stok Awal Shift + kartu: |
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
-| | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi tera, tinggi T2, kapasitas, kepekaan (mm/liter) dari buku tera MT. Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk ubah LO, ubah SO & MS2, atau tambah LO. Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk mengisi nomor SO lalu nomor LO, status, dan segel. Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
-| | `/sample` | Sample BBM 2 Jam: uji density tangki pendam minimal 2 jam setelah bongkar selesai, dibanding D15 depot |
+| | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
+| | `/apar` | Inspeksi APAR & APAB: checklist per unit (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), tersimpan otomatis; temuan wajib catatan tindak lanjut + foto |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |
 | | `/laporan/bongkaran` | Riwayat Pembongkaran MT: produk, tanggal penerimaan, SO, LO, nopol & supir, volume, transport loss, discharge loss (L, %), SLA (request MS2 / gate out sampai selesai bongkar), keterangan, progress |
 | | `/laporan/lo` | Riwayat Tracking LO: tanggal permintaan kirim, SO, LO, produk, volume, supply point, nopol MT, status; ketuk baris untuk ubah lewat pop up (LO Closed terkunci) |
-| | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan sample 2 jam |
+| | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan uji pasca penerimaan |
 | | `/laporan/tera` | Riwayat Tera: bejana 20 L per nozzle, batas -60 ml |
+| | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
 | Profil | `/profil` | Akun, statistik, Kalkulator, Pengaturan, Anggota |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
-| | `/pengaturan` | Identitas SPBU, nama default, perusahaan pengangkut, nozzle dispenser, toleransi, data acuan |
+| | `/pengaturan` | Identitas SPBU, nama default, perusahaan pengangkut, nozzle dispenser, **proteksi kebakaran** (jumlah pulau pompa, APAR termasuk cadangan, APAB: kode, jenis, kapasitas, lokasi, jadwal isi ulang), toleransi, data acuan |
 | | `/anggota` | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
 
-Sample BBM 2 Jam disimpan di data bongkaran (`report.data.sample2Jam`, ringkasan
-`summary.sample2Jam`), tanpa tabel baru.
+Uji Kualitas Pasca Penerimaan disimpan di data bongkaran (`report.data.sample2Jam`, ringkasan
+`summary.sample2Jam`), tanpa tabel baru. Kaleng Sample di Dashboard berisi sampel
+mobil tangki yang diuji saat bongkar (D15 MT vs D15 depot), terpisah dari uji pasca penerimaan.
+Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`; daftar unit ada di pengaturan.
 
 ## Alur SOP bongkaran
 
@@ -145,8 +149,9 @@ Tracking LO dibuka, dan tiap 60 detik selama aplikasi terbuka (jeda minimal 10 d
 
 Skema yang dipakai aplikasi ada di
 `supabase/migrations/20260926120000_bbm_init.sql`,
-`20260926120500_bbm_private_helpers.sql`, dan
-`20261002120000_bbm_plan_meta_daily.sql`:
+`20260926120500_bbm_private_helpers.sql`,
+`20261002120000_bbm_plan_meta_daily.sql`, dan
+`20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB):
 
 | Objek | Isi |
 |-------|-----|

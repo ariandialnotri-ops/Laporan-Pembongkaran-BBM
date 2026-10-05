@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS: Settings = {
   namaSecurityDefault: '',
   perusahaanPengangkut: 'PERTAMINA PATRA NIAGA',
   nozzles: [],
+  jumlahPulau: 0,
+  apar: [],
+  apab: [],
   rules: DEFAULT_RULES,
 }
 

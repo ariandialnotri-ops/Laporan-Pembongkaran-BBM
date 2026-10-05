@@ -69,7 +69,7 @@ export function KalengDetail({ open, onClose }: { open: { k: Kaleng; slot: numbe
         (k.menunggu ? (
           <Pill tone="cyan" className="self-start">
             <Clock aria-hidden="true" />
-            Menunggu sample 2 jam
+            D15 sample MT belum ada
           </Pill>
         ) : (
           <Pill tone={k.ok === false ? 'error' : 'success'} className="self-start">
@@ -133,18 +133,20 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
       </Bagian>
 
       <Bagian no={2} title="Parameter uji density" aside={`Toleransi ±${formatDensity(tol)}`}>
-        {/* Acuan kaleng: sample tangki 2 jam. */}
-        <UjiDensity
-          title="Sample tangki 2 jam (acuan kaleng)"
-          obs={sample ? normalizeDensity(sample.densityObs) : null}
-          suhu={sample?.suhu}
-          hasilLabel="D15 sample"
-          hasil={x.sample2Jam?.d15?.value ?? null}
-          selisih={x.sample2Jam?.selisih ?? null}
-          ok={x.sample2Jam?.ok ?? null}
-          kosong={!sample ? 'Sample 2 jam belum diambil (menu Input, Sample BBM 2 Jam).' : undefined}
-          waktu={sample ? `${formatTanggalIso(sample.tanggal)}, ${sample.jam}` : undefined}
-        />
+        {/* Isi kaleng: sample mobil tangki yang diuji saat bongkar. */}
+        {x.densityResults.length === 0 && <UjiDensity title="Sample mobil tangki (isi kaleng)" obs={null} suhu={undefined} hasilLabel="D15 MT" hasil={null} kosong="Belum ada uji density saat bongkar." />}
+        {x.densityResults.map((r) => (
+          <UjiDensity
+            key={r.id}
+            title={`Sample mobil tangki, kompartemen ${r.kompartemenNo} (isi kaleng)`}
+            obs={r.obs}
+            suhu={r.suhu}
+            hasilLabel="D15 MT"
+            hasil={r.d15?.value ?? null}
+            selisih={r.selisih}
+            ok={r.ok}
+          />
+        ))}
         <UjiDensity
           title="D15 dokumen depot"
           obs={normalizeDensity(d.densityObsDepot)}
@@ -152,18 +154,17 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
           hasilLabel="D15 depot"
           hasil={x.d15Depot}
         />
-        {x.densityResults.map((r) => (
-          <UjiDensity
-            key={r.id}
-            title={`Uji saat bongkar, kompartemen ${r.kompartemenNo}`}
-            obs={r.obs}
-            suhu={r.suhu}
-            hasilLabel="D15 bongkar"
-            hasil={r.d15?.value ?? null}
-            selisih={r.selisih}
-            ok={r.ok}
-          />
-        ))}
+        <UjiDensity
+          title="Uji kualitas pasca penerimaan (tangki pendam)"
+          obs={sample ? normalizeDensity(sample.densityObs) : null}
+          suhu={sample?.suhu}
+          hasilLabel="D15 tangki"
+          hasil={x.sample2Jam?.d15?.value ?? null}
+          selisih={x.sample2Jam?.selisih ?? null}
+          ok={x.sample2Jam?.ok ?? null}
+          kosong={!sample ? 'Belum diuji (wajib, menu Input > Uji Kualitas Pasca Penerimaan).' : undefined}
+          waktu={sample ? `${formatTanggalIso(sample.tanggal)}, ${sample.jam}` : undefined}
+        />
         <div className="flex flex-col gap-1 rounded-md bg-surface-container-low/70 p-space-sm text-body-sm">
           <span className="flex items-center gap-1.5 font-bold text-on-surface">
             <Droplets aria-hidden="true" className="size-4 text-primary" />
@@ -179,7 +180,7 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
           <Item label="Posisi kaleng" value={`Kaleng ${slot + 1} dari 3`} />
           <Item label="Masa simpan" value={slot === 2 ? 'Dibuang saat kaleng baru masuk' : `Sampai ${3 - slot} bongkaran ${k.produk} lagi`} tone={slot === 2 ? 'wait' : undefined} />
           <Item label="Kondisi segel" value={d.segelSesuai ? 'Utuh, sesuai data LO' : 'Belum dikonfirmasi'} tone={d.segelSesuai ? 'ok' : undefined} />
-          <Item label="Petugas sample 2 jam" value={sample?.petugas || '-'} />
+          <Item label="Petugas uji pasca penerimaan" value={sample?.petugas || '-'} />
         </Grid>
       </Bagian>
     </>

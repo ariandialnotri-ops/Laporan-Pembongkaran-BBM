@@ -13,8 +13,8 @@ import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { density15, normalizeDensity } from '@/lib/density'
 import { formatDensity, formatDensitySigned } from '@/lib/format'
-import { jamBolehSample, sampleMenunggu } from '@/lib/sample'
-import { evaluateAll, normalizeReport, SAMPLE_JEDA_MENIT, sampleJeda, summarize, type ReportSummary, type Sample2Jam as Sample } from '@/lib/sop'
+import { sampleMenunggu } from '@/lib/sample'
+import { evaluateAll, normalizeReport, summarize, type ReportSummary, type Sample2Jam as Sample } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Jam sekarang (di luar render). */
@@ -25,7 +25,10 @@ const jamSekarang = () => {
 
 type Draft = { r: ReportSummary; s: Sample; error: string | null }
 
-/** Input > Sample BBM 2 Jam: uji density tangki pendam minimal 2 jam setelah bongkar selesai. */
+/**
+ * Input > Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar
+ * selesai. Jam uji diatur petugas, tetapi tetap wajib untuk setiap penerimaan.
+ */
 export function Sample2Jam() {
   const app = useApp()
   const toast = useToast()
@@ -49,13 +52,12 @@ export function Sample2Jam() {
   const d15 = draft ? density15(draft.s.densityObs, draft.s.suhu) : null
   const selisih = draft && d15 && draft.r.d15Depot !== null ? Math.round((d15.value - draft.r.d15Depot) * 10000) / 10000 : null
   const ok = selisih !== null ? Math.abs(selisih) <= app.rules.densityTolerance + 1e-9 : null
-  const jeda = draft ? sampleJeda({ tanggalDatang: draft.r.tanggal, jamDatang: draft.r.jam, jamSelesaiBongkar: draft.r.jamSelesai ?? '' }, draft.s.tanggal, draft.s.jam) : null
 
   const simpan = async () => {
     if (!draft) return
     const fail = (error: string) => setDraft({ ...draft, error })
-    if (!draft.s.tanggal || !draft.s.jam) return fail('Isi tanggal dan jam pengambilan sampel.')
-    if (jeda !== null && jeda < SAMPLE_JEDA_MENIT) return fail(`Baru ${jeda} menit setelah bongkar selesai. Sampel diambil minimal 2 jam (mulai ${jamBolehSample(draft.r.jamSelesai)}).`)
+    if (!draft.s.tanggal || !draft.s.jam) return fail('Isi tanggal dan jam uji.')
+    if (draft.s.tanggal + draft.s.jam < draft.r.tanggal + (draft.r.jamSelesai || draft.r.jam)) return fail(`Jam uji harus setelah bongkar selesai (${formatTanggalIso(draft.r.tanggal)} ${draft.r.jamSelesai || draft.r.jam}).`)
     if (normalizeDensity(draft.s.densityObs) === null || !draft.s.suhu.trim()) return fail('Isi density dan suhu sampel.')
     if (!d15) return fail('Density atau suhu di luar jangkauan tabel ASTM 53.')
     if (!draft.s.petugas.trim()) return fail('Isi nama petugas.')
@@ -69,7 +71,7 @@ export function Sample2Jam() {
       await app.backend.saveReport(next, summary)
       app.upsertSummary(summary)
       setDraft(null)
-      toast(ok === false ? 'Sampel tersimpan: selisih D15 di luar toleransi' : 'Sampel 2 jam tersimpan', ok === false ? TriangleAlert : undefined)
+      toast(ok === false ? 'Uji tersimpan: selisih D15 di luar toleransi' : 'Uji kualitas pasca penerimaan tersimpan', ok === false ? TriangleAlert : undefined)
     } catch (e) {
       fail(e instanceof Error ? e.message : String(e))
     } finally {
@@ -80,20 +82,20 @@ export function Sample2Jam() {
   return (
     <div className="flex flex-col gap-space-md">
       <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Setelah bongkar selesai, tunggu minimal 2 jam agar BBM di tangki pendam tenang, lalu ambil sampel dan ukur density. Hasilnya dibanding D15 dokumen depot.
+        <b className="text-on-surface">Wajib</b> untuk setiap penerimaan BBM: setelah bongkar selesai, ambil sampel dari tangki pendam dan ukur density. Jam uji diatur petugas. Hasilnya dibanding D15 dokumen depot.
       </p>
 
       <section aria-labelledby="sample-menunggu" className="animate-entrance-2 flex flex-col gap-space-xs">
-        <SectionHeader id="sample-menunggu" title="Menunggu sampel" action={<span className="tabular text-body-sm text-on-surface-variant">{menunggu.length}</span>} />
+        <SectionHeader id="sample-menunggu" title="Belum diuji" action={<span className="tabular text-body-sm text-on-surface-variant">{menunggu.length}</span>} />
         {menunggu.length === 0 ? (
           <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-            Semua penerimaan 7 hari terakhir sudah diuji.
+            Semua penerimaan 7 hari terakhir sudah diuji pasca penerimaan.
           </GlassCard>
         ) : (
           <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40">
-            {menunggu.map(({ r, siap }) => (
+            {menunggu.map(({ r }) => (
               <button key={r.id} type="button" onClick={() => buka(r)} className="flex min-h-16 items-center gap-space-sm px-space-sm py-space-xs text-left transition-colors first:rounded-t-lg last:rounded-b-lg hover:bg-surface-container-lowest/60">
-                <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', siap ? 'bg-error-container text-error' : 'bg-surface-container text-on-surface-variant')}>
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-error-container text-error">
                   <Clock className="size-5" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
@@ -104,7 +106,7 @@ export function Sample2Jam() {
                     {formatTanggalIso(r.tanggal)}, selesai bongkar {r.jamSelesai || '-'}
                   </span>
                 </span>
-                {siap ? <Pill tone="error">Siap diambil</Pill> : <Pill>Mulai {jamBolehSample(r.jamSelesai) ?? '-'}</Pill>}
+                <Pill tone="error">Wajib diuji</Pill>
                 <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
               </button>
             ))}
@@ -137,22 +139,22 @@ export function Sample2Jam() {
       <Sheet
         open={!!draft}
         onOpenChange={(o) => !o && setDraft(null)}
-        title={draft ? `Sampel ${draft.r.produk}, ${draft.r.nopol || 'MT'}` : 'Sampel'}
-        description={draft ? `Bongkar ${formatTanggalIso(draft.r.tanggal)}, selesai ${draft.r.jamSelesai || '-'}. Sampel mulai ${jamBolehSample(draft.r.jamSelesai) ?? '-'}.` : undefined}
+        title={draft ? `Uji ${draft.r.produk}, ${draft.r.nopol || 'MT'}` : 'Uji pasca penerimaan'}
+        description={draft ? `Bongkar ${formatTanggalIso(draft.r.tanggal)}, selesai ${draft.r.jamSelesai || '-'}. Atur tanggal dan jam uji sesuai pelaksanaan.` : undefined}
         footer={
           <Button size="lg" className="flex-1" disabled={saving} onClick={simpan}>
             {saving ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
-            Simpan sampel
+            Simpan uji
           </Button>
         }
       >
         {draft && (
           <>
             <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="Tanggal ambil" htmlFor="smp-tgl">
+              <Field label="Tanggal uji" htmlFor="smp-tgl">
                 <Input id="smp-tgl" type="date" value={draft.s.tanggal} onChange={(e) => set({ tanggal: e.target.value })} />
               </Field>
-              <Field label="Jam ambil" htmlFor="smp-jam">
+              <Field label="Jam uji" htmlFor="smp-jam">
                 <Input id="smp-jam" type="time" value={draft.s.jam} onChange={(e) => set({ jam: e.target.value })} />
               </Field>
               <Field label="Density" htmlFor="smp-d">
@@ -162,12 +164,6 @@ export function Sample2Jam() {
                 <Input id="smp-s" numeric inputMode="decimal" suffix="°C" value={draft.s.suhu} onChange={(e) => set({ suhu: e.target.value })} />
               </Field>
             </div>
-            {jeda !== null && jeda < SAMPLE_JEDA_MENIT && (
-              <div role="alert" className="flex items-start gap-space-sm rounded-md bg-error-container/70 p-space-sm">
-                <Clock aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
-                <span className="text-body-sm font-semibold text-on-error-container">Baru {jeda} menit sejak bongkar selesai. Tunggu sampai {jamBolehSample(draft.r.jamSelesai)}.</span>
-              </div>
-            )}
             <Ladder
               rows={[
                 ['Density @15°C (ASTM 53)', d15 ? formatDensity(d15.value) : '-'],

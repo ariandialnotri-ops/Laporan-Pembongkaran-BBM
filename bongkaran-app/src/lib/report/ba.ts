@@ -85,9 +85,15 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
     const sel = dip !== null && tera !== null ? round(dip - tera, 4) : 0
     set(`L${row}`, sel)
     set(`M${row}`, kap)
+    const kep = c ? n(c.kepekaan) : null
     const mmPerL = c ? n(c.kepekaanMmL ?? '') : null
-    if (dip !== null && tera && mmPerL) {
-      // Kepekaan buku tera (mm/liter): selisih mm / kepekaan.
+    if (dip !== null && tera && kep) {
+      // Kepekaan buku tera (L/mm): selisih liter = selisih mm x kepekaan.
+      const liter = sel * kep
+      totalLoss += liter
+      set(`N${row}`, round(liter, 6), `L${row}*${kep}`)
+    } else if (dip !== null && tera && mmPerL) {
+      // Laporan lama: kepekaan mm per liter.
       const liter = sel / mmPerL
       totalLoss += liter
       set(`N${row}`, round(liter, 6), `L${row}/${mmPerL}`)

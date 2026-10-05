@@ -153,12 +153,12 @@ export function acuanD15(rows: ReportSummary[], produk: string, sampai?: string)
 
 export type KalengStatus = 'sesuai' | 'perhatian' | 'menunggu' | 'belum'
 
-/** Kaleng = satu bongkaran selesai; nilai D15 dari uji sample tangki 2 jam setelah bongkar. */
+/** Kaleng = satu bongkaran selesai; nilai D15 dari sample mobil tangki yang diuji saat bongkar. */
 export type Kaleng = ReportSummary & { d15Sample: number | null; selisih: number | null; ok: boolean | null; menunggu: boolean }
 
 /**
  * Kaleng sample per produk: 3 bongkaran selesai terakhir (kaleng 1 = terbaru).
- * Acuan mutu kaleng adalah hasil sample BBM 2 jam, dibanding D15 dokumen depot.
+ * Isi kaleng adalah sample mobil tangki (uji density saat bongkar), dibanding D15 dokumen depot.
  */
 export function kalengSample(rows: ReportSummary[], plans: Plan[], used: Map<string, ReportSummary>) {
   return PRODUK_OPTIONS.map((produk) => {
@@ -168,10 +168,10 @@ export function kalengSample(rows: ReportSummary[], plans: Plan[], used: Map<str
       .slice(0, 3)
       .map((r) => ({
         ...r,
-        d15Sample: r.sample2Jam?.d15 ?? null,
-        selisih: r.sample2Jam?.selisih ?? null,
-        ok: r.sample2Jam?.ok ?? null,
-        menunggu: !r.sample2Jam,
+        d15Sample: r.d15,
+        selisih: r.d15 !== null && r.d15Depot !== null ? Math.round((r.d15 - r.d15Depot) * 10000) / 10000 : null,
+        ok: r.densityOk ?? null,
+        menunggu: r.d15 === null,
       }))
     const status: KalengStatus = !cans.length
       ? 'belum'

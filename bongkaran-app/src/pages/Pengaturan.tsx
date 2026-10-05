@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
+import { ProteksiSettings } from '@/components/bongkaran/proteksi-settings'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -125,6 +126,13 @@ export function Pengaturan() {
               <Plus aria-hidden="true" />
               Tambah nozzle
             </Button>
+          </GlassCard>
+        </section>
+
+        <section aria-labelledby="proteksi" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <SectionHeader id="proteksi" title="Proteksi Kebakaran" />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <ProteksiSettings />
           </GlassCard>
         </section>
 

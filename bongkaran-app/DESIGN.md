@@ -205,7 +205,8 @@ Peta halaman:
 | | Form bongkaran 14 langkah + Finish | `/input/:id` |
 | | Plan Pengiriman | `/plan` |
 | | Kualitas Harian | `/kualitas` |
-| | Sample BBM 2 Jam | `/sample` |
+| | Uji Kualitas Pasca Penerimaan | `/sample` |
+| | Inspeksi APAR & APAB | `/apar` |
 | Laporan | Menu Laporan (kartu) | `/laporan` |
 | | Catatan Persediaan BBM | `/laporan/persediaan` |
 | | Berita Acara | `/laporan/ba` |
@@ -213,6 +214,7 @@ Peta halaman:
 | | Riwayat Tracking LO | `/laporan/lo` |
 | | Riwayat Kualitas Harian | `/laporan/kualitas` |
 | | Riwayat Tera | `/laporan/tera` |
+| | Riwayat Inspeksi APAR | `/laporan/apar` |
 | Profil | Profil, Kalkulator, Pengaturan SPBU, Anggota | `/profil`, `/kalkulator`, `/pengaturan`, `/anggota` |
 | (tanpa dock) | Login | saat belum masuk |
 
@@ -275,23 +277,23 @@ Urutan **wajib**:
 4. **Rencana vs Realisasi** (plan hari ini, "Target n L"): per produk kotak dengan "x dari y LO dibongkar (z%)", bar dua lapis (padat = dibongkar, pudar = on delivery/delivered), "n L dibongkar (n L berjalan)" vs "n L target".
 5. **Kualitas Harian (D15)**: pill toleransi; per produk kotak dengan garis warna produk, D15 acuan, D15 uji + selisih, pill Sesuai/Tidak sesuai/Belum.
 6. **Kaleng Sample**:
-   - Kartu kepala: ikon, judul, keterangan toleransi, **tombol ⓘ** (pop up ketentuan 4 poin), 4 kotak ringkasan (Sampel sesuai, Ada anomali, Menunggu sample 2 jam, Pembaruan).
+   - Kartu kepala: ikon, judul, keterangan toleransi, **tombol ⓘ** (pop up ketentuan 4 poin), 4 kotak ringkasan (Sampel sesuai, Ada anomali, Belum uji pasca penerimaan, Pembaruan).
    - Kartu akordeon per produk: ikon warna produk, nama + chip spesifikasi, nama tangki; kanan: D15 terkini (selisih), Bongkar terakhir, pill status, chevron.
    - Isi: label "Kiri terbaru, kanan terlama" + status slot; **3 kaleng** (HP: geser ke samping, kartu 85% lebar; layar lebar: 3 kolom).
-     - **Kaleng 1** (terbaru): garis tepi tebal warna produk (merah bila anomali), lencana "Kaleng 1, terbaru" + "Segel sesuai", ilustrasi kaleng, D15 sample 2 jam besar + selisih vs depot, lalu baris **Waktu bongkar, No SO, No LO, Mobil tangki (nopol / komp.)**, tautan "Lihat detail uji".
+     - **Kaleng 1** (terbaru): garis tepi tebal warna produk (merah bila anomali), lencana "Kaleng 1, terbaru" + "Segel sesuai", ilustrasi kaleng, D15 sample mobil tangki (uji saat bongkar) besar + selisih vs depot, lalu baris **Waktu bongkar, No SO, No LO, Mobil tangki (nopol / komp.)**, tautan "Lihat detail uji".
      - **Kaleng 2-3**: versi ringkas; kaleng 3 menampilkan "Retensi: dibuang saat kaleng baru masuk" (amber).
      - **Slot kosong**: garis putus-putus, "Slot kaleng n kosong", tanggal plan kirim berikutnya.
-     - Bila sample 2 jam belum diambil: "Menunggu sample 2 jam" (nada cyan) menggantikan D15.
+     - Isi kaleng = sample mobil tangki saat bongkar; uji pasca penerimaan (tangki pendam) dicatat terpisah.
    - **Pop up detail uji** (judul "Kaleng n Produk", status di atas):
      1. **Data DO Mobil Tangki**: Nomor SO, Nomor LO (tebal), Tanggal & waktu penerimaan (+ selesai bongkar), Supply point, Nopol, Driver (+ pengangkut), Tangki tujuan, tabel Kompartemen-Nomor segel.
-     2. **Parameter Uji Density** (toleransi di kanan): blok *Sample tangki 2 jam (acuan)*, *D15 dokumen depot*, *Uji saat bongkar per kompartemen*. Tiap blok: "Density observe: x g/ml" lalu "Suhu: y °C" di bawahnya, **kotak D15 disorot** di kanan (+ selisih vs depot). Lalu Air & sampel.
+     2. **Parameter Uji Density** (toleransi di kanan): blok *Sample mobil tangki per kompartemen (isi kaleng)*, *D15 dokumen depot*, *Uji kualitas pasca penerimaan (tangki pendam)*. Tiap blok: "Density observe: x g/ml" lalu "Suhu: y °C" di bawahnya, **kotak D15 disorot** di kanan (+ selisih vs depot). Lalu Air & sampel.
      3. **Data Retensi Kaleng Sampel**: posisi kaleng, masa simpan, kondisi segel, petugas sample.
      - Footer: Berita Acara, Tutup.
 7. **LO Tracking**: kartu 6 kotak status (Proses, OS, Planned, On Delivery, Delivered, Closed) + jumlah; ketuk ke Riwayat Tracking LO.
 
 ### 9.3 Menu Input
 - **Bar wajib Stok Awal Shift** paling atas: merah "Isi stok awal Shift n" / netral "Stok awal Shift n terisi".
-- Grid 2 kolom, 4 **MenuCard**: Input Bongkaran, Plan Pengiriman, Kualitas Harian, Sample BBM 2 Jam. Tiap kartu menampilkan status hidup, mis. "1 bongkaran belum selesai", "Plan besok belum dibuat", "Shift 1 belum diuji", "1 siap, 2 menunggu 2 jam".
+- Grid 2 kolom, 5 **MenuCard**: Input Bongkaran, Plan Pengiriman, Kualitas Harian, Uji Kualitas Pasca Penerimaan, Inspeksi APAR & APAB. Tiap kartu menampilkan status hidup, mis. "1 bongkaran belum selesai", "Plan besok belum dibuat", "Shift 1 belum diuji", "1 penerimaan belum diuji", "Bulan ini belum diinspeksi".
 
 ### 9.4 Stok Awal Shift
 - Kartu shift: judul "Shift n (jam)", tanggal, pill Tersimpan/Wajib diisi, pilihan tanggal & shift (Choice).
@@ -310,7 +312,7 @@ Urutan **wajib**:
 |---|---|---|---|
 | 1 | Bongkaran | Foto Mobil Tangki | Foto depan MT, **nopol** |
 | 2 | | Dokumen LO & Data Bongkaran | Foto LO, pilih SO & LO dari Plan, tanggal/jam datang (shift otomatis), driver, pengangkut, Ship To, produk/SO/LO (otomatis), volume DO, density & suhu depot, D15 dokumen, gate out depot, kompartemen |
-| 3 | | Buku Tera Mobil Tangki | Tinggi tera & kapasitas per kompartemen |
+| 3 | | Buku Tera Mobil Tangki | Tinggi T2, kapasitas, kepekaan (L/mm) per kompartemen; selisih liter = kepekaan x selisih mm |
 | 4 | | ATG Sebelum Pembongkaran | Tangki pendam, tinggi/volume/suhu ATG, totalisator awal nozzle |
 | 5 | | Kelengkapan Safety | APAR, arde, atribut safety |
 | 6 | | Segel Kompartemen | Kotak merah daftar segel dari LO, foto, nomor segel per kompartemen, konfirmasi |
@@ -339,13 +341,18 @@ Urutan **wajib**:
 - **Tera takaran (bejana 20 L)**: baris per nozzle: Selisih bejana (ml), Pump test (L), **Simpan per nozzle**, merah bila < -60 ml. Muat semua nozzle / + Nozzle. Langkah terakhir: 2 foto yang sama.
 - Ringkasan pump test + tombol **Selesaikan uji** (ditolak bila ada baris belum disimpan / foto belum ada). Riwayat + DateFilter.
 
-### 9.8 Sample BBM 2 Jam
-- Penjelasan singkat. **Menunggu sampel**: baris bongkaran (produk, nopol, tanggal, selesai bongkar, pill "Siap diambil" merah / "Mulai HH:MM").
-- Ketuk → sheet: tanggal & jam ambil, density, suhu, peringatan bila < 2 jam, tangga (D15 sample, D15 depot, D15 saat bongkar, selisih), petugas, catatan, Simpan.
+### 9.8 Uji Kualitas Pasca Penerimaan
+- Penjelasan singkat (wajib setiap penerimaan, jam diatur petugas). **Belum diuji**: baris bongkaran (produk, nopol, tanggal, selesai bongkar, pill "Wajib diuji" merah).
+- Ketuk → sheet: tanggal & jam uji (harus setelah bongkar selesai), density, suhu, tangga (D15 tangki, D15 depot, D15 saat bongkar, selisih), petugas, catatan, Simpan uji.
+
+### 9.8b Inspeksi APAR & APAB
+- Kartu ringkas (status bulan ini, jumlah pulau, APAR terpasang/cadangan, APAB; ikon ke Pengaturan), tanggal & petugas, status simpan otomatis.
+- Kartu per unit: kode, tipe (APAR/Cadangan/APAB), jenis, kapasitas, lokasi, jadwal isi ulang (merah bila lewat), tombol **Semua butir baik**, butir checklist dengan pilihan Baik/Tidak, catatan (wajib bila ada temuan), foto bukti temuan (wajib bila ada temuan).
+- **Selesaikan inspeksi** (ditolak bila ada butir kosong/temuan tanpa catatan atau foto); setelah selesai: **Buka untuk koreksi**. Daftar inspeksi terakhir.
 - **Sudah diuji**: daftar hasil + pill Sesuai/Tidak sesuai.
 
 ### 9.9 Menu Laporan
-Grid 2 kolom (3 di layar lebar), 6 MenuCard: Catatan Persediaan BBM, Berita Acara (merah bila menunggu tanda tangan), Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera (merah bila ada nozzle di bawah batas).
+Grid 2 kolom (3 di layar lebar), 6 MenuCard: Catatan Persediaan BBM, Berita Acara (merah bila menunggu tanda tangan), Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera (merah bila ada nozzle di bawah batas), Riwayat Inspeksi APAR (merah bila ada unit dengan temuan).
 
 ### 9.10 Halaman laporan (semua memakai RecordTable)
 
@@ -355,13 +362,14 @@ Grid 2 kolom (3 di layar lebar), 6 MenuCard: Catatan Persediaan BBM, Berita Acar
 | **Berita Acara** | DateFilter, 4 kotak status (Semua/Selesai/Anomali/Draft) | BBM, Nopol, Tanggal/Jam, No BA, Volume, Tanda tangan ("Menunggu Pengawas, ABH"), Status |
 | **Riwayat Pembongkaran MT** | DateFilter, chip produk | **Produk, Tgl penerimaan, No SO, No LO, Nopol & supir**, Volume, Transport loss, Discharge loss (L & %), SLA (Req / Gate out), Keterangan (pill), Status, Progress tindakan |
 | **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → **pop up ubah LO** (bukan pindah halaman) |
-| **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Sample 2 jam), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
+| **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Uji pasca penerimaan), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
 | **Riwayat Tera** | DateFilter, chip Semua / Di bawah batas | Tanggal, Shift, Nozzle, BBM, Selisih (ml), Pump test, Status |
+| **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil |
 
 ### 9.11 Profil, Kalkulator, Pengaturan, Anggota
 - **Profil**: kartu identitas (inisial, nama, email, SPBU), 3 StatTile (Selesai, Kepatuhan, Laporan bulan ini), grup **Alat bantu** (Kalkulator), grup **Akun & SPBU** (Pengaturan SPBU, Anggota, Data acuan, Keluar).
 - **Kalkulator**: Density observasi + Suhu → D15 (angka besar); Tangki + Ketinggian → volume dari tabel kalibrasi.
-- **Pengaturan SPBU**: Nama SPBU, Kode, Alamat, logo; nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser** (nama + produk, tambah/hapus); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
+- **Pengaturan SPBU**: Nama SPBU, Kode, Alamat, logo; nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser** (nama + produk, tambah/hapus); **Proteksi Kebakaran** (jumlah pulau pompa, daftar APAR termasuk cadangan, daftar APAB: kode, jenis, kapasitas, lokasi, jadwal isi ulang; tombol 1 APAR per pulau); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
 - **Anggota** (pengawas, mode server): daftar email + peran (pengawas/petugas), tambah/hapus.
 
 ---
@@ -440,9 +448,9 @@ Pertahankan struktur:
 - Dashboard (hanya data, tanpa tombol input), urutan: kartu operasional (tanggal + shift); Status Bongkaran Pekan Ini
   (7 kotak hari: status ikon + titik plan kirim, ketuk = detail); Total Bongkaran per produk (diterima, transport loss,
   discharge loss L & %, SLA request MS2 dan gate out); Plan Pengiriman Hari Ini per produk (progress dibongkar);
-  Kualitas Harian per produk; Kaleng Sample (kartu per produk, 3 kaleng kiri terbaru kanan terlama, D15 sample 2 jam
+  Kualitas Harian per produk; Kaleng Sample (kartu per produk, 3 kaleng kiri terbaru kanan terlama, D15 sample mobil tangki
   vs D15 depot, waktu bongkar, No SO, No LO, mobil tangki; slot kosong; pop up detail uji); LO Tracking (6 status).
-- Menu Input: bar wajib Stok Awal Shift + 4 kartu (Input Bongkaran, Plan Pengiriman, Kualitas Harian, Sample BBM 2 Jam)
+- Menu Input: bar wajib Stok Awal Shift + 5 kartu (Input Bongkaran, Plan Pengiriman, Kualitas Harian, Uji Kualitas Pasca Penerimaan, Inspeksi APAR & APAB)
   dengan status hidup dan lencana merah bila perlu dikerjakan.
 - Menu Laporan: 6 kartu (Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO,
   Riwayat Kualitas Harian, Riwayat Tera); riwayat = tabel di laptop, kartu di HP.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -14,6 +14,7 @@ import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
+import { usePhotoSrc } from '@/lib/use-photo-src'
 import {
   BEJANA_LIMIT_ML,
   bejanaStatus,
@@ -48,27 +49,6 @@ const kuantitasValid = (n: QqKuantitas) => (bejanaStatus(n.selisihMl) === 'koson
 
 function upsert<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
-}
-
-/** URL tampilan foto: dataURL (mode lokal / baru diambil) atau signed URL Supabase. */
-function usePhotoSrc(photos: Photo[]) {
-  const app = useApp()
-  const [urls, setUrls] = useState<Record<string, string>>({})
-  const kunci = photos.map((p) => p.id).join(',')
-  useEffect(() => {
-    const butuh = photos.filter((p) => !p.dataUrl && p.path && !urls[p.id])
-    if (!butuh.length) return
-    let alive = true
-    app.backend
-      .signedUrls(butuh)
-      .then((u) => alive && setUrls((cur) => ({ ...cur, ...u })))
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kunci, app.backend])
-  return (p: Photo) => p.dataUrl || urls[p.id]
 }
 
 /** Input > Kualitas Harian: uji density per produk dan tera bejana 20 L per nozzle, disimpan per baris. */

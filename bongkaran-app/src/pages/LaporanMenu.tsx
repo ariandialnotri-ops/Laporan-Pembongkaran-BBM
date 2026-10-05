@@ -1,8 +1,9 @@
-import { ClipboardList, FileSpreadsheet, FileText, FlaskConical, Ruler, Truck } from 'lucide-react'
+import { ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { useApp } from '@/lib/app-state'
-import { bejanaStatus, type QqRecord } from '@/lib/daily'
+import { hasilCek } from '@/lib/apar'
+import { bejanaStatus, type AparRecord, type QqRecord } from '@/lib/daily'
 import { addDays, todayIso } from '@/lib/date'
 import { loStatus } from '@/lib/plan'
 
@@ -25,6 +26,9 @@ export function LaporanMenu() {
     .sort((a, b) => (a.tanggal + a.shift).localeCompare(b.tanggal + b.shift))
     .forEach((r) => r.data.kuantitas.forEach((n) => n.selisihMl.trim() && terakhir.set(n.nozzleId || n.nozzle, n.selisihMl)))
   const lewat = [...terakhir.values()].filter((v) => bejanaStatus(v) === 'lewat').length
+  // Temuan pada inspeksi APAR & APAB terakhir.
+  const aparTerakhir = app.daily.filter((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
+  const temuanApar = aparTerakhir ? aparTerakhir.data.units.filter((u) => hasilCek(u).temuan.length).length : 0
 
   const menus: MenuItem[] = [
     { to: '/laporan/persediaan', icon: FileSpreadsheet, title: 'Catatan Persediaan BBM', desc: 'Per produk, satu baris per shift', status: 'Unduh Excel atau PDF' },
@@ -38,7 +42,7 @@ export function LaporanMenu() {
     },
     { to: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status', status: `${app.reports.filter((r) => r.tanggal >= bulan).length} bongkaran bulan ini` },
     { to: '/laporan/lo', icon: ClipboardList, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed', status: `${loAktif} LO aktif` },
-    { to: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan sample BBM 2 jam', status: `${ujiKualitas} uji 7 hari terakhir` },
+    { to: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan', status: `${ujiKualitas} uji 7 hari terakhir` },
     {
       to: '/laporan/tera',
       icon: Ruler,
@@ -46,6 +50,14 @@ export function LaporanMenu() {
       desc: 'Bejana 20 L per nozzle',
       status: lewat ? `${lewat} nozzle di bawah batas` : 'Semua nozzle dalam batas',
       badge: lewat,
+    },
+    {
+      to: '/laporan/apar',
+      icon: FireExtinguisher,
+      title: 'Riwayat Inspeksi APAR',
+      desc: 'APAR, APAR cadangan, dan APAB',
+      status: !aparTerakhir ? 'Belum ada inspeksi' : temuanApar ? `${temuanApar} unit ada temuan` : `Terakhir ${aparTerakhir.tanggal.slice(8)}/${aparTerakhir.tanggal.slice(5, 7)}, semua baik`,
+      badge: temuanApar,
     },
   ]
 

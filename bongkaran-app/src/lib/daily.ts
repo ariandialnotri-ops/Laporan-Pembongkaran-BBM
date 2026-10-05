@@ -7,6 +7,7 @@ import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import type { Shift } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
+import type { AparData } from '@/lib/apar'
 
 export interface StokItem {
   /** Ketinggian ATG/deepstick (mm). */
@@ -77,7 +78,8 @@ interface DailyBase {
 }
 export type StokRecord = DailyBase & { kind: 'stok'; data: StokData }
 export type QqRecord = DailyBase & { kind: 'qq'; data: QqData }
-export type DailyRecord = StokRecord | QqRecord
+export type AparRecord = DailyBase & { kind: 'apar'; data: AparData }
+export type DailyRecord = StokRecord | QqRecord | AparRecord
 
 /** Toleransi uji bejana 20 liter: selisih di bawah -60 ml ditandai. */
 export const BEJANA_LIMIT_ML = -60
