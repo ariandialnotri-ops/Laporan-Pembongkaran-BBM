@@ -10,7 +10,7 @@ export function AppHeader() {
   const navigate = useNavigate()
 
   return (
-    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
+    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
           {/* Halaman turunan: tombol kembali ke menu induk menggantikan logo. */}

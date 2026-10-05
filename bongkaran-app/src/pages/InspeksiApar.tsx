@@ -29,7 +29,8 @@ export function InspeksiApar() {
   const app = useApp()
   const toast = useToast()
   useSyncOnOpen()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
+  const fokusId = params.get('unit')
   const [tanggal, setTanggal] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(params.get('tanggal') ?? '') ? params.get('tanggal')! : todayIso()))
   const id = aparRecordId(tanggal)
   const records = useMemo(() => app.daily.filter((d): d is AparRecord => d.kind === 'apar'), [app.daily])
@@ -143,13 +144,13 @@ export function InspeksiApar() {
   }
 
   const selesaikan = async () => {
-    if (!data.units.length) return setError('Belum ada unit APAR/APAB. Atur dulu di Pengaturan, Proteksi Kebakaran.')
+    if (!data.units.length) return setError('Belum ada unit APAR/APAB. Atur dulu di Data utama APAR & APAB.')
     if (!data.petugas.trim()) return setError('Isi nama petugas inspeksi.')
     for (const u of data.units) {
       const h = hasilCek(u)
       if (h.kosong.length) return setError(`${u.kode || 'Unit'}: ${h.kosong.length} butir belum diperiksa.`)
       if (h.temuan.length && !u.catatan.trim()) return setError(`${u.kode || 'Unit'}: tulis catatan tindak lanjut temuan.`)
-      if (h.temuan.length && !u.foto.length) return setError(`${u.kode || 'Unit'}: foto bukti temuan wajib.`)
+      if (!u.foto.length) return setError(`${u.kode || 'Unit'}: foto kondisi unit wajib diunggah.`)
     }
     setBusy('selesai')
     // Batalkan simpan otomatis yang tertunda agar tidak menimpa status selesai.
@@ -171,7 +172,19 @@ export function InspeksiApar() {
   const bulan = todayIso().slice(0, 7)
   const bulanIni = records.filter((r) => r.data.selesaiAt && r.tanggal.startsWith(bulan)).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
   const temuanTotal = data.units.reduce((n, u) => n + hasilCek(u).temuan.length, 0)
-  const lengkap = data.units.filter((u) => !hasilCek(u).kosong.length).length
+  const unitLengkap = (u: AparCek) => !hasilCek(u).kosong.length && u.foto.length > 0
+  const lengkap = data.units.filter(unitLengkap).length
+  // Mode satu unit (dibuka dari label QR): hanya unit itu yang ditampilkan.
+  const fokus = data.units.find((u) => u.unitId === fokusId) ?? null
+  const tampil = fokusId ? (fokus ? [fokus] : []) : data.units
+  const berikut = data.units.find((u) => u.unitId !== fokusId && !unitLengkap(u))
+  const keUnit = (uid: string | null) => {
+    const next = new URLSearchParams(params)
+    if (uid) next.set('unit', uid)
+    else next.delete('unit')
+    setParams(next, { replace: true })
+    window.scrollTo(0, 0)
+  }
   const riwayat = records.filter((r) => r.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal)).slice(0, 6)
   const hariIni = todayIso()
 
@@ -188,7 +201,7 @@ export function InspeksiApar() {
               {s.jumlahPulau || 0} pulau pompa, {(s.apar ?? []).filter((u) => !u.cadangan).length} APAR terpasang, {(s.apar ?? []).filter((u) => u.cadangan).length} cadangan, {(s.apab ?? []).length} APAB
             </span>
           </div>
-          <Link to="/pengaturan#proteksi" aria-label="Atur unit APAR & APAB" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+          <Link to="/apar/data" aria-label="Atur unit APAR & APAB" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
             <Settings2 aria-hidden="true" />
           </Link>
         </div>
@@ -212,15 +225,32 @@ export function InspeksiApar() {
       {data.units.length === 0 ? (
         <GlassCard level={1} className="flex flex-col items-center gap-space-sm p-space-md text-center">
           <span className="text-body-sm text-on-surface-variant">Belum ada unit APAR/APAB. Isi jumlah pulau dan daftar APAR, APAR cadangan, dan APAB di profil SPBU.</span>
-          <Link to="/pengaturan#proteksi" className={buttonVariants({ size: 'pill' })}>
+          <Link to="/apar/data" className={buttonVariants({ size: 'pill' })}>
             <Settings2 aria-hidden="true" />
-            Atur proteksi kebakaran
+            Atur data utama
           </Link>
         </GlassCard>
       ) : (
         <section aria-labelledby="apar-unit" className="animate-entrance-2 flex flex-col gap-space-sm">
-          <SectionHeader id="apar-unit" title="Checklist per unit" action={selesai ? <Pill tone="success">Selesai</Pill> : undefined} />
-          {data.units.map((u) => (
+          <SectionHeader
+            id="apar-unit"
+            title={fokusId ? `Inspeksi ${fokus?.kode ?? 'unit'}` : 'Checklist per unit'}
+            action={
+              fokusId ? (
+                <button type="button" onClick={() => keUnit(null)} className="touch-44 text-body-sm font-semibold text-primary">
+                  Semua unit
+                </button>
+              ) : selesai ? (
+                <Pill tone="success">Selesai</Pill>
+              ) : undefined
+            }
+          />
+          {fokusId && !fokus && (
+            <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+              Unit dari label QR ini tidak ada di data utama (mungkin sudah dihapus).
+            </GlassCard>
+          )}
+          {tampil.map((u) => (
             <UnitCard
               key={u.unitId}
               u={u}
@@ -235,6 +265,18 @@ export function InspeksiApar() {
               onHapusFoto={(i) => hapusFoto(u, i)}
             />
           ))}
+          {fokusId && fokus && !selesai && (
+            <div className="flex flex-col gap-space-xs">
+              {berikut ? (
+                <Button variant="soft" size="lg" onClick={() => keUnit(berikut.unitId)}>
+                  Unit berikutnya: {berikut.kode} ({berikut.lokasi || '-'})
+                </Button>
+              ) : (
+                <span className="text-center text-body-sm font-semibold text-on-surface">Semua unit sudah diperiksa. Selesaikan inspeksi di bawah.</span>
+              )}
+              <span className="text-center text-body-sm text-on-surface-variant">Atau pindai label QR unit berikutnya.</span>
+            </div>
+          )}
           <Field label="Catatan umum (opsional)" htmlFor="apar-catatan">
             <Input id="apar-catatan" disabled={selesai} value={data.catatan} onChange={(e) => setData({ catatan: e.target.value })} />
           </Field>
@@ -309,7 +351,7 @@ function UnitCard({
   const h = hasilCek(u)
   const exp = statusKedaluwarsa(u.kedaluwarsa, hariIni)
   return (
-    <GlassCard level={2} className={cn('flex flex-col gap-space-sm p-space-md', h.temuan.length > 0 && 'ring-1 ring-error/40')}>
+    <GlassCard id={`unit-${u.unitId}`} level={2} className={cn('flex scroll-mt-24 flex-col gap-space-sm p-space-md', h.temuan.length > 0 && 'ring-1 ring-error/40')}>
       <div className="flex items-start gap-space-sm">
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -326,7 +368,7 @@ function UnitCard({
             </span>
           )}
         </div>
-        {h.kosong.length === 0 ? (
+        {h.kosong.length === 0 && u.foto.length > 0 ? (
           h.temuan.length ? (
             <Pill tone="error">{h.temuan.length} temuan</Pill>
           ) : (
@@ -336,7 +378,7 @@ function UnitCard({
             </Pill>
           )
         ) : (
-          <Pill>{h.kosong.length} belum</Pill>
+          <Pill>{h.kosong.length ? `${h.kosong.length} belum` : 'Foto belum'}</Pill>
         )}
       </div>
       {!readOnly && h.kosong.length > 0 && (
@@ -379,9 +421,15 @@ function UnitCard({
       <Field label={h.temuan.length ? 'Tindak lanjut temuan (wajib)' : 'Catatan (opsional)'} htmlFor={`apar-cat-${u.unitId}`}>
         <Input id={`apar-cat-${u.unitId}`} disabled={readOnly} placeholder={h.temuan.length ? 'Mis. diganti pin baru, isi ulang dijadwalkan' : ''} value={u.catatan} onChange={(e) => onCatatan(e.target.value)} />
       </Field>
-      {(h.temuan.length > 0 || u.foto.length > 0) && (
-        <PhotoSlot label="Foto bukti temuan" photos={u.foto} required={h.temuan.length > 0} busy={busy} disabled={readOnly} srcOf={srcOf} onAdd={onFoto} onRemove={onHapusFoto} />
-      )}
+      <PhotoSlot
+        label={h.temuan.length ? 'Foto kondisi unit & bukti temuan' : 'Foto kondisi unit'}
+        photos={u.foto}
+        busy={busy}
+        disabled={readOnly}
+        srcOf={srcOf}
+        onAdd={onFoto}
+        onRemove={onHapusFoto}
+      />
     </GlassCard>
   )
 }

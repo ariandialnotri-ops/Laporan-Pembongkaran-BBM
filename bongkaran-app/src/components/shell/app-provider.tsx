@@ -5,6 +5,7 @@ import type { DailyRecord } from '@/lib/daily'
 import { addDays, todayIso } from '@/lib/date'
 import { DEFAULT_RULES, effectiveRules, type Plan, type ReportSummary, type Settings } from '@/lib/sop'
 import { TANK_SPBU } from '@/lib/tank'
+import { DEFAULT_AREAS } from '@/lib/apar'
 
 const DEFAULT_SETTINGS: Settings = {
   namaSpbu: TANK_SPBU,
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: Settings = {
   perusahaanPengangkut: 'PERTAMINA PATRA NIAGA',
   nozzles: [],
   jumlahPulau: 0,
+  aparArea: DEFAULT_AREAS,
   apar: [],
   apab: [],
   rules: DEFAULT_RULES,

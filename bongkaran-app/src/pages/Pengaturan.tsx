@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { FireExtinguisher, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
-import { ProteksiSettings } from '@/components/bongkaran/proteksi-settings'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
@@ -132,7 +131,14 @@ export function Pengaturan() {
         <section aria-labelledby="proteksi" className="animate-entrance-2 flex flex-col gap-space-sm">
           <SectionHeader id="proteksi" title="Proteksi Kebakaran" />
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-            <ProteksiSettings />
+            <span className="tabular text-body-sm text-on-surface">
+              {s.jumlahPulau || 0} pulau pompa, {(s.apar ?? []).filter((u) => !u.cadangan).length} APAR terpasang, {(s.apar ?? []).filter((u) => u.cadangan).length} cadangan, {(s.apab ?? []).length} APAB,{' '}
+              {(s.aparArea ?? []).length} area
+            </span>
+            <Link to="/apar/data" className={buttonVariants({ variant: 'soft', size: 'sm' }) + ' self-start'}>
+              <FireExtinguisher aria-hidden="true" />
+              Buka data utama APAR & APAB
+            </Link>
           </GlassCard>
         </section>
 

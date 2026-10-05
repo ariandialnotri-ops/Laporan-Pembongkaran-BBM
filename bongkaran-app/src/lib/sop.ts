@@ -288,6 +288,8 @@ export interface Settings {
   nozzles: Nozzle[]
   /** Proteksi kebakaran: jumlah pulau pompa, APAR (termasuk cadangan), dan APAB. */
   jumlahPulau: number
+  /** Data utama area/lokasi APAR selain pulau pompa. */
+  aparArea: string[]
   apar: AparUnit[]
   apab: AparUnit[]
   rules: Rules

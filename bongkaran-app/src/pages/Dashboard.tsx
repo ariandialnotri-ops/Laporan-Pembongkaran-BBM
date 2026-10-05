@@ -8,6 +8,7 @@ import {
   CircleCheck,
   ClipboardCheck,
   Ellipsis,
+  FireExtinguisher,
   FlaskConical,
   Gauge,
   Minus,
@@ -24,7 +25,8 @@ import { QQPill } from '@/components/bongkaran/qq-pill'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
-import { bejanaStatus, qqD15, type QqKualitas, type QqRecord } from '@/lib/daily'
+import { kondisiSemua } from '@/lib/apar'
+import { bejanaStatus, qqD15, type AparRecord, type QqKualitas, type QqRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
@@ -132,6 +134,9 @@ export function Dashboard() {
   const tol = app.rules.densityTolerance + 1e-9
   const loTotal = LO_DASH.reduce((n, x) => n + (loCounts.get(x.key) ?? 0), 0)
   const isToday = range.preset === 'today'
+  const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
+  const aparTemuan = apar.filter((k) => k.status === 'temuan').length
+  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat').length
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -408,6 +413,41 @@ export function Dashboard() {
           ))}
         </div>
       </Kartu>
+
+      {/* 8. Proteksi kebakaran (APAR & APAB) */}
+      {apar.length > 0 && (
+        <Kartu
+          id="proteksi"
+          icon={FireExtinguisher}
+          title="Proteksi Kebakaran"
+          sub="Kondisi APAR & APAB dari inspeksi terakhir"
+          className="animate-entrance-5"
+          action={
+            <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+              {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
+              <span className="text-[10px] font-bold uppercase text-emerald-700">Baik</span>
+              <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
+            </Link>
+            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+              <span className={cn('text-[10px] font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
+              <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
+            </Link>
+            <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
+              <span className="text-[10px] font-bold uppercase text-amber-700">Belum bulan ini</span>
+              <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
+            </Link>
+            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+              <span className={cn('text-[10px] font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang lewat</span>
+              <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
+            </Link>
+          </div>
+        </Kartu>
+      )}
 
       <DetailHari iso={hari} onClose={() => setHari(null)} />
     </div>

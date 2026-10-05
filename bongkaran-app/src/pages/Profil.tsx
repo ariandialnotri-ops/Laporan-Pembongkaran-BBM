@@ -73,7 +73,7 @@ export function Profil() {
         <GlassCard level={2} className="flex flex-col p-space-2xs">
           <MenuRow to="/pengaturan" icon={Settings2} label={app.canManage ? 'Pengaturan SPBU' : 'Info SPBU & Aturan'} />
           {remote && app.canManage && <MenuRow to="/anggota" icon={Users} label="Anggota SPBU" />}
-          <MenuRow to="/pengaturan#proteksi" icon={FireExtinguisher} label="Proteksi Kebakaran (pulau, APAR, APAB)" />
+          <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (pulau, area, unit)" />
           <MenuRow to="/pengaturan#data-acuan" icon={Database} label="Data Acuan Tabel" />
           {remote && <MenuRow icon={LogOut} label="Keluar" danger onClick={() => void app.signOut()} />}
         </GlassCard>

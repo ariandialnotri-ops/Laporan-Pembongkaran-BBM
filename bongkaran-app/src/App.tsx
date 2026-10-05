@@ -15,6 +15,10 @@ const Anggota = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.A
 const BeritaAcara = lazy(() => import('@/pages/BeritaAcara').then((m) => ({ default: m.BeritaAcara })))
 const FormBongkar = lazy(() => import('@/pages/FormBongkar').then((m) => ({ default: m.FormBongkar })))
 const FormInput = lazy(() => import('@/pages/FormInput').then((m) => ({ default: m.FormInput })))
+const AparDashboard = lazy(() => import('@/pages/AparDashboard').then((m) => ({ default: m.AparDashboard })))
+const AparLabel = lazy(() => import('@/pages/AparLabel').then((m) => ({ default: m.AparLabel })))
+const AparUnit = lazy(() => import('@/pages/AparUnit').then((m) => ({ default: m.AparUnit })))
+const DataUtamaApar = lazy(() => import('@/pages/DataUtamaApar').then((m) => ({ default: m.DataUtamaApar })))
 const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
@@ -56,7 +60,11 @@ function Gate() {
           <Route path="/kualitas" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
           <Route path="/stok" element={<StokShift />} />
-          <Route path="/apar" element={<InspeksiApar />} />
+          <Route path="/apar" element={<AparDashboard />} />
+          <Route path="/apar/inspeksi" element={<InspeksiApar />} />
+          <Route path="/apar/data" element={<DataUtamaApar />} />
+          <Route path="/apar/label" element={<AparLabel />} />
+          <Route path="/apar/unit/:id" element={<AparUnit />} />
           <Route path="/laporan" element={<LaporanMenu />} />
           <Route path="/laporan/persediaan" element={<Persediaan />} />
           <Route path="/laporan/ba" element={<BeritaAcara />} />

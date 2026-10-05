@@ -48,7 +48,11 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk mengisi nomor SO lalu nomor LO, status, dan segel. Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
-| | `/apar` | Inspeksi APAR & APAB: checklist per unit (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), tersimpan otomatis; temuan wajib catatan tindak lanjut + foto |
+| | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, per area, daftar unit; tombol Mulai inspeksi, Pindai QR, Label QR, Data utama |
+| | `/apar/inspeksi` | Inspeksi: checklist per unit (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB) + **foto kondisi tiap unit (wajib)**, tersimpan otomatis; temuan wajib catatan tindak lanjut. `?unit=` = mode satu unit (dari QR) dengan tombol unit berikutnya |
+| | `/apar/data` | Data utama: jumlah pulau pompa, **area/lokasi (tambah/hapus)**, APAR (termasuk cadangan) dan APAB: kode, jenis, kapasitas, lokasi, jadwal isi ulang |
+| | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung |
+| | `/apar/unit/:id` | Tujuan QR: data unit, kondisi terakhir (temuan, catatan, foto), riwayat, tombol Inspeksi unit ini |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |
@@ -59,13 +63,15 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
 | Profil | `/profil` | Akun, statistik, Kalkulator, Pengaturan, Anggota |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
-| | `/pengaturan` | Identitas SPBU, nama default, perusahaan pengangkut, nozzle dispenser, **proteksi kebakaran** (jumlah pulau pompa, APAR termasuk cadangan, APAB: kode, jenis, kapasitas, lokasi, jadwal isi ulang), toleransi, data acuan |
+| | `/pengaturan` | Identitas SPBU, nama default, perusahaan pengangkut, nozzle dispenser, ringkasan proteksi kebakaran (tautan ke Data utama APAR & APAB), toleransi, data acuan |
 | | `/anggota` | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
 
 Uji Kualitas Pasca Penerimaan disimpan di data bongkaran (`report.data.sample2Jam`, ringkasan
 `summary.sample2Jam`), tanpa tabel baru. Kaleng Sample di Dashboard berisi sampel
 mobil tangki yang diuji saat bongkar (D15 MT vs D15 depot), terpisah dari uji pasca penerimaan.
-Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`; daftar unit ada di pengaturan.
+Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`; data utama (pulau, area, unit) ada di pengaturan.
+Label QR berisi alamat `https://<domain aplikasi>/apar/unit/<id>`: cetak label dari aplikasi produksi agar QR mengarah ke domain yang benar.
+Pemindai di aplikasi memakai BarcodeDetector (Chrome Android); bila tidak didukung, pindai dengan aplikasi kamera HP atau ketik kode unit.
 
 ## Alur SOP bongkaran
 

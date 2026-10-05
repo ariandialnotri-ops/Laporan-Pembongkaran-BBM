@@ -64,9 +64,9 @@ export function InputMenu() {
     {
       to: '/apar',
       icon: FireExtinguisher,
-      title: 'Inspeksi APAR & APAB',
-      desc: 'Pemeriksaan alat pemadam per unit, termasuk cadangan',
-      status: !unitApar ? 'Atur unit di Pengaturan SPBU' : aparBulanIni ? `Bulan ini sudah (${aparBulanIni.tanggal.slice(8)}/${aparBulanIni.tanggal.slice(5, 7)})` : 'Bulan ini belum diinspeksi',
+      title: 'APAR & APAB',
+      desc: 'Dashboard, inspeksi per unit dengan foto, dan label QR',
+      status: !unitApar ? 'Isi data utama (pulau, area, unit)' : aparBulanIni ? `Bulan ini sudah (${aparBulanIni.tanggal.slice(8)}/${aparBulanIni.tanggal.slice(5, 7)})` : 'Bulan ini belum diinspeksi',
       badge: unitApar && !aparBulanIni ? 1 : 0,
     },
   ]

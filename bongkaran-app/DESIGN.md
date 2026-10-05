@@ -345,11 +345,13 @@ Urutan **wajib**:
 - Penjelasan singkat (wajib setiap penerimaan, jam diatur petugas). **Belum diuji**: baris bongkaran (produk, nopol, tanggal, selesai bongkar, pill "Wajib diuji" merah).
 - Ketuk → sheet: tanggal & jam uji (harus setelah bongkar selesai), density, suhu, tangga (D15 tangki, D15 depot, D15 saat bongkar, selisih), petugas, catatan, Simpan uji.
 
-### 9.8b Inspeksi APAR & APAB
-- Kartu ringkas (status bulan ini, jumlah pulau, APAR terpasang/cadangan, APAB; ikon ke Pengaturan), tanggal & petugas, status simpan otomatis.
-- Kartu per unit: kode, tipe (APAR/Cadangan/APAB), jenis, kapasitas, lokasi, jadwal isi ulang (merah bila lewat), tombol **Semua butir baik**, butir checklist dengan pilihan Baik/Tidak, catatan (wajib bila ada temuan), foto bukti temuan (wajib bila ada temuan).
-- **Selesaikan inspeksi** (ditolak bila ada butir kosong/temuan tanpa catatan atau foto); setelah selesai: **Buka untuk koreksi**. Daftar inspeksi terakhir.
-- **Sudah diuji**: daftar hasil + pill Sesuai/Tidak sesuai.
+### 9.8b APAR & APAB
+- **Dashboard** (`/apar`): kartu kepala (ikon, jumlah pulau/APAR/cadangan/APAB; tombol Mulai/Lanjutkan inspeksi, Pindai QR, Label QR, Data utama), 4 kotak (Kondisi baik x/n, Ada temuan, Belum bulan ini, Isi ulang), daftar **Per area** (unit & status), **Daftar unit** dengan chip saring (Semua, Temuan, Belum bulan ini, Isi ulang) yang menuju halaman unit.
+- **Inspeksi** (`/apar/inspeksi`): tanggal & petugas, status simpan otomatis; kartu per unit (kode, tipe, jenis, kapasitas, lokasi, isi ulang), **Semua butir baik**, butir Baik/Tidak, catatan (wajib bila temuan), **foto kondisi unit (wajib)**. Mode `?unit=` menampilkan satu unit + tombol **Unit berikutnya**. **Selesaikan inspeksi** / **Buka untuk koreksi**.
+- **Data utama** (`/apar/data`): jumlah pulau, daftar area (pulau otomatis; area lain bisa ditambah/dihapus bila tidak dipakai unit), daftar APAR (cadangan) & APAB.
+- **Label QR** (`/apar/label`): kartu label bergaris putus (QR, nama SPBU, kode, tipe/jenis/kapasitas, lokasi), tombol Cetak / simpan PDF; header & dock disembunyikan saat cetak.
+- **Unit** (`/apar/unit/:id`, tujuan QR): QR + data unit, chip isi ulang, **Inspeksi unit ini**, Kondisi terakhir (temuan, catatan, foto), Riwayat inspeksi.
+- Dashboard utama: kartu **Proteksi Kebakaran** (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat).
 
 ### 9.9 Menu Laporan
 Grid 2 kolom (3 di layar lebar), 6 MenuCard: Catatan Persediaan BBM, Berita Acara (merah bila menunggu tanda tangan), Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera (merah bila ada nozzle di bawah batas), Riwayat Inspeksi APAR (merah bila ada unit dengan temuan).

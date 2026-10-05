@@ -70,7 +70,7 @@ export function RiwayatApar() {
           total={all.length}
           cols={COLS}
           rowKey={(x) => x.key}
-          onRow={(x) => navigate(`/apar?tanggal=${x.tanggal}`)}
+          onRow={(x) => navigate(`/apar/inspeksi?tanggal=${x.tanggal}&unit=${encodeURIComponent(x.u.unitId)}`)}
           empty="Belum ada inspeksi selesai pada rentang ini."
         />
       </div>
