@@ -528,6 +528,12 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
+/* Sheet padat: isi halaman di belakang tidak tembus (Android tanpa blur), dan lebih ringan. */
+.sheet-content {
+  background: var(--surface-container-lowest);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .sheet-content[data-state='open'] { animation: sheetIn 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
 .sheet-content[data-state='closed'] { animation: sheetOut 0.2s cubic-bezier(0.4, 0, 1, 1); }
 .sheet-overlay[data-state='open'] { animation: fadeIn 0.25s ease-out; }

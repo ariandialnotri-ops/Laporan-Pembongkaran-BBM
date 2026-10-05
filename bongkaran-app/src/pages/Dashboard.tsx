@@ -23,7 +23,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
-import { useApp } from '@/lib/app-state'
+import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { bejanaStatus, qqD15, type QqKualitas, type QqRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
@@ -82,6 +82,7 @@ export function Dashboard() {
     return c
   }, [app.plans, app.usedLoIds])
 
+  useSyncOnOpen()
   if (!app.loaded) return <Loading />
 
   const hariIni = todayIso(now)

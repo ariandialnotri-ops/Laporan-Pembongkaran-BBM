@@ -90,19 +90,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [status, userId, refresh])
 
-  // Data dari perangkat lain: muat ulang saat aplikasi kembali dibuka,
-  // paling sering sekali per menit (kembali dari kamera juga memicu focus).
+  // Data dari perangkat lain (akun sama, HP/PC berbeda): muat ulang saat aplikasi
+  // kembali tampil, saat online lagi, saat halaman plan/LO dibuka, dan tiap 60 detik
+  // selama aplikasi terlihat. Jeda minimal 10 detik agar hemat kuota & baterai.
+  const lastSync = useRef(0)
+  const sync = useCallback(() => {
+    if (backend.mode !== 'supabase' || Date.now() - lastSync.current < 10_000) return
+    lastSync.current = Date.now()
+    void refresh().catch(() => {})
+  }, [refresh])
   useEffect(() => {
     if (backend.mode !== 'supabase' || !loaded) return
-    let last = Date.now()
-    const onFocus = () => {
-      if (Date.now() - last < 60_000) return
-      last = Date.now()
-      void refresh().catch(() => {})
+    lastSync.current = Date.now()
+    const onShow = () => document.visibilityState === 'visible' && sync()
+    window.addEventListener('focus', onShow)
+    window.addEventListener('online', onShow)
+    document.addEventListener('visibilitychange', onShow)
+    const t = setInterval(onShow, 60_000)
+    return () => {
+      window.removeEventListener('focus', onShow)
+      window.removeEventListener('online', onShow)
+      document.removeEventListener('visibilitychange', onShow)
+      clearInterval(t)
     }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [loaded, refresh])
+  }, [loaded, sync])
 
   // Pengaturan disimpan dengan jeda agar tidak setiap ketikan.
   const updateSettings = useCallback((patch: Partial<Settings>) => {
@@ -220,13 +231,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteDaily,
       usedLoIds,
       refresh,
+      sync,
       retrySession: () => void initSession(),
       signIn,
       signOut,
       // Bongkaran selesai (closed) tidak dapat dihapus siapa pun.
       canDeleteReport: (r) => r.status !== 'selesai' && (canManage || (r.status === 'draft' && !!userId && r.createdBy === userId)),
     }
-  }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, daily, saveDaily, deleteDaily, refresh, initSession, signIn, signOut, userId])
+  }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, daily, saveDaily, deleteDaily, refresh, sync, initSession, signIn, signOut, userId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

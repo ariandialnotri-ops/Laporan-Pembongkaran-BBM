@@ -45,7 +45,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi tera, tinggi T2, kapasitas, kepekaan (mm/liter) dari buku tera MT. Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet) dengan shift per produk; tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk ubah LO, ubah SO & MS2, atau tambah LO. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk ubah LO, ubah SO & MS2, atau tambah LO. Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Sample BBM 2 Jam: uji density tangki pendam minimal 2 jam setelah bongkar selesai, dibanding D15 depot |
 | Laporan | `/laporan` | Kartu laporan: |
@@ -138,6 +138,10 @@ src/
 
 Tanpa env Supabase aplikasi berjalan di **mode lokal** (data disimpan di
 IndexedDB perangkat). Dengan env terisi, data tersinkron dan wajib login.
+
+Data dari perangkat lain (akun sama, HP/PC berbeda) dimuat ulang otomatis saat
+aplikasi kembali tampil, saat koneksi kembali online, saat Dashboard / Plan /
+Tracking LO dibuka, dan tiap 60 detik selama aplikasi terbuka (jeda minimal 10 detik).
 
 Skema yang dipakai aplikasi ada di
 `supabase/migrations/20260926120000_bbm_init.sql`,

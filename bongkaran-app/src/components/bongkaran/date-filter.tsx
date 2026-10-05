@@ -25,13 +25,21 @@ export function rangeOf(preset: DatePreset, now = new Date()): DateRange {
   const today = todayIso(now)
   if (preset === 'today') return { preset, from: today, to: today }
   if (preset === '7d') return { preset, from: todayIso(addDays(now, -6)), to: today }
-  if (preset === 'month') return { preset, from: `${today.slice(0, 8)}01`, to: today }
+  if (preset === 'month') return { preset, from: `${today.slice(0, 8)}01`, to: todayIso(new Date(now.getFullYear(), now.getMonth() + 1, 0)) }
   return { preset, from: '', to: '' }
 }
 
 export function inRange(iso: string, r: DateRange) {
   if (!iso) return r.preset === 'all'
   return (!r.from || iso >= r.from) && (!r.to || iso <= r.to)
+}
+
+/**
+ * Untuk plan & LO: rentang terpilih, ditambah semua plan dengan tanggal kirim
+ * setelah hari ini (plan besok dst. selalu tampil, kecuali rentang bebas).
+ */
+export function inRangeOrUpcoming(iso: string, r: DateRange, now = new Date()) {
+  return inRange(iso, r) || (r.preset !== 'custom' && !!iso && iso > todayIso(now))
 }
 
 export function useDateRange(initial: DatePreset = 'month') {

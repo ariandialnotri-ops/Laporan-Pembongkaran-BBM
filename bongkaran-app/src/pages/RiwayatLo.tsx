@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Lock } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
-import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
+import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
 import { LoEditSheet, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
 import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { useApp } from '@/lib/app-state'
+import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
 import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
@@ -56,12 +56,13 @@ export function RiwayatLo() {
   const [range, setRange] = useDateRange('month')
   const [status, setStatus] = useState<'semua' | LoDisplayStatus>('semua')
   const [edit, setEdit] = useState<LoTarget | null>(null)
+  useSyncOnOpen()
   if (!app.loaded) return <Loading />
 
   const all: Row[] = app.plans
     .flatMap((plan) => plan.los.map((lo) => ({ plan, lo, status: loStatus(lo, app.usedLoIds), report: app.usedLoIds.get(lo.id) })))
     .sort((a, b) => b.plan.tanggal.localeCompare(a.plan.tanggal) || b.plan.createdAt - a.plan.createdAt)
-  const inDate = all.filter((x) => inRange(x.plan.tanggal, range))
+  const inDate = all.filter((x) => inRangeOrUpcoming(x.plan.tanggal, range))
   const rows = status === 'semua' ? inDate : inDate.filter((x) => x.status === status)
   const n = (k: LoDisplayStatus) => inDate.filter((x) => x.status === k).length
 
@@ -76,7 +77,7 @@ export function RiwayatLo() {
           options={[{ value: 'semua' as const, label: `Semua ${inDate.length}` }, ...LO_STATUS.map((s) => ({ value: s.key, label: `${s.label} ${n(s.key)}` }))]}
         />
         <span className="text-body-sm text-on-surface-variant">
-          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
+          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Plan dengan tanggal kirim mendatang selalu tampil. Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
         </span>
       </GlassCard>
       <div className="animate-entrance-2">

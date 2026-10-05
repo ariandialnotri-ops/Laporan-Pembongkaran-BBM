@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import type { Backend, SessionInfo } from '@/lib/backend'
 import type { DailyRecord } from '@/lib/daily'
 import type { Plan, ReportSummary, Rules, Settings } from '@/lib/sop'
@@ -34,6 +34,8 @@ export interface AppState {
   /** LO yang sudah dipakai laporan lain: loId -> ringkasan laporan. */
   usedLoIds: Map<string, ReportSummary>
   refresh: () => Promise<void>
+  /** Muat ulang data dari server bila terakhir dimuat lebih dari 10 detik lalu. */
+  sync: () => void
 
   retrySession: () => void
   signIn: (email: string, password: string) => Promise<void>
@@ -47,4 +49,10 @@ export function useApp() {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('useApp harus dipakai di dalam AppProvider')
   return ctx
+}
+
+/** Ambil data terbaru dari server saat halaman dibuka (data dari perangkat lain). */
+export function useSyncOnOpen() {
+  const { sync } = useApp()
+  useEffect(() => sync(), [sync])
 }

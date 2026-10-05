@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight, CalendarClock, ClipboardList, Lock, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
-import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
+import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, LoEditSheet, ProdukSelect, SupplySelect, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
 import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
-import { useApp } from '@/lib/app-state'
+import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
@@ -102,17 +102,6 @@ function PlanFields({ form, set, idp, withSo }: { form: PlanForm; set: (p: Parti
       <Field label="Jam permintaan MS2" htmlFor={`${idp}-ms2j`}>
         <Input id={`${idp}-ms2j`} type="time" value={form.ms2Jam} onChange={(e) => set({ ms2Jam: e.target.value })} />
       </Field>
-      <Field label="Shift permintaan" className="col-span-2">
-        <Choice
-          label="Shift permintaan"
-          value={form.ms2Shift}
-          onChange={(v) => set({ ms2Shift: v })}
-          options={[
-            { value: '1', label: 'Shift 1' },
-            { value: '2', label: 'Shift 2' },
-          ]}
-        />
-      </Field>
       <Field label="No. Ship To" htmlFor={`${idp}-ship`}>
         <Input id={`${idp}-ship`} autoComplete="off" inputMode="numeric" value={form.shipTo} onChange={(e) => set({ shipTo: e.target.value })} />
       </Field>
@@ -131,7 +120,6 @@ function PlanFields({ form, set, idp, withSo }: { form: PlanForm; set: (p: Parti
 function validatePlan(f: PlanForm) {
   if (!f.tanggal) return 'Isi tanggal kirim.'
   if (!f.ms2Tanggal || !f.ms2Jam) return 'Isi tanggal dan jam permintaan lewat MS2.'
-  if (!f.ms2Shift) return 'Pilih shift permintaan.'
   if (!f.supplyPoint) return 'Pilih supply point.'
   if (!f.shipTo.trim()) return 'Isi nomor Ship To.'
   return null
@@ -144,6 +132,7 @@ export function Plan() {
   const [rows, setRows] = useState<Row[]>(() => [blankRow()])
   const [error, setError] = useState<string | null>(null)
   const [baru, setBaru] = useState(false)
+  const [menyimpan, setMenyimpan] = useState(false)
   const [notifBisa, setNotifBisa] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'default')
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
@@ -151,8 +140,9 @@ export function Plan() {
   const [editPlan, setEditPlan] = useState<{ plan: PlanT; form: PlanForm; error: string | null } | null>(null)
   const [editLo, setEditLo] = useState<LoTarget | null>(null)
 
+  useSyncOnOpen()
   const used = app.usedLoIds
-  const inDate = useMemo(() => app.plans.filter((p) => inRange(p.tanggal, range)), [app.plans, range])
+  const inDate = useMemo(() => app.plans.filter((p) => inRangeOrUpcoming(p.tanggal, range)), [app.plans, range])
   // Dashboard SO & LO per status, mengikuti filter tanggal.
   const counts = useMemo(() => {
     const c = new Map<LoDisplayStatus, number>()
@@ -168,22 +158,28 @@ export function Plan() {
   const besok = planBesokKurang(app.plans)
 
   const simpan = async () => {
+    if (menyimpan) return
     const err = validatePlan(form)
     if (err) return setError(err)
     const valid = rows.filter((r) => (parseAngka(r.volume) ?? 0) > 0)
     if (!valid.length) return setError('Isi minimal satu produk dengan volume lebih dari 0 liter.')
+    const tanpaShift = valid.findIndex((r) => !r.shift)
+    if (tanpaShift >= 0) return setError(`Pilih shift permintaan untuk produk ${rows.indexOf(valid[tanpaShift]) + 1} (${valid[tanpaShift].produk}).`)
     const plan: PlanT = {
       id: genId('plan'),
       createdAt: Date.now(),
       ...form,
+      // Shift permintaan diisi per produk; shift plan = shift produk pertama (data lama/SLA).
+      ms2Shift: valid[0].shift,
       shipTo: form.shipTo.trim(),
       poSap: form.poSap.trim(),
       noSO: '',
       produk: '',
       soldTo: '',
-      los: valid.map((r) => ({ id: r.id, noLO: '', produk: r.produk, volume: parseAngka(r.volume) ?? 0, shift: r.shift || form.ms2Shift, status: 'os', segel: [] })),
+      los: valid.map((r) => ({ id: r.id, noLO: '', produk: r.produk, volume: parseAngka(r.volume) ?? 0, shift: r.shift, status: 'os', segel: [] })),
     }
     setError(null)
+    setMenyimpan(true)
     try {
       await app.savePlan(plan)
       setForm(blankPlanForm(form.tanggal))
@@ -192,6 +188,8 @@ export function Plan() {
       toast('Permintaan tersimpan. Isi SO & LO di daftar saat sudah terbit.')
     } catch (e) {
       setError(pesan(e))
+    } finally {
+      setMenyimpan(false)
     }
   }
 
@@ -324,9 +322,9 @@ export function Plan() {
         title="Permintaan baru (MS2)"
         description="Nomor SO dan LO diisi dari daftar plan setelah terbit dari depot."
         footer={
-          <Button size="lg" className="flex-1" onClick={simpan}>
+          <Button size="lg" className="flex-1" disabled={menyimpan} onClick={simpan}>
             <ClipboardList aria-hidden="true" />
-            Simpan permintaan
+            {menyimpan ? 'Menyimpan…' : 'Simpan permintaan'}
           </Button>
         }
       >
@@ -344,11 +342,11 @@ export function Plan() {
                     <Trash2 aria-hidden="true" />
                   </Button>
                 </div>
-                <Choice label={`Shift permintaan produk ${i + 1}`} value={r.shift || form.ms2Shift} onChange={(v) => setRow({ shift: v })} options={SHIFT_PERMINTAAN} />
+                <Choice label={`Shift permintaan produk ${i + 1}`} value={r.shift} onChange={(v) => setRow({ shift: v })} options={SHIFT_PERMINTAAN} />
               </div>
             )
           })}
-          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow(rows.at(-1)?.shift || form.ms2Shift)])}>
+          <Button variant="soft" size="sm" className="self-start" onClick={() => setRows([...rows, blankRow(rows.at(-1)?.shift)])}>
             <Plus aria-hidden="true" />
             Tambah produk
           </Button>
