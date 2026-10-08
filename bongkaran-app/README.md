@@ -45,7 +45,8 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk mengisi nomor SO lalu nomor LO **tiap produk** yang dipesan dalam satu pop up, dan status (nomor segel tidak lagi diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), volume permintaan dipecah otomatis **tiap 8.000 L = 1 LO** (maks. 8.000 L per LO). Ketuk baris untuk membuka halaman **Edit SO & LO** (nomor segel tidak diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/plan/so/:id` | Edit SO & LO satu permintaan dalam bentuk tabel: Nomor SO, lalu per LO produk, volume (maks. 8.000 L), shift, nomor LO, status, alih supply; LO Closed terkunci. Simpan otomatis kembali ke Tracking LO asal (Plan Pengiriman atau Riwayat Tracking LO) |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
 | | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, per area, daftar unit; tombol Mulai inspeksi, Pindai QR, Label QR, Data utama |
@@ -129,7 +130,7 @@ src/
   components/ui/         primitif kaca: glass-card, pill, button, input, select, tabs, toast, spring-value
   components/shell/      header (tombol kembali), dock navigasi, ambient orbs, app-shell, app-provider (state global)
   components/bongkaran/  langkah SOP, slot foto, panel finish, tanda tangan, filter tanggal, stok-gate, stat-tile, qq-pill
-  pages/                 Dashboard, InputMenu, FormInput, FormBongkar, Plan, QqHarian, Sample2Jam, StokShift,
+  pages/                 Dashboard, InputMenu, FormInput, FormBongkar, Plan, EditLo, QqHarian, Sample2Jam, StokShift,
                          LaporanMenu, Persediaan, BeritaAcara, RiwayatBongkaran, RiwayatLo, RiwayatKualitas, RiwayatTera,
                          Kalkulator, Profil, Pengaturan, Anggota, Login
   lib/sop.ts             definisi 14 langkah, validasi & hitungan bongkaran

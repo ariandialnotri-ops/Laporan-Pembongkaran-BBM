@@ -23,6 +23,7 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/input/bongkar', title: 'Input Bongkaran', parent: '/input' },
   { href: '/input/', title: 'Form Bongkaran', parent: '/input/bongkar' },
   { href: '/plan', title: 'Plan Pengiriman', parent: '/input' },
+  { href: '/plan/so/', title: 'Edit SO & LO', parent: '/plan' },
   { href: '/kualitas', title: 'Kualitas Harian', parent: '/input' },
   { href: '/sample', title: 'Uji Pasca Penerimaan', parent: '/input' },
   { href: '/stok', title: 'Stok Awal Shift', parent: '/input' },

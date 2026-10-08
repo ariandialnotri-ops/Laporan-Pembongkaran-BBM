@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowRight, CalendarClock, ClipboardList, Lock, Plus, Trash2 } from 'lucide-react'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
-import { ErrorBox, LoEditSheet, ProdukSelect, SupplySelect, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
+import { ErrorBox, ProdukSelect, SupplySelect } from '@/components/bongkaran/lo-fields'
 import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -14,7 +15,7 @@ import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
+import { LO_MAX_LITER, LO_STATUS, loStatus, loStatusMeta, pecahVolume, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
 import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +36,7 @@ const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
 
 type TRow = { plan: PlanT; lo: PlanLo; status: LoDisplayStatus }
 
-/** Tabel plan pengiriman: satu baris per LO, ketuk untuk ubah LO, SO, atau tambah LO. */
+/** Tabel plan pengiriman: satu baris per LO, ketuk untuk membuka halaman Edit SO & LO. */
 const COLS: Col<TRow>[] = [
   { header: 'Tgl kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobileCell: (x) => `Kirim ${formatTanggalIso(x.plan.tanggal)}`, mobile: 'sub' },
   { header: 'No SO', cell: (x) => <span className="tabular whitespace-nowrap">{x.plan.noSO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>, mobile: 'hide' },
@@ -123,6 +124,7 @@ function validatePlan(f: PlanForm) {
 export function Plan() {
   const app = useApp()
   const toast = useToast()
+  const navigate = useNavigate()
   const [form, setForm] = useState<PlanForm>(() => blankPlanForm())
   const [rows, setRows] = useState<Row[]>(() => [blankRow()])
   const [error, setError] = useState<string | null>(null)
@@ -131,8 +133,6 @@ export function Plan() {
   const [notifBisa, setNotifBisa] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'default')
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
-
-  const [editLo, setEditLo] = useState<LoTarget | null>(null)
 
   useSyncOnOpen()
   const used = app.usedLoIds
@@ -158,6 +158,7 @@ export function Plan() {
     const valid = rows.filter((r) => (parseAngka(r.volume) ?? 0) > 0)
     if (!valid.length) return setError('Isi minimal satu produk dengan volume lebih dari 0 liter.')
     const tanpaShift = valid.findIndex((r) => !r.shift)
+    const volumeRow = (r: Row) => parseAngka(r.volume) ?? 0
     if (tanpaShift >= 0) return setError(`Pilih shift permintaan untuk produk ${rows.indexOf(valid[tanpaShift]) + 1} (${valid[tanpaShift].produk}).`)
     const plan: PlanT = {
       id: genId('plan'),
@@ -170,7 +171,8 @@ export function Plan() {
       noSO: '',
       produk: '',
       soldTo: '',
-      los: valid.map((r) => ({ id: r.id, noLO: '', produk: r.produk, volume: parseAngka(r.volume) ?? 0, shift: r.shift, status: 'os', segel: [] })),
+      // Tiap 8.000 L = 1 LO: 16.000 L menjadi 2 LO, 20.000 L menjadi 8.000 + 8.000 + 4.000.
+      los: valid.flatMap((r) => pecahVolume(volumeRow(r)).map((volume, i) => ({ id: i ? genId('lo') : r.id, noLO: '', produk: r.produk, volume, shift: r.shift, status: 'os' as const, segel: [] }))),
     }
     setError(null)
     setMenyimpan(true)
@@ -179,7 +181,7 @@ export function Plan() {
       setForm(blankPlanForm(form.tanggal))
       setRows([blankRow()])
       setBaru(false)
-      toast('Permintaan tersimpan. Isi SO & LO di daftar saat sudah terbit.')
+      toast(`Permintaan tersimpan: ${plan.los.length} LO. Isi SO & LO di daftar saat sudah terbit.`)
     } catch (e) {
       setError(pesan(e))
     } finally {
@@ -188,7 +190,7 @@ export function Plan() {
   }
 
 
-  const bukaLo = (plan: PlanT, lo: PlanLo | null) => setEditLo({ plan, lo })
+  const bukaLo = (plan: PlanT, lo: PlanLo) => navigate(`/plan/so/${encodeURIComponent(plan.id)}?lo=${encodeURIComponent(lo.id)}`)
 
 
   const visible = inDate
@@ -310,6 +312,7 @@ export function Plan() {
                   </Button>
                 </div>
                 <Choice label={`Shift permintaan produk ${i + 1}`} value={r.shift} onChange={(v) => setRow({ shift: v })} options={SHIFT_PERMINTAAN} />
+                <JumlahLo volume={parseAngka(r.volume) ?? 0} />
               </div>
             )
           })}
@@ -321,7 +324,18 @@ export function Plan() {
         <ErrorBox text={error} />
       </Sheet>
 
-      <LoEditSheet target={editLo} onClose={() => setEditLo(null)} />
     </div>
+  )
+}
+
+/** Pratinjau pemecahan volume permintaan: tiap 8.000 L = 1 LO. */
+function JumlahLo({ volume }: { volume: number }) {
+  const bagian = pecahVolume(volume)
+  if (!bagian.length) return null
+  return (
+    <span className="tabular text-body-sm text-on-surface-variant">
+      = <b className="text-on-surface">{bagian.length} LO</b>
+      {bagian.length > 1 ? ` (${bagian.map((v) => formatNumber(v)).join(' + ')} L)` : ''}, maks. {formatNumber(LO_MAX_LITER)} L per LO
+    </span>
   )
 }

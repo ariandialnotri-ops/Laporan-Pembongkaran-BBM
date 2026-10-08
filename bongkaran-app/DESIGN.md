@@ -214,6 +214,7 @@ Peta halaman:
 | | Input Bongkaran (mulai / berjalan) | `/input/bongkar` |
 | | Form bongkaran 14 langkah + Finish | `/input/:id` |
 | | Plan Pengiriman | `/plan` |
+| | Edit SO & LO (halaman tabel, satu permintaan) | `/plan/so/:id` |
 | | Kualitas Harian | `/kualitas` |
 | | Uji Kualitas Pasca Penerimaan | `/sample` |
 | | APAR & APAB (dashboard) | `/apar` |
@@ -266,7 +267,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 | **LeaveGuard** | `leave-guard.tsx` | Sheet konfirmasi keluar dari form | |
 | **StepRail** | `pages/FormBongkar.tsx` | 14 bulatan nomor bisa digeser, pemisah antar fase, aktif biru besar | lengkap/terkunci |
 | **Kaleng (ilustrasi)** | `kaleng-sample.tsx` | Kaleng: tutup, label `K1/K2/K3`, isi warna produk | |
-| **LoEditSheet** | `lo-edit-sheet.tsx` | Pop up LO: **Nomor SO** (berlaku untuk semua LO di permintaan, tanpa placeholder), **Nomor LO per produk** (satu field per produk yang dipesan; LO yang Closed/Delivered tampil terkunci), produk, volume, shift, status (grid kartu), alih supply, hapus (pengawas). Tidak ada field segel | LO Closed: tampilan kunci saja |
+| **lo-fields** | `lo-fields.tsx` | ErrorBox, ProdukSelect, SupplySelect yang dipakai bersama Plan, Edit SO & LO, dan langkah 2 bongkaran | |
 | **KalengDetail** | `kaleng-detail.tsx` | Pop up detail uji kaleng (lihat 9.2) | |
 | **ProteksiSettings** | `proteksi-settings.tsx` | Data utama APAR: jumlah pulau, ringkas unit, daftar area (+ Tambah area), kartu unit (kode, jenis, lokasi, kapasitas, jadwal isi ulang, cadangan) | |
 | **QrImg** | `apar/qr.tsx` | Gambar QR (data URL) untuk alamat halaman unit | memuat: kotak berdenyut |
@@ -357,7 +358,14 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 - Tombol besar **Permintaan baru (MS2)** → sheet: Tanggal kirim, Supply point, Tanggal & jam MS2, Ship To, PO SAP (opsional); **baris produk**: Produk, Volume L, hapus, **Shift 1/2 per produk (wajib)**; Tambah produk; Simpan (terkunci saat menyimpan).
 - Kartu **Status SO & LO**: DateFilter + 8 kotak status (bisa jadi saringan).
 - **Tabel Plan Pengiriman** (RecordTable, satu baris per LO): Tgl kirim, No SO, No LO (LO lama dicoret → LO baru bila alih supply), Produk, Volume, Shift, Supply point, Permintaan MS2, Status. Plan bertanggal kirim mendatang selalu tampil.
-- Ketuk baris → **LoEditSheet** (Nomor SO dulu, lalu Nomor LO tiap produk dalam satu pop up).
+- Form permintaan MS2: volume per produk dipecah otomatis, **tiap 8.000 L = 1 LO** (16.000 L → 2 LO; 20.000 L → 8.000 + 8.000 + 4.000). Pratinjau "= n LO" tampil di bawah tiap produk.
+- Ketuk baris → halaman **Edit SO & LO** (`/plan/so/:id?lo=<id>`, bukan pop up):
+  - Kartu atas: data permintaan MS2 (hanya dibaca: supply point, Ship To, waktu MS2, total LO & liter) + field **Nomor SO**.
+  - Tabel **Daftar LO**, kolom: No (+ tombol hapus untuk pengawas), Produk / Volume (maks. 8.000 L) / Shift, Nomor LO / Status. Di HP isian bertumpuk dalam sel; di layar lebar berjajar sesuai judul kolom. Baris yang diketuk ditandai garis biru dan digulir ke tengah.
+  - LO Delivered/Closed: baris terkunci (ikon kunci, nomor, "dari LO lama", nopol MT, pill status).
+  - Status **Alih Supply** membuka baris tambahan: nomor LO baru + supply point baru.
+  - LO lama di atas 8.000 L dipecah otomatis menjadi beberapa baris (latar kuning + catatan).
+  - Tombol **Batal** dan **Simpan & kembali**; simpan otomatis kembali ke Tracking LO asal (`/plan` atau `?dari=/laporan/lo`). Keluar dengan perubahan belum disimpan memunculkan konfirmasi.
 
 ### 9.7 Kualitas Harian
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
@@ -397,7 +405,7 @@ Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acar
 | **Catatan Persediaan BBM** | Produk (Select), DateFilter | Pratinjau: Tanggal, Shift, Stok awal, Terima, Keluar, Selisih; tombol **Unduh Excel / PDF** (format template asli) |
 | **Berita Acara** | DateFilter, 4 kotak status (Semua/Selesai/Anomali/Draft) | BBM, Nopol, Tanggal/Jam, No BA, Volume, Tanda tangan ("Menunggu Pengawas, ABH"), Status |
 | **Riwayat Pembongkaran MT** | DateFilter, chip produk | **Produk, Tgl penerimaan, No SO, No LO, Nopol & supir**, Volume, Transport loss, Discharge loss (L & %), SLA (Req / Gate out), Keterangan (pill), Status, Progress tindakan |
-| **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → **pop up LO** |
+| **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → halaman **Edit SO & LO**, simpan kembali ke Riwayat Tracking LO |
 | **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Uji pasca penerimaan), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
 | **Riwayat Tera** | DateFilter, chip Semua / Di bawah batas | Tanggal, Shift, Nozzle, BBM, Selisih (ml), Pump test, Status |
 | **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → inspeksi unit itu |
@@ -499,7 +507,7 @@ Pertahankan struktur:
   Riwayat Kualitas Harian, Riwayat Tera, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
 - Form bongkaran 14 langkah dalam 3 fase (Bongkaran, Quality, Quantity) + Finish, setiap langkah ada foto wajib;
   buku tera: Tinggi T2, Kapasitas, Kepekaan (L/mm); tanda tangan lewat pop up dengan kotak panduan.
-- Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); pop up LO berisi Nomor SO lalu Nomor LO per produk (tanpa segel). Langkah 2 bongkaran: tombol "Ubah nomor LO / pindah station" pada LO terpilih (bottom sheet: nomor LO baru, centang pindah station + supply point baru); tersimpan ke Plan sehingga Tracking LO ikut berubah.
+- Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); halaman Edit SO & LO berbentuk tabel (Nomor SO lalu Nomor LO & status tiap LO, tanpa segel, maks. 8.000 L per LO), simpan kembali ke Tracking LO. Langkah 2 bongkaran: tombol "Ubah nomor LO / pindah station" pada LO terpilih (bottom sheet: nomor LO baru, centang pindah station + supply point baru); tersimpan ke Plan sehingga Tracking LO ikut berubah.
 - APAR & APAB: dashboard (ringkas kondisi, per area, daftar unit), inspeksi per unit (butir Baik/Tidak + foto wajib),
   data utama (pulau, area, unit), label QR siap cetak, halaman unit dari QR (data, kondisi terakhir, riwayat).
 Warna status: hijau = sesuai, biru = aksi/aktif, cyan = menunggu, amber = pengingat, merah = anomali.

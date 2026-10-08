@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
-import { SupplySelect } from '@/components/bongkaran/lo-edit-sheet'
+import { SupplySelect } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'

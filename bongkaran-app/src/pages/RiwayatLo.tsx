@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
-import { LoEditSheet, type LoTarget } from '@/components/bongkaran/lo-edit-sheet'
 import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -50,12 +50,12 @@ const COLS: Col<Row>[] = [
   },
 ]
 
-/** Laporan > Riwayat Tracking LO. Ketuk baris untuk ubah LO lewat pop up; LO Closed terkunci. */
+/** Laporan > Riwayat Tracking LO. Ketuk baris untuk membuka halaman Edit SO & LO; LO Closed terkunci. */
 export function RiwayatLo() {
   const app = useApp()
   const [range, setRange] = useDateRange('month')
   const [status, setStatus] = useState<'semua' | LoDisplayStatus>('semua')
-  const [edit, setEdit] = useState<LoTarget | null>(null)
+  const navigate = useNavigate()
   useSyncOnOpen()
   if (!app.loaded) return <Loading />
 
@@ -81,9 +81,8 @@ export function RiwayatLo() {
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} onRow={(x) => setEdit({ plan: x.plan, lo: x.lo })} empty="Tidak ada LO pada rentang ini." />
+        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} onRow={(x) => navigate(`/plan/so/${encodeURIComponent(x.plan.id)}?lo=${encodeURIComponent(x.lo.id)}&dari=/laporan/lo`)} empty="Tidak ada LO pada rentang ini." />
       </div>
-      <LoEditSheet target={edit} onClose={() => setEdit(null)} />
     </div>
   )
 }

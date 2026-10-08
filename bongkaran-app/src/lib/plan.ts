@@ -18,6 +18,16 @@ export const LO_STATUS: { key: LoDisplayStatus; label: string; desc: string; ton
 ]
 
 /** Status yang dapat dipilih manual; Delivered & Closed mengikuti data bongkaran. */
+/** Satu LO maksimal 8.000 liter (satu PB); permintaan di atas itu dipecah menjadi beberapa LO. */
+export const LO_MAX_LITER = 8000
+
+/** Pecah volume permintaan menjadi volume per LO: tiap 8.000 L = 1 LO, sisa menjadi LO terakhir. */
+export function pecahVolume(volume: number): number[] {
+  if (!(volume > 0)) return []
+  const n = Math.ceil(volume / LO_MAX_LITER)
+  return Array.from({ length: n }, (_, i) => (i < n - 1 ? LO_MAX_LITER : volume - LO_MAX_LITER * (n - 1)))
+}
+
 export const LO_MANUAL_STATUS: LoStatus[] = ['os', 'planned', 'delivery', 'alih', 'deleted']
 
 /** Pilihan shift permintaan pengiriman (hanya shift 1 dan 2). */

@@ -25,6 +25,7 @@ const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ defa
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
+const EditLo = lazy(() => import('@/pages/EditLo').then((m) => ({ default: m.EditLo })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
 const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ default: m.RiwayatApar })))
@@ -57,6 +58,7 @@ function Gate() {
           <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
           <Route path="/plan" element={<Plan />} />
+          <Route path="/plan/so/:id" element={<EditLo />} />
           <Route path="/kualitas" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
           <Route path="/stok" element={<StokShift />} />
