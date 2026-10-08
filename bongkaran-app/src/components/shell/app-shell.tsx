@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
+import { PlanReminder } from './plan-reminder'
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -13,15 +14,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         Lompat ke konten
       </a>
 
-      <AmbientOrbs />
+      <div className="print:hidden">
+        <AmbientOrbs />
+      </div>
       <AppHeader />
 
       {/* pt-20 clears the fixed header; pb-28 clears the floating dock. */}
-      <main id="konten" className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-margin pb-28 pt-20">
+      <main id="konten" className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-margin pb-28 pt-20 print:max-w-none print:p-0">
         {children}
       </main>
 
       <DockNav />
+      <PlanReminder />
     </>
   )
 }

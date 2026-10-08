@@ -53,6 +53,17 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
 
+  // Edge function bbm-akun (khusus ABH): buat akun & atur ulang kata sandi.
+  const akun = async (body: Record<string, string>) => {
+    const { data, error } = await sb.functions.invoke('bbm-akun', { body })
+    if (error) {
+      const res = (error as { context?: Response }).context
+      const detail = res && typeof res.json === 'function' ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : null
+      throw new Error(translateError(detail || error.message))
+    }
+    if ((data as { error?: string } | null)?.error) throw new Error((data as { error: string }).error)
+  }
+
   const toPlan = (r: PlanRow): Plan =>
     normalizePlan({
       ...(r.meta ?? {}),
@@ -260,6 +271,16 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async removeMember(userId) {
       const rows = check(await sb.from('bbm_members').delete().eq('user_id', userId).select('user_id'))
       if (!rows?.length) throw new Error('Tidak dapat menghapus anggota ini.')
+    },
+    async createAccount(email, password, nama, role) {
+      await akun({ aksi: 'buat', email, password, nama, role })
+    },
+    async resetPassword(userId, password) {
+      await akun({ aksi: 'sandi', userId, password })
+    },
+    async changePassword(password) {
+      const { error } = await sb.auth.updateUser({ password })
+      if (error) throw new Error(translateError(error.message))
     },
   }
 }

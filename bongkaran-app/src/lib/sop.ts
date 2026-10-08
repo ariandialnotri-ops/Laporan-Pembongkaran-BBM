@@ -8,6 +8,7 @@ import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { shiftKey, type Shift } from '@/lib/shift'
 import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
+import type { AparUnit } from '@/lib/apar'
 
 export interface Photo {
   id: string
@@ -25,11 +26,15 @@ export type ReportStatus = 'draft' | 'selesai' | 'anomali'
 export interface Compartment {
   id: string
   no: string
+  /** Tinggi T2 mobil tangki (mm) dari buku tera MT: acuan deepstick. */
   tinggiTera: string
   /** Kapasitas kompartemen (L) dari buku tera, dipakai menghitung selisih liter. */
   kapasitas: string
-  /** Laporan lama: liter per mm. */
+  /** Kepekaan dari buku tera MT (liter per mm): selisih liter = kepekaan x selisih mm. */
   kepekaan: string
+  /** Data lama (versi sebelumnya): kepekaan mm per liter dan tinggi T2 terpisah. */
+  kepekaanMmL?: string
+  tinggiT2?: string
   dipAktual: string
   noSegel: string
 }
@@ -96,7 +101,7 @@ export interface ReportData {
   jumlahDO: string
   /** Volume DO/LO yang diterima (liter). */
   volumeDO: string
-  /** Nomor segel dari data LO di Plan Kirim, untuk dicocokkan di tahap segel. */
+  /** Nomor segel dari data LO lama (sebelum segel dihapus dari Tracking LO); kosong untuk LO baru. */
   segelLO: string[]
   perusahaanPengangkut: string
   densityObsDepot: string
@@ -124,6 +129,8 @@ export interface ReportData {
   totalisator: Totalisator[]
   dipAfterMm: string
   ttd: Partial<Record<SignerKey, Signature>>
+  /** Uji kualitas pasca penerimaan: sampel tangki pendam setelah bongkar selesai (jam diatur petugas). */
+  sample2Jam?: Sample2Jam | null
   noBA: string
   namaPetugas: string
   namaPengawas: string
@@ -153,6 +160,8 @@ export interface PlanLo {
   status: LoStatus
   /** Nomor segel per produk sesuai dokumen LO. */
   segel: string[]
+  /** Shift permintaan untuk produk ini (boleh beda antar produk dalam satu permintaan). */
+  shift?: '' | '1' | '2'
   /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
   supplyPoint?: string
   noLOLama?: string
@@ -185,6 +194,28 @@ export interface Plan {
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']
 
 /** Ringkasan per laporan untuk daftar, beranda, dan penanda LO terpakai. */
+export interface Sample2Jam {
+  tanggal: string
+  jam: string
+  densityObs: string
+  suhu: string
+  petugas: string
+  catatan: string
+  savedAt: string
+}
+
+/** Jeda minimal antara bongkar selesai dan pengambilan sampel tangki pendam. */
+export const SAMPLE_JEDA_MENIT = 120
+
+export interface Sample2JamResult {
+  d15: Density15 | null
+  /** Selisih terhadap D15 dokumen depot. */
+  selisih: number | null
+  ok: boolean | null
+  /** Menit sejak bongkar selesai. */
+  jedaMenit: number | null
+}
+
 export interface ReportSummary {
   id: string
   createdAt: number
@@ -214,6 +245,26 @@ export interface ReportSummary {
   d15: number | null
   d15Depot: number | null
   densityOk: boolean | null
+  /** Field berikut tidak ada pada ringkasan lama. */
+  jamSelesai?: string
+  noBA?: string
+  /** Penanda tangan yang belum tanda tangan. */
+  ttdKurang?: SignerKey[]
+  sample2Jam?: { tanggal: string; jam: string; d15: number | null; selisih: number | null; ok: boolean | null } | null
+  /** Untuk kartu kaleng sample: penerima/petugas uji, nomor kompartemen yang diuji, hasil uji air. */
+  petugas?: string
+  kompartemen?: string[]
+  airNihil?: boolean | null
+  segelOk?: boolean
+  planId?: string
+  namaDriver?: string
+  /** Total selisih liter kompartemen (transport loss). */
+  transportLoss?: number | null
+  /** Discharge gain/loss dalam persen volume penerimaan (DO). */
+  gainLossPct?: number | null
+  /** Gate out depot (ISO tanggal + jam). */
+  tanggalKeluar?: string
+  jamKeluar?: string
 }
 
 export interface Rules {
@@ -235,6 +286,13 @@ export interface Settings {
   namaSecurityDefault: string
   perusahaanPengangkut: string
   nozzles: Nozzle[]
+  /** Data SPBU: jumlah pulau pompa (juga lokasi APAR) dan jumlah dispenser. */
+  jumlahPulau: number
+  jumlahDispenser: number
+  /** Data utama area/lokasi APAR selain pulau pompa. */
+  aparArea: string[]
+  apar: AparUnit[]
+  apab: AparUnit[]
   rules: Rules
 }
 
@@ -287,13 +345,13 @@ export const STEPS: StepDef[] = [
   {
     id: 'lo',
     title: 'Dokumen LO & Data Bongkaran',
-    desc: 'Foto dokumen LO, pilih SO & LO yang datang dari Plan Kirim, lalu isi data LO mobil tangki.',
+    desc: 'Foto dokumen LO, pilih SO & LO yang datang dari Plan, lalu isi data LO mobil tangki.',
     photos: [{ key: 'dok_lo', label: 'Dokumen LO mobil tangki' }],
   },
   {
     id: 'tera',
     title: 'Buku Tera Mobil Tangki',
-    desc: 'Foto buku tera MT, isi tinggi tera dan kapasitas tiap kompartemen.',
+    desc: 'Foto buku tera MT, isi tinggi T2, kapasitas, dan kepekaan tiap kompartemen.',
     photos: [{ key: 'buku_tera', label: 'Buku tera mobil tangki' }],
   },
   {
@@ -332,7 +390,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'dip_mt',
     title: 'Deepstick Kompartemen MT vs Buku Tera',
-    desc: 'Isi ketinggian minyak tiap kompartemen hasil deepstick, dibandingkan dengan tinggi tera.',
+    desc: 'Isi ketinggian minyak tiap kompartemen hasil deepstick, dibandingkan dengan tinggi T2 buku tera.',
     photos: [{ key: 'dip_mt', label: 'Deepstick ketinggian minyak mobil tangki' }],
   },
   {
@@ -405,7 +463,14 @@ export function normalizeReport(r: Report): Report {
       perusahaanPengangkut: d.perusahaanPengangkut ?? '',
       totalisator: d.totalisator ?? [],
       ttd: d.ttd ?? {},
-      compartments: d.compartments.map((c) => ({ ...c, kapasitas: c.kapasitas ?? '', noSegel: c.noSegel ?? '' })),
+      compartments: d.compartments.map((c) => {
+        const base = { ...c, kapasitas: c.kapasitas ?? '', kepekaan: c.kepekaan ?? '', noSegel: c.noSegel ?? '' }
+        // Draf versi sebelumnya: T2 menjadi acuan tunggal dan angka kepekaan dipakai sebagai pengali.
+        // Laporan selesai tidak diubah agar angka Berita Acara tetap sama.
+        if (r.status !== 'draft' || (!c.tinggiT2 && !c.kepekaanMmL)) return base
+        const { tinggiT2, kepekaanMmL, ...rest } = base
+        return { ...rest, tinggiTera: tinggiT2 || c.tinggiTera, kepekaan: c.kepekaan || kepekaanMmL || '' }
+      }),
     },
   }
 }
@@ -529,6 +594,17 @@ export interface Derived {
   diterimaDip: number | null
   gainLossDip: number | null
   settleMinutes: number | null
+  sample2Jam: Sample2JamResult | null
+}
+
+/** Menit dari bongkar selesai sampai sampel diambil (melewati tengah malam bila jam selesai < jam datang). */
+export function sampleJeda(d: Pick<ReportData, 'tanggalDatang' | 'jamDatang' | 'jamSelesaiBongkar'>, tanggal: string, jam: string): number | null {
+  if (!d.tanggalDatang || !d.jamSelesaiBongkar || !tanggal || !jam) return null
+  const selesai = new Date(`${d.tanggalDatang}T${d.jamSelesaiBongkar}:00`)
+  if (d.jamDatang && d.jamSelesaiBongkar < d.jamDatang) selesai.setDate(selesai.getDate() + 1)
+  const ambil = new Date(`${tanggal}T${jam}:00`)
+  const m = Math.round((ambil.getTime() - selesai.getTime()) / 60000)
+  return Number.isFinite(m) ? m : null
 }
 
 /** Semua angka turunan yang dipakai di form, Berita Acara, dan template WhatsApp. */
@@ -540,9 +616,11 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     const tera = num(c.tinggiTera)
     const dip = num(c.dipAktual)
     const kapasitas = num(c.kapasitas)
-    const kepekaan = kapasitas !== null && tera ? kapasitas / tera : num(c.kepekaan)
-    const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari tera
-    // Sama dengan Berita Acara: selisih (mm) x kapasitas / tinggi tera.
+    const mmPerL = num(c.kepekaanMmL ?? '')
+    // Liter per mm: kepekaan buku tera; laporan lama: 1 / kepekaan mm per liter, atau kapasitas / tinggi.
+    const kepekaan = num(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
+    const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari T2
+    // Sama dengan Berita Acara: kepekaan x selisih (mm). Contoh 0,3 L/mm x -5 mm = -1,5 L.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
     const outOfLimit = selisihMm !== null && -selisihMm > rules.teraToleranceMm
     return { ...c, selisihMm, estLiter, outOfLimit }
@@ -608,6 +686,20 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     diterimaDip,
     gainLossDip: diterimaDip !== null && volumeDO !== null ? diterimaDip - volumeDO : null,
     settleMinutes: minutesBetween(d.jamSelesaiBongkar, d.jamBacaAtg),
+    sample2Jam: deriveSample(d, d15Depot, rules),
+  }
+}
+
+function deriveSample(d: ReportData, d15Depot: number | null, rules: Rules): Sample2JamResult | null {
+  const s = d.sample2Jam
+  if (!s) return null
+  const res = density15(s.densityObs, s.suhu)
+  const selisih = res && d15Depot !== null ? Math.round((res.value - d15Depot) * 10000) / 10000 : null
+  return {
+    d15: res,
+    selisih,
+    ok: selisih !== null ? Math.abs(selisih) <= rules.densityTolerance + 1e-9 : null,
+    jedaMenit: sampleJeda(d, s.tanggal, s.jam),
   }
 }
 
@@ -632,7 +724,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.nopol)) issues.push('Isi nomor polisi mobil tangki')
       break
     case 'lo':
-      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan Kirim')
+      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan')
       if (!has(d.tanggalDatang) || !has(d.jamDatang)) issues.push('Isi tanggal & jam kedatangan MT')
       if (!has(d.namaDriver)) issues.push('Isi nama lengkap driver')
       if (!has(d.shipTo)) issues.push('Isi nomor Ship To')
@@ -643,8 +735,8 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.tanggalKeluar) || !has(d.jamKeluar)) issues.push('Isi tanggal & jam keluar MT dari depot')
       break
     case 'tera':
-      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0 || (num(c.kepekaan) ?? 0) > 0))) {
-        issues.push('Isi tinggi tera & kapasitas untuk semua kompartemen')
+      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((num(c.kepekaan) ?? 0) > 0))) {
+        issues.push('Isi tinggi T2, kapasitas, dan kepekaan (L/mm) dari buku tera MT untuk semua kompartemen')
       }
       break
     case 'atg_before':
@@ -661,7 +753,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       break
     case 'segel':
       if (d.compartments.some((c) => !has(c.noSegel))) issues.push('Isi nomor segel tiap kompartemen')
-      if (!d.segelSesuai) issues.push('Konfirmasi nomor segel sesuai data LO')
+      if (!d.segelSesuai) issues.push('Konfirmasi nomor segel sesuai dokumen LO')
       break
     case 'dip_before':
       if (num(d.dipBeforeMm) === null) issues.push('Isi ketinggian deepstick tangki pendam (mm)')
@@ -676,7 +768,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (d.compartments.some((c) => num(c.dipAktual) === null)) issues.push('Isi hasil deepstick semua kompartemen')
       else if (x.teraOutOfLimit && !d.teraApproval) {
         needsApproval = true
-        issues.push(`Selisih dengan buku tera melebihi ${rules.teraToleranceMm} mm, butuh izin penanggung jawab`)
+        issues.push(`Selisih dengan tinggi T2 buku tera melebihi ${rules.teraToleranceMm} mm, butuh izin penanggung jawab`)
       }
       break
     case 'sampel':
@@ -783,6 +875,23 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     d15: d15s.length ? Math.round((d15s.reduce((n, v) => n + v, 0) / d15s.length) * 10000) / 10000 : null,
     d15Depot: x.d15Depot,
     densityOk: x.densityResults.length ? x.densityResults.every((r) => r.ok !== false) : null,
+    jamSelesai: d.jamSelesaiBongkar,
+    petugas: d.ttd?.penerima?.nama || d.namaPetugas,
+    kompartemen: [...new Set(x.densityResults.map((r) => r.kompartemenNo).filter((n) => n && n !== '-'))],
+    airNihil: d.airNihil,
+    segelOk: d.segelSesuai,
+    planId: d.planId,
+    namaDriver: d.namaDriver,
+    transportLoss: x.transportLoss,
+    gainLossPct: x.gainLossPct,
+    tanggalKeluar: d.tanggalKeluar,
+    jamKeluar: d.jamKeluar,
+    noBA: d.noBA,
+    ttdKurang: SIGNERS.filter((s) => !d.ttd?.[s.key]?.img).map((s) => s.key),
+    sample2Jam:
+      d.sample2Jam && x.sample2Jam
+        ? { tanggal: d.sample2Jam.tanggal, jam: d.sample2Jam.jam, d15: x.sample2Jam.d15?.value ?? null, selisih: x.sample2Jam.selisih, ok: x.sample2Jam.ok }
+        : null,
   }
 }
 

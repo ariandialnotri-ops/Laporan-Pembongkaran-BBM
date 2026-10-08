@@ -58,7 +58,7 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   L.push('')
   L.push('*SAFETY & KELENGKAPAN*')
   L.push(`APAR ${ok(d.safetyApar)} | Arde ${ok(d.safetyArde)} | Atribut safety ${ok(d.safetyAtribut)}`)
-  L.push(`Segel sesuai data LO ${ok(d.segelSesuai)}${x.compartments.some((c) => c.noSegel) ? ` (${x.compartments.map((c) => c.noSegel || '-').join(', ')})` : ''}`)
+  L.push(`Segel sesuai dokumen LO ${ok(d.segelSesuai)}${x.compartments.some((c) => c.noSegel) ? ` (${x.compartments.map((c) => c.noSegel || '-').join(', ')})` : ''}`)
   L.push(`Hose & fillport sesuai ${ok(d.fillportSesuai)}`)
   L.push('')
   L.push(`Status: *${status}*`)

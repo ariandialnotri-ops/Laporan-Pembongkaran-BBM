@@ -54,6 +54,8 @@ export interface Overlay {
   from: string
   to: string
   src: string
+  /** Lebar kotak (px template), di tengah area `from`-`to`; boleh melewati kolom. */
+  w?: number
 }
 
 const FONT: Record<string, string> = { Calibri: 'Carlito, Calibri, sans-serif', Arial: 'Arimo, Arial, sans-serif' }
@@ -71,6 +73,19 @@ export const parseRef = (ref: string) => {
 
 export function getLayout(key: SheetKey) {
   return layouts[key] as unknown as Layout
+}
+
+/** Kotak gambar (px template) untuk area sel: lebar `w` di tengah kolom area, tinggi baris area. */
+export function overlayBox(key: SheetKey, o: Pick<Overlay, 'from' | 'to' | 'w'>) {
+  const l = getLayout(key)
+  const a = parseRef(o.from)
+  const z = parseRef(o.to)
+  const xs = (c: number) => l.cols.slice(0, c - l.area.c1).reduce((s, v) => s + v, 0)
+  const ys = (r: number) => l.rows.slice(0, r - l.area.r1).reduce((s, v) => s + v, 0)
+  const left = xs(a.c)
+  const right = xs(z.c + 1)
+  const w = o.w ?? right - left - 8
+  return { x: (left + right) / 2 - w / 2, y: ys(a.r) + 2, w, h: ys(z.r + 1) - ys(a.r) - 4 }
 }
 
 export function sheetSize(key: SheetKey) {
@@ -120,8 +135,8 @@ function strokeSide(ctx: CanvasRenderingContext2D, spec: string, x1: number, y1:
   ctx.restore()
 }
 
-export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: { red?: string[]; overlays?: Overlay[]; scale?: number } = {}) {
-  const { red = [], overlays = [], scale = 2 } = opts
+export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: { red?: string[]; overlays?: Overlay[]; scale?: number; formats?: Record<string, string> } = {}) {
+  const { red = [], overlays = [], scale = 2, formats = {} } = opts
   const l = getLayout(sheet)
   const { c1, r1, c2, r2 } = l.area
   const { width, height } = sheetSize(sheet)
@@ -185,7 +200,7 @@ export async function drawSheet(sheet: SheetKey, values: Record<string, CellValu
     const v = valueOf(b.ref)
     if (v === null || v === '') continue
     const st = b.st
-    const { text, align } = formatCell(v, st?.fmt ?? 'General')
+    const { text, align } = formatCell(v, formats[b.ref] ?? st?.fmt ?? 'General')
     if (!text) continue
     const px = ((st?.sz ?? 11) * 96) / 72
     ctx.font = `${st?.i ? 'italic ' : ''}${st?.b ? 700 : 400} ${px}px ${FONT[st?.ff ?? 'Calibri'] ?? st?.ff}`
@@ -242,12 +257,7 @@ export async function drawSheet(sheet: SheetKey, values: Record<string, CellValu
   for (const o of overlays) {
     const el = await loadImage(o.src)
     if (!el) continue
-    const a = parseRef(o.from)
-    const z = parseRef(o.to)
-    const ax = X(a.c) + 4
-    const ay = Y(a.r) + 2
-    const aw = X(z.c + 1) - X(a.c) - 8
-    const ah = Y(z.r + 1) - Y(a.r) - 4
+    const { x: ax, y: ay, w: aw, h: ah } = overlayBox(sheet, o)
     const s = Math.min(aw / el.naturalWidth, ah / el.naturalHeight)
     const w = el.naturalWidth * s
     const hh = el.naturalHeight * s

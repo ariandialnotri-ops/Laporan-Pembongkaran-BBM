@@ -8,7 +8,8 @@ import { jsPDF } from 'jspdf'
 import { LEGACY_PHOTO_SLOTS, STEPS, type Derived, type Report, type Settings } from '@/lib/sop'
 import { buildBa } from './ba'
 import { paginate, persediaanCells, type PersediaanRow } from './persediaan'
-import { drawSheet, getLayout, type SheetKey } from './sheet-canvas'
+import { trimSignature } from '@/lib/signature'
+import { drawSheet, getLayout, overlayBox, type SheetKey } from './sheet-canvas'
 import { dataUrlToBytes, Workbook, type CellSpec, type ImageSpec } from './xlsx'
 
 const BA_SHEET = 'BERITA ACARA PEMBONGKARAN'
@@ -30,30 +31,19 @@ const valuesOf = (cells: Record<string, CellSpec>) => Object.fromEntries(Object.
 // ---------------------------------------------------------------- Excel
 
 /** Posisi gambar dalam piksel -> kolom/baris + offset, memakai ukuran template. */
-function anchorFor(sheet: SheetKey, fromRef: string, toRef: string, imgW: number, imgH: number): Omit<ImageSpec, 'png' | 'name'> {
+function anchorFor(sheet: SheetKey, area: { from: string; to: string; w?: number }, imgW: number, imgH: number): Omit<ImageSpec, 'png' | 'name'> {
   const l = getLayout(sheet)
-  const ref = (s: string) => {
-    const m = s.match(/^([A-Z]+)(\d+)$/)!
-    return { c: m[1].split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0), r: Number(m[2]) }
-  }
-  const a = ref(fromRef)
-  const b = ref(toRef)
-  const xs = (c: number) => l.cols.slice(0, c - l.area.c1).reduce((s, v) => s + v, 0)
-  const ys = (r: number) => l.rows.slice(0, r - l.area.r1).reduce((s, v) => s + v, 0)
-  const areaW = xs(b.c + 1) - xs(a.c) - 8
-  const areaH = ys(b.r + 1) - ys(a.r) - 4
-  const scale = Math.min(areaW / imgW, areaH / imgH)
+  const box = overlayBox(sheet, area)
+  const scale = Math.min(box.w / imgW, box.h / imgH)
   const w = imgW * scale
   const h = imgH * scale
-  // Letakkan di tengah area; offset dihitung dari kolom/baris pertama area.
-  let x = xs(a.c) + 4 + (areaW - w) / 2
-  let y = ys(a.r) + 2 + (areaH - h) / 2
-  let col = a.c
-  while (col < b.c && x - xs(col) >= l.cols[col - l.area.c1]) col++
-  let row = a.r
-  while (row < b.r && y - ys(row) >= l.rows[row - l.area.r1]) row++
-  x -= xs(col)
-  y -= ys(row)
+  // Letakkan di tengah kotak; offset dihitung dari kolom/baris tempat sudut kiri atas jatuh.
+  let x = box.x + (box.w - w) / 2
+  let y = box.y + (box.h - h) / 2
+  let col = l.area.c1
+  while (col < l.area.c2 && x >= l.cols[col - l.area.c1]) x -= l.cols[col++ - l.area.c1]
+  let row = l.area.r1
+  while (row < l.area.r2 && y >= l.rows[row - l.area.r1]) y -= l.rows[row++ - l.area.r1]
   return { col: col - 1, colOffPx: x, row: row - 1, rowOffPx: y, widthPx: w, heightPx: h }
 }
 
@@ -74,8 +64,9 @@ export async function exportBaXlsx(report: Report, x: Derived, settings: Setting
   await wb.setCells(path, ba.cells)
   const images: ImageSpec[] = []
   for (const s of ba.signatures) {
-    const { w, h } = await imageSize(s.img)
-    images.push({ ...anchorFor('ba', s.from, s.to, w, h), png: await dataUrlToBytes(s.img), name: `Tanda tangan ${s.key}` })
+    const img = await trimSignature(s.img)
+    const { w, h } = await imageSize(img)
+    images.push({ ...anchorFor('ba', s, w, h), png: await dataUrlToBytes(img), name: `Tanda tangan ${s.key}` })
   }
   await wb.addImages(path, images)
   await wb.editSheet(path, (d) => {
@@ -121,9 +112,11 @@ export async function exportPersediaanXlsx(data: PersediaanExport, filename: str
 
 // ---------------------------------------------------------------- PDF / JPG
 
-function baRender(report: Report, x: Derived, settings: Settings) {
+async function baRender(report: Report, x: Derived, settings: Settings) {
   const ba = buildBa(report, x, settings)
-  return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays: ba.signatures.map((s) => ({ from: s.from, to: s.to, src: s.img })) })
+  const overlays = await Promise.all(ba.signatures.map(async (s) => ({ from: s.from, to: s.to, w: s.w, src: await trimSignature(s.img) })))
+  const formats = Object.fromEntries(Object.entries(ba.cells).flatMap(([k, v]) => (v.fmt ? [[k, v.fmt]] : [])))
+  return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays, formats })
 }
 
 export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string) {
@@ -146,9 +139,17 @@ function placeCanvas(doc: jsPDF, canvas: HTMLCanvasElement, margin = 24) {
   doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (pw - w) / 2, margin, w, h)
 }
 
-export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string>, filename: string) {
+/** Jenis unduhan BA. `pdf-ba`: PDF tanpa lampiran foto (cepat). */
+export type ExportKind = 'pdf' | 'pdf-ba' | 'jpg' | 'xlsx'
+
+/** PDF Berita Acara; `photoData` null = tanpa lampiran foto evidence. */
+export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string> | null, filename: string) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
   placeCanvas(doc, await baRender(report, x, settings))
+  if (!photoData) {
+    doc.save(filename)
+    return
+  }
 
   // Lampiran foto evidence per tahap.
   const groups = STEPS.flatMap((step, si) =>

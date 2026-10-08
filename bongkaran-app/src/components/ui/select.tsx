@@ -39,7 +39,7 @@ function SelectContent({
         position={position}
         sideOffset={6}
         className={cn(
-          'glass-3 z-50 overflow-hidden rounded-lg',
+          'glass-3 z-[70] overflow-hidden rounded-lg',
           position === 'popper' && 'w-[var(--radix-select-trigger-width)]',
           className,
         )}

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { FireExtinguisher, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
@@ -21,7 +21,7 @@ export function Pengaturan() {
   const { hash } = useLocation()
   const logoRef = useRef<HTMLInputElement>(null)
   const s = app.settings
-  const readOnly = !app.canManage
+  const readOnly = !app.isAdmin
 
   useEffect(() => {
     if (hash && app.loaded) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +39,7 @@ export function Pengaturan() {
     <div className="flex flex-col gap-space-md">
       {readOnly && (
         <GlassCard level={1} className="animate-entrance-1 p-space-md text-center text-body-sm text-on-surface-variant">
-          Pengaturan hanya dapat diubah oleh pengawas.
+          Pengaturan hanya dapat diubah oleh ABH.
         </GlassCard>
       )}
       <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
@@ -69,6 +69,13 @@ export function Pengaturan() {
                 <Input id="set-abh" value={s.namaAbhDefault} onChange={(e) => app.updateSettings({ namaAbhDefault: e.target.value })} />
               </Field>
             </div>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <JumlahField id="set-pulau" label="Jumlah pulau pompa" value={s.jumlahPulau ?? 0} max={30} onChange={(n) => app.updateSettings({ jumlahPulau: n })} />
+              <JumlahField id="set-dispenser" label="Jumlah dispenser" value={s.jumlahDispenser ?? 0} max={60} onChange={(n) => app.updateSettings({ jumlahDispenser: n })} />
+              <span className="col-span-2 text-body-sm text-on-surface-variant">
+                {s.nozzles.length} nozzle terdaftar di bawah. Pulau pompa otomatis menjadi lokasi APAR di data utama APAR & APAB.
+              </span>
+            </div>
             <Field label="Perusahaan pengangkut (default)" htmlFor="set-pengangkut">
               <Input id="set-pengangkut" value={s.perusahaanPengangkut} onChange={(e) => app.updateSettings({ perusahaanPengangkut: e.target.value })} />
             </Field>
@@ -95,7 +102,7 @@ export function Pengaturan() {
         <section aria-labelledby="nozzle" className="animate-entrance-2 flex flex-col gap-space-sm">
           <SectionHeader id="nozzle" title="Nozzle Dispenser" />
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-            <span className="text-body-sm text-on-surface-variant">Dipakai untuk totalisator penjualan selama bongkar dan uji bejana 20 liter di Q&Q Harian.</span>
+            <span className="text-body-sm text-on-surface-variant">Dipakai untuk totalisator penjualan selama bongkar dan uji bejana 20 liter di Input, Kualitas Harian.</span>
             {s.nozzles.map((nz, i) => (
               <div key={nz.id} className="grid grid-cols-[1fr_1.3fr_auto] items-center gap-space-xs">
                 <Input aria-label={`Nama nozzle ${i + 1}`} value={nz.nama} onChange={(e) => setNozzle(nz.id, { nama: e.target.value })} />
@@ -125,6 +132,20 @@ export function Pengaturan() {
               <Plus aria-hidden="true" />
               Tambah nozzle
             </Button>
+          </GlassCard>
+        </section>
+
+        <section aria-labelledby="proteksi" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <SectionHeader id="proteksi" title="Proteksi Kebakaran" />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <span className="tabular text-body-sm text-on-surface">
+              {s.jumlahPulau || 0} pulau pompa, {(s.apar ?? []).filter((u) => !u.cadangan).length} APAR terpasang, {(s.apar ?? []).filter((u) => u.cadangan).length} cadangan, {(s.apab ?? []).length} APAB,{' '}
+              {(s.aparArea ?? []).length} area
+            </span>
+            <Link to="/apar/data" className={buttonVariants({ variant: 'soft', size: 'sm' }) + ' self-start'}>
+              <FireExtinguisher aria-hidden="true" />
+              Buka data utama APAR & APAB
+            </Link>
           </GlassCard>
         </section>
 
@@ -197,5 +218,25 @@ function RuleInput({ id, value, suffix, onChange }: { id: string; value: number;
         if (n !== null && n > 0) onChange(n)
       }}
     />
+  )
+}
+
+/** Angka bulat 0..max; teks disimpan sendiri agar kolom boleh kosong saat diketik. */
+function JumlahField({ id, label, value, max, onChange }: { id: string; label: string; value: number; max: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(() => (value ? String(value) : ''))
+  return (
+    <Field label={label} htmlFor={id}>
+      <Input
+        id={id}
+        numeric
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          const n = parseAngka(e.target.value)
+          onChange(n !== null && n >= 0 ? Math.min(Math.round(n), max) : 0)
+        }}
+      />
+    </Field>
   )
 }

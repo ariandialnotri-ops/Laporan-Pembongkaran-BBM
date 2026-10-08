@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, Images, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import type { ExportKind } from '@/lib/report/export'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SignersSection } from '@/components/bongkaran/sop-steps'
 import { StatusBanner } from '@/components/bongkaran/status-banner'
@@ -23,6 +24,7 @@ export function FinishPanel({
   onFinish,
   onReopen,
   onPdf,
+  onPdfBa,
   onJpg,
   onXlsx,
   generating,
@@ -34,11 +36,15 @@ export function FinishPanel({
   readOnly: boolean
   setData: (patch: Partial<ReportData>) => void
   onFinish: (status: ReportStatus) => void
-  onReopen: () => void
+  /** Hanya untuk BA anomali dan pengawas; BA selesai tidak dapat diubah. */
+  onReopen?: () => void
+  /** PDF BA + lampiran foto evidence. */
   onPdf: () => void
+  /** PDF BA saja, tanpa foto (cepat). */
+  onPdfBa: () => void
   onJpg: () => void
   onXlsx: () => void
-  generating: 'pdf' | 'jpg' | 'xlsx' | null
+  generating: ExportKind | null
   waText: string
 }) {
   const toast = useToast()
@@ -101,7 +107,7 @@ export function FinishPanel({
             ['Stok akhir teoritis', x.stokTeoritis !== null ? formatLiter(x.stokTeoritis) : '-'],
             ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
           ]}
-          total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
+          total={['Discharge gain/loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')} dari volume DO)` : '-']}
         />
         <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>
@@ -138,15 +144,20 @@ export function FinishPanel({
               Excel (template BA)
             </Button>
             <div className="grid grid-cols-2 gap-space-xs">
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
-                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
-                PDF
+              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdfBa}>
+                {generating === 'pdf-ba' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
+                PDF BA saja
               </Button>
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onJpg}>
+              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
+                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Images aria-hidden="true" />}
+                PDF + foto
+              </Button>
+              <Button variant="glass" size="pill" className="col-span-2" disabled={generating !== null} onClick={onJpg}>
                 {generating === 'jpg' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <ImageIcon aria-hidden="true" />}
                 JPG
               </Button>
             </div>
+            <span className="text-body-sm text-on-surface-variant">PDF BA saja lebih cepat, tanpa lampiran foto evidence.</span>
           </GlassCard>
 
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
@@ -169,10 +180,12 @@ export function FinishPanel({
             </div>
           </GlassCard>
 
-          <Button variant="ghost" size="sm" className="self-center" onClick={onReopen}>
-            <RotateCcw aria-hidden="true" />
-            Buka kembali untuk koreksi
-          </Button>
+          {onReopen && (
+            <Button variant="ghost" size="sm" className="self-center" onClick={onReopen}>
+              <RotateCcw aria-hidden="true" />
+              Buka kembali untuk koreksi (pengawas)
+            </Button>
+          )}
         </>
       )}
     </div>

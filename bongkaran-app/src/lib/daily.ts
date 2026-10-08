@@ -6,6 +6,8 @@ import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import type { Shift } from '@/lib/shift'
+import type { Photo } from '@/lib/sop'
+import type { AparData } from '@/lib/apar'
 
 export interface StokItem {
   /** Ketinggian ATG/deepstick (mm). */
@@ -30,6 +32,8 @@ export interface QqKualitas {
   suhu: string
   /** Volume pump test untuk sampel uji kualitas (L). */
   pumpTest: string
+  /** Waktu baris ini terakhir disimpan; kosong bila belum/berubah setelah disimpan. */
+  savedAt?: string
 }
 
 export interface QqKuantitas {
@@ -41,6 +45,16 @@ export interface QqKuantitas {
   selisihMl: string
   /** Volume pump test uji kuantitas (L), standar 20. */
   pumpTest: string
+  savedAt?: string
+}
+
+/** Foto wajib di akhir tiap uji: struk pump test dan pengembalian minyak ke tangki. */
+export type QqFotoKey = 'kualitasStruk' | 'kualitasKembali' | 'kuantitasStruk' | 'kuantitasKembali'
+export const QQ_FOTO: Record<QqFotoKey, string> = {
+  kualitasStruk: 'Foto struk pump test',
+  kualitasKembali: 'Foto pengembalian minyak ke tangki',
+  kuantitasStruk: 'Foto struk pump test',
+  kuantitasKembali: 'Foto pengembalian minyak ke tangki',
 }
 
 export interface QqData {
@@ -49,6 +63,9 @@ export interface QqData {
   kualitas: QqKualitas[]
   kuantitas: QqKuantitas[]
   catatan: string
+  foto?: Partial<Record<QqFotoKey, Photo[]>>
+  /** Diisi saat uji diselesaikan (semua baris & foto lengkap). */
+  selesaiAt?: string
 }
 
 interface DailyBase {
@@ -61,7 +78,8 @@ interface DailyBase {
 }
 export type StokRecord = DailyBase & { kind: 'stok'; data: StokData }
 export type QqRecord = DailyBase & { kind: 'qq'; data: QqData }
-export type DailyRecord = StokRecord | QqRecord
+export type AparRecord = DailyBase & { kind: 'apar'; data: AparData }
+export type DailyRecord = StokRecord | QqRecord | AparRecord
 
 /** Toleransi uji bejana 20 liter: selisih di bawah -60 ml ditandai. */
 export const BEJANA_LIMIT_ML = -60
@@ -93,3 +111,4 @@ export function totalPumpTest(d: QqData) {
 }
 
 export const stokRecordId = (tanggal: string, shift: Shift) => `stok_${tanggal}_${shift}`
+export const qqRecordId = (tanggal: string, shift: Shift) => `qq_${tanggal}_${shift}`

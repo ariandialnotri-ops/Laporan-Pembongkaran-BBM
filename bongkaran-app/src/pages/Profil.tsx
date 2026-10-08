@@ -1,11 +1,18 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Calculator, ChevronRight, ClipboardList, Database, FileText, FlaskConical, LogOut, MapPin, Settings2, ShieldCheck, Truck, Users } from 'lucide-react'
+import { Calculator, ChevronRight, Database, FileText, FireExtinguisher, FlaskConical, KeyRound, LogOut, MapPin, Settings2, ShieldCheck, TriangleAlert, Truck, Users } from 'lucide-react'
+import { Field } from '@/components/bongkaran/form-bits'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
+import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
+import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Sheet } from '@/components/ui/sheet'
+import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
+import { roleLabel } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 
 export function Profil() {
@@ -18,7 +25,8 @@ export function Profil() {
     return r.status !== 'draft' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
   }).length
   const remote = app.backend.mode === 'supabase'
-  const role = !remote ? 'Mode lokal' : app.session.role === 'pengawas' ? 'Pengawas' : 'Petugas'
+  const role = !remote ? 'Mode lokal' : roleLabel(app.role)
+  const [sandi, setSandi] = useState(false)
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -50,31 +58,36 @@ export function Profil() {
         </span>
       </GlassCard>
 
-      <section aria-labelledby="statistik" className="animate-entrance-2">
-        <h2 id="statistik" className="sr-only">
-          Statistik
-        </h2>
-        <div className="grid grid-cols-3 gap-space-xs">
-          <StatTile label="Selesai" value={selesai} hint="Bongkaran" icon={Truck} />
-          <StatTile label="Kepatuhan" value={selesai + anomali > 0 ? `${Math.round((selesai / (selesai + anomali)) * 100)}%` : '-'} hint="Q&Q sesuai" icon={FlaskConical} tone="primary" />
-          <StatTile label="Laporan" value={bulanIni} hint="Bulan ini" icon={FileText} tone="primary" />
-        </div>
-      </section>
+      {app.can('/input/bongkar') && (
+        <section aria-labelledby="statistik" className="animate-entrance-2">
+          <h2 id="statistik" className="sr-only">
+            Statistik
+          </h2>
+          <div className="grid grid-cols-3 gap-space-xs">
+            <StatTile label="Selesai" value={selesai} hint="Bongkaran" icon={Truck} />
+            <StatTile label="Kepatuhan" value={selesai + anomali > 0 ? `${Math.round((selesai / (selesai + anomali)) * 100)}%` : '-'} hint="Q&Q sesuai" icon={FlaskConical} tone="primary" />
+            <StatTile label="Laporan" value={bulanIni} hint="Bulan ini" icon={FileText} tone="primary" />
+          </div>
+        </section>
+      )}
 
-      <section aria-labelledby="operasional" className="animate-entrance-3 flex flex-col gap-space-sm">
-        <SectionHeader id="operasional" title="Operasional" />
-        <GlassCard level={2} className="flex flex-col p-space-2xs">
-          <MenuRow to="/plan" icon={ClipboardList} label="Plan Kirim (SO & LO)" />
-          <MenuRow to="/kalkulator" icon={Calculator} label="Kalkulator Density & Tangki" />
-        </GlassCard>
-      </section>
+      {app.can('/kalkulator') && (
+        <section aria-labelledby="operasional" className="animate-entrance-3 flex flex-col gap-space-sm">
+          <SectionHeader id="operasional" title="Alat bantu" />
+          <GlassCard level={2} className="flex flex-col p-space-2xs">
+            <MenuRow to="/kalkulator" icon={Calculator} label="Kalkulator Density & Tangki" />
+          </GlassCard>
+        </section>
+      )}
 
       <section aria-labelledby="akun" className="animate-entrance-4 flex flex-col gap-space-sm">
         <SectionHeader id="akun" title="Akun & SPBU" />
         <GlassCard level={2} className="flex flex-col p-space-2xs">
-          <MenuRow to="/pengaturan" icon={Settings2} label={app.canManage ? 'Pengaturan SPBU' : 'Info SPBU & Aturan'} />
-          {remote && app.canManage && <MenuRow to="/anggota" icon={Users} label="Anggota SPBU" />}
-          <MenuRow to="/pengaturan#data-acuan" icon={Database} label="Data Acuan Tabel" />
+          {app.isAdmin && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (pulau pompa, dispenser, nozzle)" />}
+          {remote && app.isAdmin && <MenuRow to="/anggota" icon={Users} label="Anggota & akun per peran" />}
+          {app.isAdmin && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
+          {app.isAdmin && <MenuRow to="/pengaturan#data-acuan" icon={Database} label="Data Acuan Tabel" />}
+          {remote && <MenuRow icon={KeyRound} label="Ganti kata sandi" onClick={() => setSandi(true)} />}
           {remote && <MenuRow icon={LogOut} label="Keluar" danger onClick={() => void app.signOut()} />}
         </GlassCard>
         {!remote && (
@@ -83,7 +96,53 @@ export function Profil() {
           </GlassCard>
         )}
       </section>
+      <Sheet open={sandi} onOpenChange={setSandi} title="Ganti kata sandi" description={app.session.user?.email}>
+        {sandi && <GantiSandi onDone={() => setSandi(false)} />}
+      </Sheet>
     </div>
+  )
+}
+
+function GantiSandi({ onDone }: { onDone: () => void }) {
+  const app = useApp()
+  const toast = useToast()
+  const [a, setA] = useState('')
+  const [b, setB] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const simpan = async () => {
+    if (a.length < 8) return setError('Kata sandi minimal 8 karakter.')
+    if (a !== b) return setError('Ulangi kata sandi belum sama.')
+    setBusy(true)
+    try {
+      await app.backend.changePassword(a)
+      toast('Kata sandi diganti')
+      onDone()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <Field label="Kata sandi baru" htmlFor="sandi-baru">
+        <Input id="sandi-baru" type="password" autoComplete="new-password" value={a} onChange={(e) => (setError(null), setA(e.target.value))} />
+      </Field>
+      <Field label="Ulangi kata sandi baru" htmlFor="sandi-ulang">
+        <Input id="sandi-ulang" type="password" autoComplete="new-password" value={b} onChange={(e) => (setError(null), setB(e.target.value))} />
+      </Field>
+      {error && (
+        <span role="alert" className="flex items-center gap-1.5 text-body-sm font-semibold text-error">
+          <TriangleAlert aria-hidden="true" className="size-4" />
+          {error}
+        </span>
+      )}
+      <Button size="lg" disabled={busy} onClick={simpan}>
+        <KeyRound aria-hidden="true" />
+        Simpan kata sandi
+      </Button>
+    </>
   )
 }
 

@@ -1,7 +1,8 @@
 import { bejanaStatus, type DailyRecord, type QqRecord, type StokRecord } from '@/lib/daily'
 import { addDays, hariSingkat, sameDay, startOfWeek, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
-import { PRODUK_OPTIONS, type Nozzle, type ReportSummary } from '@/lib/sop'
+import { loStatus } from '@/lib/plan'
+import { PRODUK_OPTIONS, type Nozzle, type Plan, type ReportSummary } from '@/lib/sop'
 
 /** Status Q&Q di pill: sesuai (selesai), perhatian (anomali), belum (draft / belum ada). */
 export type QQStatus = 'sesuai' | 'perhatian' | 'belum'
@@ -138,3 +139,52 @@ export function detailTanggal(iso: string, rows: ReportSummary[], daily: DailyRe
   }
 }
 
+
+/** D15 bongkaran terakhir suatu produk (sampai tanggal tertentu) sebagai acuan uji harian. */
+export function acuanD15(rows: ReportSummary[], produk: string, sampai?: string) {
+  let best: ReportSummary | null = null
+  for (const r of rows) {
+    if (r.produk !== produk || r.d15 === null || r.status === 'draft') continue
+    if (sampai && r.tanggal > sampai) continue
+    if (!best || r.tanggal + r.jam > best.tanggal + best.jam) best = r
+  }
+  return best ? { d15: best.d15 as number, tanggal: best.tanggal } : null
+}
+
+export type KalengStatus = 'sesuai' | 'perhatian' | 'menunggu' | 'belum'
+
+/** Kaleng = satu bongkaran selesai; nilai D15 dari sample mobil tangki yang diuji saat bongkar. */
+export type Kaleng = ReportSummary & { d15Sample: number | null; selisih: number | null; ok: boolean | null; menunggu: boolean }
+
+/**
+ * Kaleng sample per produk: 3 bongkaran selesai terakhir (kaleng 1 = terbaru).
+ * Isi kaleng adalah sample mobil tangki (uji density saat bongkar), dibanding D15 dokumen depot.
+ */
+export function kalengSample(rows: ReportSummary[], plans: Plan[], used: Map<string, ReportSummary>) {
+  return PRODUK_OPTIONS.map((produk) => {
+    const cans: Kaleng[] = rows
+      .filter((r) => r.produk === produk && r.status === 'selesai')
+      .sort((a, b) => (b.tanggal + b.jam).localeCompare(a.tanggal + a.jam) || b.createdAt - a.createdAt)
+      .slice(0, 3)
+      .map((r) => ({
+        ...r,
+        d15Sample: r.d15,
+        selisih: r.d15 !== null && r.d15Depot !== null ? Math.round((r.d15 - r.d15Depot) * 10000) / 10000 : null,
+        ok: r.densityOk ?? null,
+        menunggu: r.d15 === null,
+      }))
+    const status: KalengStatus = !cans.length
+      ? 'belum'
+      : cans.some((c) => c.ok === false)
+        ? 'perhatian'
+        : cans[0].menunggu
+          ? 'menunggu'
+          : 'sesuai'
+    const today = todayIso()
+    const next = plans
+      .filter((p) => p.tanggal >= today && p.los.some((lo) => lo.produk === produk && ['os', 'planned', 'delivery'].includes(loStatus(lo, used))))
+      .map((p) => p.tanggal)
+      .sort()[0]
+    return { produk, cans, status, nextPlan: next ?? null }
+  })
+}

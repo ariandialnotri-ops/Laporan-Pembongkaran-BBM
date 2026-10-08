@@ -1,22 +1,38 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
-import { titleFor } from '@/lib/nav'
+import { parentOf, titleFor } from '@/lib/nav'
 
 export function AppHeader() {
   const { pathname } = useLocation()
   const app = useApp()
+  const parent = parentOf(pathname)
+  const navigate = useNavigate()
 
   return (
-    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
+    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
-          <Link
-            to="/"
-            aria-label="FLOQ, buka HOME"
-            className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
-          >
-            <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
-          </Link>
+          {/* Halaman turunan: tombol kembali ke menu induk menggantikan logo. */}
+          {parent ? (
+            <button
+              type="button"
+              aria-label="Kembali"
+              // Kembali ke halaman asal (mis. Riwayat), bukan ke form; tanpa riwayat, ke menu induk.
+              onClick={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate(parent, { replace: true }))}
+              className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
+            >
+              <ChevronLeft aria-hidden="true" className="size-6" />
+            </button>
+          ) : (
+            <Link
+              to="/"
+              aria-label="FLOQ, buka Dashboard"
+              className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
+            >
+              <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
+            </Link>
+          )}
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>
             <span className="truncate text-tag uppercase text-primary">{app.settings.namaSpbu || 'SPBU'}</span>

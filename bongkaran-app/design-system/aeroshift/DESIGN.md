@@ -147,7 +147,20 @@ Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, a
 - Teks brand tidak memakai tanda em-dash (`—`); pakai koma atau titik dua.
 
 ### Struktur layar
-- Halaman utama berjudul **HOME**. Dock bawah: Beranda, Input, Laporan, Profil.
+- Dock bawah berisi 4 menu dengan peran tegas:
+  - **Dashboard**: hanya data, tanpa tombol aksi. Urutan: Kalender Progress (paling atas), Total Bongkaran (hari ini/periode), Kualitas Harian, Kaleng Sample (3 bongkaran terakhir per produk), LO Tracking.
+  - **Input**: semua pengisian. Kartu Input Bongkaran, Plan Pengiriman, Kualitas Harian, Sample BBM 2 Jam, dengan bar wajib Stok Awal Shift di atasnya.
+  - **Laporan**: semua riwayat dan unduhan. Kartu Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera.
+  - **Profil**: akun, pengaturan, dan Kalkulator (Kalkulator hanya ada di sini).
+- **Kaleng Sample** (Dashboard): kartu ringkasan (produk, sampel sesuai, anomali/belum ada, pembaruan), lalu satu kartu akordeon per produk berisi 3 kaleng (kiri terbaru, kanan terlama; slot kosong bergaris putus-putus dengan tanggal plan kirim berikutnya). Kaleng 1 bergaris warna produk (merah bila anomali). Ketuk kaleng untuk bottom sheet detail uji: penerimaan, parameter density, segel & retensi, tanda tangan. Warna produk Pertamina (Pertalite hijau, Pertamax biru, Turbo merah, Biosolar kuning, Dex teal) hanya untuk ikon, chip spesifikasi, dan isi kaleng; status tetap memakai token AeroShift.
+- Bongkaran selesai terkunci (hanya tanda tangan pengawas/ABH); hanya pengawas yang dapat membuka kembali BA anomali. Tombol kembali di header mengikuti riwayat navigasi (kembali ke halaman asal), menu induk bila tidak ada riwayat.
+- Ubah data dari tabel riwayat lewat bottom sheet, bukan pindah halaman.
+- Lapisan pop up: dropdown Select z-70 di atas sheet (z-60/61), toast z-80. Label Pill tidak membungkus baris.
+- Halaman di bawah menu membuka satu pekerjaan; tombol kembali di kiri header (menggantikan logo) kembali ke menu induk.
+- Kartu menu: ikon biru, judul, satu kalimat isi, dan baris status (biru bila beres, merah dengan lencana jumlah bila ada yang perlu dikerjakan).
+- Riwayat memakai tabel rekap di layar lebar (judul huruf besar + chip "n dari total", kolom BBM berupa chip, kolom Aksi) dan kartu di HP, dari definisi kolom yang sama (`RecordTable`).
+- Form yang jarang dipakai (permintaan MS2, edit LO, input sampel 2 jam) dibuka di bottom sheet.
+- Lapisan: header 40, dock 50, sheet 60/61, dropdown Select 70, toast 80.
 - Form bongkaran: tab segmen **Bongkaran / Quality / Quantity / Finish**, 14 langkah SOP, titik langkah bernomor, satu kartu kaca per kelompok isian.
 - Login: logo di tengah, kartu kaca berisi form, gelombang biru lembut (3 lapis, opasitas 0,14 / 0,20 / 0,28) di bawah layar.
 
