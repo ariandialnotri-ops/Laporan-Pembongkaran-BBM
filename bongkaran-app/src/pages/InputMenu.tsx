@@ -41,7 +41,7 @@ export function InputMenu() {
       to: '/plan',
       icon: ClipboardList,
       title: 'Plan Pengiriman',
-      desc: 'Permintaan MS2, nomor SO, LO, dan segel',
+      desc: 'Permintaan MS2, nomor SO, dan LO per produk',
       status: besok ? 'Plan besok belum dibuat' : proses ? `${proses} LO belum terbit` : kirim ? `${kirim} LO sedang dikirim` : 'Semua LO terisi',
       badge: (besok ? 1 : 0) + proses,
     },

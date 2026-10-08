@@ -179,7 +179,7 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
         <Grid>
           <Item label="Posisi kaleng" value={`Kaleng ${slot + 1} dari 3`} />
           <Item label="Masa simpan" value={slot === 2 ? 'Dibuang saat kaleng baru masuk' : `Sampai ${3 - slot} bongkaran ${k.produk} lagi`} tone={slot === 2 ? 'wait' : undefined} />
-          <Item label="Kondisi segel" value={d.segelSesuai ? 'Utuh, sesuai data LO' : 'Belum dikonfirmasi'} tone={d.segelSesuai ? 'ok' : undefined} />
+          <Item label="Kondisi segel" value={d.segelSesuai ? 'Utuh, sesuai dokumen LO' : 'Belum dikonfirmasi'} tone={d.segelSesuai ? 'ok' : undefined} />
           <Item label="Petugas uji pasca penerimaan" value={sample?.petugas || '-'} />
         </Grid>
       </Bagian>

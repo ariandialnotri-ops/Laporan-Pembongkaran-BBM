@@ -266,7 +266,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 | **LeaveGuard** | `leave-guard.tsx` | Sheet konfirmasi keluar dari form | |
 | **StepRail** | `pages/FormBongkar.tsx` | 14 bulatan nomor bisa digeser, pemisah antar fase, aktif biru besar | lengkap/terkunci |
 | **Kaleng (ilustrasi)** | `kaleng-sample.tsx` | Kaleng: tutup, label `K1/K2/K3`, isi warna produk | |
-| **LoEditSheet** | `lo-edit-sheet.tsx` | Pop up LO: **Nomor SO** (berlaku untuk semua LO di permintaan), **Nomor LO**, produk, volume, shift, status (grid kartu), alih supply, segel, hapus (pengawas) | LO Closed: tampilan kunci saja |
+| **LoEditSheet** | `lo-edit-sheet.tsx` | Pop up LO: **Nomor SO** (berlaku untuk semua LO di permintaan, tanpa placeholder), **Nomor LO per produk** (satu field per produk yang dipesan; LO yang Closed/Delivered tampil terkunci), produk, volume, shift, status (grid kartu), alih supply, hapus (pengawas). Tidak ada field segel | LO Closed: tampilan kunci saja |
 | **KalengDetail** | `kaleng-detail.tsx` | Pop up detail uji kaleng (lihat 9.2) | |
 | **ProteksiSettings** | `proteksi-settings.tsx` | Data utama APAR: jumlah pulau, ringkas unit, daftar area (+ Tambah area), kartu unit (kode, jenis, lokasi, kapasitas, jadwal isi ulang, cadangan) | |
 | **QrImg** | `apar/qr.tsx` | Gambar QR (data URL) untuk alamat halaman unit | memuat: kotak berdenyut |
@@ -339,7 +339,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 | 3 | | Buku Tera Mobil Tangki | Per kompartemen: **Tinggi T2 mobil tangki** (mm, penuh lebar), **Kapasitas** (L), **Kepekaan** (L/mm). Teks bantu: selisih liter = kepekaan × selisih mm (0,3 × −5 = −1,5 L) |
 | 4 | | ATG Sebelum Pembongkaran | Tangki pendam; kartu **"Pembacaan berdasarkan ATG"** (tinggi/volume/suhu); totalisator awal nozzle |
 | 5 | | Kelengkapan Safety | APAR, arde, atribut safety |
-| 6 | | Segel Kompartemen | Kotak merah daftar segel dari LO, foto, nomor segel per kompartemen, konfirmasi |
+| 6 | | Segel Kompartemen | Kotak merah: cocokkan dengan dokumen LO fisik, foto, nomor segel per kompartemen, konfirmasi |
 | 7 | | Deepstick Tangki Pendam (Sebelum) | Tinggi deepstick + volume |
 | 8 | | Water Content Kompartemen MT | Nihil / Ada air (+ foto draining) |
 | 9 | | Deepstick Kompartemen MT vs Buku Tera | Tinggi T2 (tetap) vs hasil deepstick; banner "Selisih −5 mm ≈ −1,5 L"; izin penanggung jawab bila selisih > batas |
@@ -357,7 +357,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 - Tombol besar **Permintaan baru (MS2)** → sheet: Tanggal kirim, Supply point, Tanggal & jam MS2, Ship To, PO SAP (opsional); **baris produk**: Produk, Volume L, hapus, **Shift 1/2 per produk (wajib)**; Tambah produk; Simpan (terkunci saat menyimpan).
 - Kartu **Status SO & LO**: DateFilter + 8 kotak status (bisa jadi saringan).
 - **Tabel Plan Pengiriman** (RecordTable, satu baris per LO): Tgl kirim, No SO, No LO (LO lama dicoret → LO baru bila alih supply), Produk, Volume, Shift, Supply point, Permintaan MS2, Status. Plan bertanggal kirim mendatang selalu tampil.
-- Ketuk baris → **LoEditSheet** (Nomor SO dulu, lalu Nomor LO).
+- Ketuk baris → **LoEditSheet** (Nomor SO dulu, lalu Nomor LO tiap produk dalam satu pop up).
 
 ### 9.7 Kualitas Harian
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
@@ -499,7 +499,7 @@ Pertahankan struktur:
   Riwayat Kualitas Harian, Riwayat Tera, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
 - Form bongkaran 14 langkah dalam 3 fase (Bongkaran, Quality, Quantity) + Finish, setiap langkah ada foto wajib;
   buku tera: Tinggi T2, Kapasitas, Kepekaan (L/mm); tanda tangan lewat pop up dengan kotak panduan.
-- Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); pop up LO berisi Nomor SO lalu Nomor LO.
+- Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); pop up LO berisi Nomor SO lalu Nomor LO per produk (tanpa segel). Langkah 2 bongkaran: tombol "Ubah nomor LO / pindah station" pada LO terpilih (bottom sheet: nomor LO baru, centang pindah station + supply point baru); tersimpan ke Plan sehingga Tracking LO ikut berubah.
 - APAR & APAB: dashboard (ringkas kondisi, per area, daftar unit), inspeksi per unit (butir Baik/Tidak + foto wajib),
   data utama (pulau, area, unit), label QR siap cetak, halaman unit dari QR (data, kondisi terakhir, riwayat).
 Warna status: hijau = sesuai, biru = aksi/aktif, cyan = menunggu, amber = pengingat, merah = anomali.

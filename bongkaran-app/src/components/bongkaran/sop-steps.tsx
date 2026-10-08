@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { CircleCheck, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
+import { SupplySelect } from '@/components/bongkaran/lo-edit-sheet'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'
@@ -9,12 +10,15 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast'
+import { useApp } from '@/lib/app-state'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso, minutesBetween, nowHm } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { loPickable, loStatus, loStatusMeta } from '@/lib/plan'
+import { loPickable, loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import { shiftLabel } from '@/lib/shift'
 import {
   SIGNERS,
@@ -414,6 +418,15 @@ function LoStep(props: StepProps) {
       totalisator: produk !== d.produk ? nozzles.map((n) => ({ nozzleId: n.id, nozzle: n.nama, awal: '', akhir: '' })) : d.totalisator,
     })
   }
+  // Nomor LO di laporan mengikuti Plan (mis. setelah nomor LO diubah karena pindah station).
+  const noLOsPlan = plan ? plan.los.filter((l) => d.loIds.includes(l.id)).map((l) => l.noLO) : null
+  const kunciPlan = noLOsPlan?.join('|')
+  useEffect(() => {
+    if (!props.readOnly && noLOsPlan && kunciPlan !== d.noLOs.join('|')) setData({ noLOs: noLOsPlan })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kunciPlan])
+  const [ubahLo, setUbahLo] = useState<PlanLo | null>(null)
+
   const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
   const removeComp = (id: string) =>
     setData({ compartments: d.compartments.filter((c) => c.id !== id), densityTests: d.densityTests.filter((t) => t.kompartemenId !== id) })
@@ -457,12 +470,26 @@ function LoStep(props: StepProps) {
               const blocked = !checked && !mine && !loPickable(lo, usedLoIds)
               const lainProduk = !checked && !!d.produk && d.loIds.length > 0 && lo.produk !== d.produk
               return (
-                <CheckRow key={lo.id} checked={checked} disabled={blocked || lainProduk} onChange={(v) => toggleLo(lo, v)}>
-                  <span className="tabular font-semibold">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>, {lo.produk} {formatLiter(lo.volume)}
-                  {lo.noLOLama && <span className="tabular text-on-surface-variant"> (alih supply dari LO {lo.noLOLama})</span>}
-                  {blocked && <span className="text-on-surface-variant">. Status {loStatusMeta(st).label}</span>}
-                  {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
-                </CheckRow>
+                <div key={lo.id} className="flex flex-col gap-1">
+                  <CheckRow checked={checked} disabled={blocked || lainProduk} onChange={(v) => toggleLo(lo, v)}>
+                    <span className="tabular font-semibold">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>, {lo.produk} {formatLiter(lo.volume)}
+                    {lo.noLOLama && (
+                      <span className="tabular text-on-surface-variant">
+                        {' '}
+                        (pindah station dari LO {lo.noLOLama}
+                        {lo.supplyPointLama ? `, ${lo.supplyPointLama}` : ''})
+                      </span>
+                    )}
+                    {blocked && <span className="text-on-surface-variant">. Status {loStatusMeta(st).label}</span>}
+                    {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
+                  </CheckRow>
+                  {checked && !props.readOnly && (
+                    <Button variant="soft" size="sm" className="self-start" onClick={() => setUbahLo(lo)}>
+                      <Repeat aria-hidden="true" />
+                      Ubah nomor LO / pindah station
+                    </Button>
+                  )}
+                </div>
               )
             })}
           </div>
@@ -479,6 +506,8 @@ function LoStep(props: StepProps) {
           Tercatat sebagai bongkaran <b className="text-on-surface">{shiftLabel(x.shift)}</b>
         </span>
       </Section>
+
+      {plan && <UbahLoSheet plan={plan} lo={ubahLo} onClose={() => setUbahLo(null)} />}
 
       <Section>
         <span className="text-tag uppercase text-primary">Data LO mobil tangki</span>
@@ -815,7 +844,7 @@ function SegelStep(props: StepProps) {
         {daftar.length ? (
           <span className="tabular text-body-md font-semibold text-on-error-container">{daftar.join(', ')}</span>
         ) : (
-          <span className="text-body-sm text-on-error-container">Nomor segel belum diisi di data LO (Input, Plan Pengiriman). Cocokkan langsung dengan dokumen LO fisik.</span>
+          <span className="text-body-sm text-on-error-container">Cocokkan nomor segel tiap kompartemen langsung dengan nomor segel di dokumen LO fisik.</span>
         )}
         <span className="text-body-sm text-on-error-container">Segel rusak atau nomor berbeda: hentikan bongkar dan hubungi pengawas.</span>
       </div>
@@ -856,7 +885,7 @@ function SegelStep(props: StepProps) {
           <StatusBanner tone="error" title="Nomor segel tidak ada di data LO" detail={asing.map((c) => `Kompartemen ${c.no}: ${c.noSegel}`).join(', ')} />
         )}
         <CheckRow checked={d.segelSesuai} onChange={(v) => setData({ segelSesuai: v })}>
-          Segel kompartemen atas & bawah utuh dan nomornya sesuai data LO
+          Segel kompartemen atas & bawah utuh dan nomornya sesuai dokumen LO
         </CheckRow>
       </Section>
     </>
@@ -908,3 +937,106 @@ export function SignersSection({
     </Section>
   )
 }
+
+/**
+ * Ubah nomor LO saat bongkar, mis. MT dialihkan ke station (supply point) lain dan LO terbit ulang.
+ * Disimpan ke Plan sehingga Tracking LO dan laporan ikut berubah; LO lama tetap tercatat.
+ */
+function UbahLoSheet({ plan, lo, onClose }: { plan: Plan; lo: PlanLo | null; onClose: () => void }) {
+  return (
+    <Sheet open={!!lo} onOpenChange={(o) => !o && onClose()} title="Ubah nomor LO" description={lo ? `${lo.produk}, ${formatLiter(lo.volume)}, SO ${plan.noSO || '-'}` : undefined}>
+      {lo && <UbahLoIsi key={lo.id} plan={plan} lo={lo} onClose={onClose} />}
+    </Sheet>
+  )
+}
+
+function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () => void }) {
+  const app = useApp()
+  const toast = useToast()
+  const asal = planSupply(plan, lo)
+  const [no, setNo] = useState(lo.noLO)
+  const [pindah, setPindah] = useState(false)
+  const [sp, setSp] = useState(asal)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const simpan = async () => {
+    const baru = no.trim()
+    if (!baru) return setError('Isi nomor LO.')
+    const lain = new Set(
+      app.plans
+        .flatMap((p) => p.los.filter((x) => x.id !== lo.id).flatMap((x) => [x.noLO, x.noLOLama ?? '']))
+        .map((n) => n.trim().toUpperCase())
+        .filter(Boolean),
+    )
+    if (lain.has(baru.toUpperCase())) return setError(`Nomor LO ${baru} sudah terdaftar.`)
+    if (pindah && (!sp || sp === asal)) return setError('Pilih station (supply point) baru yang berbeda.')
+    if (!pindah && baru === lo.noLO) return onClose()
+    const next: PlanLo = pindah
+      ? { ...lo, status: 'alih', noLOLama: lo.noLO, supplyPointLama: asal, noLO: baru, supplyPoint: sp }
+      : { ...lo, noLO: baru }
+    setSaving(true)
+    try {
+      await app.savePlan({ ...plan, los: plan.los.map((x) => (x.id === lo.id ? next : x)) })
+      toast(pindah ? `Pindah station: LO ${lo.noLO || '-'} menjadi ${baru}` : `Nomor LO menjadi ${baru}`)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-0.5 rounded-md bg-surface-container-low px-space-sm py-space-xs text-body-sm">
+        <span className="text-on-surface-variant">LO sekarang</span>
+        <span className="tabular font-semibold text-on-surface">
+          {lo.noLO || 'belum terbit'}, {asal || '-'}
+        </span>
+      </div>
+      <Field label="Nomor LO baru" htmlFor="bongkar-lo-baru">
+        <Input
+          id="bongkar-lo-baru"
+          autoComplete="off"
+          inputMode="numeric"
+          value={no}
+          onChange={(e) => {
+            setNo(e.target.value)
+            setError(null)
+          }}
+        />
+      </Field>
+      <CheckRow
+        checked={pindah}
+        onChange={(v) => {
+          setPindah(v)
+          setError(null)
+        }}
+      >
+        Pindah station pengiriman (alih supply); LO lama tetap tercatat
+      </CheckRow>
+      {pindah && (
+        <Field label="Station / supply point baru" htmlFor="bongkar-lo-sp">
+          <SupplySelect
+            id="bongkar-lo-sp"
+            value={sp}
+            onChange={(v) => {
+              setSp(v)
+              setError(null)
+            }}
+          />
+        </Field>
+      )}
+      {error && (
+        <span role="alert" className="text-body-sm font-semibold text-error">
+          {error}
+        </span>
+      )}
+      <Button size="lg" disabled={saving} onClick={simpan}>
+        Simpan nomor LO
+      </Button>
+    </>
+  )
+}
+

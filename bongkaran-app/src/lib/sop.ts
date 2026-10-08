@@ -101,7 +101,7 @@ export interface ReportData {
   jumlahDO: string
   /** Volume DO/LO yang diterima (liter). */
   volumeDO: string
-  /** Nomor segel dari data LO di Plan Kirim, untuk dicocokkan di tahap segel. */
+  /** Nomor segel dari data LO lama (sebelum segel dihapus dari Tracking LO); kosong untuk LO baru. */
   segelLO: string[]
   perusahaanPengangkut: string
   densityObsDepot: string
@@ -752,7 +752,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       break
     case 'segel':
       if (d.compartments.some((c) => !has(c.noSegel))) issues.push('Isi nomor segel tiap kompartemen')
-      if (!d.segelSesuai) issues.push('Konfirmasi nomor segel sesuai data LO')
+      if (!d.segelSesuai) issues.push('Konfirmasi nomor segel sesuai dokumen LO')
       break
     case 'dip_before':
       if (num(d.dipBeforeMm) === null) issues.push('Isi ketinggian deepstick tangki pendam (mm)')

@@ -45,7 +45,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
-| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk mengisi nomor SO lalu nomor LO, status, dan segel. Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
+| | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), ketuk baris untuk mengisi nomor SO lalu nomor LO **tiap produk** yang dipesan dalam satu pop up, dan status (nomor segel tidak lagi diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
 | | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, per area, daftar unit; tombol Mulai inspeksi, Pindai QR, Label QR, Data utama |
@@ -80,7 +80,7 @@ sampai langkah sebelumnya lengkap. Semua isian tersimpan otomatis.
 
 | Fase | Langkah |
 |------|---------|
-| Bongkaran | 1 MT tiba + nopol, 2 Dokumen LO (pilih SO & LO dari plan, Ship To, volume DO liter, shift bongkar otomatis), 3 Buku tera + kapasitas kompartemen, 4 ATG sebelum + totalisator awal nozzle, 5 Safety, 6 Segel atas & bawah (nomor segel dicocokkan dengan data LO), 7 Deepstick tangki sebelum, 8 Water content & draining, 9 Deepstick kompartemen MT |
+| Bongkaran | 1 MT tiba + nopol, 2 Dokumen LO (pilih SO & LO dari plan, Ship To, volume DO liter, shift bongkar otomatis; tombol **Ubah nomor LO / pindah station** bila MT dialihkan ke station lain, tersimpan ke Plan & Tracking LO dengan LO lama tetap tercatat), 3 Buku tera + kapasitas kompartemen, 4 ATG sebelum + totalisator awal nozzle, 5 Safety, 6 Segel atas & bawah (nomor segel per kompartemen dicocokkan dengan dokumen LO fisik), 7 Deepstick tangki sebelum, 8 Water content & draining, 9 Deepstick kompartemen MT |
 | Quality   | 10 Sampel atas/bawah, 11 Density (dihentikan bila selisih D15 > toleransi) |
 | Quantity  | 12 Hose & fillport, 13 ATG setelah (min. 10 menit setelah selesai) + totalisator akhir, 14 Deepstick tangki setelah + tanda tangan digital |
 

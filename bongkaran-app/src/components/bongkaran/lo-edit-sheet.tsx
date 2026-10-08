@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Lock, Repeat, Trash2, TriangleAlert } from 'lucide-react'
-import { Choice, Field, TagInput } from '@/components/bongkaran/form-bits'
+import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -60,18 +60,20 @@ export function SupplySelect({ id, value, onChange }: { id: string; value: strin
   )
 }
 
-type LoForm = { noSO: string; noLO: string; produk: string; volume: string; shift: '' | '1' | '2'; status: LoStatus; segel: string[]; alihLO: string; alihSP: string }
+type LoForm = { noSO: string; noLO: string; produk: string; volume: string; shift: '' | '1' | '2'; status: LoStatus; alihLO: string; alihSP: string; /** Nomor LO produk lain dalam permintaan yang sama. */ lainLO: Record<string, string> }
 
 export type LoTarget = { plan: Plan; lo: PlanLo | null }
 
 const formOf = ({ plan, lo }: LoTarget): LoForm =>
   lo
-    ? { noSO: plan.noSO, noLO: lo.noLO, produk: lo.produk, volume: String(lo.volume), shift: lo.shift ?? plan.ms2Shift ?? '', status: lo.status, segel: lo.segel, alihLO: '', alihSP: planSupply(plan, lo) }
-    : { noSO: plan.noSO, noLO: '', produk: PRODUK_OPTIONS[0], volume: '8000', shift: plan.ms2Shift ?? '', status: 'os', segel: [], alihLO: '', alihSP: plan.supplyPoint }
+    ? { noSO: plan.noSO, noLO: lo.noLO, produk: lo.produk, volume: String(lo.volume), shift: lo.shift ?? plan.ms2Shift ?? '', status: lo.status, alihLO: '', alihSP: planSupply(plan, lo), lainLO: lainOf(plan, lo.id) }
+    : { noSO: plan.noSO, noLO: '', produk: PRODUK_OPTIONS[0], volume: '8000', shift: plan.ms2Shift ?? '', status: 'os', alihLO: '', alihSP: plan.supplyPoint, lainLO: lainOf(plan, '') }
+
+const lainOf = (plan: Plan, kecuali: string) => Object.fromEntries(plan.los.filter((x) => x.id !== kecuali).map((x) => [x.id, x.noLO]))
 
 /**
- * Pop up ubah satu LO: nomor SO (milik permintaan), nomor LO, produk, volume, shift,
- * status, segel, alih supply.
+ * Pop up ubah LO: nomor SO (milik permintaan), nomor LO tiap produk dalam permintaan,
+ * lalu produk, volume, shift, status, dan alih supply untuk LO yang diketuk.
  * LO Closed (sudah dibongkar) hanya bisa dilihat.
  */
 export function LoEditSheet({ target, onClose }: { target: LoTarget | null; onClose: () => void }) {
@@ -104,16 +106,26 @@ function Isi({ target, onClose }: { target: LoTarget; onClose: () => void }) {
   const terkunci = status === 'closed'
   const startAlih = f.status === 'alih' && !!lo && lo.status !== 'alih'
 
+  // LO lain di permintaan ini yang nomornya masih boleh diubah (belum dipakai bongkaran, tidak dihapus).
+  const bisaUbah = (x: PlanLo) => !app.usedLoIds.has(x.id) && x.status !== 'deleted'
+  const lain = plan.los.filter((x) => x.id !== lo?.id)
+  // Nomor LO di permintaan lain (permintaan ini dicek terpisah karena nomornya bisa ditukar).
   const taken = () =>
     new Set(
       app.plans
-        .flatMap((p) => p.los.filter((x) => x.id !== lo?.id).flatMap((x) => [x.noLO, x.noLOLama ?? '']))
+        .filter((p) => p.id !== plan.id)
+        .flatMap((p) => p.los.flatMap((x) => [x.noLO, x.noLOLama ?? '']))
         .map((n) => n.trim().toUpperCase())
         .filter(Boolean),
     )
 
   const simpan = async () => {
-    if ((f.noLO.trim() || startAlih) && !f.noSO.trim()) return setError('Isi nomor SO terlebih dahulu, baru nomor LO.')
+    const lainBaru = lain.map((x) => ({ x, no: bisaUbah(x) ? (f.lainLO[x.id] ?? '').trim() : x.noLO }))
+    if ((f.noLO.trim() || startAlih || lainBaru.some((l) => l.no && bisaUbah(l.x))) && !f.noSO.trim()) return setError('Isi nomor SO terlebih dahulu, baru nomor LO.')
+    // Nomor LO dalam permintaan ini tidak boleh kembar.
+    const semua = [startAlih ? f.alihLO.trim() : f.noLO.trim(), ...lainBaru.map((l) => l.no), ...plan.los.map((x) => x.noLOLama ?? '')].map((n) => n.toUpperCase()).filter(Boolean)
+    const kembar = semua.find((n, i) => semua.indexOf(n) !== i)
+    if (kembar) return setError(`Nomor LO ${kembar} dipakai lebih dari sekali.`)
     const volume = parseAngka(f.volume)
     if (!(volume && volume > 0)) return setError('Volume harus lebih dari 0 liter.')
     const sudah = taken()
@@ -126,11 +138,17 @@ function Isi({ target, onClose }: { target: LoTarget; onClose: () => void }) {
     } else if (f.noLO.trim() && sudah.has(f.noLO.trim().toUpperCase())) {
       return setError(`Nomor LO ${f.noLO} sudah terdaftar.`)
     }
+    const lainDipakai = lainBaru.find((l) => bisaUbah(l.x) && l.no && sudah.has(l.no.toUpperCase()))
+    if (lainDipakai) return setError(`Nomor LO ${lainDipakai.no} (${lainDipakai.x.produk}) sudah terdaftar.`)
     const next: PlanLo =
       startAlih && lo
-        ? { ...lo, produk: f.produk, volume, shift: f.shift, segel: f.segel, status: 'alih', noLOLama: lo.noLO, supplyPointLama: planSupply(plan, lo), noLO: f.alihLO.trim(), supplyPoint: f.alihSP }
-        : { ...(lo ?? { id: genId('lo') }), noLO: f.noLO.trim(), produk: f.produk, volume, shift: f.shift, status: f.status, segel: f.segel }
-    const los = lo ? plan.los.map((x) => (x.id === lo.id ? next : x)) : [...plan.los, next]
+        ? { ...lo, produk: f.produk, volume, shift: f.shift, status: 'alih', noLOLama: lo.noLO, supplyPointLama: planSupply(plan, lo), noLO: f.alihLO.trim(), supplyPoint: f.alihSP }
+        : { segel: [], ...(lo ?? { id: genId('lo') }), noLO: f.noLO.trim(), produk: f.produk, volume, shift: f.shift, status: f.status }
+    const lainLos = plan.los.map((x) => {
+      const baru = lainBaru.find((l) => l.x.id === x.id)
+      return baru && bisaUbah(x) ? { ...x, noLO: baru.no } : x
+    })
+    const los = lo ? lainLos.map((x) => (x.id === lo.id ? next : x)) : [...lainLos, next]
     setSaving(true)
     try {
       await app.savePlan({ ...plan, noSO: f.noSO.trim(), los })
@@ -172,7 +190,7 @@ function Isi({ target, onClose }: { target: LoTarget; onClose: () => void }) {
           <Info label="Nomor LO" value={lo.noLO || '-'} />
           <Info label="Shift permintaan" value={lo.shift ? `Shift ${lo.shift}` : '-'} />
           <Info label="Supply point" value={planSupply(plan, lo) || '-'} />
-          <Info label="Segel" value={lo.segel.join(', ') || '-'} />
+          {lo.noLOLama && <Info label="Pindah station dari" value={`LO ${lo.noLOLama}${lo.supplyPointLama ? `, ${lo.supplyPointLama}` : ''}`} />}
         </dl>
         <Button size="lg" variant="glass" className="w-full" onClick={onClose}>
           Tutup
@@ -191,9 +209,36 @@ function Isi({ target, onClose }: { target: LoTarget; onClose: () => void }) {
         >
           <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" value={f.noSO} onChange={(e) => set({ noSO: e.target.value })} />
         </Field>
-        <Field label="Nomor LO" htmlFor="lo-no-edit" className="col-span-2">
-          <Input id="lo-no-edit" autoComplete="off" inputMode="numeric" disabled={startAlih} placeholder={f.noSO.trim() ? '' : 'Isi nomor SO dulu'} value={f.noLO} onChange={(e) => set({ noLO: e.target.value })} />
-        </Field>
+        <div className="col-span-2 flex flex-col gap-space-xs">
+          <span className="text-tag uppercase text-on-surface-variant">{plan.los.length > 1 ? 'Nomor LO per produk' : 'Nomor LO'}</span>
+          {plan.los.map((x) => {
+            const ini = x.id === lo?.id
+            const label = `${x.produk}, ${formatNumber(x.volume)} L${x.shift ? `, shift ${x.shift}` : ''}`
+            if (ini)
+              return (
+                <Field key={x.id} label={plan.los.length > 1 ? `${label} (LO ini)` : label} htmlFor="lo-no-edit">
+                  <Input id="lo-no-edit" autoComplete="off" inputMode="numeric" disabled={startAlih} value={f.noLO} onChange={(e) => set({ noLO: e.target.value })} />
+                </Field>
+              )
+            return bisaUbah(x) ? (
+              <Field key={x.id} label={label} htmlFor={`lo-no-${x.id}`}>
+                <Input id={`lo-no-${x.id}`} autoComplete="off" inputMode="numeric" value={f.lainLO[x.id] ?? ''} onChange={(e) => set({ lainLO: { ...f.lainLO, [x.id]: e.target.value } })} />
+              </Field>
+            ) : (
+              <div key={x.id} className="flex min-h-11 items-center gap-space-sm rounded-md bg-surface-container-low px-space-sm text-body-sm">
+                <Lock aria-hidden="true" className="size-4 shrink-0 text-on-surface-variant" />
+                <span className="flex-1 text-on-surface">{label}</span>
+                <span className="tabular font-semibold text-on-surface">{x.noLO || '-'}</span>
+                <span className="text-on-surface-variant">{loStatusMeta(loStatus(x, app.usedLoIds)).label}</span>
+              </div>
+            )
+          })}
+          {!lo && (
+            <Field label="LO baru" htmlFor="lo-no-edit">
+              <Input id="lo-no-edit" autoComplete="off" inputMode="numeric" value={f.noLO} onChange={(e) => set({ noLO: e.target.value })} />
+            </Field>
+          )}
+        </div>
         <Field label="Produk" htmlFor="lo-produk-edit">
           <ProdukSelect id="lo-produk-edit" value={f.produk} onChange={(v) => set({ produk: v })} />
         </Field>
@@ -252,9 +297,6 @@ function Isi({ target, onClose }: { target: LoTarget; onClose: () => void }) {
         </div>
       )}
 
-      <Field label="Nomor segel (sesuai dokumen LO)" htmlFor="lo-segel-edit" hint="Dipakai petugas untuk mencocokkan segel saat bongkar.">
-        <TagInput id="lo-segel-edit" values={f.segel} onChange={(v) => set({ segel: v })} placeholder="Ketik nomor segel" />
-      </Field>
       <ErrorBox text={error} />
       <div className="flex gap-space-xs">
         {lo && app.canManage && !usedBy && (
