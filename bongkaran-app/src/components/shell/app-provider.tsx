@@ -3,6 +3,7 @@ import { AppContext, type AppState, type SessionStatus } from '@/lib/app-state'
 import { backend, type SessionInfo } from '@/lib/backend'
 import type { DailyRecord } from '@/lib/daily'
 import { addDays, todayIso } from '@/lib/date'
+import { bolehBuka, type Role } from '@/lib/roles'
 import { DEFAULT_RULES, effectiveRules, type Plan, type ReportSummary, type Settings } from '@/lib/sop'
 import { TANK_SPBU } from '@/lib/tank'
 import { DEFAULT_AREAS } from '@/lib/apar'
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   perusahaanPengangkut: 'PERTAMINA PATRA NIAGA',
   nozzles: [],
   jumlahPulau: 0,
+  jumlahDispenser: 0,
   aparArea: DEFAULT_AREAS,
   apar: [],
   apab: [],
@@ -240,7 +242,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const rules = useMemo(() => effectiveRules(settings.rules), [settings.rules])
 
   const value = useMemo<AppState>(() => {
-    const canManage = backend.mode === 'local' || session.role === 'pengawas'
+    // Mode lokal = ABH; saat pengembangan peran lain bisa dicoba lewat localStorage "floq-peran".
+    const role: Role = backend.mode === 'local' ? peranUjiLokal() : (session.role ?? 'security')
+    const isAdmin = role === 'abh'
+    const canManage = isAdmin || role === 'pengawas'
     const displayName = session.nama || session.user?.email || 'Mode lokal'
     const usedLoIds = new Map<string, ReportSummary>()
     reports.forEach((r) => r.loIds?.forEach((id) => usedLoIds.set(id, r)))
@@ -249,7 +254,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status,
       statusMessage,
       session,
+      role,
+      isAdmin,
       canManage,
+      can: (path) => bolehBuka(role, path),
       displayName,
       initials: initialsOf(displayName),
       loaded,
@@ -277,4 +285,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [status, statusMessage, session, loaded, settings, rules, updateSettings, plans, savePlan, deletePlan, reports, upsertSummary, removeSummary, daily, saveDaily, deleteDaily, refresh, sync, initSession, signIn, signOut, userId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+}
+
+function peranUjiLokal(): Role {
+  if (!import.meta.env.DEV) return 'abh'
+  try {
+    const r = localStorage.getItem('floq-peran')
+    return r === 'pengawas' || r === 'kashift' || r === 'security' ? r : 'abh'
+  } catch {
+    return 'abh'
+  }
 }

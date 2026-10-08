@@ -64,20 +64,24 @@ export function AparUnit() {
             {k.isiUlang === 'lewat' ? ', sudah lewat' : k.isiUlang === 'segera' ? ', kurang dari 30 hari' : ''}
           </span>
         )}
-        <Link to={`/apar/inspeksi?unit=${encodeURIComponent(u.id)}`} className={buttonVariants({ size: 'lg' })}>
-          <ClipboardCheck aria-hidden="true" />
-          Inspeksi unit ini
-        </Link>
-        <div className="grid grid-cols-2 gap-space-xs">
-          <Link to={`/apar/label?unit=${encodeURIComponent(u.id)}`} className={buttonVariants({ variant: 'glass', size: 'sm' })}>
-            <Printer aria-hidden="true" />
-            Cetak label
+        {app.can('/apar/inspeksi/') && (
+          <Link to={`/apar/inspeksi/${encodeURIComponent(u.id)}`} className={buttonVariants({ size: 'lg' })}>
+            <ClipboardCheck aria-hidden="true" />
+            Inspeksi unit ini
           </Link>
-          <Link to="/apar/data" className={buttonVariants({ variant: 'glass', size: 'sm' })}>
-            <Database aria-hidden="true" />
-            Data utama
-          </Link>
-        </div>
+        )}
+        {app.can('/apar/data') && (
+          <div className="grid grid-cols-2 gap-space-xs">
+            <Link to={`/apar/label?unit=${encodeURIComponent(u.id)}`} className={buttonVariants({ variant: 'glass', size: 'sm' })}>
+              <Printer aria-hidden="true" />
+              Cetak label
+            </Link>
+            <Link to="/apar/data" className={buttonVariants({ variant: 'glass', size: 'sm' })}>
+              <Database aria-hidden="true" />
+              Data utama
+            </Link>
+          </div>
+        )}
       </GlassCard>
 
       <section aria-labelledby="unit-kondisi" className="animate-entrance-2 flex flex-col gap-space-xs">
@@ -130,14 +134,17 @@ export function AparUnit() {
         <section aria-labelledby="unit-riwayat" className="animate-entrance-3 flex flex-col gap-space-xs">
           <SectionHeader id="unit-riwayat" title="Riwayat inspeksi" />
           <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
-            {riwayat.slice(0, 12).map((r) => (
-              <Link key={r.tanggal} to={`/apar/inspeksi?tanggal=${r.tanggal}&unit=${encodeURIComponent(u.id)}`} className="flex min-h-12 items-center gap-space-sm px-space-sm py-space-xs">
+            {riwayat.slice(0, 12).map((r, i) => (
+              <div key={`${r.tanggal}_${i}`} className="flex min-h-12 items-center gap-space-sm px-space-sm py-space-xs">
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="tabular text-body-sm font-semibold text-on-surface">{formatTanggalIso(r.tanggal)}</span>
-                  <span className="truncate text-body-sm text-on-surface-variant">{r.temuan.length ? r.temuan.join('; ') : `Semua butir baik, ${r.petugas || '-'}`}</span>
+                  <span className="text-body-sm text-on-surface-variant">
+                    {r.temuan.length ? r.temuan.join('; ') : 'Semua butir baik'}, {r.petugas || '-'}
+                    {r.cek.catatan ? `. ${r.cek.catatan}` : ''}
+                  </span>
                 </span>
                 {r.status === 'temuan' ? <Pill tone="error">Temuan</Pill> : <Pill tone="success">Baik</Pill>}
-              </Link>
+              </div>
             ))}
           </GlassCard>
         </section>

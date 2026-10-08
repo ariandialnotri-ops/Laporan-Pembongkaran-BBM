@@ -113,4 +113,9 @@ export const localBackend: Backend = {
   },
   setMemberRole: async () => {},
   removeMember: async () => {},
+  createAccount: async () => {
+    throw new Error('Akun hanya tersedia bila Supabase dikonfigurasi.')
+  },
+  resetPassword: async () => {},
+  changePassword: async () => {},
 }

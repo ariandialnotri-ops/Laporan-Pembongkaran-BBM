@@ -63,7 +63,7 @@ export function LaporanMenu() {
 
   return (
     <nav aria-label="Menu laporan" className="grid grid-cols-2 gap-space-sm lg:grid-cols-3">
-      {menus.map((m, i) => (
+      {menus.filter((m) => app.can(m.to)).map((m, i) => (
         <MenuCard key={m.to} m={m} index={i} />
       ))}
     </nav>

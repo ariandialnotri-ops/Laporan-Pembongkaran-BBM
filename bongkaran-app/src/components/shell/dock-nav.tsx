@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useApp } from '@/lib/app-state'
 import { activeNav, NAV_ITEMS } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils'
  */
 export function DockNav() {
   const { pathname } = useLocation()
+  const { can } = useApp()
   const current = activeNav(pathname)
 
   return (
@@ -16,7 +18,7 @@ export function DockNav() {
       className="print:hidden pointer-events-none fixed inset-x-0 bottom-0 z-50 px-margin pb-[env(safe-area-inset-bottom,0px)]"
     >
       <div className="glass-2 pointer-events-auto mx-auto mb-space-sm flex max-w-md items-center justify-between rounded-full p-space-2xs">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => can(item.href)).map((item) => {
           const active = current === item.href
           const Icon = item.icon
           return (

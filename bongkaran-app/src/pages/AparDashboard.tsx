@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarClock, ChevronRight, ClipboardCheck, Database, FireExtinguisher, MapPin, QrCode, ScanLine, TriangleAlert } from 'lucide-react'
+import { CalendarClock, ChevronRight, ClipboardCheck, Database, FireExtinguisher, History, MapPin, QrCode, ScanLine, TriangleAlert } from 'lucide-react'
 import { QrScanner } from '@/components/apar/qr'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -8,7 +8,7 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { aparRecordId, hasilCek, kondisiSemua, tipeLabel, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
+import { kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -29,9 +29,6 @@ export function AparDashboard() {
   const today = todayIso()
   const s = app.settings
   const kondisi = kondisiSemua(s, records, today)
-  const hariIni = records.find((r) => r.id === aparRecordId(today))
-  const sedang = hariIni && !hariIni.data.selesaiAt
-  const diperiksaHariIni = hariIni ? hariIni.data.units.filter((u) => !hasilCek(u).kosong.length && u.foto.length).length : 0
   const n = {
     total: kondisi.length,
     baik: kondisi.filter((k) => k.status === 'baik').length,
@@ -47,9 +44,12 @@ export function AparDashboard() {
   const areas = [...new Set([...urutan.filter((a) => kondisi.some((k) => k.unit.lokasi === a)), ...kondisi.map((k) => k.unit.lokasi || 'Tanpa lokasi')])]
 
   const bukaKode = (kode: string) => {
-    const k = kondisi.find((x) => x.unit.kode.trim().toLowerCase() === kode.trim().toLowerCase())
-    if (!k) return `Kode "${kode}" tidak ada di data utama.`
-    navigate(`/apar/unit/${encodeURIComponent(k.unit.id)}`)
+    const u = unitDariKode(
+      kode,
+      kondisi.map((k) => k.unit),
+    )
+    if (!u) return `Kode "${kode}" tidak ada di data utama.`
+    navigate(`/apar/unit/${encodeURIComponent(u.id)}`)
     return null
   }
 
@@ -69,28 +69,39 @@ export function AparDashboard() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-space-xs">
-          <Link to="/apar/inspeksi" className={cn(buttonVariants({ size: 'lg' }), 'col-span-2')}>
-            <ClipboardCheck aria-hidden="true" />
-            {sedang ? `Lanjutkan inspeksi (${diperiksaHariIni}/${n.total})` : hariIni ? 'Lihat inspeksi hari ini' : 'Mulai inspeksi'}
-          </Link>
-          <Button variant="glass" onClick={() => setScan(true)}>
+          {app.can('/apar/inspeksi') && (
+            <Link to="/apar/inspeksi" className={cn(buttonVariants({ size: 'lg' }), 'col-span-2')}>
+              <ClipboardCheck aria-hidden="true" />
+              Inspeksi unit ({n.total - n.belum}/{n.total} bulan ini)
+            </Link>
+          )}
+          <Button variant="glass" className={cn(!app.can('/apar/label') && !app.can('/laporan/apar') && 'col-span-2')} onClick={() => setScan(true)}>
             <ScanLine aria-hidden="true" />
             Pindai QR
           </Button>
-          <Link to="/apar/label" className={buttonVariants({ variant: 'glass' })}>
-            <QrCode aria-hidden="true" />
-            Label QR
-          </Link>
-          <Link to="/apar/data" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'col-span-2')}>
-            <Database aria-hidden="true" />
-            Data utama (pulau, area, unit)
-          </Link>
+          {app.can('/apar/label') ? (
+            <Link to="/apar/label" className={buttonVariants({ variant: 'glass' })}>
+              <QrCode aria-hidden="true" />
+              Label QR
+            </Link>
+          ) : app.can('/laporan/apar') ? (
+            <Link to="/laporan/apar" className={buttonVariants({ variant: 'glass' })}>
+              <History aria-hidden="true" />
+              Riwayat
+            </Link>
+          ) : null}
+          {app.can('/apar/data') && (
+            <Link to="/apar/data" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'col-span-2')}>
+              <Database aria-hidden="true" />
+              Data utama (area & unit)
+            </Link>
+          )}
         </div>
       </GlassCard>
 
       {n.total === 0 ? (
         <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-          Belum ada unit. Buka Data utama untuk mengisi jumlah pulau, area, APAR, APAR cadangan, dan APAB.
+          Belum ada unit. ABH mengisi jumlah pulau di Pengaturan SPBU, lalu area, APAR, APAR cadangan, dan APAB di Data utama.
         </GlassCard>
       ) : (
         <>
@@ -162,9 +173,16 @@ export function AparDashboard() {
 
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'ok' | 'bad' | 'wait' }) {
   return (
-    <div className={cn('flex min-w-0 flex-col rounded-md p-space-sm', tone === 'ok' ? 'bg-emerald-50' : tone === 'bad' ? 'bg-error-container/60' : tone === 'wait' ? 'bg-amber-50' : 'bg-surface-container-lowest/80')}>
+    <div
+      className={cn(
+        'flex min-w-0 flex-col rounded-md p-space-sm',
+        tone === 'ok' ? 'bg-emerald-50' : tone === 'bad' ? 'bg-error-container/60' : tone === 'wait' ? 'bg-amber-50' : 'bg-surface-container-lowest/80',
+      )}
+    >
       <span className="text-tag uppercase text-on-surface-variant">{label}</span>
-      <span className={cn('tabular text-numeric-lg font-bold', tone === 'bad' ? 'text-error' : tone === 'ok' ? 'text-emerald-700' : tone === 'wait' ? 'text-amber-700' : 'text-on-surface')}>{value}</span>
+      <span className={cn('tabular text-numeric-lg font-bold', tone === 'bad' ? 'text-error' : tone === 'ok' ? 'text-emerald-700' : tone === 'wait' ? 'text-amber-700' : 'text-on-surface')}>
+        {value}
+      </span>
       <span className="truncate text-body-sm text-on-surface-variant">{sub}</span>
     </div>
   )

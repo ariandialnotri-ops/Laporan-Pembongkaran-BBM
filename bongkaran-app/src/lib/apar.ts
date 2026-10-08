@@ -3,6 +3,7 @@
  * (alat pemadam api berat/beroda) di Pengaturan, dan inspeksi berkala per unit.
  */
 import { addDays, todayIso as isoOf } from '@/lib/date'
+import { genId } from '@/lib/image'
 import type { Photo } from '@/lib/sop'
 
 export type AparTipe = 'apar' | 'apab'
@@ -33,6 +34,28 @@ export const DEFAULT_AREAS = [
 ]
 
 export const namaPulau = (n: number) => `Pulau pompa ${n}`
+
+const PREFIX: Record<AparTipe, string> = { apar: 'APAR', apab: 'APAB' }
+
+/** Kode berikutnya yang belum dipakai, mis. APAR-03. */
+export function kodeBerikut(tipe: AparTipe, units: AparUnit[]) {
+  const pakai = new Set(units.map((u) => u.kode.trim().toUpperCase()))
+  for (let n = 1; ; n++) {
+    const kode = `${PREFIX[tipe]}-${String(n).padStart(2, '0')}`
+    if (!pakai.has(kode)) return kode
+  }
+}
+
+/** Unit baru dengan nilai awal umum (APAR 6 kg, APAB 50 kg, powder). */
+export const unitBaru = (tipe: AparTipe, kode: string, lokasi = ''): AparUnit => ({
+  id: genId(tipe),
+  kode,
+  jenis: APAR_JENIS[0],
+  kapasitasKg: tipe === 'apar' ? '6' : '50',
+  lokasi,
+  cadangan: false,
+  kedaluwarsa: '',
+})
 
 /** Pilihan lokasi: pulau pompa sesuai jumlah pulau, lalu area dari data utama. */
 export function lokasiOptions(jumlahPulau: number, areas: string[] = DEFAULT_AREAS) {
@@ -83,7 +106,16 @@ export interface AparData {
   selesaiAt?: string
 }
 
+/** Record lama: satu inspeksi untuk semua unit per tanggal. */
 export const aparRecordId = (tanggal: string) => `apar_${tanggal}`
+/** Inspeksi per unit (dikirim di lokasi unit setelah pindai QR): satu record per unit per tanggal. */
+export const aparUnitRecordId = (tanggal: string, unitId: string) => `apar_${tanggal}_${unitId}`
+
+/** Cari unit dari kode yang diketik (label QR rusak), tanpa beda huruf besar/kecil & spasi. */
+export function unitDariKode(kode: string, units: AparUnit[]) {
+  const k = kode.trim().toUpperCase().replace(/\s+/g, '')
+  return k ? (units.find((u) => u.kode.trim().toUpperCase().replace(/\s+/g, '') === k) ?? null) : null
+}
 
 export function cekDari(u: AparUnit, tipe: AparTipe): AparCek {
   return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, cek: {}, catatan: '', foto: [] }

@@ -1,435 +1,181 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { CircleCheck, CloudCheck, FireExtinguisher, Flag, LoaderCircle, Pencil, Settings2, TriangleAlert } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CircleCheck, FireExtinguisher, ScanLine, Search, TriangleAlert } from 'lucide-react'
+import { QrScanner } from '@/components/apar/qr'
+import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
-import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { useToast } from '@/components/ui/toast'
-import { aparRecordId, cekDari, hasilCek, statusKedaluwarsa, type AparCek, type AparData, type CekKey, type CekNilai } from '@/lib/apar'
+import { kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
-import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
-import { compressImage } from '@/lib/image'
-import { currentShift } from '@/lib/shift'
-import type { Photo } from '@/lib/sop'
-import { usePhotoSrc } from '@/lib/use-photo-src'
-import { cn } from '@/lib/utils'
+import { formatTanggalIso, todayIso } from '@/lib/date'
 
-const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
-const stamp = () => Date.now()
-const isoNow = () => new Date().toISOString()
+type Saring = 'belum' | 'sudah' | 'semua'
 
-/** Input > Inspeksi APAR & APAB: checklist per unit, tersimpan otomatis, diselesaikan bila lengkap. */
+/**
+ * Input > APAR & APAB > Inspeksi: petugas mendatangi unit, memindai label QR
+ * (atau mengetik kode bila label rusak), lalu mengirim inspeksi unit itu saja.
+ */
 export function InspeksiApar() {
   const app = useApp()
-  const toast = useToast()
+  const navigate = useNavigate()
   useSyncOnOpen()
-  const [params, setParams] = useSearchParams()
-  const fokusId = params.get('unit')
-  const [tanggal, setTanggal] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(params.get('tanggal') ?? '') ? params.get('tanggal')! : todayIso()))
-  const id = aparRecordId(tanggal)
-  const records = useMemo(() => app.daily.filter((d): d is AparRecord => d.kind === 'apar'), [app.daily])
-  const existing = records.find((r) => r.id === id) ?? null
-  const [draft, setDraft] = useState<{ id: string; tanggal: string; data: AparData } | null>(null)
+  const [params] = useSearchParams()
+  const terkirim = params.get('terkirim')
+  const [scan, setScan] = useState(false)
+  const [kode, setKode] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const s = app.settings
-  const unitsSetting = useMemo(() => [...(s.apar ?? []).map((u) => cekDari(u, 'apar')), ...(s.apab ?? []).map((u) => cekDari(u, 'apab'))], [s.apar, s.apab])
-
-  // Inspeksi belum selesai mengikuti daftar unit terbaru di Pengaturan (isian unit lama dipertahankan).
-  const base: AparData = useMemo(() => {
-    const d = existing?.data
-    if (d?.selesaiAt) return d
-    const lama = new Map((d?.units ?? []).map((u) => [u.unitId, u]))
-    return {
-      petugas: d?.petugas ?? (app.displayName === 'Mode lokal' ? s.namaPetugasDefault : app.displayName),
-      jam: d?.jam ?? nowHm(),
-      catatan: d?.catatan ?? '',
-      units: unitsSetting.map((u) => {
-        const old = lama.get(u.unitId)
-        return old ? { ...u, cek: old.cek, catatan: old.catatan, foto: old.foto } : u
-      }),
-    }
-  }, [existing, unitsSetting, app.displayName, s.namaPetugasDefault])
-  const data = draft?.id === id ? draft.data : base
-  const selesai = !!data.selesaiAt
-  const srcOf = usePhotoSrc(data.units.flatMap((u) => u.foto))
-
-  // Simpan otomatis 700 ms setelah perubahan terakhir, selalu ke tanggal milik draf itu
-  // (bukan tanggal yang sedang dipilih), sehingga ganti tanggal tidak memindahkan isian.
-  const latest = useRef(records)
-  latest.current = records
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const berjalan = useRef<Promise<unknown>>(Promise.resolve())
-  // Cleanup layout effect berjalan lebih dulu saat halaman ditutup: tanda untuk menyimpan langsung.
-  const aktif = useRef(true)
-  useLayoutEffect(() => {
-    aktif.current = true
-    return () => {
-      aktif.current = false
-    }
-  }, [])
-  const persist = async (tgl: string, next: AparData) => {
-    const rid = aparRecordId(tgl)
-    const ex = latest.current.find((r) => r.id === rid)
-    const rec: AparRecord = {
-      id: rid,
-      kind: 'apar',
-      tanggal: tgl,
-      shift: currentShift().shift,
-      data: next,
-      createdAt: ex?.createdAt ?? stamp(),
-      updatedAt: stamp(),
-      createdBy: ex?.createdBy ?? app.session.user?.id ?? null,
-    }
-    await app.saveDaily(rec)
-  }
-  useEffect(() => {
-    if (!draft || draft.data.selesaiAt) return
-    timer.current = setTimeout(() => {
-      timer.current = null
-      setSave('saving')
-      const job = persist(draft.tanggal, draft.data)
-      berjalan.current = job.catch(() => {})
-      job
-        .then(() => setSave('saved'))
-        .catch((e) => {
-          setSave('error')
-          setError(`Gagal menyimpan: ${pesan(e)}`)
-        })
-    }, 700)
-    return () => {
-      if (timer.current) {
-        clearTimeout(timer.current)
-        // Halaman ditinggalkan sebelum jeda habis: simpan sekarang.
-        if (!aktif.current) void persist(draft.tanggal, draft.data).catch(() => {})
-      }
-      timer.current = null
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft])
-
+  const [saring, setSaring] = useState<Saring>('belum')
+  const records = useMemo(() => app.daily.filter((d): d is AparRecord => d.kind === 'apar'), [app.daily])
   if (!app.loaded) return <Loading />
 
-  const setData = (patch: Partial<AparData>) => {
-    setError(null)
-    setDraft({ id, tanggal, data: { ...data, ...patch } })
-  }
-  const setUnit = (unitId: string, patch: Partial<AparCek>) => setData({ units: data.units.map((u) => (u.unitId === unitId ? { ...u, ...patch } : u)) })
-  const setCek = (u: AparCek, key: CekKey, v: CekNilai) => setUnit(u.unitId, { cek: { ...u.cek, [key]: v } })
-  const semuaBaik = (u: AparCek) => setUnit(u.unitId, { cek: Object.fromEntries(hasilCek(u).items.map((i) => [i.key, 'ok'])) })
+  const s = app.settings
+  const today = todayIso()
+  const kondisi = kondisiSemua(s, records, today)
+  const units = kondisi.map((k) => k.unit)
+  const sudah = kondisi.filter((k) => k.bulanIni)
+  const rows = saring === 'belum' ? kondisi.filter((k) => !k.bulanIni) : saring === 'sudah' ? sudah : kondisi
+  const baru = terkirim ? kondisi.find((k) => k.unit.id === terkirim) : null
 
-  const tambahFoto = async (u: AparCek, files: File[]) => {
-    setBusy(u.unitId)
-    try {
-      const baru: Photo[] = []
-      for (const f of files) baru.push(await app.backend.uploadPhoto(`daily-${id}`, await compressImage(f), `${u.kode || 'apar'}.jpg`))
-      setUnit(u.unitId, { foto: [...u.foto, ...baru] })
-    } catch (e) {
-      setError(`Gagal menyimpan foto: ${pesan(e)}`)
-    } finally {
-      setBusy(null)
-    }
+  const buka = (unitId: string) => navigate(`/apar/inspeksi/${encodeURIComponent(unitId)}`)
+  const cariKode = (k: string) => {
+    const u = unitDariKode(k, units)
+    if (!u) return `Kode "${k.trim()}" tidak ada di data utama. Periksa tulisan kode pada tabung.`
+    buka(u.id)
+    return null
   }
-  const hapusFoto = (u: AparCek, i: number) => {
-    const target = u.foto[i]
-    setUnit(u.unitId, { foto: u.foto.filter((_, j) => j !== i) })
-    if (target) void app.backend.deletePhoto(target).catch(() => {})
-  }
-
-  const selesaikan = async () => {
-    if (!data.units.length) return setError('Belum ada unit APAR/APAB. Atur dulu di Data utama APAR & APAB.')
-    if (!data.petugas.trim()) return setError('Isi nama petugas inspeksi.')
-    for (const u of data.units) {
-      const h = hasilCek(u)
-      if (h.kosong.length) return setError(`${u.kode || 'Unit'}: ${h.kosong.length} butir belum diperiksa.`)
-      if (h.temuan.length && !u.catatan.trim()) return setError(`${u.kode || 'Unit'}: tulis catatan tindak lanjut temuan.`)
-      if (!u.foto.length) return setError(`${u.kode || 'Unit'}: foto kondisi unit wajib diunggah.`)
-    }
-    setBusy('selesai')
-    // Batalkan simpan otomatis yang tertunda agar tidak menimpa status selesai.
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = null
-    try {
-      await berjalan.current
-      const next = { ...data, selesaiAt: isoNow() }
-      await persist(tanggal, next)
-      setDraft(null)
-      toast('Inspeksi APAR & APAB selesai')
-    } catch (e) {
-      setError(pesan(e))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const bulan = todayIso().slice(0, 7)
-  const bulanIni = records.filter((r) => r.data.selesaiAt && r.tanggal.startsWith(bulan)).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
-  const temuanTotal = data.units.reduce((n, u) => n + hasilCek(u).temuan.length, 0)
-  const unitLengkap = (u: AparCek) => !hasilCek(u).kosong.length && u.foto.length > 0
-  const lengkap = data.units.filter(unitLengkap).length
-  // Mode satu unit (dibuka dari label QR): hanya unit itu yang ditampilkan.
-  const fokus = data.units.find((u) => u.unitId === fokusId) ?? null
-  const tampil = fokusId ? (fokus ? [fokus] : []) : data.units
-  const berikut = data.units.find((u) => u.unitId !== fokusId && !unitLengkap(u))
-  const keUnit = (uid: string | null) => {
-    const next = new URLSearchParams(params)
-    if (uid) next.set('unit', uid)
-    else next.delete('unit')
-    setParams(next, { replace: true })
-    window.scrollTo(0, 0)
-  }
-  const riwayat = records.filter((r) => r.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal)).slice(0, 6)
-  const hariIni = todayIso()
 
   return (
     <div className="flex flex-col gap-space-md">
+      {baru && (
+        <div role="status" className="animate-entrance-1 flex items-start gap-space-sm rounded-lg bg-emerald-50 p-space-sm">
+          <CircleCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-emerald-700" />
+          <span className="text-body-sm text-on-surface">
+            Inspeksi <b>{baru.unit.kode}</b> terkirim ({baru.status === 'temuan' ? 'ada temuan' : 'baik'}). Lanjutkan ke unit berikutnya: {kondisi.length - sudah.length} unit belum diinspeksi bulan ini.
+          </span>
+        </div>
+      )}
+
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start gap-space-sm">
           <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-error-container text-error">
             <FireExtinguisher className="size-5" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-body-md font-bold text-on-surface">{bulanIni ? `Bulan ini sudah diinspeksi (${formatTanggalIso(bulanIni.tanggal)})` : 'Bulan ini belum diinspeksi'}</span>
-            <span className="tabular text-body-sm text-on-surface-variant">
-              {s.jumlahPulau || 0} pulau pompa, {(s.apar ?? []).filter((u) => !u.cadangan).length} APAR terpasang, {(s.apar ?? []).filter((u) => u.cadangan).length} cadangan, {(s.apab ?? []).length} APAB
-            </span>
+            <span className="text-body-md font-bold text-on-surface">Inspeksi per unit di lokasi</span>
+            <span className="text-body-sm text-on-surface-variant">Datangi unit APAR/APAB, pindai label QR pada tabung, isi checklist & foto, lalu kirim. Ulangi untuk unit berikutnya.</span>
           </div>
-          <Link to="/apar/data" aria-label="Atur unit APAR & APAB" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-            <Settings2 aria-hidden="true" />
-          </Link>
         </div>
-        <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Tanggal inspeksi" htmlFor="apar-tgl">
-            <Input id="apar-tgl" type="date" max={hariIni} value={tanggal} onChange={(e) => e.target.value && setTanggal(e.target.value)} />
+        <Button size="lg" onClick={() => setScan(true)} disabled={!units.length}>
+          <ScanLine aria-hidden="true" />
+          Pindai QR unit
+        </Button>
+        <div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
+          <Field label="Label QR rusak? Ketik kode unit" htmlFor="apar-kode">
+            <Input
+              id="apar-kode"
+              autoComplete="off"
+              autoCapitalize="characters"
+              placeholder="Mis. APAR-01"
+              value={kode}
+              onChange={(e) => (setError(null), setKode(e.target.value))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  setError(cariKode(kode))
+                }
+              }}
+            />
           </Field>
-          <Field label="Petugas" htmlFor="apar-petugas">
-            <Input id="apar-petugas" disabled={selesai} value={data.petugas} onChange={(e) => setData({ petugas: e.target.value })} />
-          </Field>
+          <Button variant="soft" disabled={!kode.trim()} onClick={() => setError(cariKode(kode))}>
+            <Search aria-hidden="true" />
+            Buka
+          </Button>
         </div>
-        {!selesai && data.units.length > 0 && (
-          <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
-            {save === 'saving' ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <CloudCheck aria-hidden="true" className="size-4" />}
-            {save === 'saving' ? 'Menyimpan…' : save === 'error' ? 'Gagal tersimpan' : 'Tersimpan otomatis'}, {lengkap} dari {data.units.length} unit lengkap
-            {temuanTotal ? `, ${temuanTotal} temuan` : ''}
+        {error && (
+          <span role="alert" className="flex items-start gap-1.5 text-body-sm font-semibold text-error">
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            {error}
           </span>
         )}
       </GlassCard>
 
-      {data.units.length === 0 ? (
+      {units.length === 0 ? (
         <GlassCard level={1} className="flex flex-col items-center gap-space-sm p-space-md text-center">
-          <span className="text-body-sm text-on-surface-variant">Belum ada unit APAR/APAB. Isi jumlah pulau dan daftar APAR, APAR cadangan, dan APAB di profil SPBU.</span>
-          <Link to="/apar/data" className={buttonVariants({ size: 'pill' })}>
-            <Settings2 aria-hidden="true" />
-            Atur data utama
-          </Link>
+          <span className="text-body-sm text-on-surface-variant">Belum ada unit APAR/APAB di data utama. Minta ABH mendaftarkan unit dan mencetak label QR.</span>
+          {app.can('/apar/data') && (
+            <Link to="/apar/data" className={buttonVariants({ size: 'pill' })}>
+              Data utama
+            </Link>
+          )}
         </GlassCard>
       ) : (
-        <section aria-labelledby="apar-unit" className="animate-entrance-2 flex flex-col gap-space-sm">
-          <SectionHeader
-            id="apar-unit"
-            title={fokusId ? `Inspeksi ${fokus?.kode ?? 'unit'}` : 'Checklist per unit'}
-            action={
-              fokusId ? (
-                <button type="button" onClick={() => keUnit(null)} className="touch-44 text-body-sm font-semibold text-primary">
-                  Semua unit
-                </button>
-              ) : selesai ? (
-                <Pill tone="success">Selesai</Pill>
-              ) : undefined
-            }
+        <section aria-labelledby="apar-progres" className="animate-entrance-2 flex flex-col gap-space-xs">
+          <SectionHeader id="apar-progres" title={`Bulan ini: ${sudah.length} dari ${kondisi.length} unit`} />
+          <div className="h-2 overflow-hidden rounded-full bg-surface-container">
+            <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${kondisi.length ? (sudah.length / kondisi.length) * 100 : 0}%` }} />
+          </div>
+          <ChipFilter
+            label="Saring unit"
+            value={saring}
+            onChange={setSaring}
+            options={[
+              { value: 'belum' as const, label: `Belum ${kondisi.length - sudah.length}` },
+              { value: 'sudah' as const, label: `Sudah ${sudah.length}` },
+              { value: 'semua' as const, label: `Semua ${kondisi.length}` },
+            ]}
           />
-          {fokusId && !fokus && (
-            <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-              Unit dari label QR ini tidak ada di data utama (mungkin sudah dihapus).
-            </GlassCard>
-          )}
-          {tampil.map((u) => (
-            <UnitCard
-              key={u.unitId}
-              u={u}
-              hariIni={hariIni}
-              readOnly={selesai}
-              busy={busy === u.unitId}
-              srcOf={srcOf}
-              onCek={(k, v) => setCek(u, k, v)}
-              onSemuaBaik={() => semuaBaik(u)}
-              onCatatan={(v) => setUnit(u.unitId, { catatan: v })}
-              onFoto={(f) => void tambahFoto(u, f)}
-              onHapusFoto={(i) => hapusFoto(u, i)}
-            />
-          ))}
-          {fokusId && fokus && !selesai && (
-            <div className="flex flex-col gap-space-xs">
-              {berikut ? (
-                <Button variant="soft" size="lg" onClick={() => keUnit(berikut.unitId)}>
-                  Unit berikutnya: {berikut.kode} ({berikut.lokasi || '-'})
-                </Button>
-              ) : (
-                <span className="text-center text-body-sm font-semibold text-on-surface">Semua unit sudah diperiksa. Selesaikan inspeksi di bawah.</span>
-              )}
-              <span className="text-center text-body-sm text-on-surface-variant">Atau pindai label QR unit berikutnya.</span>
-            </div>
-          )}
-          <Field label="Catatan umum (opsional)" htmlFor="apar-catatan">
-            <Input id="apar-catatan" disabled={selesai} value={data.catatan} onChange={(e) => setData({ catatan: e.target.value })} />
-          </Field>
-          {error && (
-            <div role="alert" className="flex items-start gap-space-sm rounded-md bg-error-container/70 p-space-sm">
-              <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
-              <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
-            </div>
-          )}
-          {selesai ? (
-            <Button variant="glass" size="lg" onClick={() => setDraft({ id, tanggal, data: { ...data, selesaiAt: undefined } })}>
-              <Pencil aria-hidden="true" />
-              Buka untuk koreksi
-            </Button>
-          ) : (
-            <Button size="lg" disabled={busy !== null} onClick={selesaikan}>
-              {busy === 'selesai' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Flag aria-hidden="true" />}
-              Selesaikan inspeksi
-            </Button>
-          )}
+          <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
+            {rows.length === 0 && <p className="p-space-md text-center text-body-sm text-on-surface-variant">{saring === 'belum' ? 'Semua unit sudah diinspeksi bulan ini.' : 'Belum ada unit diinspeksi bulan ini.'}</p>}
+            {rows.map((k) => (
+              <UnitBaris key={k.unit.id} k={k} />
+            ))}
+          </GlassCard>
+          <span className="text-center text-body-sm text-on-surface-variant">Inspeksi dibuka dari label QR atau kode unit, agar dilakukan di lokasi unit.</span>
         </section>
       )}
 
-      {riwayat.length > 0 && (
-        <section aria-labelledby="apar-riwayat" className="animate-entrance-3 flex flex-col gap-space-xs">
-          <SectionHeader id="apar-riwayat" title="Inspeksi terakhir" action={<Link to="/laporan/apar" className="text-body-sm font-semibold text-primary">Riwayat</Link>} />
-          <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
-            {riwayat.map((r) => {
-              const t = r.data.units.reduce((n, u) => n + hasilCek(u).temuan.length, 0)
-              return (
-                <button key={r.id} type="button" onClick={() => setTanggal(r.tanggal)} className="flex min-h-14 items-center gap-space-sm px-space-sm py-space-xs text-left">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="tabular text-body-sm font-semibold text-on-surface">{formatTanggalIso(r.tanggal)}</span>
-                    <span className="truncate text-body-sm text-on-surface-variant">
-                      {r.data.units.length} unit, petugas {r.data.petugas || '-'}
-                    </span>
-                  </span>
-                  {t ? <Pill tone="error">{t} temuan</Pill> : <Pill tone="success">Semua baik</Pill>}
-                </button>
-              )
-            })}
-          </GlassCard>
-        </section>
-      )}
+      <QrScanner
+        open={scan}
+        onClose={() => setScan(false)}
+        onKode={cariKode}
+        onResult={(text) => {
+          const id = unitIdDariQr(text)
+          setScan(false)
+          if (id && units.some((u) => u.id === id)) buka(id)
+          else setError(id ? 'Unit pada label ini sudah tidak terdaftar di data utama.' : 'QR ini bukan label APAR/APAB FLOQ. Ketik kode unit bila label rusak.')
+        }}
+      />
     </div>
   )
 }
 
-function UnitCard({
-  u,
-  hariIni,
-  readOnly,
-  busy,
-  srcOf,
-  onCek,
-  onSemuaBaik,
-  onCatatan,
-  onFoto,
-  onHapusFoto,
-}: {
-  u: AparCek
-  hariIni: string
-  readOnly: boolean
-  busy: boolean
-  srcOf: (p: Photo) => string | undefined
-  onCek: (k: CekKey, v: CekNilai) => void
-  onSemuaBaik: () => void
-  onCatatan: (v: string) => void
-  onFoto: (f: File[]) => void
-  onHapusFoto: (i: number) => void
-}) {
-  const h = hasilCek(u)
-  const exp = statusKedaluwarsa(u.kedaluwarsa, hariIni)
+function UnitBaris({ k }: { k: KondisiUnit }) {
+  const t = k.terakhir
   return (
-    <GlassCard id={`unit-${u.unitId}`} level={2} className={cn('flex scroll-mt-24 flex-col gap-space-sm p-space-md', h.temuan.length > 0 && 'ring-1 ring-error/40')}>
-      <div className="flex items-start gap-space-sm">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="tabular text-body-lg font-bold text-on-surface">{u.kode || '-'}</span>
-            <Pill tone={u.tipe === 'apab' ? 'primary' : 'neutral'}>{u.tipe === 'apab' ? 'APAB' : u.cadangan ? 'Cadangan' : 'APAR'}</Pill>
-          </span>
-          <span className="text-body-sm text-on-surface-variant">
-            {u.jenis}, {u.kapasitasKg || '-'} kg, {u.lokasi || 'lokasi belum diatur'}
-          </span>
-          {exp && (
-            <span className={cn('tabular text-body-sm font-semibold', exp === 'lewat' ? 'text-error' : exp === 'segera' ? 'text-amber-700' : 'text-on-surface-variant')}>
-              Isi ulang {formatTanggalIso(u.kedaluwarsa)}
-              {exp === 'lewat' ? ' (sudah lewat)' : exp === 'segera' ? ' (kurang dari 30 hari)' : ''}
-            </span>
-          )}
-        </div>
-        {h.kosong.length === 0 && u.foto.length > 0 ? (
-          h.temuan.length ? (
-            <Pill tone="error">{h.temuan.length} temuan</Pill>
-          ) : (
-            <Pill tone="success">
-              <CircleCheck aria-hidden="true" />
-              Baik
-            </Pill>
-          )
-        ) : (
-          <Pill>{h.kosong.length ? `${h.kosong.length} belum` : 'Foto belum'}</Pill>
-        )}
-      </div>
-      {!readOnly && h.kosong.length > 0 && (
-        <Button variant="soft" size="sm" className="self-start" onClick={onSemuaBaik}>
-          <CircleCheck aria-hidden="true" />
-          Semua butir baik
-        </Button>
+    <div className="flex min-h-14 items-center gap-space-sm px-space-sm py-space-xs">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex items-center gap-1.5 text-body-sm font-semibold text-on-surface">
+          <span className="tabular">{k.unit.kode || '-'}</span>
+          <span className="font-normal text-on-surface-variant">{tipeLabel(k.tipe, k.unit.cadangan)}</span>
+        </span>
+        <span className="truncate text-body-sm text-on-surface-variant">
+          {k.unit.lokasi || 'Tanpa lokasi'}
+          {t && k.bulanIni ? `, ${formatTanggalIso(t.tanggal)} oleh ${t.petugas || '-'}` : ''}
+        </span>
+      </span>
+      {!k.bulanIni ? (
+        <Pill>Belum</Pill>
+      ) : (
+        <Pill tone={k.status === 'temuan' ? 'error' : 'success'}>
+          {k.status === 'temuan' ? 'Temuan' : 'Baik'}
+        </Pill>
       )}
-      <ul className="flex flex-col gap-1">
-        {h.items.map((it) => {
-          const v = u.cek[it.key]
-          return (
-            <li key={it.key} className="flex items-center gap-space-sm rounded-md bg-surface-container-low/70 px-space-sm py-1.5">
-              <span className="flex min-w-0 flex-1 flex-col text-body-sm">
-                <span className="text-on-surface">{it.label}</span>
-                {it.hint && <span className="text-on-surface-variant">{it.hint}</span>}
-              </span>
-              <div role="radiogroup" aria-label={`${it.label}, ${u.kode}`} className="flex shrink-0 gap-1">
-                {(['ok', 'tidak'] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    role="radio"
-                    aria-checked={v === n}
-                    disabled={readOnly}
-                    onClick={() => onCek(it.key, n)}
-                    className={cn(
-                      'min-h-9 min-w-14 rounded-full px-2.5 text-body-sm font-semibold transition-colors disabled:cursor-default',
-                      v === n ? (n === 'ok' ? 'bg-primary text-on-primary' : 'bg-error text-on-error') : 'bg-surface-container-lowest text-on-surface-variant ring-1 ring-outline-variant',
-                    )}
-                  >
-                    {n === 'ok' ? 'Baik' : 'Tidak'}
-                  </button>
-                ))}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-      <Field label={h.temuan.length ? 'Tindak lanjut temuan (wajib)' : 'Catatan (opsional)'} htmlFor={`apar-cat-${u.unitId}`}>
-        <Input id={`apar-cat-${u.unitId}`} disabled={readOnly} placeholder={h.temuan.length ? 'Mis. diganti pin baru, isi ulang dijadwalkan' : ''} value={u.catatan} onChange={(e) => onCatatan(e.target.value)} />
-      </Field>
-      <PhotoSlot
-        label={h.temuan.length ? 'Foto kondisi unit & bukti temuan' : 'Foto kondisi unit'}
-        photos={u.foto}
-        busy={busy}
-        disabled={readOnly}
-        srcOf={srcOf}
-        onAdd={onFoto}
-        onRemove={onHapusFoto}
-      />
-    </GlassCard>
+    </div>
   )
 }

@@ -21,7 +21,7 @@ export function Pengaturan() {
   const { hash } = useLocation()
   const logoRef = useRef<HTMLInputElement>(null)
   const s = app.settings
-  const readOnly = !app.canManage
+  const readOnly = !app.isAdmin
 
   useEffect(() => {
     if (hash && app.loaded) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +39,7 @@ export function Pengaturan() {
     <div className="flex flex-col gap-space-md">
       {readOnly && (
         <GlassCard level={1} className="animate-entrance-1 p-space-md text-center text-body-sm text-on-surface-variant">
-          Pengaturan hanya dapat diubah oleh pengawas.
+          Pengaturan hanya dapat diubah oleh ABH.
         </GlassCard>
       )}
       <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
@@ -68,6 +68,13 @@ export function Pengaturan() {
               <Field label="Area Business Head" htmlFor="set-abh">
                 <Input id="set-abh" value={s.namaAbhDefault} onChange={(e) => app.updateSettings({ namaAbhDefault: e.target.value })} />
               </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <JumlahField id="set-pulau" label="Jumlah pulau pompa" value={s.jumlahPulau ?? 0} max={30} onChange={(n) => app.updateSettings({ jumlahPulau: n })} />
+              <JumlahField id="set-dispenser" label="Jumlah dispenser" value={s.jumlahDispenser ?? 0} max={60} onChange={(n) => app.updateSettings({ jumlahDispenser: n })} />
+              <span className="col-span-2 text-body-sm text-on-surface-variant">
+                {s.nozzles.length} nozzle terdaftar di bawah. Pulau pompa otomatis menjadi lokasi APAR di data utama APAR & APAB.
+              </span>
             </div>
             <Field label="Perusahaan pengangkut (default)" htmlFor="set-pengangkut">
               <Input id="set-pengangkut" value={s.perusahaanPengangkut} onChange={(e) => app.updateSettings({ perusahaanPengangkut: e.target.value })} />
@@ -211,5 +218,25 @@ function RuleInput({ id, value, suffix, onChange }: { id: string; value: number;
         if (n !== null && n > 0) onChange(n)
       }}
     />
+  )
+}
+
+/** Angka bulat 0..max; teks disimpan sendiri agar kolom boleh kosong saat diketik. */
+function JumlahField({ id, label, value, max, onChange }: { id: string; label: string; value: number; max: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(() => (value ? String(value) : ''))
+  return (
+    <Field label={label} htmlFor={id}>
+      <Input
+        id={id}
+        numeric
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          const n = parseAngka(e.target.value)
+          onChange(n !== null && n >= 0 ? Math.min(Math.round(n), max) : 0)
+        }}
+      />
+    </Field>
   )
 }

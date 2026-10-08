@@ -286,8 +286,9 @@ export interface Settings {
   namaSecurityDefault: string
   perusahaanPengangkut: string
   nozzles: Nozzle[]
-  /** Proteksi kebakaran: jumlah pulau pompa, APAR (termasuk cadangan), dan APAB. */
+  /** Data SPBU: jumlah pulau pompa (juga lokasi APAR) dan jumlah dispenser. */
   jumlahPulau: number
+  jumlahDispenser: number
   /** Data utama area/lokasi APAR selain pulau pompa. */
   aparArea: string[]
   apar: AparUnit[]

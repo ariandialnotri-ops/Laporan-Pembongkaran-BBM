@@ -49,11 +49,13 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/plan/so/:id` | Edit SO & LO satu permintaan dalam bentuk tabel: Nomor SO, lalu per LO produk, volume (maks. 8.000 L), shift, nomor LO, status, alih supply; LO Closed terkunci. Simpan otomatis kembali ke Tracking LO asal (Plan Pengiriman atau Riwayat Tracking LO) |
 | | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
-| | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, per area, daftar unit; tombol Mulai inspeksi, Pindai QR, Label QR, Data utama |
-| | `/apar/inspeksi` | Inspeksi: checklist per unit (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB) + **foto kondisi tiap unit (wajib)**, tersimpan otomatis; temuan wajib catatan tindak lanjut. `?unit=` = mode satu unit (dari QR) dengan tombol unit berikutnya |
-| | `/apar/data` | Data utama: jumlah pulau pompa, **area/lokasi (tambah/hapus)**, APAR (termasuk cadangan) dan APAB: kode, jenis, kapasitas, lokasi, jadwal isi ulang |
+| | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, per area, daftar unit; tombol Inspeksi unit, Pindai QR (lihat data unit), Label QR & Data utama (ABH) |
+| | `/apar/inspeksi` | Inspeksi **per unit di lokasi**: tombol Pindai QR unit, atau ketik kode bila label rusak; progres bulan ini (belum/sudah per unit). Tidak ada inspeksi massal |
+| | `/apar/inspeksi/:id` | Form satu unit: checklist (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), catatan (wajib bila temuan), **foto wajib**, petugas; **Kirim** menyimpan unit itu saja lalu kembali ke pemindai. Unit yang sudah dikirim hari ini tampil hasilnya + tombol koreksi |
+| | `/apar/data` | Data utama (ABH): **daftar unit tersimpan** (tabel, saring APAR/cadangan/APAB) dan daftar area (tambah lewat bottom sheet, hapus bila kosong); jumlah pulau dari Pengaturan SPBU |
+| | `/apar/data/unit/:id` | Form tambah (`baru`) / ubah unit: tipe, kode (unik), kapasitas, jenis, lokasi, jadwal isi ulang, cadangan; Simpan kembali ke daftar; hapus, label QR |
 | | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung |
-| | `/apar/unit/:id` | Tujuan QR: data unit, kondisi terakhir (temuan, catatan, foto), riwayat, tombol Inspeksi unit ini |
+| | `/apar/unit/:id` | Tujuan QR (kamera HP): data unit, kondisi terakhir (temuan, catatan, foto), riwayat, tombol Inspeksi unit ini |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |
@@ -62,15 +64,15 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan uji pasca penerimaan |
 | | `/laporan/tera` | Riwayat Tera: bejana 20 L per nozzle, batas -60 ml |
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
-| Profil | `/profil` | Akun, statistik, Kalkulator, Pengaturan, Anggota |
+| Profil | `/profil` | Akun & peran, ganti kata sandi, statistik, Kalkulator; Pengaturan, Anggota, Data utama APAR (ABH) |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
-| | `/pengaturan` | Identitas SPBU, nama default, perusahaan pengangkut, nozzle dispenser, ringkasan proteksi kebakaran (tautan ke Data utama APAR & APAB), toleransi, data acuan |
-| | `/anggota` | Kelola anggota dan peran (khusus pengawas, mode Supabase) |
+| | `/pengaturan` | Identitas SPBU, **jumlah pulau pompa & jumlah dispenser**, nama default, perusahaan pengangkut, nozzle dispenser, ringkasan proteksi kebakaran (tautan ke Data utama APAR & APAB), toleransi, data acuan |
+| | `/anggota` | Khusus ABH: **buat akun** (email + kata sandi sementara, langsung aktif) per peran, ubah peran, atur ulang kata sandi, hapus anggota; daftar hak akses per peran |
 
 Uji Kualitas Pasca Penerimaan disimpan di data bongkaran (`report.data.sample2Jam`, ringkasan
 `summary.sample2Jam`), tanpa tabel baru. Kaleng Sample di Dashboard berisi sampel
 mobil tangki yang diuji saat bongkar (D15 MT vs D15 depot), terpisah dari uji pasca penerimaan.
-Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`; data utama (pulau, area, unit) ada di pengaturan.
+Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`, satu record per unit per tanggal (`apar_<tanggal>_<unitId>`); record lama `apar_<tanggal>` (semua unit) tetap terbaca. Data utama (area, unit) ada di pengaturan.
 Label QR berisi alamat `https://<domain aplikasi>/apar/unit/<id>`: cetak label dari aplikasi produksi agar QR mengarah ke domain yang benar.
 Pemindai di aplikasi memakai BarcodeDetector (Chrome Android); bila tidak didukung, pindai dengan aplikasi kamera HP atau ketik kode unit.
 
@@ -158,21 +160,33 @@ Skema yang dipakai aplikasi ada di
 `supabase/migrations/20260926120000_bbm_init.sql`,
 `20260926120500_bbm_private_helpers.sql`,
 `20261002120000_bbm_plan_meta_daily.sql`, dan
-`20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB):
+`20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB), dan
+`20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran). Edge function
+`supabase/functions/bbm-akun` membuat akun & mengatur ulang kata sandi (khusus ABH):
 
 | Objek | Isi |
 |-------|-----|
-| `bbm_members` | Anggota dan peran (`pengawas` / `petugas`) |
+| `bbm_members` | Anggota dan peran (`abh` / `pengawas` / `kashift` / `security`) |
 | `bbm_settings` | Pengaturan SPBU |
 | `bbm_plans` | Plan kirim (SO & LO); data MS2, Ship To, PO SAP, supply point di kolom `meta` |
 | `bbm_daily` | Stok awal shift (`kind = stok`, satu per shift) dan Q&Q harian (`kind = qq`) |
 | `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
 | bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
 
-RLS aktif: hanya anggota yang bisa membaca/menulis; petugas hanya bisa
-menghapus draft miliknya, pengawas mengelola semuanya. Pengguna pertama yang
-login otomatis menjadi pengawas, lalu menambah anggota lain di `/anggota`
-(akun dibuat dulu di Supabase → Authentication).
+RLS aktif: hanya anggota yang bisa membaca. Peran:
+
+| Peran | Modul |
+|-------|-------|
+| ABH | Semua modul + Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
+| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
+| Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
+| Security | Inspeksi APAR/APAB saja |
+
+Tulis: plan & laporan oleh ABH/Pengawas/Kashift; Security hanya `bbm_daily`
+kind `apar`; pengaturan & anggota hanya ABH; hapus plan/laporan oleh ABH/Pengawas
+(draft milik sendiri boleh dihapus pembuatnya). Daftar halaman per peran ada di
+`src/lib/roles.ts`. Pengguna pertama yang login otomatis menjadi ABH, lalu
+membuat akun lain di `/anggota`.
 
 Tabel lama `bongkaran`, `laporan`, dan bucket `bukti-bongkaran` (migrasi
 `2026092600*`) tidak lagi dipakai aplikasi.

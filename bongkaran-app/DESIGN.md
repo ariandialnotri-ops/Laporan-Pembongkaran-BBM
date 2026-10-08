@@ -198,6 +198,14 @@ Mode **Kurangi Transparansi** (pengaturan HP): semua kaca jadi warna padat `#F7F
 
 - **Header**: kiri logo (halaman menu) **atau** tombol kembali (halaman turunan); judul halaman; nama SPBU huruf besar biru. Kanan: chip inisial pengguna (ke Profil).
 - **Tombol kembali**: kembali ke halaman asal (riwayat navigasi). Tanpa riwayat: ke menu induk.
+- **Peran** (`src/lib/roles.ts`): dock, kartu menu Input/Laporan, dan isi Profil hanya menampilkan modul milik peran. Halaman di luar hak akses menampilkan kartu kunci "Halaman ini tidak tersedia untuk peran X" + tombol Ke beranda. Beranda: ABH/Pengawas = Dashboard, Kepala Shift = Input, Security = APAR & APAB.
+
+| Peran | Dock | Kartu Input |
+|---|---|---|
+| ABH | Dashboard, Input, Laporan, Profil | semua |
+| Pengawas | Dashboard, Input, Laporan, Profil | Stok awal, Input Bongkaran, Kualitas Harian, Uji Pasca Penerimaan, APAR (lihat) |
+| Kepala Shift | Input, Laporan, Profil | Stok awal, Input Bongkaran, Plan Pengiriman, Kualitas Harian, APAR |
+| Security | Input, Profil | APAR & APAB saja |
 - **Konfirmasi keluar**: bila meninggalkan form bongkaran yang belum selesai atau Kualitas Harian dengan baris belum disimpan (lewat tombol kembali, dock, atau tautan), muncul sheet "Keluar dari form …?" dengan **Ya, keluar** (merah) dan **Tetap di sini**.
 - **Dock**: 4 item, item aktif berlatar `primary/10` dan teks biru. Label 12 px huruf besar.
 - **Bottom sheet**: semua form tambahan / ubah / detail muncul dari bawah (maks 88% tinggi layar, lebar maks 576 px), pegangan, judul + deskripsi + tombol tutup ×, footer tombol.
@@ -218,8 +226,10 @@ Peta halaman:
 | | Kualitas Harian | `/kualitas` |
 | | Uji Kualitas Pasca Penerimaan | `/sample` |
 | | APAR & APAB (dashboard) | `/apar` |
-| | Inspeksi APAR & APAB | `/apar/inspeksi` (`?tanggal=`, `?unit=`) |
-| | Data utama APAR & APAB | `/apar/data` |
+| | Inspeksi APAR & APAB (pindai / kode) | `/apar/inspeksi` (`?terkirim=`) |
+| | Inspeksi satu unit | `/apar/inspeksi/:id` |
+| | Data utama APAR & APAB (daftar) | `/apar/data` |
+| | Form unit APAR/APAB | `/apar/data/unit/:id` (`baru`) |
 | | Label QR APAR & APAB | `/apar/label` (`?unit=`) |
 | | Unit APAR/APAB (tujuan QR) | `/apar/unit/:id` |
 | Laporan | Menu Laporan (kartu) | `/laporan` |
@@ -269,7 +279,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 | **Kaleng (ilustrasi)** | `kaleng-sample.tsx` | Kaleng: tutup, label `K1/K2/K3`, isi warna produk | |
 | **lo-fields** | `lo-fields.tsx` | ErrorBox, ProdukSelect, SupplySelect yang dipakai bersama Plan, Edit SO & LO, dan langkah 2 bongkaran | |
 | **KalengDetail** | `kaleng-detail.tsx` | Pop up detail uji kaleng (lihat 9.2) | |
-| **ProteksiSettings** | `proteksi-settings.tsx` | Data utama APAR: jumlah pulau, ringkas unit, daftar area (+ Tambah area), kartu unit (kode, jenis, lokasi, kapasitas, jadwal isi ulang, cadangan) | |
+| **UnitCard** | `apar/unit-cek.tsx` | Checklist satu unit APAR/APAB: kode + pill tipe, isi ulang, Semua butir baik, butir Baik/Tidak, catatan, foto | Hanya baca setelah dikirim |
 | **QrImg** | `apar/qr.tsx` | Gambar QR (data URL) untuk alamat halaman unit | memuat: kotak berdenyut |
 | **QrScanner** | `apar/qr.tsx` | Sheet kamera persegi + bingkai bidik putih; kolom "Atau ketik kode unit" + Buka | tanpa dukungan kamera: kotak penjelasan |
 | **PlanReminder** | `shell/plan-reminder.tsx` | Tanpa tampilan: toast + notifikasi 06:00 | |
@@ -385,12 +395,13 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
   - 4 kotak: Kondisi baik (x/n, hijau), Ada temuan (merah bila > 0), Belum bulan ini (amber), Isi ulang (lewat / ≤ 30 hari).
   - **Per area**: ikon pin, nama area, kode unit, pill Baik / n temuan / n belum.
   - **Daftar unit** + chip saring (Semua, Temuan, Belum bulan ini, Isi ulang): kode, tipe, lokasi, tanggal diperiksa, peringatan isi ulang, pill status, chevron → halaman unit.
-- **Inspeksi** (`/apar/inspeksi`):
-  - Kartu kepala: status bulan ini, tanggal inspeksi, petugas, "Tersimpan otomatis, x dari n unit lengkap, n temuan".
-  - Kartu per unit: kode besar + pill tipe (APAR/Cadangan/APAB), jenis, kapasitas, lokasi, jadwal isi ulang (merah bila lewat); pill Baik / n temuan / n belum / Foto belum; tombol **Semua butir baik**; tiap butir dengan tombol **Baik / Tidak** (Tidak = merah); catatan (wajib bila temuan); **Foto kondisi unit (wajib)**.
-  - Mode satu unit `?unit=` (dari QR): judul "Inspeksi APAR-01", tautan "Semua unit", tombol **Unit berikutnya: kode (lokasi)**.
-  - **Selesaikan inspeksi** / **Buka untuk koreksi**; daftar inspeksi terakhir.
-- **Data utama** (`/apar/data`, ubah khusus pengawas): jumlah pulau pompa; **Area / lokasi** (pulau otomatis, area lain bisa ditambah, ditolak bila ganda, dihapus bila tidak dipakai unit); daftar APAR (dengan tanda cadangan, tombol 1 APAR per pulau) & APAB; tombol Cetak label QR semua unit.
+- **Inspeksi** (`/apar/inspeksi`), per unit di lokasi, tanpa inspeksi massal:
+  - Banner hijau setelah kirim: "Inspeksi APAR-01 terkirim (baik/ada temuan). Lanjutkan ke unit berikutnya: n unit belum".
+  - Kartu kepala: ikon pemadam, "Inspeksi per unit di lokasi" + petunjuk; tombol utama **Pindai QR unit**; field "Label QR rusak? Ketik kode unit" + **Buka** (kode salah: pesan merah).
+  - **Bulan ini: x dari n unit** + bar progres; chip Belum / Sudah / Semua; baris unit (kode, tipe, lokasi, tanggal & petugas) dengan pill Belum / Baik / Temuan. Baris tidak membuka form: inspeksi hanya dari QR atau kode.
+- **Inspeksi satu unit** (`/apar/inspeksi/:id`): kartu unit (kode besar, pill tipe, jenis, kapasitas, lokasi, isi ulang), tombol **Semua butir baik**, butir **Baik / Tidak**, catatan (wajib bila temuan), **foto wajib**; kartu bawah: Petugas, Tanggal (hari ini), **Kirim inspeksi APAR-01** → kembali ke pemindai. Unit yang sudah dikirim hari ini: ringkasan + **Koreksi inspeksi hari ini**. Keluar sebelum kirim memunculkan konfirmasi.
+- **Data utama** (`/apar/data`, ubah khusus ABH): 4 kotak ringkas (pulau pompa, APAR terpasang, cadangan, APAB); tombol **Tambah APAR / APAB**, Label QR, Jumlah pulau (ke Pengaturan), "Tambah 1 APAR di n pulau yang belum punya"; **Unit tersimpan** (chip saring + RecordTable: kode, tipe, jenis & kapasitas, lokasi, isi ulang, pill isi ulang lewat/≤ 30 hari) — ketuk baris membuka form; **Area / lokasi** (pulau otomatis dari jumlah pulau, area lain + hapus bila kosong; "Tambah area" membuka bottom sheet).
+- **Form unit** (`/apar/data/unit/:id`): tipe (APAR / APAB, hanya unit baru; kode & kapasitas awal ikut tipe), kode (unik), kapasitas, jenis media, lokasi, jadwal isi ulang, centang cadangan; **Batal / Simpan unit**; unit lama: Kondisi unit, Label QR, Hapus unit.
 - **Label QR** (`/apar/label`): chip saring (Semua/APAR/APAB), tombol **Cetak / simpan PDF (n label)**; label putih bergaris putus: QR 112 px, nama SPBU, kode besar, tipe/jenis/kapasitas, lokasi, "Pindai: data, kondisi & inspeksi". Saat cetak: 3 kolom.
 - **Unit** (`/apar/unit/:id`, tujuan QR): QR + kode besar, tipe, jenis/kapasitas, lokasi; chip isi ulang; tombol **Inspeksi unit ini**, Cetak label, Data utama; **Kondisi terakhir** (tanggal, petugas, temuan merah, catatan, foto); **Riwayat inspeksi**. Unit terhapus: "Unit tidak ditemukan".
 - **Pindai QR**: sheet kamera (bingkai bidik), atau ketik kode unit.
@@ -408,13 +419,13 @@ Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acar
 | **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → halaman **Edit SO & LO**, simpan kembali ke Riwayat Tracking LO |
 | **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Uji pasca penerimaan), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
 | **Riwayat Tera** | DateFilter, chip Semua / Di bawah batas | Tanggal, Shift, Nozzle, BBM, Selisih (ml), Pump test, Status |
-| **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → inspeksi unit itu |
+| **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → halaman unit (data & riwayat) |
 
 ### 9.12 Profil, Kalkulator, Pengaturan, Anggota
-- **Profil**: kartu identitas (inisial, nama, email, SPBU), 3 StatTile (Selesai, Kepatuhan, Laporan bulan ini), grup **Alat bantu** (Kalkulator), grup **Akun & SPBU** (Pengaturan SPBU, Anggota, Data utama APAR & APAB, Data acuan, Keluar).
+- **Profil**: kartu identitas (inisial, nama, pill peran, email, SPBU), 3 StatTile (bila punya bongkaran), grup **Alat bantu** (Kalkulator), grup **Akun & SPBU** (ABH: Pengaturan SPBU, Anggota & akun per peran, Data utama APAR & APAB, Data acuan; semua: **Ganti kata sandi** (bottom sheet), Keluar).
 - **Kalkulator**: Density observasi + Suhu → D15 (angka besar); Tangki + Ketinggian → volume dari tabel kalibrasi.
-- **Pengaturan SPBU**: Nama SPBU, Kode, Alamat, logo; nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
-- **Anggota** (pengawas, mode server): daftar email + peran (pengawas/petugas), tambah/hapus.
+- **Pengaturan SPBU** (ABH): Nama SPBU, Kode, Alamat, logo; **Jumlah pulau pompa** & **Jumlah dispenser** (+ jumlah nozzle); nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
+- **Anggota** (ABH, mode server): kartu **Buat akun baru** (Nama, Peran, Email, Kata sandi sementara + tombol acak, keterangan hak akses peran, tombol **Buat akun <peran>**, kotak hijau email & sandi yang dibuat); daftar anggota (nama/email, Select peran, ikon kunci = atur ulang kata sandi lewat bottom sheet, hapus); **Hak akses per peran**; lipatan "Daftarkan akun yang sudah ada".
 
 ---
 

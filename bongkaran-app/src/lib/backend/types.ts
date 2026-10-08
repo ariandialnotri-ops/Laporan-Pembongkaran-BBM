@@ -1,7 +1,9 @@
 import type { DailyRecord } from '@/lib/daily'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 
-export type Role = 'pengawas' | 'petugas'
+import type { Role } from '@/lib/roles'
+
+export type { Role }
 
 export interface Member {
   user_id: string
@@ -58,4 +60,10 @@ export interface Backend {
   addMember(email: string, nama: string, role: Role): Promise<void>
   setMemberRole(userId: string, role: Role): Promise<void>
   removeMember(userId: string): Promise<void>
+  /** ABH membuat akun login baru (langsung aktif) dan mendaftarkannya sebagai anggota. */
+  createAccount(email: string, password: string, nama: string, role: Role): Promise<void>
+  /** ABH mengatur ulang kata sandi anggota. */
+  resetPassword(userId: string, password: string): Promise<void>
+  /** Pengguna mengganti kata sandinya sendiri. */
+  changePassword(password: string): Promise<void>
 }

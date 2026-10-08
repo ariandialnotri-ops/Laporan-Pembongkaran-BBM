@@ -3,6 +3,7 @@ import { ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConica
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
+import { kondisiSemua } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { loStatus, planBesokKurang } from '@/lib/plan'
@@ -25,8 +26,12 @@ export function InputMenu() {
   const sample = sampleMenunggu(app.reports)
   const besok = planBesokKurang(app.plans)
   const unitApar = (app.settings.apar?.length ?? 0) + (app.settings.apab?.length ?? 0)
-  const bulan = stok.key.tanggal.slice(0, 7)
-  const aparBulanIni = app.daily.find((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt && d.tanggal.startsWith(bulan))
+  // Inspeksi APAR per unit: berapa unit yang belum diinspeksi bulan ini.
+  const aparBelum = kondisiSemua(
+    app.settings,
+    app.daily.filter((d): d is AparRecord => d.kind === 'apar'),
+    stok.key.tanggal,
+  ).filter((k) => !k.bulanIni).length
 
   const menus: MenuItem[] = [
     {
@@ -65,40 +70,44 @@ export function InputMenu() {
       to: '/apar',
       icon: FireExtinguisher,
       title: 'APAR & APAB',
-      desc: 'Dashboard, inspeksi per unit dengan foto, dan label QR',
-      status: !unitApar ? 'Isi data utama (pulau, area, unit)' : aparBulanIni ? `Bulan ini sudah (${aparBulanIni.tanggal.slice(8)}/${aparBulanIni.tanggal.slice(5, 7)})` : 'Bulan ini belum diinspeksi',
-      badge: unitApar && !aparBulanIni ? 1 : 0,
+      desc: 'Pindai QR di unit, checklist & foto, kirim per unit',
+      status: !unitApar ? 'Data utama unit belum diisi' : aparBelum ? `${aparBelum} dari ${unitApar} unit belum bulan ini` : 'Semua unit sudah bulan ini',
+      badge: aparBelum,
     },
   ]
 
   return (
     <div className="flex flex-col gap-space-md">
       {/* Kewajiban awal shift: bukan menu, tapi syarat sebelum input lain. */}
-      <Link
-        to="/stok"
-        className={cn(
-          'animate-entrance-1 flex min-h-16 items-center gap-space-sm rounded-lg p-space-sm transition-transform active:scale-[0.99]',
-          stok.missing ? 'border border-error/40 bg-error-container/70' : 'glass-1',
-        )}
-      >
-        <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', stok.missing ? 'bg-error text-on-error' : 'bg-primary-fixed text-primary')}>
-          {stok.missing ? <Fuel className="size-5" /> : <CircleCheck className="size-5" />}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className={cn('text-body-md font-bold', stok.missing ? 'text-on-error-container' : 'text-on-surface')}>
-            {stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}
+      {app.can('/stok') && (
+        <Link
+          to="/stok"
+          className={cn(
+            'animate-entrance-1 flex min-h-16 items-center gap-space-sm rounded-lg p-space-sm transition-transform active:scale-[0.99]',
+            stok.missing ? 'border border-error/40 bg-error-container/70' : 'glass-1',
+          )}
+        >
+          <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', stok.missing ? 'bg-error text-on-error' : 'bg-primary-fixed text-primary')}>
+            {stok.missing ? <Fuel className="size-5" /> : <CircleCheck className="size-5" />}
           </span>
-          <span className={cn('text-body-sm', stok.missing ? 'text-on-error-container' : 'text-on-surface-variant')}>
-            {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser diisi di akhir shift.'}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className={cn('text-body-md font-bold', stok.missing ? 'text-on-error-container' : 'text-on-surface')}>
+              {stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}
+            </span>
+            <span className={cn('text-body-sm', stok.missing ? 'text-on-error-container' : 'text-on-surface-variant')}>
+              {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser diisi di akhir shift.'}
+            </span>
           </span>
-        </span>
-        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-      </Link>
+          <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+        </Link>
+      )}
 
       <nav aria-label="Menu input" className="grid grid-cols-2 gap-space-sm">
-        {menus.map((m, i) => (
-          <MenuCard key={m.to} m={m} index={i} />
-        ))}
+        {menus
+          .filter((m) => app.can(m.to))
+          .map((m, i) => (
+            <MenuCard key={m.to} m={m} index={i} />
+          ))}
       </nav>
     </div>
   )

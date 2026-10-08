@@ -1,11 +1,15 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { AppProvider } from '@/components/shell/app-provider'
 import { AppShell } from '@/components/shell/app-shell'
+import { buttonVariants } from '@/components/ui/button'
+import { GlassCard } from '@/components/ui/glass-card'
 import { ToastProvider } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
+import { berandaPeran, roleLabel } from '@/lib/roles'
 import { Dashboard } from '@/pages/Dashboard'
 import { InputMenu } from '@/pages/InputMenu'
 import { Login, NotMember, SessionState } from '@/pages/Login'
@@ -18,7 +22,9 @@ const FormInput = lazy(() => import('@/pages/FormInput').then((m) => ({ default:
 const AparDashboard = lazy(() => import('@/pages/AparDashboard').then((m) => ({ default: m.AparDashboard })))
 const AparLabel = lazy(() => import('@/pages/AparLabel').then((m) => ({ default: m.AparLabel })))
 const AparUnit = lazy(() => import('@/pages/AparUnit').then((m) => ({ default: m.AparUnit })))
+const AparUnitForm = lazy(() => import('@/pages/AparUnitForm').then((m) => ({ default: m.AparUnitForm })))
 const DataUtamaApar = lazy(() => import('@/pages/DataUtamaApar').then((m) => ({ default: m.DataUtamaApar })))
+const InspeksiUnit = lazy(() => import('@/pages/InspeksiUnit').then((m) => ({ default: m.InspeksiUnit })))
 const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
@@ -48,6 +54,15 @@ function Gate() {
   if (app.status === 'login') return <Login />
   if (app.status === 'nomember') return <NotMember />
   if (app.status !== 'ready') return <SessionState />
+  // Halaman di luar hak akses peran: beranda dialihkan, halaman lain diberi keterangan.
+  if (!app.can(pathname)) {
+    if (pathname === '/') return <Navigate to={berandaPeran(app.role)} replace />
+    return (
+      <AppShell>
+        <TanpaAkses peran={roleLabel(app.role)} beranda={berandaPeran(app.role)} />
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell>
@@ -64,7 +79,9 @@ function Gate() {
           <Route path="/stok" element={<StokShift />} />
           <Route path="/apar" element={<AparDashboard />} />
           <Route path="/apar/inspeksi" element={<InspeksiApar />} />
+          <Route path="/apar/inspeksi/:id" element={<InspeksiUnit />} />
           <Route path="/apar/data" element={<DataUtamaApar />} />
+          <Route path="/apar/data/unit/:id" element={<AparUnitForm />} />
           <Route path="/apar/label" element={<AparLabel />} />
           <Route path="/apar/unit/:id" element={<AparUnit />} />
           <Route path="/laporan" element={<LaporanMenu />} />
@@ -99,3 +116,16 @@ function App() {
 }
 
 export default App
+
+function TanpaAkses({ peran, beranda }: { peran: string; beranda: string }) {
+  return (
+    <GlassCard level={1} className="flex flex-col items-center gap-space-sm p-space-md text-center">
+      <Lock aria-hidden="true" className="size-6 text-on-surface-variant" />
+      <span className="text-body-md font-semibold text-on-surface">Halaman ini tidak tersedia untuk peran {peran}</span>
+      <span className="text-body-sm text-on-surface-variant">Minta ABH mengubah peran akun Anda bila perlu membuka modul ini.</span>
+      <Link to={beranda} className={buttonVariants({ size: 'pill' })}>
+        Ke beranda
+      </Link>
+    </GlassCard>
+  )
+}

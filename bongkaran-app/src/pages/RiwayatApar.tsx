@@ -61,7 +61,7 @@ export function RiwayatApar() {
             { value: 'temuan' as const, label: `Ada temuan ${nTemuan}` },
           ]}
         />
-        <span className="text-body-sm text-on-surface-variant">Ketuk baris untuk membuka inspeksi pada tanggal itu.</span>
+        <span className="text-body-sm text-on-surface-variant">Ketuk baris untuk membuka data & riwayat unit.</span>
       </GlassCard>
       <div className="animate-entrance-2">
         <RecordTable
@@ -70,7 +70,7 @@ export function RiwayatApar() {
           total={all.length}
           cols={COLS}
           rowKey={(x) => x.key}
-          onRow={(x) => navigate(`/apar/inspeksi?tanggal=${x.tanggal}&unit=${encodeURIComponent(x.u.unitId)}`)}
+          onRow={(x) => navigate(`/apar/unit/${encodeURIComponent(x.u.unitId)}`)}
           empty="Belum ada inspeksi selesai pada rentang ini."
         />
       </div>
