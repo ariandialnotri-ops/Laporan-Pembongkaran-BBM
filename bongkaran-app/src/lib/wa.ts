@@ -20,7 +20,7 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   L.push(`🕒 ${shiftLabel(x.shift)}`)
   L.push(`🚚 MT ${d.nopol || '-'} | Driver: ${d.namaDriver || '-'}`)
   L.push(`⛽ ${d.produk || '-'} | ${x.tank ? x.tank.label : '-'}`)
-  L.push(`SO: ${d.noSO || '-'} | LO: ${d.noLOs.join(', ') || '-'} | Ship to: ${d.shipTo || d.soldTo || '-'}`)
+  L.push(`SO: ${d.noSO || '-'} | LO: ${d.noLOs.join(', ') || '-'} | Sold to: ${d.soldTo || '-'} | Ship to: ${d.shipTo || '-'}`)
   L.push(`Volume DO: ${formatMaybe(x.volumeDO)} L`)
   L.push('')
   L.push('*QUALITY*')

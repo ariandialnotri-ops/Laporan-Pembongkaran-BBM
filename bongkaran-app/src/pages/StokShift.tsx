@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Save, TriangleAlert } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
@@ -27,6 +28,7 @@ const stamp = () => Date.now()
 
 export function StokShift() {
   const app = useApp()
+  const navigate = useNavigate()
   const toast = useToast()
   const now = currentShift()
   const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
@@ -68,6 +70,7 @@ export function StokShift() {
       await app.saveDaily(rec)
       setDraft(null)
       toast(`Stok ${shiftLabel(key.shift).split(' (')[0]} tersimpan`)
+      navigate(`/laporan/persediaan?baru=${encodeURIComponent(id)}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

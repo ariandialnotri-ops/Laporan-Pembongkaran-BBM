@@ -408,10 +408,14 @@ function LoStep(props: StepProps) {
     const picked = plan!.los.filter((l) => loIds.includes(l.id))
     const produk = picked[0]?.produk ?? ''
     const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    // Ship To per produk dari Profil (bila ada), selain itu dari permintaan MS2.
+    const shipTo = (produk && settings.shipTo?.[produk]) || plan!.shipTo || d.shipTo
     setData({
       loIds,
       noLOs: picked.map((l) => l.noLO),
       produk,
+      shipTo,
+      soldTo: d.soldTo || settings.soldTo || '',
       volumeDO: picked.length ? String(picked.reduce((s, l) => s + l.volume, 0)) : '',
       segelLO: [...new Set(picked.flatMap((l) => l.segel))],
       tankId: produk !== d.produk ? (tankForProduk(produk)?.id ?? '') : d.tankId,
@@ -519,8 +523,11 @@ function LoStep(props: StepProps) {
           <Input id="pengangkut" autoComplete="off" value={d.perusahaanPengangkut} onChange={(e) => setData({ perusahaanPengangkut: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="No. Sold To" htmlFor="soldto">
+            <Input id="soldto" autoComplete="off" inputMode="numeric" placeholder="dari Profil" value={d.soldTo} onChange={(e) => setData({ soldTo: e.target.value })} />
+          </Field>
           <Field label="No. Ship To" htmlFor="shipto">
-            <Input id="shipto" autoComplete="off" inputMode="numeric" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
+            <Input id="shipto" autoComplete="off" inputMode="numeric" placeholder="otomatis per produk" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
           </Field>
           <Field label="Produk" htmlFor="lo-produk">
             <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />

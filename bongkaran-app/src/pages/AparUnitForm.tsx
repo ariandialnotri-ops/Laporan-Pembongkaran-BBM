@@ -75,7 +75,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     app.updateSettings(tipe === 'apar' ? { apar: ganti(list('apar')) } : { apab: ganti(list('apab')) })
     guard.bypass()
     toast(`${kode} ${awal ? 'diperbarui' : 'ditambahkan'}`)
-    navigate('/apar/data')
+    navigate(`/apar/data?baru=${encodeURIComponent(u.id)}`)
   }
 
   const hapus = () => {

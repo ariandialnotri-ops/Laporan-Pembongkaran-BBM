@@ -22,6 +22,9 @@ const DEFAULT_SETTINGS: Settings = {
   nozzles: [],
   jumlahPulau: 0,
   jumlahDispenser: 0,
+  dispensers: [],
+  soldTo: '',
+  shipTo: {},
   aparArea: DEFAULT_AREAS,
   apar: [],
   apab: [],
@@ -160,8 +163,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const flush = () => {
       if (!settingsDirty.current) return
       settingsDirty.current = false
-      // Pengawas hanya boleh mengubah data utama APAR/APAB; ABH menyimpan seluruh pengaturan.
-      const simpan = roleRef.current === 'pengawas' ? backend.saveAparSettings({ apar: settings.apar, apab: settings.apab, aparArea: settings.aparArea }) : backend.saveSettings(settings)
+      // Pengawas hanya boleh mengubah data utama APAR/APAB, Sold To & Ship To; ABH menyimpan seluruh pengaturan.
+      const simpan =
+        roleRef.current === 'pengawas'
+          ? backend.saveSettingsTerbatas({ apar: settings.apar, apab: settings.apab, aparArea: settings.aparArea, soldTo: settings.soldTo, shipTo: settings.shipTo })
+          : backend.saveSettings(settings)
       simpan.catch((e: Error) => setStatusMessage(`Gagal menyimpan pengaturan: ${e.message}`))
     }
     const t = setTimeout(flush, 700)

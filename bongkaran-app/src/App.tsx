@@ -27,9 +27,18 @@ const AparUnitForm = lazy(() => import('@/pages/AparUnitForm').then((m) => ({ de
 const DataUtamaApar = lazy(() => import('@/pages/DataUtamaApar').then((m) => ({ default: m.DataUtamaApar })))
 const InspeksiUnit = lazy(() => import('@/pages/InspeksiUnit').then((m) => ({ default: m.InspeksiUnit })))
 const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
+const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenBaru })))
+const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
+const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenDetail })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
+const IdentitasSpbu = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.IdentitasSpbu })))
+const AturanPemeriksaan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.AturanPemeriksaan })))
+const DataAcuan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.DataAcuan })))
+const DataDispenser = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DataDispenser })))
+const NozzleTera = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.NozzleTera })))
+const SoldShipTo = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.SoldShipTo })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const EditLo = lazy(() => import('@/pages/EditLo').then((m) => ({ default: m.EditLo })))
@@ -37,6 +46,7 @@ const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Pro
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
 const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ default: m.RiwayatApar })))
 const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
+const KualitasDetail = lazy(() => import('@/pages/KualitasDetail').then((m) => ({ default: m.KualitasDetail })))
 const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
 const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
 const RiwayatTera = lazy(() => import('@/pages/RiwayatTera').then((m) => ({ default: m.RiwayatTera })))
@@ -92,11 +102,21 @@ function Gate() {
           <Route path="/laporan/bongkaran" element={<RiwayatBongkaran />} />
           <Route path="/laporan/lo" element={<RiwayatLo />} />
           <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
+          <Route path="/laporan/kualitas/:kunci" element={<KualitasDetail />} />
           <Route path="/laporan/tera" element={<RiwayatTera />} />
           <Route path="/laporan/apar" element={<RiwayatApar />} />
+          <Route path="/insiden/baru" element={<InsidenBaru />} />
+          <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
+          <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />
           <Route path="/profil" element={<Profil />} />
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
+          <Route path="/pengaturan/identitas" element={<IdentitasSpbu />} />
+          <Route path="/pengaturan/dispenser" element={<DataDispenser />} />
+          <Route path="/pengaturan/nozzle" element={<NozzleTera />} />
+          <Route path="/pengaturan/sold-ship-to" element={<SoldShipTo />} />
+          <Route path="/pengaturan/aturan" element={<AturanPemeriksaan />} />
+          <Route path="/pengaturan/acuan" element={<DataAcuan />} />
           <Route path="/anggota" element={<Anggota />} />
           {/* Alamat lama */}
           <Route path="/qq/*" element={<Navigate to="/kualitas" replace />} />

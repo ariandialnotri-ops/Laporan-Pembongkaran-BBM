@@ -20,12 +20,15 @@ import {
 } from 'lucide-react'
 import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bongkaran/date-filter'
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
+import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
+import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
+import { berlakuSertifikat, statusSertifikat } from '@/lib/berlaku'
 import { bejanaStatus, qqD15, type AparRecord, type QqKualitas, type QqRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
@@ -62,6 +65,7 @@ export function Dashboard() {
   const [range, setRange] = useDateRange('today')
   const [filter, setFilter] = useState(false)
   const [buka, setBuka] = useState<string | null>(null)
+  const [ujiKunci, setUjiKunci] = useState<string | null>(null)
 
   // Uji kualitas harian terakhir tiap produk.
   const harian = useMemo(() => {
@@ -88,6 +92,7 @@ export function Dashboard() {
   if (!app.loaded) return <Loading />
 
   const hariIni = todayIso(now)
+  const teraMasalah = (app.settings.nozzles ?? []).filter((n) => ['lewat', 'segera'].includes(statusSertifikat(n.teraTanggal, hariIni)))
   const calendarWeek = kalenderMinggu(app.reports, weekAnchor, app.daily, now)
   const planDates = new Set(app.plans.filter((p) => p.los.some((lo) => lo.status !== 'deleted')).map((p) => p.tanggal))
   const senin = startOfWeek(weekAnchor)
@@ -349,6 +354,21 @@ export function Dashboard() {
         )}
       </Kartu>
 
+      {/* Sertifikat tera metrologi nozzle (maks. 1 tahun) yang lewat atau tinggal ≤ 30 hari. */}
+      {teraMasalah.length > 0 && (
+        <div role="status" className="animate-entrance-3 flex items-start gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-sm">
+          <Gauge aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
+          <span className="min-w-0 flex-1 text-body-sm text-on-surface">
+            <b>Tera metrologi:</b> {teraMasalah.map((n) => `${n.nama} ${statusSertifikat(n.teraTanggal, hariIni) === 'lewat' ? 'lewat' : 's/d ' + formatTanggalIso(berlakuSertifikat(n.teraTanggal))}`).join(', ')}
+          </span>
+          {app.can('/pengaturan/nozzle') && (
+            <Link to="/pengaturan/nozzle" className="shrink-0 text-body-sm font-semibold text-primary">
+              Atur
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* 5. Kualitas harian */}
       <Kartu
         id="kualitas-harian"
@@ -364,8 +384,8 @@ export function Dashboard() {
           const ref = h ? acuanD15(app.reports, p, h.rec.tanggal) : null
           const selisih = d15 !== null && ref ? Math.round((d15 - ref.d15) * 10000) / 10000 : null
           const ok = selisih !== null ? Math.abs(selisih) <= tol : null
-          return (
-            <div key={p} className="flex min-h-14 items-center gap-2.5 rounded-md bg-surface-container-low p-3">
+          const isi = (
+            <>
               <span aria-hidden="true" className={cn('h-8 w-1.5 shrink-0 rounded-full', h ? produkMeta(p).dot : 'bg-outline-variant')} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-md font-bold text-on-surface">{p}</span>
@@ -382,10 +402,35 @@ export function Dashboard() {
                 </span>
               )}
               {ok === null ? <Pill>{h ? 'Tanpa acuan' : 'Belum'}</Pill> : ok ? <Pill tone="success">Sesuai</Pill> : <Pill tone="error">Tidak sesuai</Pill>}
+            </>
+          )
+          // Ketuk produk yang sudah diuji: pop up highlight hasil uji terakhir.
+          return h ? (
+            <button
+              key={p}
+              type="button"
+              aria-label={`Lihat hasil uji ${p}`}
+              onClick={() => setUjiKunci(kunciHarian(h.rec.id, h.k.id))}
+              className="flex min-h-14 w-full items-center gap-2.5 rounded-md bg-surface-container-low p-3 text-left transition-colors hover:bg-primary-fixed/30 active:scale-[0.99]"
+            >
+              {isi}
+            </button>
+          ) : (
+            <div key={p} className="flex min-h-14 items-center gap-2.5 rounded-md bg-surface-container-low p-3">
+              {isi}
             </div>
           )
         })}
       </Kartu>
+
+      <Sheet open={!!ujiKunci} onOpenChange={(o) => !o && setUjiKunci(null)} title="Hasil uji kualitas harian" description="Highlight data uji terakhir produk ini.">
+        {ujiKunci && <KualitasHighlight kunci={ujiKunci} />}
+        {ujiKunci && app.can('/laporan/kualitas') && (
+          <Link to="/laporan/kualitas" className={buttonVariants({ variant: 'glass' })}>
+            Riwayat kualitas harian
+          </Link>
+        )}
+      </Sheet>
 
       <div className="animate-entrance-4">
         <KalengSample />

@@ -42,7 +42,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 |------|------|-----|
 | Dashboard | `/` | Kartu operasional (tanggal & shift), Status Bongkaran Pekan Ini (7 kotak hari dengan ikon status & titik plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Bongkaran Hari Ini per produk (dropdown: MT, diterima, transport loss, discharge loss L & %), SLA rata-rata, Rencana vs Realisasi, Kualitas Harian, Kaleng Sample (D15 sample mobil tangki saat bongkar dari 3 bongkaran terakhir), LO Tracking |
 | Input | `/input` | Bar wajib Stok Awal Shift + kartu: |
-| | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser |
+| | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser; simpan lalu ke Catatan Persediaan |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
 | | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), volume permintaan dipecah otomatis **tiap 8.000 L = 1 LO** (maks. 8.000 L per LO). Ketuk baris untuk membuka halaman **Edit SO & LO** (nomor segel tidak diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
@@ -61,12 +61,15 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |
 | | `/laporan/bongkaran` | Riwayat Pembongkaran MT: produk, tanggal penerimaan, SO, LO, nopol & supir, volume, transport loss, discharge loss (L, %), SLA (request MS2 / gate out sampai selesai bongkar), keterangan, progress |
 | | `/laporan/lo` | Riwayat Tracking LO: tanggal permintaan kirim, SO, LO, produk, volume, supply point, nopol MT, status; ketuk baris untuk ubah lewat pop up (LO Closed terkunci) |
-| | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan uji pasca penerimaan |
+| | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan uji pasca penerimaan; baris yang baru dikirim disorot biru. Ketuk baris → `/laporan/kualitas/:kunci` (highlight data: D15 besar, selisih vs acuan, status, density, suhu, petugas, foto; info bongkaran kecil) |
 | | `/laporan/tera` | Riwayat Tera: bejana 20 L per nozzle, batas -60 ml |
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
+| | `/insiden/baru` | **Lapor Insiden / Near miss / Kerusakan** (semua peran): jenis, kategori, tanggal & jam, lokasi, peralatan, uraian, dampak (wajib untuk insiden), penyebab, tindakan, tingkat risiko, foto (wajib untuk insiden & kerusakan), pelapor; kirim lalu ke riwayat |
+| | `/laporan/insiden` | Riwayat insiden: filter tanggal/jenis/status, baris terbuka oranye, baru biru; `/laporan/insiden/:id` detail + tindak lanjut (status, PIC, target, catatan) oleh ABH/Pengawas/Kashift |
 | Profil | `/profil` | Akun & peran, ganti kata sandi, statistik, Kalkulator; Pengaturan, Anggota, Data utama APAR (ABH) |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
-| | `/pengaturan` | Identitas SPBU, **jumlah pulau pompa & jumlah dispenser**, nama default, perusahaan pengangkut, nozzle dispenser, ringkasan proteksi kebakaran (tautan ke Data utama APAR & APAB), toleransi, data acuan |
+| | `/pengaturan` | Menu Pengaturan SPBU (ABH): **Identitas SPBU** (`/pengaturan/identitas`: nama, kode, alamat, jumlah pulau, logo, nama default), **Data Dispenser** (`/pengaturan/dispenser`: unit, merk, nomor seri, pulau), **Nozzle & Tera Metrologi** (`/pengaturan/nozzle`: produk, dispenser, no. & tanggal sertifikat tera, berlaku maks. 1 tahun), Sold To & Ship To, Data utama APAR, **Aturan Pemeriksaan** (`/pengaturan/aturan`), **Data Acuan** (`/pengaturan/acuan`) |
+| | `/pengaturan/sold-ship-to` | ABH & Pengawas: No. Sold To (satu) dan Ship To per produk; mengisi otomatis form bongkaran (setelah LO dipilih) dan permintaan MS2 |
 | | `/anggota` | Khusus ABH: **buat akun** (email + kata sandi sementara, langsung aktif) per peran, ubah peran, atur ulang kata sandi, hapus anggota; daftar hak akses per peran |
 
 Uji Kualitas Pasca Penerimaan disimpan di data bongkaran (`report.data.sample2Jam`, ringkasan
@@ -162,7 +165,7 @@ Skema yang dipakai aplikasi ada di
 `20261002120000_bbm_plan_meta_daily.sql`, dan
 `20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB), dan
 `20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran), dan
-`20261009120000_bbm_save_apar.sql` (RPC `bbm_save_apar`: pengawas menyimpan unit & area APAR saja, tanpa akses ke pengaturan SPBU lain). Edge function
+`20261009120000_bbm_save_apar.sql`, `20261009130000_bbm_save_settings_terbatas.sql` (RPC: pengawas menyimpan unit & area APAR serta Sold To/Ship To saja), dan `20261009140000_bbm_daily_insiden.sql` (kind `insiden`, semua peran boleh melapor). Edge function
 `supabase/functions/bbm-akun` membuat akun & mengatur ulang kata sandi (khusus ABH):
 
 | Objek | Isi |

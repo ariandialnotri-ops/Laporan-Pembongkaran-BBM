@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { MapPin, Plus, QrCode, Settings2, Trash2, Wand2 } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
-import { RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -71,6 +71,7 @@ const COLS: Col<Row>[] = [
 export function DataUtamaApar() {
   const app = useApp()
   const navigate = useNavigate()
+  const baru = useSearchParams()[0].get('baru')
   const toast = useToast()
   const [saring, setSaring] = useState<Saring>('semua')
   const [areaOpen, setAreaOpen] = useState(false)
@@ -116,7 +117,7 @@ export function DataUtamaApar() {
               Label QR
             </Link>
             {app.isAdmin ? (
-              <Link to="/pengaturan" className={buttonVariants({ variant: 'glass' })}>
+              <Link to="/pengaturan/identitas" className={buttonVariants({ variant: 'glass' })}>
                 <Settings2 aria-hidden="true" />
                 Jumlah pulau
               </Link>
@@ -152,6 +153,7 @@ export function DataUtamaApar() {
           total={semua.length}
           cols={COLS}
           rowKey={(x) => x.u.id}
+          rowClass={(x) => (x.u.id === baru ? BARIS_BARU : undefined)}
           onRow={(x) => navigate(ubah ? `/apar/data/unit/${encodeURIComponent(x.u.id)}` : `/apar/unit/${encodeURIComponent(x.u.id)}`)}
           empty={semua.length ? 'Tidak ada unit pada saringan ini.' : 'Belum ada unit. Ketuk "Tambah APAR / APAB".'}
         />

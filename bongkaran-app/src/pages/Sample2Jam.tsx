@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronRight, CircleCheck, Clock, LoaderCircle, Save, TriangleAlert } from 'lucide-react'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -38,6 +39,7 @@ function selesaiBongkar(r: ReportSummary) {
  */
 export function Sample2Jam() {
   const app = useApp()
+  const navigate = useNavigate()
   const toast = useToast()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -80,6 +82,7 @@ export function Sample2Jam() {
       app.upsertSummary(summary)
       setDraft(null)
       toast(ok === false ? 'Uji tersimpan: selisih D15 di luar toleransi' : 'Uji kualitas pasca penerimaan tersimpan', ok === false ? TriangleAlert : undefined)
+      navigate(`/laporan/kualitas?baru=${encodeURIComponent(`p.${next.id}`)}`)
     } catch (e) {
       fail(e instanceof Error ? e.message : String(e))
     } finally {

@@ -149,7 +149,7 @@ function Form({ plan }: { plan: Plan }) {
       else await app.deletePlan(plan)
       guard.bypass()
       toast(los.length ? 'SO & LO tersimpan' : 'Permintaan dihapus')
-      navigate(kembaliKe)
+      navigate(`${kembaliKe}?baru=${encodeURIComponent(plan.id)}`)
     } catch (e) {
       setError(pesan(e))
     } finally {

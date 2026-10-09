@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, CalendarClock, ClipboardList, Lock, Plus, Trash2 } from 'lucide-react'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, ProdukSelect, SupplySelect } from '@/components/bongkaran/lo-fields'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, BARIS_ORANYE, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -15,7 +15,7 @@ import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { LO_MAX_LITER, LO_STATUS, loStatus, loStatusMeta, pecahVolume, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
+import { belumTerbit, LO_MAX_LITER, LO_STATUS, loStatus, loStatusMeta, pecahVolume, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
 import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
@@ -104,7 +104,7 @@ function PlanFields({ form, set, idp }: { form: PlanForm; set: (p: Partial<PlanF
         <Input id={`${idp}-ms2j`} type="time" value={form.ms2Jam} onChange={(e) => set({ ms2Jam: e.target.value })} />
       </Field>
       <Field label="No. Ship To" htmlFor={`${idp}-ship`}>
-        <Input id={`${idp}-ship`} autoComplete="off" inputMode="numeric" value={form.shipTo} onChange={(e) => set({ shipTo: e.target.value })} />
+        <Input id={`${idp}-ship`} autoComplete="off" inputMode="numeric" placeholder="otomatis dari Profil" value={form.shipTo} onChange={(e) => set({ shipTo: e.target.value })} />
       </Field>
       <Field label="No. PO SAP" htmlFor={`${idp}-po`}>
         <Input id={`${idp}-po`} autoComplete="off" placeholder="opsional" value={form.poSap} onChange={(e) => set({ poSap: e.target.value })} />
@@ -125,6 +125,10 @@ export function Plan() {
   const app = useApp()
   const toast = useToast()
   const navigate = useNavigate()
+  // Permintaan yang baru disimpan / SO-LO yang baru diubah disorot biru.
+  const [params] = useSearchParams()
+  const [baruLokal, setBaruLokal] = useState<string | null>(null)
+  const sorot = baruLokal ?? params.get('baru')
   const [form, setForm] = useState<PlanForm>(() => blankPlanForm())
   const [rows, setRows] = useState<Row[]>(() => [blankRow()])
   const [error, setError] = useState<string | null>(null)
@@ -153,9 +157,12 @@ export function Plan() {
 
   const simpan = async () => {
     if (menyimpan) return
-    const err = validatePlan(form)
-    if (err) return setError(err)
     const valid = rows.filter((r) => (parseAngka(r.volume) ?? 0) > 0)
+    // Ship To kosong: pakai Ship To produk pertama dari Profil > Sold To & Ship To.
+    const shipToProfil = valid[0] ? app.settings.shipTo?.[valid[0].produk] : ''
+    const f = { ...form, shipTo: form.shipTo.trim() || shipToProfil || '' }
+    const err = validatePlan(f)
+    if (err) return setError(err)
     if (!valid.length) return setError('Isi minimal satu produk dengan volume lebih dari 0 liter.')
     const tanpaShift = valid.findIndex((r) => !r.shift)
     const volumeRow = (r: Row) => parseAngka(r.volume) ?? 0
@@ -163,14 +170,14 @@ export function Plan() {
     const plan: PlanT = {
       id: genId('plan'),
       createdAt: Date.now(),
-      ...form,
+      ...f,
       // Shift permintaan diisi per produk; shift plan = shift produk pertama (data lama/SLA).
       ms2Shift: valid[0].shift,
-      shipTo: form.shipTo.trim(),
-      poSap: form.poSap.trim(),
+      shipTo: f.shipTo.trim(),
+      poSap: f.poSap.trim(),
+      soldTo: app.settings.soldTo ?? '',
       noSO: '',
       produk: '',
-      soldTo: '',
       // Tiap 8.000 L = 1 LO: 16.000 L menjadi 2 LO, 20.000 L menjadi 8.000 + 8.000 + 4.000.
       los: valid.flatMap((r) => pecahVolume(volumeRow(r)).map((volume, i) => ({ id: i ? genId('lo') : r.id, noLO: '', produk: r.produk, volume, shift: r.shift, status: 'os' as const, segel: [] }))),
     }
@@ -178,6 +185,7 @@ export function Plan() {
     setMenyimpan(true)
     try {
       await app.savePlan(plan)
+      setBaruLokal(plan.id)
       setForm(blankPlanForm(form.tanggal))
       setRows([blankRow()])
       setBaru(false)
@@ -270,6 +278,10 @@ export function Plan() {
             LO berstatus <b className="text-on-surface">{loStatusMeta(statusFilter).label}</b>: {loStatusMeta(statusFilter).desc.toLowerCase()}.
           </span>
         )}
+        <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+          <span aria-hidden="true" className="size-3 shrink-0 rounded-sm bg-orange-50 shadow-[inset_3px_0_0_#f97316] ring-1 ring-orange-200" />
+          Baris oranye: SO/LO belum terbit dari depot.
+        </span>
       </GlassCard>
 
       <div className="animate-entrance-2">
@@ -280,6 +292,7 @@ export function Plan() {
           cols={COLS}
           rowKey={(x) => x.lo.id}
           onRow={(x) => bukaLo(x.plan, x.lo)}
+          rowClass={(x) => (x.plan.id === sorot ? BARIS_BARU : belumTerbit(x.plan, x.lo) ? BARIS_ORANYE : undefined)}
           empty={statusFilter ? 'Tidak ada LO dengan status ini pada rentang tanggal terpilih.' : 'Belum ada plan pengiriman pada rentang tanggal ini.'}
         />
       </div>

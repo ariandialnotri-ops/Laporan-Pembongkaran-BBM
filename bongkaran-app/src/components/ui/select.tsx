@@ -40,7 +40,8 @@ function SelectContent({
         sideOffset={6}
         className={cn(
           'glass-3 z-[70] overflow-hidden rounded-lg',
-          position === 'popper' && 'w-[var(--radix-select-trigger-width)]',
+          // Daftar panjang dibatasi setinggi ruang yang tersedia di layar, lalu digulir.
+          position === 'popper' && 'max-h-[min(var(--radix-select-content-available-height),24rem)] w-[var(--radix-select-trigger-width)]',
           className,
         )}
         {...props}

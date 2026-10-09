@@ -63,7 +63,7 @@ export const localBackend: Backend = {
 
   getSettings: () => get('settings').then((s) => (s as never) ?? null),
   saveSettings: (settings) => set('settings', settings).then(() => {}),
-  async saveAparSettings(data) {
+  async saveSettingsTerbatas(data) {
     await set('settings', { ...((await get<Settings>('settings')) ?? {}), ...data })
   },
 

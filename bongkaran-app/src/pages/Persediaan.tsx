@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileSpreadsheet, FileText, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { DateFilter, useDateRange } from '@/components/bongkaran/date-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -23,6 +25,7 @@ export function Persediaan() {
   const [range, setRange] = useDateRange('month')
   const [produk, setProduk] = useState(PRODUK_OPTIONS[0])
   const [busy, setBusy] = useState<'xlsx' | 'pdf' | null>(null)
+  const baru = useSearchParams()[0].get('baru')
 
   const stok = useMemo(() => app.daily.filter((d): d is StokRecord => d.kind === 'stok'), [app.daily])
   const from = range.from || '0000-01-01'
@@ -50,6 +53,7 @@ export function Persediaan() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      {baru && <BannerTerkirim teks="Stok shift tersimpan. Catatan persediaan di bawah sudah memuat data terbaru." />}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <Field label="Produk" htmlFor="persediaan-produk" hint={tank ? tankName(tank.tankNo) : undefined}>
           <Select value={produk} onValueChange={setProduk}>

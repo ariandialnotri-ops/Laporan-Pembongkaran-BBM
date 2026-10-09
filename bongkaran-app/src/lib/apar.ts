@@ -2,7 +2,7 @@
  * Proteksi kebakaran SPBU: daftar APAR (alat pemadam api ringan) dan APAB
  * (alat pemadam api berat/beroda) di Pengaturan, dan inspeksi berkala per unit.
  */
-import { addDays, todayIso as isoOf } from '@/lib/date'
+import { berlakuSertifikat, MASA_SERTIFIKAT_BULAN, statusSertifikat, statusTanggal } from '@/lib/berlaku'
 import { genId } from '@/lib/image'
 import type { Photo } from '@/lib/sop'
 
@@ -135,29 +135,14 @@ export function hasilCek(c: AparCek) {
 }
 
 /** Kedaluwarsa sudah lewat (atau dalam 30 hari). */
-export function statusKedaluwarsa(tgl: string, todayIso: string): 'lewat' | 'segera' | 'ok' | null {
-  if (!tgl) return null
-  if (tgl < todayIso) return 'lewat'
-  return tgl <= isoOf(addDays(new Date(`${todayIso}T00:00:00`), 30)) ? 'segera' : 'ok'
-}
+export const statusKedaluwarsa = statusTanggal
 
 /** Pemeriksaan oleh instansi berwenang paling lama 12 bulan sekali. */
-export const MASA_INSTANSI_BULAN = 12
-
+export const MASA_INSTANSI_BULAN = MASA_SERTIFIKAT_BULAN
 /** Batas berlaku pemeriksaan instansi: tanggal periksa + 12 bulan (YYYY-MM-DD). */
-export function berlakuInstansi(tglPeriksa: string | undefined) {
-  if (!tglPeriksa) return ''
-  const [y, m, d] = tglPeriksa.split('-').map(Number)
-  const t = new Date(y, m - 1 + MASA_INSTANSI_BULAN, d)
-  // 29 Feb / tanggal 31 yang tidak ada di bulan tujuan: pakai akhir bulan itu.
-  if (t.getDate() !== d) t.setDate(0)
-  return isoOf(t)
-}
-
+export const berlakuInstansi = berlakuSertifikat
 /** Status pemeriksaan instansi: belum dicatat, lewat, ≤ 30 hari lagi, atau masih berlaku. */
-export function statusInstansi(tglPeriksa: string | undefined, todayIso: string): 'belum' | 'lewat' | 'segera' | 'ok' {
-  return statusKedaluwarsa(berlakuInstansi(tglPeriksa), todayIso) ?? 'belum'
-}
+export const statusInstansi = statusSertifikat
 
 export type StatusUnit = 'baik' | 'temuan' | 'belum'
 

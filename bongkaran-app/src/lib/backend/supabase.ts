@@ -119,8 +119,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async saveSettings(settings) {
       check(await sb.from('bbm_settings').upsert({ id: 'default', value: settings }))
     },
-    async saveAparSettings({ apar, apab, aparArea }) {
-      check(await sb.rpc('bbm_save_apar', { p_apar: apar ?? [], p_apab: apab ?? [], p_area: aparArea ?? [] }))
+    async saveSettingsTerbatas({ apar, apab, aparArea, soldTo, shipTo }) {
+      check(await sb.rpc('bbm_save_settings_terbatas', { p_patch: { apar: apar ?? [], apab: apab ?? [], aparArea: aparArea ?? [], soldTo: soldTo ?? '', shipTo: shipTo ?? {} } }))
     },
 
     async listPlans() {

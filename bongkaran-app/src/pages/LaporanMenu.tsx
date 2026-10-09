@@ -1,4 +1,4 @@
-import { ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, Truck } from 'lucide-react'
+import { ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, ShieldAlert, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { useApp } from '@/lib/app-state'
@@ -30,6 +30,8 @@ export function LaporanMenu() {
   const aparTerakhir = app.daily.filter((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
   const temuanApar = aparTerakhir ? aparTerakhir.data.units.filter((u) => hasilCek(u).temuan.length).length : 0
 
+  const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
+
   const menus: MenuItem[] = [
     { to: '/laporan/persediaan', icon: FileSpreadsheet, title: 'Catatan Persediaan BBM', desc: 'Per produk, satu baris per shift', status: 'Unduh Excel atau PDF' },
     {
@@ -58,6 +60,14 @@ export function LaporanMenu() {
       desc: 'APAR, APAR cadangan, dan APAB',
       status: !aparTerakhir ? 'Belum ada inspeksi' : temuanApar ? `${temuanApar} unit ada temuan` : `Terakhir ${aparTerakhir.tanggal.slice(8)}/${aparTerakhir.tanggal.slice(5, 7)}, semua baik`,
       badge: temuanApar,
+    },
+    {
+      to: '/laporan/insiden',
+      icon: ShieldAlert,
+      title: 'Riwayat Insiden & Near miss',
+      desc: 'Insiden, near miss, kerusakan, dan tindak lanjut',
+      status: insidenTerbuka ? `${insidenTerbuka} belum selesai` : 'Semua laporan selesai',
+      badge: insidenTerbuka,
     },
   ]
 

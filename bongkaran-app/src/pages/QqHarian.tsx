@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -54,6 +55,7 @@ function upsert<T extends { id: string }>(list: T[], item: T) {
 /** Input > Kualitas Harian: uji density per produk dan tera bejana 20 L per nozzle, disimpan per baris. */
 export function QqHarian() {
   const app = useApp()
+  const navigate = useNavigate()
   const toast = useToast()
   const { key: now } = useStokShift()
   const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
@@ -203,6 +205,7 @@ export function QqHarian() {
       await persist(() => ({ ...data, selesaiAt: isoNow() }))
       setDraft(null)
       toast('Uji Q&Q harian selesai')
+      navigate(`/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`)
     } catch (e) {
       setError(pesan(e))
     } finally {

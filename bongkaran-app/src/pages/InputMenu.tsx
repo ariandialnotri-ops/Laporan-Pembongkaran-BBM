@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, TestTube, Truck } from 'lucide-react'
+import { ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
@@ -32,6 +32,8 @@ export function InputMenu() {
     app.daily.filter((d): d is AparRecord => d.kind === 'apar'),
     stok.key.tanggal,
   ).filter((k) => !k.bulanIni).length
+
+  const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
 
   const menus: MenuItem[] = [
     {
@@ -73,6 +75,14 @@ export function InputMenu() {
       desc: 'Pindai QR di unit, checklist & foto, kirim per unit',
       status: !unitApar ? 'Data utama unit belum diisi' : aparBelum ? `${aparBelum} dari ${unitApar} unit belum bulan ini` : 'Semua unit sudah bulan ini',
       badge: aparBelum,
+    },
+    {
+      to: '/insiden/baru',
+      icon: ShieldAlert,
+      title: 'Lapor Insiden & Near miss',
+      desc: 'Insiden, near miss, dan kerusakan peralatan',
+      status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
+      badge: insidenTerbuka,
     },
   ]
 

@@ -289,6 +289,10 @@ export interface Settings {
   /** Data SPBU: jumlah pulau pompa (juga lokasi APAR) dan jumlah dispenser. */
   jumlahPulau: number
   jumlahDispenser: number
+  dispensers: Dispenser[]
+  /** Nomor Sold To SPBU (satu) dan Ship To per produk; mengisi otomatis form bongkaran & permintaan MS2. */
+  soldTo: string
+  shipTo: Record<string, string>
   /** Data utama area/lokasi APAR selain pulau pompa. */
   aparArea: string[]
   apar: AparUnit[]
@@ -300,6 +304,23 @@ export interface Nozzle {
   id: string
   nama: string
   produk: string
+  /** Unit dispenser tempat nozzle ini terpasang. */
+  dispenserId?: string
+  /** Nomor sertifikat tera metrologi. */
+  teraNoSertifikat?: string
+  /** Tanggal keluar sertifikat tera metrologi; berlaku maks. 1 tahun. */
+  teraTanggal?: string
+}
+
+/** Unit dispenser (pompa) di SPBU. */
+export interface Dispenser {
+  id: string
+  /** Nomor/nama unit, mis. "Dispenser 1". */
+  nama: string
+  merk: string
+  noSeri: string
+  /** Pulau pompa tempat dispenser dipasang. */
+  pulau: string
 }
 
 export const PRODUK_OPTIONS = ['Pertalite', 'Pertamax', 'Pertamax Turbo', 'Biosolar', 'Pertamina Dex']
@@ -498,7 +519,8 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
       jamDatang: nowHm(),
       nopol: '',
       namaDriver: '',
-      soldTo: '',
+      // Sold To SPBU dari Profil > Sold To & Ship To.
+      soldTo: settings.soldTo ?? '',
       shipTo: '',
       produk: '',
       jumlahDO: '',

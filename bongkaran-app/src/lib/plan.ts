@@ -50,6 +50,9 @@ export function loStatus(lo: PlanLo, used: Map<string, ReportSummary>): LoDispla
   return lo.status
 }
 
+/** SO atau LO belum terbit dari depot (disorot oranye di Tracking LO); LO yang dihapus tidak dihitung. */
+export const belumTerbit = (plan: Plan, lo: PlanLo) => lo.status !== 'deleted' && (!plan.noSO.trim() || !lo.noLO.trim())
+
 /** LO yang boleh dipilih saat bongkar. */
 export function loPickable(lo: PlanLo, used: Map<string, ReportSummary>) {
   return !!lo.noLO.trim() && !['deleted', 'closed', 'delivered', 'proses'].includes(loStatus(lo, used))

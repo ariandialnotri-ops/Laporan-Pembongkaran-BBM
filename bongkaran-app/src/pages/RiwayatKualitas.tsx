@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
+import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { Loading } from '@/components/bongkaran/load-state'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { kunciHarian, kunciPasca } from '@/components/bongkaran/kualitas-highlight'
+import { BARIS_BARU, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useApp } from '@/lib/app-state'
@@ -25,7 +28,7 @@ type Row = {
   acuan: string
   selisih: number | null
   ok: boolean | null
-  to?: string
+  detail: string
 }
 
 const COLS: Col<Row>[] = [
@@ -59,6 +62,9 @@ const COLS: Col<Row>[] = [
 /** Laporan > Riwayat Kualitas Harian: uji density harian per shift dan uji kualitas pasca penerimaan. */
 export function RiwayatKualitas() {
   const app = useApp()
+  // Data yang baru dikirim dari Kualitas Harian / Uji Pasca Penerimaan disorot.
+  const [params] = useSearchParams()
+  const baru = params.get('baru')
   const [range, setRange] = useDateRange('7d')
   const [produk, setProduk] = useState('semua')
   const [jenis, setJenis] = useState<'semua' | Row['jenis']>('semua')
@@ -84,7 +90,7 @@ export function RiwayatKualitas() {
             acuan: ref ? `bongkar ${formatTanggalIso(ref.tanggal)}` : 'belum ada bongkaran',
             selisih,
             ok: selisih !== null ? Math.abs(selisih) <= tol : null,
-            to: '/kualitas',
+            detail: kunciHarian(rec.id, k.id),
           }
         }),
       )
@@ -102,7 +108,7 @@ export function RiwayatKualitas() {
         acuan: 'D15 depot',
         selisih: r.sample2Jam!.selisih,
         ok: r.sample2Jam!.ok,
-        to: `/input/${r.id}`,
+        detail: kunciPasca(r.id),
       }))
     return [...harian, ...sample].sort((a, b) => (b.tanggal + b.waktu).localeCompare(a.tanggal + a.waktu))
   }, [app.daily, app.reports, app.rules.densityTolerance])
@@ -114,6 +120,7 @@ export function RiwayatKualitas() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      {baru && <BannerTerkirim teks="Hasil uji tersimpan dan disorot di riwayat. Ketuk baris untuk melihat highlight data." />}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <DateFilter id="kualitas-range" value={range} onChange={setRange} />
         <ChipFilter
@@ -132,7 +139,16 @@ export function RiwayatKualitas() {
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Kualitas Harian" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.key} to={(x) => x.to ?? '/kualitas'} empty="Belum ada uji kualitas pada rentang ini." />
+        <RecordTable
+          title="Kualitas Harian"
+          rows={rows}
+          total={all.length}
+          cols={COLS}
+          rowKey={(x) => x.key}
+          to={(x) => `/laporan/kualitas/${encodeURIComponent(x.detail)}`}
+          rowClass={(x) => (baru && x.detail.startsWith(baru) ? BARIS_BARU : undefined)}
+          empty="Belum ada uji kualitas pada rentang ini."
+        />
       </div>
     </div>
   )

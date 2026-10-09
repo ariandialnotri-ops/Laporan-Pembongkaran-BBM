@@ -406,10 +406,17 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 - **Unit** (`/apar/unit/:id`, tujuan QR): QR + kode besar, tipe, jenis/kapasitas, lokasi; chip isi ulang; tombol **Inspeksi unit ini**, Cetak label, Data utama; **Kondisi terakhir** (tanggal, petugas, temuan merah, catatan, foto); **Riwayat inspeksi**. Unit terhapus: "Unit tidak ditemukan".
 - **Pindai QR**: sheet kamera (bingkai bidik), atau ketik kode unit.
 
+### 9.9b Pelaporan Insiden, Near miss & Kerusakan
+- **Form** (`/insiden/baru`, semua peran): 3 kartu jenis (Insiden / Near miss / Kerusakan, kartu terpilih biru), Kategori (Select per jenis), Tanggal & Jam kejadian, Lokasi (pulau + area APAR + Area lain), Peralatan (datalist dispenser/nozzle), Uraian, Dampak/korban (wajib untuk insiden), Dugaan penyebab, Tindakan yang sudah dilakukan, Tingkat risiko (Rendah/Sedang/Tinggi), Foto (wajib untuk insiden & kerusakan), Pelapor; tombol **Kirim laporan …** → Riwayat Insiden dengan banner hijau dan baris biru.
+- **Riwayat** (`/laporan/insiden`): kartu "n laporan belum selesai" + tombol Laporkan, DateFilter, chip Jenis & Status; RecordTable (Tanggal, Jenis, Kategori, Lokasi, Risiko, Pelapor, Status); baris terbuka oranye.
+- **Detail** (`/laporan/insiden/:id`): kartu ringkas (jenis, kategori, waktu, lokasi, risiko, status), uraian/dampak/penyebab/tindakan/pelapor/PIC, foto 96 px; **Tindak lanjut** (linimasa terbaru di atas); form **Tambah tindak lanjut** (status, PIC, target selesai, catatan) untuk ABH/Pengawas/Kashift.
+
 ### 9.10 Menu Laporan
 Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acara (merah bila menunggu tanda tangan), Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera (merah bila ada nozzle di bawah batas), Riwayat Inspeksi APAR (merah bila ada unit dengan temuan).
 
 ### 9.11 Halaman laporan (semua memakai RecordTable)
+
+Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan Persediaan, kualitas harian & pasca penerimaan → Riwayat Kualitas Harian, bongkaran selesai → Riwayat Pembongkaran dengan tombol "Laporan WA & unduh BA", insiden → Riwayat Insiden, MS2 / Edit SO & LO → Tracking LO, unit APAR → Data utama). Data baru: banner hijau + baris biru (`BARIS_BARU`); perlu perhatian (SO/LO belum terbit, insiden terbuka, tera lewat): baris oranye (`BARIS_ORANYE`).
 
 | Halaman | Penyaring | Kolom (urut) |
 |---|---|---|
@@ -422,9 +429,11 @@ Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acar
 | **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → halaman unit (data & riwayat) |
 
 ### 9.12 Profil, Kalkulator, Pengaturan, Anggota
+- **Tanda tangan**: tombol "Ketuk untuk tanda tangan" membuka **layar penuh** (area gambar sebesar layar, kotak panduan, putar HP untuk area lebar); **Simpan tanda tangan** → pratinjau "Gunakan tanda tangan ini?" dengan **Ulangi / Ya, simpan**. Tanda tangan tersimpan tampil ringkas (gambar 48 px + Ulangi).
+- **Dashboard**: kartu Kualitas Harian bisa diketuk → pop up highlight uji terakhir produk itu; banner amber bila sertifikat tera nozzle lewat / ≤ 30 hari.
 - **Profil**: kartu identitas (inisial, nama, pill peran, email, SPBU), 3 StatTile (bila punya bongkaran), grup **Alat bantu** (Kalkulator), grup **Akun & SPBU** (ABH: Pengaturan SPBU, Anggota & akun per peran, Data utama APAR & APAB, Data acuan; semua: **Ganti kata sandi** (bottom sheet), Keluar).
 - **Kalkulator**: Density observasi + Suhu → D15 (angka besar); Tangki + Ketinggian → volume dari tabel kalibrasi.
-- **Pengaturan SPBU** (ABH): Nama SPBU, Kode, Alamat, logo; **Jumlah pulau pompa** & **Jumlah dispenser** (+ jumlah nozzle); nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
+- **Pengaturan SPBU** (ABH) kini menu daftar ke halaman terpisah: Identitas SPBU, Data Dispenser (RecordTable + sheet form: unit, merk, nomor seri, pulau), Nozzle & Tera Metrologi (RecordTable: nozzle, produk, dispenser, no. sertifikat, tanggal tera, berlaku s/d, pill Tera lewat / ≤ 30 hari / Belum dicatat / Berlaku; baris oranye bila lewat/≤ 30 hari; sheet form dengan hint "Berlaku sampai …"), Sold To & Ship To (ABH & Pengawas), Data utama APAR, Aturan Pemeriksaan, Data Acuan. Isi lama (referensi): Nama SPBU, Kode, Alamat, logo; **Jumlah pulau pompa** & **Jumlah dispenser** (+ jumlah nozzle); nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
 - **Anggota** (ABH, mode server): kartu **Buat akun baru** (Nama, Peran, Email, Kata sandi sementara + tombol acak, keterangan hak akses peran, tombol **Buat akun <peran>**, kotak hijau email & sandi yang dibuat); daftar anggota (nama/email, Select peran, ikon kunci = atur ulang kata sandi lewat bottom sheet, hapus); **Hak akses per peran**; lipatan "Daftarkan akun yang sudah ada".
 
 ---

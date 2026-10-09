@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, BARIS_ORANYE, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
-import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
+import { belumTerbit, LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
 import type { Plan, PlanLo, ReportSummary } from '@/lib/sop'
 
 type Row = { plan: Plan; lo: PlanLo; status: LoDisplayStatus; report: ReportSummary | undefined }
@@ -56,6 +56,7 @@ export function RiwayatLo() {
   const [range, setRange] = useDateRange('month')
   const [status, setStatus] = useState<'semua' | LoDisplayStatus>('semua')
   const navigate = useNavigate()
+  const baru = useSearchParams()[0].get('baru')
   useSyncOnOpen()
   if (!app.loaded) return <Loading />
 
@@ -77,11 +78,11 @@ export function RiwayatLo() {
           options={[{ value: 'semua' as const, label: `Semua ${inDate.length}` }, ...LO_STATUS.map((s) => ({ value: s.key, label: `${s.label} ${n(s.key)}` }))]}
         />
         <span className="text-body-sm text-on-surface-variant">
-          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Plan dengan tanggal kirim mendatang selalu tampil. Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
+          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Baris oranye: SO/LO belum terbit. Plan dengan tanggal kirim mendatang selalu tampil. Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} onRow={(x) => navigate(`/plan/so/${encodeURIComponent(x.plan.id)}?lo=${encodeURIComponent(x.lo.id)}&dari=/laporan/lo`)} empty="Tidak ada LO pada rentang ini." />
+        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} rowClass={(x) => (x.plan.id === baru ? BARIS_BARU : belumTerbit(x.plan, x.lo) ? BARIS_ORANYE : undefined)} onRow={(x) => navigate(`/plan/so/${encodeURIComponent(x.plan.id)}?lo=${encodeURIComponent(x.lo.id)}&dari=/laporan/lo`)} empty="Tidak ada LO pada rentang ini." />
       </div>
     </div>
   )

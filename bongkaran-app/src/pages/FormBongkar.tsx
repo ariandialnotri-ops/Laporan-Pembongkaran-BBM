@@ -137,6 +137,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     urgent.current = false
   }, [report, flush])
 
+  const [keRiwayat, setKeRiwayat] = useState(false)
+
   // Isian dari cadangan perangkat langsung dikirim ke server.
   useEffect(() => {
     if (restored) void save(initial)
@@ -243,6 +245,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       data: { ...prev.data, noBA: prev.data.noBA || suggestNoBA(app.settings, prev) },
     }))
     toast(status === 'anomali' ? 'Ditutup sebagai anomali' : 'Bongkaran selesai · Berita Acara siap')
+    setKeRiwayat(true)
   }
   const reopen = () => {
     if (!window.confirm('Buka kembali untuk koreksi? Status kembali menjadi draft.')) return
@@ -279,6 +282,13 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
     beforeLeave: flush,
   })
+  // Setelah diselesaikan, pindah ke Riwayat Pembongkaran (penyimpanan terakhir dijalankan saat halaman ditutup).
+  useEffect(() => {
+    if (!keRiwayat || report.status === 'draft') return
+    guard.bypass()
+    navigate(`/laporan/bongkaran?baru=${encodeURIComponent(report.id)}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keRiwayat, report.status, report.id, navigate])
   const waText = useMemo(() => buildWaText(report, evaluation.derived, app.settings), [report, evaluation, app.settings])
 
   const hapus = async () => {

@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { FileDown } from 'lucide-react'
+import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useApp } from '@/lib/app-state'
@@ -123,13 +127,24 @@ export function RiwayatBongkaran() {
   const app = useApp()
   const [range, setRange] = useDateRange('month')
   const [produk, setProduk] = useState('semua')
+  const [params] = useSearchParams()
+  const baru = params.get('baru')
   if (!app.loaded) return <Loading />
+  const selesai = baru ? app.reports.find((r) => r.id === baru) : undefined
 
-  const rows: Row[] = app.reports.filter((r) => inRange(r.tanggal, range) && (produk === 'semua' || r.produk === produk)).map((r) => ({ ...r, sla: slaOf(r, app.plans) }))
+  const rows: Row[] = app.reports.filter((r) => (inRange(r.tanggal, range) || r.id === baru) && (produk === 'semua' || r.produk === produk)).map((r) => ({ ...r, sla: slaOf(r, app.plans) }))
   const liter = rows.filter((r) => r.status === 'selesai').reduce((n, r) => n + (r.volumeDO ?? 0), 0)
 
   return (
     <div className="flex flex-col gap-space-md">
+      {selesai && (
+        <BannerTerkirim teks={`Bongkaran ${selesai.nopol || 'MT'} (${selesai.produk}) ${selesai.status === 'anomali' ? 'ditutup sebagai anomali' : 'selesai'} dan disorot di bawah.`}>
+          <Link to={`/input/${selesai.id}`} className={buttonVariants({ size: 'sm', className: 'self-start' })}>
+            <FileDown aria-hidden="true" />
+            Laporan WA & unduh BA
+          </Link>
+        </BannerTerkirim>
+      )}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <DateFilter id="mt-range" value={range} onChange={setRange} />
         <ChipFilter label="Produk" value={produk} onChange={setProduk} options={[{ value: 'semua', label: 'Semua produk' }, ...PRODUK_OPTIONS.map((p) => ({ value: p, label: p }))]} />
@@ -138,7 +153,7 @@ export function RiwayatBongkaran() {
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Pembongkaran MT" rows={rows} total={app.reports.length} cols={COLS} rowKey={(r) => r.id} to={(r) => `/input/${r.id}`} empty="Tidak ada bongkaran pada rentang ini." />
+        <RecordTable title="Pembongkaran MT" rows={rows} total={app.reports.length} cols={COLS} rowKey={(r) => r.id} to={(r) => `/input/${r.id}`} rowClass={(r) => (r.id === baru ? BARIS_BARU : undefined)} empty="Tidak ada bongkaran pada rentang ini." />
       </div>
     </div>
   )
