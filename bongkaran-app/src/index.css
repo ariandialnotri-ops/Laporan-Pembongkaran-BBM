@@ -528,11 +528,46 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
-/* Sheet padat: isi halaman di belakang tidak tembus (Android tanpa blur), dan lebih ringan. */
+/* Sheet padat: isi halaman di belakang tidak tembus (Android tanpa blur), dan lebih ringan.
+   Tinggi mengikuti area yang terlihat (--vvh) dan naik di atas keyboard (--kb), agar
+   tombol simpan di bawah sheet tetap bisa dijangkau di iPhone. */
 .sheet-content {
   background: var(--surface-container-lowest);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  max-height: 88vh;
+  max-height: min(88dvh, calc(var(--vvh, 100dvh) - 1rem));
+  bottom: var(--kb, 0px);
+}
+
+/* Dock disembunyikan selama keyboard HP tampil (muncul lagi saat keyboard ditutup). */
+html[data-keyboard='open'] [data-dock] {
+  visibility: hidden;
+}
+
+/* iPhone/iPad (Safari & semua browser iOS memakai WebKit): banyak lapisan backdrop-filter
+   pada halaman panjang menghabiskan memori GPU, sehingga dock/konten bawah bisa tidak
+   tergambar dan halaman terasa tidak bisa digulir sampai bawah. Di iOS, kartu memakai
+   permukaan padat tanpa blur, orb latar dimatikan, latar tidak "fixed", dan gulir
+   memantul bawaan iOS dibiarkan. */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --glass-1-bg: rgba(255, 255, 255, 0.82);
+    --glass-2-bg: rgba(255, 255, 255, 0.9);
+    --glass-3-bg: #ffffff;
+    --glass-1-blur: none;
+    --glass-2-blur: none;
+    --glass-3-blur: none;
+  }
+  body {
+    background-attachment: scroll;
+    /* overscroll-behavior: none di Safari iOS menghambat toolbar bawah menyusut,
+       sehingga bagian bawah halaman tertutup toolbar dan tidak bisa digulir. */
+    overscroll-behavior-y: auto;
+  }
+  [data-orbs] {
+    display: none;
+  }
 }
 .sheet-content[data-state='open'] { animation: sheetIn 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
 .sheet-content[data-state='closed'] { animation: sheetOut 0.2s cubic-bezier(0.4, 0, 1, 1); }

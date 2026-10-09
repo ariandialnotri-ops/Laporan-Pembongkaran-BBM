@@ -4,6 +4,7 @@ import { Lock } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { AppProvider } from '@/components/shell/app-provider'
 import { AppShell } from '@/components/shell/app-shell'
+import { lepasKunciGulir } from '@/components/shell/viewport'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { ToastProvider } from '@/components/ui/toast'
@@ -49,6 +50,7 @@ function Gate() {
   useEffect(() => {
     document.title = `${titleFor(pathname)} · FLOQ`
     window.scrollTo(0, 0)
+    lepasKunciGulir()
   }, [pathname])
 
   if (app.status === 'login') return <Login />

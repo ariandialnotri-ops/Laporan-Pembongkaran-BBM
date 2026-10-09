@@ -178,7 +178,7 @@ RLS aktif: hanya anggota yang bisa membaca. Peran:
 | Peran | Modul |
 |-------|-------|
 | ABH | Semua modul + Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
-| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
+| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
 | Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB saja |
 

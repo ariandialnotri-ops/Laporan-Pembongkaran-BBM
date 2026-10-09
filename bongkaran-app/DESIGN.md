@@ -203,7 +203,7 @@ Mode **Kurangi Transparansi** (pengaturan HP): semua kaca jadi warna padat `#F7F
 | Peran | Dock | Kartu Input |
 |---|---|---|
 | ABH | Dashboard, Input, Laporan, Profil | semua |
-| Pengawas | Dashboard, Input, Laporan, Profil | Stok awal, Input Bongkaran, Kualitas Harian, Uji Pasca Penerimaan, APAR (lihat) |
+| Pengawas | Dashboard, Input, Laporan, Profil | Stok awal, Input Bongkaran, Plan Pengiriman, Kualitas Harian, Uji Pasca Penerimaan, APAR (lihat) |
 | Kepala Shift | Input, Laporan, Profil | Stok awal, Input Bongkaran, Plan Pengiriman, Kualitas Harian, APAR |
 | Security | Input, Profil | APAR & APAB saja |
 - **Konfirmasi keluar**: bila meninggalkan form bongkaran yang belum selesai atau Kualitas Harian dengan baris belum disimpan (lewat tombol kembali, dock, atau tautan), muncul sheet "Keluar dari form …?" dengan **Ya, keluar** (merah) dan **Tetap di sini**.

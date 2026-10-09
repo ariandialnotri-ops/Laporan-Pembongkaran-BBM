@@ -15,6 +15,7 @@ export function DockNav() {
   return (
     <nav
       aria-label="Navigasi utama"
+      data-dock
       className="print:hidden pointer-events-none fixed inset-x-0 bottom-0 z-50 px-margin pb-[env(safe-area-inset-bottom,0px)]"
     >
       <div className="glass-2 pointer-events-auto mx-auto mb-space-sm flex max-w-md items-center justify-between rounded-full p-space-2xs">

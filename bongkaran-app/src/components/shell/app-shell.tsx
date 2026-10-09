@@ -3,8 +3,10 @@ import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
 import { PlanReminder } from './plan-reminder'
+import { useViewportVars } from './viewport'
 
 export function AppShell({ children }: { children: ReactNode }) {
+  useViewportVars()
   return (
     <>
       <a
@@ -19,8 +21,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <AppHeader />
 
-      {/* pt-20 clears the fixed header; pb-28 clears the floating dock. */}
-      <main id="konten" className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-margin pb-28 pt-20 print:max-w-none print:p-0">
+      {/* Ruang untuk header tetap (+ notch) dan dock melayang (+ garis home iPhone). */}
+      <main
+        id="konten"
+        className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-margin pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))] pt-[calc(5rem+env(safe-area-inset-top,0px))] print:max-w-none print:p-0"
+      >
         {children}
       </main>
 
