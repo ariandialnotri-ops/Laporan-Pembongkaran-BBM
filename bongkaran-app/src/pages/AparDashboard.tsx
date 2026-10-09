@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarClock, ChevronRight, ClipboardCheck, Database, FireExtinguisher, History, MapPin, QrCode, ScanLine, TriangleAlert } from 'lucide-react'
+import { CalendarClock, ChevronRight, ClipboardCheck, Database, FireExtinguisher, History, MapPin, QrCode, ScanLine, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { QrScanner } from '@/components/apar/qr'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -8,13 +8,13 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
+import { berlakuInstansi, kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
-type Filter = 'semua' | 'temuan' | 'belum' | 'isi'
+type Filter = 'semua' | 'temuan' | 'belum' | 'isi' | 'instansi'
 
 /** Input > APAR & APAB: kondisi semua unit, jadwal isi ulang, per area, dan akses inspeksi/QR. */
 export function AparDashboard() {
@@ -35,9 +35,13 @@ export function AparDashboard() {
     temuan: kondisi.filter((k) => k.status === 'temuan').length,
     belum: kondisi.filter((k) => !k.bulanIni).length,
     isi: kondisi.filter((k) => k.isiUlang === 'lewat' || k.isiUlang === 'segera').length,
+    // Pemeriksaan instansi berwenang (maks. 12 bulan): lewat, ≤ 30 hari, atau belum dicatat.
+    instansi: kondisi.filter((k) => k.instansi !== 'ok').length,
+    instansiLewat: kondisi.filter((k) => k.instansi === 'lewat').length,
+    instansiBelum: kondisi.filter((k) => k.instansi === 'belum').length,
   }
   const lewat = kondisi.filter((k) => k.isiUlang === 'lewat').length
-  const rows = kondisi.filter((k) => (filter === 'temuan' ? k.status === 'temuan' : filter === 'belum' ? !k.bulanIni : filter === 'isi' ? k.isiUlang === 'lewat' || k.isiUlang === 'segera' : true))
+  const rows = kondisi.filter((k) => (filter === 'temuan' ? k.status === 'temuan' : filter === 'belum' ? !k.bulanIni : filter === 'isi' ? k.isiUlang === 'lewat' || k.isiUlang === 'segera' : filter === 'instansi' ? k.instansi !== 'ok' : true))
 
   // Per area (urutan: pulau, lalu area data utama, lalu lainnya).
   const urutan = [...Array.from({ length: s.jumlahPulau || 0 }, (_, i) => `Pulau pompa ${i + 1}`), ...(s.aparArea ?? [])]
@@ -105,11 +109,18 @@ export function AparDashboard() {
         </GlassCard>
       ) : (
         <>
-          <section aria-label="Ringkasan kondisi" className="animate-entrance-2 grid grid-cols-2 gap-space-xs sm:grid-cols-4">
+          <section aria-label="Ringkasan kondisi" className="animate-entrance-2 grid grid-cols-2 gap-space-xs sm:grid-cols-5">
             <Tile label="Kondisi baik" value={`${n.baik}/${n.total}`} sub="Pemeriksaan terakhir" tone="ok" />
             <Tile label="Ada temuan" value={String(n.temuan)} sub="Perlu tindak lanjut" tone={n.temuan ? 'bad' : undefined} />
             <Tile label="Belum bulan ini" value={String(n.belum)} sub="Unit belum diperiksa" tone={n.belum ? 'wait' : undefined} />
             <Tile label="Isi ulang" value={String(n.isi)} sub={lewat ? `${lewat} sudah lewat` : 'Lewat / ≤ 30 hari'} tone={lewat ? 'bad' : n.isi ? 'wait' : undefined} />
+            <Tile
+              className="col-span-2 sm:col-span-1"
+              label="Uji instansi (12 bln)"
+              value={String(n.instansi)}
+              sub={n.instansiLewat ? `${n.instansiLewat} lewat masa berlaku` : n.instansiBelum ? `${n.instansiBelum} belum dicatat` : 'Semua masih berlaku'}
+              tone={n.instansiLewat ? 'bad' : n.instansi ? 'wait' : 'ok'}
+            />
           </section>
 
           <section aria-labelledby="apar-area" className="animate-entrance-3 flex flex-col gap-space-xs">
@@ -144,6 +155,7 @@ export function AparDashboard() {
                 { value: 'temuan' as const, label: `Temuan ${n.temuan}` },
                 { value: 'belum' as const, label: `Belum bulan ini ${n.belum}` },
                 { value: 'isi' as const, label: `Isi ulang ${n.isi}` },
+                { value: 'instansi' as const, label: `Uji instansi ${n.instansi}` },
               ]}
             />
             <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
@@ -171,10 +183,11 @@ export function AparDashboard() {
   )
 }
 
-function Tile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: 'ok' | 'bad' | 'wait' }) {
+function Tile({ label, value, sub, tone, className }: { label: string; value: string; sub: string; tone?: 'ok' | 'bad' | 'wait'; className?: string }) {
   return (
     <div
       className={cn(
+        className,
         'flex min-w-0 flex-col rounded-md p-space-sm',
         tone === 'ok' ? 'bg-emerald-50' : tone === 'bad' ? 'bg-error-container/60' : tone === 'wait' ? 'bg-amber-50' : 'bg-surface-container-lowest/80',
       )}
@@ -204,6 +217,13 @@ function UnitRow({ k }: { k: KondisiUnit }) {
             <CalendarClock aria-hidden="true" className="size-3.5" />
             Isi ulang {formatTanggalIso(k.unit.kedaluwarsa)}
             {k.isiUlang === 'lewat' ? ' (lewat)' : ''}
+          </span>
+        )}
+        {(k.instansi === 'lewat' || k.instansi === 'segera') && (
+          <span className={cn('tabular flex items-center gap-1 text-body-sm font-semibold', k.instansi === 'lewat' ? 'text-error' : 'text-amber-700')}>
+            <ShieldCheck aria-hidden="true" className="size-3.5" />
+            Uji instansi s/d {formatTanggalIso(berlakuInstansi(k.unit.periksaInstansi))}
+            {k.instansi === 'lewat' ? ' (lewat)' : ''}
           </span>
         )}
       </span>

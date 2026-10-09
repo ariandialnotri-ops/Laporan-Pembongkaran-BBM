@@ -5,7 +5,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Button } from '@/components/ui/button'
-import { hasilCek, statusKedaluwarsa, type AparCek, type CekKey, type CekNilai } from '@/lib/apar'
+import { berlakuInstansi, hasilCek, statusInstansi, statusKedaluwarsa, type AparCek, type CekKey, type CekNilai } from '@/lib/apar'
 import { formatTanggalIso } from '@/lib/date'
 import type { Photo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,8 @@ export function UnitCard({
 }) {
   const h = hasilCek(u)
   const exp = statusKedaluwarsa(u.kedaluwarsa, hariIni)
+  // Riwayat lama (sebelum ada data instansi) tidak menampilkan baris ini.
+  const inst = u.periksaInstansi === undefined ? null : statusInstansi(u.periksaInstansi, hariIni)
   return (
     <GlassCard id={`unit-${u.unitId}`} level={2} className={cn('flex scroll-mt-24 flex-col gap-space-sm p-space-md', h.temuan.length > 0 && 'ring-1 ring-error/40')}>
       <div className="flex items-start gap-space-sm">
@@ -51,6 +53,13 @@ export function UnitCard({
             <span className={cn('tabular text-body-sm font-semibold', exp === 'lewat' ? 'text-error' : exp === 'segera' ? 'text-amber-700' : 'text-on-surface-variant')}>
               Isi ulang {formatTanggalIso(u.kedaluwarsa)}
               {exp === 'lewat' ? ' (sudah lewat)' : exp === 'segera' ? ' (kurang dari 30 hari)' : ''}
+            </span>
+          )}
+          {inst && inst !== 'ok' && (
+            <span className={cn('tabular text-body-sm font-semibold', inst === 'lewat' ? 'text-error' : 'text-amber-700')}>
+              {inst === 'belum'
+                ? 'Pemeriksaan instansi berwenang belum dicatat'
+                : `Uji instansi berlaku s/d ${formatTanggalIso(berlakuInstansi(u.periksaInstansi))}${inst === 'lewat' ? ' (sudah lewat, maks. 12 bulan)' : ' (kurang dari 30 hari)'}`}
             </span>
           )}
         </div>

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
-import { DEFAULT_AREAS, kodeBerikut, lokasiOptions, namaPulau, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { berlakuInstansi, DEFAULT_AREAS, kodeBerikut, lokasiOptions, namaPulau, statusInstansi, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { cn } from '@/lib/utils'
@@ -36,10 +36,29 @@ const COLS: Col<Row>[] = [
     mobile: 'sub',
   },
   {
+    header: 'Uji instansi (12 bln)',
+    cell: (x) => {
+      const st = statusInstansi(x.u.periksaInstansi, todayIso())
+      if (st === 'belum') return <span className="italic text-on-surface-variant">belum dicatat</span>
+      return (
+        <span className={cn('tabular whitespace-nowrap', st === 'lewat' ? 'font-semibold text-error' : st === 'segera' ? 'font-semibold text-amber-700' : '')}>
+          s/d {formatTanggalIso(berlakuInstansi(x.u.periksaInstansi))}
+        </span>
+      )
+    },
+    mobile: 'sub',
+  },
+  {
     header: 'Status',
     cell: (x) => {
-      const st = statusKedaluwarsa(x.u.kedaluwarsa, todayIso())
-      return st === 'lewat' ? <Pill tone="error">Isi ulang lewat</Pill> : st === 'segera' ? <Pill>Isi ulang ≤ 30 hari</Pill> : null
+      const t = todayIso()
+      const inst = statusInstansi(x.u.periksaInstansi, t)
+      const st = statusKedaluwarsa(x.u.kedaluwarsa, t)
+      if (inst === 'lewat') return <Pill tone="error">Uji instansi lewat</Pill>
+      if (st === 'lewat') return <Pill tone="error">Isi ulang lewat</Pill>
+      if (inst === 'segera') return <Pill>Uji instansi ≤ 30 hari</Pill>
+      if (st === 'segera') return <Pill>Isi ulang ≤ 30 hari</Pill>
+      return null
     },
     mobile: 'badge',
   },

@@ -10,8 +10,9 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
-import { APAR_JENIS, DEFAULT_AREAS, kodeBerikut, lokasiOptions, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { APAR_JENIS, berlakuInstansi, DEFAULT_AREAS, kodeBerikut, MASA_INSTANSI_BULAN, lokasiOptions, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
+import { formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 
 const TIPE = [
@@ -67,6 +68,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     if (!u.lokasi && !u.cadangan) return setError('Pilih lokasi unit.')
     const kap = parseAngka(u.kapasitasKg)
     if (!(kap && kap > 0)) return setError('Isi kapasitas (kg).')
+    if (u.periksaInstansi && u.periksaInstansi > todayIso()) return setError('Tanggal pemeriksaan instansi tidak boleh di masa depan.')
     const next = { ...u, kode }
     const list = (t: AparTipe) => (t === 'apar' ? (s.apar ?? []) : (s.apab ?? []))
     const ganti = (arr: AparUnit[]) => (arr.some((x) => x.id === u.id) ? arr.map((x) => (x.id === u.id ? next : x)) : [...arr, next])
@@ -135,6 +137,16 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
           </Field>
           <Field label="Jadwal isi ulang" htmlFor="unit-exp" className="col-span-2">
             <Input id="unit-exp" type="date" value={u.kedaluwarsa} onChange={(e) => set({ kedaluwarsa: e.target.value })} />
+          </Field>
+          <Field
+            label="Pemeriksaan instansi terakhir"
+            htmlFor="unit-instansi-tgl"
+            hint={u.periksaInstansi ? `Berlaku sampai ${formatTanggalIso(berlakuInstansi(u.periksaInstansi))} (maks. ${MASA_INSTANSI_BULAN} bulan).` : `Wajib diperiksa instansi berwenang maks. ${MASA_INSTANSI_BULAN} bulan sekali.`}
+          >
+            <Input id="unit-instansi-tgl" type="date" max={todayIso()} value={u.periksaInstansi ?? ''} onChange={(e) => set({ periksaInstansi: e.target.value })} />
+          </Field>
+          <Field label="Instansi pemeriksa" htmlFor="unit-instansi">
+            <Input id="unit-instansi" autoComplete="off" placeholder="Mis. Disnaker / Damkar" value={u.instansi ?? ''} onChange={(e) => set({ instansi: e.target.value })} />
           </Field>
         </div>
         {tipe === 'apar' && (

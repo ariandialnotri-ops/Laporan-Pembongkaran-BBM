@@ -136,7 +136,8 @@ export function Dashboard() {
   const isToday = range.preset === 'today'
   const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
   const aparTemuan = apar.filter((k) => k.status === 'temuan').length
-  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat').length
+  // Masa berlaku lewat: isi ulang atau pemeriksaan instansi berwenang (maks. 12 bulan).
+  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat' || k.instansi === 'lewat').length
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -442,7 +443,7 @@ export function Dashboard() {
               <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
             </Link>
             <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-[10px] font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang lewat</span>
+              <span className={cn('text-[10px] font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
               <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
             </Link>
           </div>

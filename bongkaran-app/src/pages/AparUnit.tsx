@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { CalendarClock, ClipboardCheck, Database, Printer, TriangleAlert } from 'lucide-react'
+import { CalendarClock, ClipboardCheck, Database, Printer, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { QrImg } from '@/components/apar/qr'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { aparUnitUrl, kondisiSemua, riwayatUnit, tipeLabel } from '@/lib/apar'
+import { aparUnitUrl, berlakuInstansi, kondisiSemua, riwayatUnit, tipeLabel } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -52,6 +52,17 @@ export function AparUnit() {
             <span className="text-body-sm text-on-surface-variant">{u.lokasi || 'Lokasi belum diatur'}</span>
           </div>
         </div>
+        <span
+          className={cn(
+            'tabular flex items-center gap-1.5 rounded-md px-space-sm py-space-xs text-body-sm font-semibold',
+            k.instansi === 'lewat' ? 'bg-error-container/60 text-error' : k.instansi === 'segera' || k.instansi === 'belum' ? 'bg-amber-50 text-amber-700' : 'bg-surface-container-low text-on-surface',
+          )}
+        >
+          <ShieldCheck aria-hidden="true" className="size-4 shrink-0" />
+          {k.instansi === 'belum'
+            ? 'Pemeriksaan instansi berwenang belum dicatat'
+            : `Uji ${u.instansi || 'instansi'} ${formatTanggalIso(u.periksaInstansi ?? '')}, berlaku s/d ${formatTanggalIso(berlakuInstansi(u.periksaInstansi))}${k.instansi === 'lewat' ? ' (sudah lewat)' : k.instansi === 'segera' ? ' (kurang dari 30 hari)' : ''}`}
+        </span>
         {u.kedaluwarsa && (
           <span
             className={cn(

@@ -19,6 +19,10 @@ export interface AparUnit {
   cadangan: boolean
   /** Tanggal isi ulang berikutnya / kedaluwarsa (YYYY-MM-DD). */
   kedaluwarsa: string
+  /** Tanggal pemeriksaan terakhir oleh instansi berwenang (YYYY-MM-DD); berlaku maks. 12 bulan. */
+  periksaInstansi?: string
+  /** Nama instansi pemeriksa, mis. Disnaker atau Damkar. */
+  instansi?: string
 }
 
 export const APAR_JENIS = ['Powder (DCP)', 'CO2', 'Foam (AFFF)', 'Clean agent'] as const
@@ -92,6 +96,7 @@ export interface AparCek {
   lokasi: string
   cadangan: boolean
   kedaluwarsa: string
+  periksaInstansi?: string
   cek: Partial<Record<CekKey, CekNilai>>
   catatan: string
   foto: Photo[]
@@ -118,7 +123,7 @@ export function unitDariKode(kode: string, units: AparUnit[]) {
 }
 
 export function cekDari(u: AparUnit, tipe: AparTipe): AparCek {
-  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, cek: {}, catatan: '', foto: [] }
+  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, periksaInstansi: u.periksaInstansi ?? '', cek: {}, catatan: '', foto: [] }
 }
 
 /** Butir yang belum diisi, dan butir yang ditandai "Tidak" (temuan). */
@@ -134,6 +139,24 @@ export function statusKedaluwarsa(tgl: string, todayIso: string): 'lewat' | 'seg
   if (!tgl) return null
   if (tgl < todayIso) return 'lewat'
   return tgl <= isoOf(addDays(new Date(`${todayIso}T00:00:00`), 30)) ? 'segera' : 'ok'
+}
+
+/** Pemeriksaan oleh instansi berwenang paling lama 12 bulan sekali. */
+export const MASA_INSTANSI_BULAN = 12
+
+/** Batas berlaku pemeriksaan instansi: tanggal periksa + 12 bulan (YYYY-MM-DD). */
+export function berlakuInstansi(tglPeriksa: string | undefined) {
+  if (!tglPeriksa) return ''
+  const [y, m, d] = tglPeriksa.split('-').map(Number)
+  const t = new Date(y, m - 1 + MASA_INSTANSI_BULAN, d)
+  // 29 Feb / tanggal 31 yang tidak ada di bulan tujuan: pakai akhir bulan itu.
+  if (t.getDate() !== d) t.setDate(0)
+  return isoOf(t)
+}
+
+/** Status pemeriksaan instansi: belum dicatat, lewat, ≤ 30 hari lagi, atau masih berlaku. */
+export function statusInstansi(tglPeriksa: string | undefined, todayIso: string): 'belum' | 'lewat' | 'segera' | 'ok' {
+  return statusKedaluwarsa(berlakuInstansi(tglPeriksa), todayIso) ?? 'belum'
 }
 
 export type StatusUnit = 'baik' | 'temuan' | 'belum'
@@ -158,6 +181,8 @@ export interface KondisiUnit {
   /** Sudah diperiksa pada bulan berjalan. */
   bulanIni: boolean
   isiUlang: ReturnType<typeof statusKedaluwarsa>
+  /** Pemeriksaan instansi berwenang (maks. 12 bulan). */
+  instansi: ReturnType<typeof statusInstansi>
 }
 
 /** Kondisi terkini semua unit dari data utama, untuk dashboard dan halaman unit. */
@@ -172,6 +197,7 @@ export function kondisiSemua(s: { apar?: AparUnit[]; apab?: AparUnit[] }, record
       status: terakhir ? terakhir.status : 'belum',
       bulanIni: !!terakhir && terakhir.tanggal.startsWith(today.slice(0, 7)),
       isiUlang: statusKedaluwarsa(u.kedaluwarsa, today),
+      instansi: statusInstansi(u.periksaInstansi, today),
     }
   })
 }
