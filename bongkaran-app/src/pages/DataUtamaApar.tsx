@@ -77,7 +77,7 @@ export function DataUtamaApar() {
   if (!app.loaded) return <Loading />
 
   const s = app.settings
-  const ubah = app.isAdmin
+  const ubah = app.isAdmin || app.role === 'pengawas'
   const pulau = s.jumlahPulau ?? 0
   const areas = s.aparArea ?? DEFAULT_AREAS
   const apar = s.apar ?? []
@@ -104,7 +104,7 @@ export function DataUtamaApar() {
           <Ringkas label="APAR cadangan" value={apar.filter((u) => u.cadangan).length} />
           <Ringkas label="APAB" value={apab.length} />
         </div>
-        {!ubah && <span className="text-body-sm text-on-surface-variant">Data utama hanya dapat diubah ABH.</span>}
+        {!ubah && <span className="text-body-sm text-on-surface-variant">Data utama hanya dapat diubah ABH atau pengawas.</span>}
         {ubah && (
           <div className="grid grid-cols-2 gap-space-xs">
             <Link to="/apar/data/unit/baru" className={cn(buttonVariants({ size: 'lg' }), 'col-span-2')}>
@@ -115,10 +115,14 @@ export function DataUtamaApar() {
               <QrCode aria-hidden="true" />
               Label QR
             </Link>
-            <Link to="/pengaturan" className={buttonVariants({ variant: 'glass' })}>
-              <Settings2 aria-hidden="true" />
-              Jumlah pulau
-            </Link>
+            {app.isAdmin ? (
+              <Link to="/pengaturan" className={buttonVariants({ variant: 'glass' })}>
+                <Settings2 aria-hidden="true" />
+                Jumlah pulau
+              </Link>
+            ) : (
+              <span className="flex items-center justify-center rounded-md bg-surface-container-low px-space-sm text-center text-body-sm text-on-surface-variant">Jumlah pulau diatur ABH</span>
+            )}
             {pulauTanpaApar.length > 0 && (
               <Button variant="soft" size="sm" className="col-span-2" onClick={isiPerPulau}>
                 <Wand2 aria-hidden="true" />

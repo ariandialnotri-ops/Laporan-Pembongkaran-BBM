@@ -85,7 +85,7 @@ export function Profil() {
         <GlassCard level={2} className="flex flex-col p-space-2xs">
           {app.isAdmin && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (pulau pompa, dispenser, nozzle)" />}
           {remote && app.isAdmin && <MenuRow to="/anggota" icon={Users} label="Anggota & akun per peran" />}
-          {app.isAdmin && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
+          {app.can('/apar/data') && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
           {app.isAdmin && <MenuRow to="/pengaturan#data-acuan" icon={Database} label="Data Acuan Tabel" />}
           {remote && <MenuRow icon={KeyRound} label="Ganti kata sandi" onClick={() => setSandi(true)} />}
           {remote && <MenuRow icon={LogOut} label="Keluar" danger onClick={() => void app.signOut()} />}

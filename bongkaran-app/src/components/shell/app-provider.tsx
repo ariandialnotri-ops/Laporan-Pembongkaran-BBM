@@ -43,6 +43,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('loading')
   const [statusMessage, setStatusMessage] = useState('')
   const [session, setSession] = useState<SessionInfo>(NO_SESSION)
+  // Peran terbaru untuk simpan pengaturan (dibaca di dalam efek tunda).
+  const roleRef = useRef<string | null>(null)
+  roleRef.current = backend.mode === 'local' ? null : session.role
   const [loaded, setLoaded] = useState(false)
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [plans, setPlans] = useState<Plan[]>([])
@@ -157,7 +160,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const flush = () => {
       if (!settingsDirty.current) return
       settingsDirty.current = false
-      backend.saveSettings(settings).catch((e: Error) => setStatusMessage(`Gagal menyimpan pengaturan: ${e.message}`))
+      // Pengawas hanya boleh mengubah data utama APAR/APAB; ABH menyimpan seluruh pengaturan.
+      const simpan = roleRef.current === 'pengawas' ? backend.saveAparSettings({ apar: settings.apar, apab: settings.apab, aparArea: settings.aparArea }) : backend.saveSettings(settings)
+      simpan.catch((e: Error) => setStatusMessage(`Gagal menyimpan pengaturan: ${e.message}`))
     }
     const t = setTimeout(flush, 700)
     // Muat ulang/tutup tab sebelum jeda habis: simpan saat itu juga.

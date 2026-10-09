@@ -52,7 +52,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, **uji instansi (12 bulan) lewat/≤30 hari/belum dicatat**, per area, daftar unit; tombol Inspeksi unit, Pindai QR (lihat data unit), Label QR & Data utama (ABH) |
 | | `/apar/inspeksi` | Inspeksi **per unit di lokasi**: tombol Pindai QR unit, atau ketik kode bila label rusak; progres bulan ini (belum/sudah per unit). Tidak ada inspeksi massal |
 | | `/apar/inspeksi/:id` | Form satu unit: checklist (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), catatan (wajib bila temuan), **foto wajib**, petugas; **Kirim** menyimpan unit itu saja lalu kembali ke pemindai. Unit yang sudah dikirim hari ini tampil hasilnya + tombol koreksi |
-| | `/apar/data` | Data utama (ABH): **daftar unit tersimpan** (tabel, saring APAR/cadangan/APAB) dan daftar area (tambah lewat bottom sheet, hapus bila kosong); jumlah pulau dari Pengaturan SPBU |
+| | `/apar/data` | Data utama (ABH & Pengawas): **daftar unit tersimpan** (tabel, saring APAR/cadangan/APAB) dan daftar area (tambah lewat bottom sheet, hapus bila kosong); jumlah pulau dari Pengaturan SPBU |
 | | `/apar/data/unit/:id` | Form tambah (`baru`) / ubah unit: tipe, kode (unik), kapasitas, jenis, lokasi, jadwal isi ulang, **tanggal pemeriksaan instansi berwenang + nama instansi (berlaku maks. 12 bulan)**, cadangan; Simpan kembali ke daftar; hapus, label QR |
 | | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung |
 | | `/apar/unit/:id` | Tujuan QR (kamera HP): data unit, kondisi terakhir (temuan, catatan, foto), riwayat, tombol Inspeksi unit ini |
@@ -161,7 +161,8 @@ Skema yang dipakai aplikasi ada di
 `20260926120500_bbm_private_helpers.sql`,
 `20261002120000_bbm_plan_meta_daily.sql`, dan
 `20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB), dan
-`20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran). Edge function
+`20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran), dan
+`20261009120000_bbm_save_apar.sql` (RPC `bbm_save_apar`: pengawas menyimpan unit & area APAR saja, tanpa akses ke pengaturan SPBU lain). Edge function
 `supabase/functions/bbm-akun` membuat akun & mengatur ulang kata sandi (khusus ABH):
 
 | Objek | Isi |
@@ -178,7 +179,7 @@ RLS aktif: hanya anggota yang bisa membaca. Peran:
 | Peran | Modul |
 |-------|-------|
 | ABH | Semua modul + Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
-| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
+| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
 | Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB saja |
 

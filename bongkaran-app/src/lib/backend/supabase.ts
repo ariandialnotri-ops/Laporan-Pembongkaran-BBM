@@ -119,6 +119,9 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async saveSettings(settings) {
       check(await sb.from('bbm_settings').upsert({ id: 'default', value: settings }))
     },
+    async saveAparSettings({ apar, apab, aparArea }) {
+      check(await sb.rpc('bbm_save_apar', { p_apar: apar ?? [], p_apab: apab ?? [], p_area: aparArea ?? [] }))
+    },
 
     async listPlans() {
       const rows = check(await sb.from('bbm_plans').select('*').order('tanggal', { ascending: false })) as PlanRow[]

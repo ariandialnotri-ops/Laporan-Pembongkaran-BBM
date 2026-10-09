@@ -6,7 +6,7 @@
 import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
 import { normalizePlan } from '@/lib/plan'
-import type { Photos, Plan, Report, ReportSummary } from '@/lib/sop'
+import type { Photos, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 import type { Backend } from './types'
 
 const DB_NAME = 'pantas-bongkaran'
@@ -63,6 +63,9 @@ export const localBackend: Backend = {
 
   getSettings: () => get('settings').then((s) => (s as never) ?? null),
   saveSettings: (settings) => set('settings', settings).then(() => {}),
+  async saveAparSettings(data) {
+    await set('settings', { ...((await get<Settings>('settings')) ?? {}), ...data })
+  },
 
   listPlans: () => get<Plan[]>('plans').then((p) => (p ?? []).map((x) => normalizePlan(x))),
   async savePlan(plan) {

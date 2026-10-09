@@ -33,6 +33,8 @@ export interface Backend {
 
   getSettings(): Promise<Partial<Settings> | null>
   saveSettings(settings: Settings): Promise<void>
+  /** Hanya data utama APAR/APAB (unit & area); dipakai peran pengawas. */
+  saveAparSettings(data: Pick<Settings, 'apar' | 'apab' | 'aparArea'>): Promise<void>
 
   listPlans(): Promise<Plan[]>
   savePlan(plan: Plan): Promise<void>
