@@ -323,7 +323,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
      3. **Data Retensi Kaleng Sampel**: posisi kaleng, masa simpan, kondisi segel, petugas uji pasca penerimaan.
      - Footer: Berita Acara, Tutup.
 7. **LO Tracking**: 6 kotak status berwarna (Proses, OS, Planned, On Delivery, Delivered, Closed) + "Total n LO"; ketuk ke Riwayat Tracking LO.
-8. **Proteksi Kebakaran** (bila ada unit APAR): 4 kotak (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat) + "n unit"; ketuk ke dashboard APAR.
+8. **Proteksi Kebakaran** (bila ada unit APAR): strip jumlah unit (APAR terpasang | APAR cadangan | APAB), lalu 4 kotak (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat) + "n unit"; ketuk ke dashboard APAR.
 
 ### 9.3 Menu Input
 - **Bar wajib Stok Awal Shift** paling atas: merah "Isi stok awal Shift n" / netral "Stok awal Shift n terisi".
@@ -404,7 +404,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 - **Form unit** (`/apar/data/unit/:id`): tipe (APAR / APAB, hanya unit baru; kode & kapasitas awal ikut tipe), kode (unik), kapasitas, jenis media, lokasi, jadwal isi ulang, **Pemeriksaan instansi terakhir** (tanggal, hint "Berlaku sampai …(maks. 12 bulan)") + **Instansi pemeriksa**, centang cadangan; **Batal / Simpan unit**; unit lama: Kondisi unit, Label QR, Hapus unit.
 - **Label QR** (`/apar/label`): chip saring (Semua/APAR/APAB), tombol **Cetak / simpan PDF (n label)**; label putih berbingkai hitam: pita merah di atas berisi ikon pemadam + nama SPBU utuh (boleh 2 baris), lalu QR 100 px + kode 22 px tebal, tipe (kotak bergaris), jenis & kapasitas, lokasi. Warna dicetak (print-color-adjust: exact). Saat cetak: 3 kolom.
 - **Unit** (`/apar/unit/:id`, tujuan QR): QR + kode besar, tipe, jenis/kapasitas, lokasi; chip isi ulang; tombol **Inspeksi unit ini**, Cetak label, Data utama; **Kondisi terakhir** (tanggal, petugas, temuan merah, catatan, foto); **Kalender kepatuhan inspeksi** (pemilih tahun, 12 kotak bulan 4/6 kolom: hijau ✓ baik, merah ⚠ temuan, merah putus-putus × terlewat, amber • bulan ini, abu bulan mendatang/sebelum terdaftar; ketuk bulan untuk detail; "Kepatuhan YYYY: x dari n bulan (%)"; catatan amber "Periksa setiap 30 hari…"); **Riwayat inspeksi**. Unit terhapus: "Unit tidak ditemukan".
-- **Pindai QR**: sheet kamera (bingkai bidik), atau ketik kode unit.
+- **Pindai QR**: sheet kamera belakang (bingkai bidik + garis pindai bergerak, "Arahkan label QR ke dalam kotak", tombol senter bila didukung, getar saat terbaca). Dekoder: BarcodeDetector bila ada, jsQR untuk iPhone & browser lain. Kamera gagal: ikon kamera dicoret + pesan penyebab (izin ditolak / tidak ada kamera / dipakai aplikasi lain / bukan https) + **Coba lagi**. Cadangan: **Kamera tidak jalan? Ambil foto label** (foto dibaca jsQR) dan "Label rusak? Ketik kode unit". QR berisi kode unit saja juga dikenali.
 
 ### 9.9b Pelaporan Insiden, Near miss & Kerusakan
 - **Form** (`/insiden/baru`, semua peran): 3 kartu jenis (Insiden / Near miss / Kerusakan, kartu terpilih biru), Kategori (Select per jenis), Tanggal & Jam kejadian, Lokasi (pulau + area APAR + Area lain), Peralatan (datalist dispenser/nozzle), Uraian, Dampak/korban (wajib untuk insiden), Dugaan penyebab, Tindakan yang sudah dilakukan, Tingkat risiko (Rendah/Sedang/Tinggi), Foto (wajib untuk insiden & kerusakan), Pelapor; tombol **Kirim laporan …** → Riwayat Insiden dengan banner hijau dan baris biru.
@@ -520,7 +520,7 @@ Pertahankan struktur:
   6) Kaleng Sample (kartu per produk, 3 kaleng kiri terbaru kanan terlama, D15 sample mobil tangki vs D15 depot,
      waktu bongkar, No SO, No LO, mobil tangki; slot kosong; pop up detail uji);
   7) LO Tracking (6 status berwarna);
-  8) Proteksi Kebakaran (APAR baik, ada temuan, belum bulan ini, isi ulang lewat).
+  8) Proteksi Kebakaran (jumlah APAR terpasang/cadangan/APAB, APAR baik, ada temuan, belum bulan ini, isi ulang lewat).
 - Menu Input: bar wajib Stok Awal Shift + 5 kartu (Input Bongkaran, Plan Pengiriman, Kualitas Harian,
   Uji Kualitas Pasca Penerimaan, APAR & APAB) dengan status hidup dan lencana merah bila perlu dikerjakan.
 - Menu Laporan: 7 kartu (Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO,

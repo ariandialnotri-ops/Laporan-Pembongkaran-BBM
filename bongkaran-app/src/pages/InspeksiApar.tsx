@@ -10,7 +10,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
+import { kondisiSemua, tipeLabel, unitDariKode, unitDariPindai, type KondisiUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -145,10 +145,10 @@ export function InspeksiApar() {
         onClose={() => setScan(false)}
         onKode={cariKode}
         onResult={(text) => {
-          const id = unitIdDariQr(text)
+          const { unit, pesan } = unitDariPindai(text, units)
           setScan(false)
-          if (id && units.some((u) => u.id === id)) buka(id)
-          else setError(id ? 'Unit pada label ini sudah tidak terdaftar di data utama.' : 'QR ini bukan label APAR/APAB FLOQ. Ketik kode unit bila label rusak.')
+          if (unit) buka(unit.id)
+          else setError(pesan)
         }}
       />
     </div>

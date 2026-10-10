@@ -602,3 +602,23 @@ html[data-keyboard='open'] [data-dock] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Garis pindai QR yang naik-turun di dalam kotak bidik. */
+@keyframes scanGaris {
+  0%,
+  100% {
+    top: 16%;
+  }
+  50% {
+    top: 84%;
+  }
+}
+.scan-garis {
+  animation: scanGaris 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan-garis {
+    animation: none;
+    top: 50%;
+  }
+}

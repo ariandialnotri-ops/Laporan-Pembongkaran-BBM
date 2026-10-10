@@ -8,7 +8,7 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { berlakuInstansi, kondisiSemua, tipeLabel, unitDariKode, unitIdDariQr, type KondisiUnit } from '@/lib/apar'
+import { berlakuInstansi, kondisiSemua, tipeLabel, unitDariKode, unitDariPindai, type KondisiUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -180,10 +180,10 @@ export function AparDashboard() {
         onClose={() => setScan(false)}
         onKode={bukaKode}
         onResult={(text) => {
-          const id = unitIdDariQr(text)
+          const { unit, pesan } = unitDariPindai(text, kondisi.map((k) => k.unit))
           setScan(false)
-          if (id) navigate(`/apar/unit/${encodeURIComponent(id)}`)
-          else window.alert('QR ini bukan label APAR/APAB FLOQ.')
+          if (unit) navigate(`/apar/unit/${encodeURIComponent(unit.id)}`)
+          else window.alert(pesan)
         }}
       />
     </div>

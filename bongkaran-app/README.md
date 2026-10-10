@@ -77,7 +77,7 @@ Uji Kualitas Pasca Penerimaan disimpan di data bongkaran (`report.data.sample2Ja
 mobil tangki yang diuji saat bongkar (D15 MT vs D15 depot), terpisah dari uji pasca penerimaan.
 Inspeksi APAR & APAB disimpan di `bbm_daily` dengan `kind = 'apar'`, satu record per unit per tanggal (`apar_<tanggal>_<unitId>`); record lama `apar_<tanggal>` (semua unit) tetap terbaca. Data utama (area, unit) ada di pengaturan.
 Label QR berisi alamat `https://<domain aplikasi>/apar/unit/<id>`: cetak label dari aplikasi produksi agar QR mengarah ke domain yang benar.
-Pemindai di aplikasi memakai BarcodeDetector (Chrome Android); bila tidak didukung, pindai dengan aplikasi kamera HP atau ketik kode unit.
+Pemindai di aplikasi membuka kamera belakang langsung di semua HP (iPhone Safari/PWA, Android, desktop): dibaca BarcodeDetector bila ada, selain itu **jsQR** (dimuat hanya saat memindai). Tersedia tombol senter (bila kamera mendukung), **Ambil foto label** bila kamera tidak bisa dibuka, dan ketik kode unit bila label rusak. Selain URL label FLOQ, QR/barcode yang hanya berisi kode unit (mis. `APAR-01`) juga dikenali. Kamera butuh alamat https dan izin Kamera di browser.
 
 ## Alur SOP bongkaran
 

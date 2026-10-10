@@ -474,6 +474,18 @@ export function Dashboard() {
             </Link>
           }
         >
+          <div className="mb-2 grid grid-cols-3 divide-x divide-outline-variant/50 rounded-md bg-primary-fixed/50">
+            {[
+              { label: 'APAR terpasang', value: apar.filter((k) => k.tipe === 'apar' && !k.unit.cadangan).length },
+              { label: 'APAR cadangan', value: apar.filter((k) => k.unit.cadangan).length },
+              { label: 'APAB', value: apar.filter((k) => k.tipe === 'apab').length },
+            ].map((x) => (
+              <Link key={x.label} to="/apar" className="flex min-w-0 flex-col items-center px-1 py-2 text-center active:scale-[0.98]">
+                <span className="tabular text-numeric-lg font-bold text-on-surface">{x.value}</span>
+                <span className="text-[10px] font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
+              </Link>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
               <span className="text-[10px] font-bold uppercase text-emerald-700">Baik</span>

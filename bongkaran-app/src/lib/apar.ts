@@ -198,6 +198,20 @@ export function unitIdDariQr(text: string) {
   return m ? decodeURIComponent(m[1]) : null
 }
 
+/**
+ * Unit dari hasil pindai: URL label QR FLOQ (…/apar/unit/<id>), atau teks berisi kode unit
+ * (mis. barcode/QR lama yang hanya memuat "APAR-01").
+ */
+export function unitDariPindai(text: string, units: AparUnit[]): { unit: AparUnit | null; pesan: string | null } {
+  const id = unitIdDariQr(text)
+  if (id) {
+    const unit = units.find((u) => u.id === id) ?? null
+    return { unit, pesan: unit ? null : 'Unit pada label ini sudah tidak terdaftar di data utama.' }
+  }
+  const unit = unitDariKode(text, units)
+  return { unit, pesan: unit ? null : 'QR/barcode ini bukan label APAR/APAB FLOQ. Ketik kode unit bila label rusak.' }
+}
+
 export const NAMA_BULAN = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES']
 
 /**
