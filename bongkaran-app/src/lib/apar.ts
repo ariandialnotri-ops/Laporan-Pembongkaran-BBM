@@ -197,3 +197,45 @@ export function unitIdDariQr(text: string) {
   const m = text.trim().match(/\/apar\/unit\/([^/?#\s]+)/)
   return m ? decodeURIComponent(m[1]) : null
 }
+
+export const NAMA_BULAN = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES']
+
+/**
+ * Status kepatuhan inspeksi per bulan:
+ * baik / temuan = sudah diinspeksi; terlewat = bulan lalu tanpa inspeksi;
+ * berjalan = bulan ini, belum diinspeksi; nanti = bulan mendatang; sebelum = sebelum unit terdaftar.
+ */
+export type StatusBulan = 'baik' | 'temuan' | 'terlewat' | 'berjalan' | 'nanti' | 'sebelum'
+
+export interface BulanKepatuhan {
+  bulan: number
+  status: StatusBulan
+  /** Inspeksi terakhir pada bulan itu. */
+  inspeksi: ReturnType<typeof riwayatUnit>[number] | null
+}
+
+/** Bulan unit terdaftar (YYYY-MM) dari id unit (genId memuat waktu pembuatan), atau null. */
+export function bulanTerdaftar(unitId: string) {
+  const ms = Number(unitId.split('_')[1])
+  if (!Number.isFinite(ms) || ms < 1e12) return null
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Kalender kepatuhan inspeksi bulanan satu unit pada satu tahun. */
+export function kepatuhanBulanan(unitId: string, records: { tanggal: string; data: AparData }[], tahun: number, todayIso: string) {
+  const riwayat = riwayatUnit(unitId, records)
+  const bulanIni = todayIso.slice(0, 7)
+  const pertama = riwayat.at(-1)?.tanggal.slice(0, 7)
+  const daftar = [bulanTerdaftar(unitId), pertama].filter((x): x is string => !!x).sort()[0] ?? bulanIni
+  const bulan: BulanKepatuhan[] = NAMA_BULAN.map((_, i) => {
+    const ym = `${tahun}-${String(i + 1).padStart(2, '0')}`
+    const inspeksi = riwayat.find((r) => r.tanggal.startsWith(ym)) ?? null
+    const status: StatusBulan = inspeksi ? inspeksi.status === 'temuan' ? 'temuan' : 'baik' : ym > bulanIni ? 'nanti' : ym < daftar ? 'sebelum' : ym === bulanIni ? 'berjalan' : 'terlewat'
+    return { bulan: i, status, inspeksi }
+  })
+  // Kepatuhan dihitung dari bulan wajib yang sudah lewat atau berjalan (bulan berjalan dihitung bila sudah diinspeksi).
+  const wajib = bulan.filter((b) => b.status === 'baik' || b.status === 'temuan' || b.status === 'terlewat')
+  const patuh = wajib.filter((b) => b.status !== 'terlewat').length
+  return { bulan, wajib: wajib.length, patuh }
+}

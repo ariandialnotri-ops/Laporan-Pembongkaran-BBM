@@ -49,6 +49,8 @@ export interface Backend {
   /** Catatan harian (stok shift, Q&Q harian) sejak tanggal tertentu. */
   listDaily(sinceIso: string): Promise<DailyRecord[]>
   saveDaily(rec: DailyRecord): Promise<void>
+  /** Inspeksi APAR/APAB pada rentang tanggal (untuk kalender kepatuhan setahun, di luar 120 hari terakhir). */
+  listApar(fromIso: string, toIso: string): Promise<DailyRecord[]>
   deleteDaily(id: string): Promise<void>
 
   uploadPhoto(reportId: string, blob: Blob, name: string): Promise<Photo>

@@ -98,6 +98,7 @@ export const localBackend: Backend = {
   },
 
   listDaily: (since) => get<DailyRecord[]>('daily').then((d) => (d ?? []).filter((r) => r.tanggal >= since)),
+  listApar: (from, to) => get<DailyRecord[]>('daily').then((d) => (d ?? []).filter((r) => r.kind === 'apar' && r.tanggal >= from && r.tanggal <= to)),
   async saveDaily(rec) {
     await set('daily', upsertById((await get<DailyRecord[]>('daily')) ?? [], rec))
   },

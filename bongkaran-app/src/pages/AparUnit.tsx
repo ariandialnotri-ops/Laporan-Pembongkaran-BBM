@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { CalendarClock, ClipboardCheck, Database, Printer, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { KalenderKepatuhan } from '@/components/apar/kalender-kepatuhan'
 import { QrImg } from '@/components/apar/qr'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -139,6 +140,11 @@ export function AparUnit() {
             </>
           )}
         </GlassCard>
+      </section>
+
+      <section aria-labelledby="unit-kepatuhan" className="animate-entrance-3 flex flex-col gap-space-xs">
+        <SectionHeader id="unit-kepatuhan" title="Kalender kepatuhan inspeksi" />
+        <KalenderKepatuhan unitId={u.id} />
       </section>
 
       {riwayat.length > 0 && (

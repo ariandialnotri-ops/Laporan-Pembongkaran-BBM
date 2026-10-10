@@ -54,8 +54,8 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/apar/inspeksi/:id` | Form satu unit: checklist (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), catatan (wajib bila temuan), **foto wajib**, petugas; **Kirim** menyimpan unit itu saja lalu kembali ke pemindai. Unit yang sudah dikirim hari ini tampil hasilnya + tombol koreksi |
 | | `/apar/data` | Data utama (ABH & Pengawas): **daftar unit tersimpan** (tabel, saring APAR/cadangan/APAB) dan daftar area (tambah lewat bottom sheet, hapus bila kosong); jumlah pulau dari Pengaturan SPBU |
 | | `/apar/data/unit/:id` | Form tambah (`baru`) / ubah unit: tipe, kode (unik), kapasitas, jenis, lokasi, jadwal isi ulang, **tanggal pemeriksaan instansi berwenang + nama instansi (berlaku maks. 12 bulan)**, cadangan; Simpan kembali ke daftar; hapus, label QR |
-| | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung |
-| | `/apar/unit/:id` | Tujuan QR (kamera HP): data unit, kondisi terakhir (temuan, catatan, foto), riwayat, tombol Inspeksi unit ini |
+| | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung: pita merah berisi nama SPBU utuh, QR, kode besar, tipe, jenis & kapasitas, lokasi |
+| | `/apar/unit/:id` | Tujuan QR (kamera HP): data unit, kondisi terakhir (temuan, catatan, foto), **kalender kepatuhan inspeksi bulanan** (JAN–DES per tahun: baik / temuan / terlewat / bulan ini, persentase kepatuhan, data setahun dari server), riwayat, tombol Inspeksi unit ini |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
 | | `/laporan/ba` | Berita Acara: status tanda tangan, buka untuk TTD pengawas/ABH atau unduh |

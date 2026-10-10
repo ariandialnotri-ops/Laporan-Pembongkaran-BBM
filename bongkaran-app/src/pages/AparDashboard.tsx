@@ -109,6 +109,13 @@ export function AparDashboard() {
         </GlassCard>
       ) : (
         <>
+          {/* Jumlah unit menurut jenis: APAR terpasang, APAR cadangan, APAB. */}
+          <section aria-label="Jumlah unit" className="animate-entrance-2 grid grid-cols-3 gap-space-xs">
+            <Jumlah label="APAR terpasang" value={kondisi.filter((k) => k.tipe === 'apar' && !k.unit.cadangan).length} sub={`di ${s.jumlahPulau || 0} pulau & area`} />
+            <Jumlah label="APAR cadangan" value={kondisi.filter((k) => k.unit.cadangan).length} sub="disimpan" />
+            <Jumlah label="APAB" value={kondisi.filter((k) => k.tipe === 'apab').length} sub="beroda" />
+          </section>
+
           <section aria-label="Ringkasan kondisi" className="animate-entrance-2 grid grid-cols-2 gap-space-xs sm:grid-cols-5">
             <Tile label="Kondisi baik" value={`${n.baik}/${n.total}`} sub="Pemeriksaan terakhir" tone="ok" />
             <Tile label="Ada temuan" value={String(n.temuan)} sub="Perlu tindak lanjut" tone={n.temuan ? 'bad' : undefined} />
@@ -239,5 +246,16 @@ function UnitRow({ k }: { k: KondisiUnit }) {
       )}
       <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
     </Link>
+  )
+}
+
+function Jumlah({ label, value, sub }: { label: string; value: number; sub: string }) {
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-0.5 rounded-md bg-primary-fixed/50 p-space-sm">
+      <FireExtinguisher aria-hidden="true" className="size-4 text-primary" />
+      <span className="tabular text-numeric-lg font-bold leading-none text-on-surface">{value}</span>
+      <span className="text-tag uppercase leading-tight text-on-surface">{label}</span>
+      <span className="truncate text-body-sm text-on-surface-variant">{sub}</span>
+    </div>
   )
 }

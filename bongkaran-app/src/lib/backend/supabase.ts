@@ -48,6 +48,18 @@ function stripDataUrls(photos: Photos): Photos {
 // Ringkasan lama (dibuat sebelum kolom hitungan ada) diisi nilai kosong.
 const SUMMARY_DEFAULTS: Pick<ReportSummary, 'volumeDO' | 'gainLoss' | 'densityAnomaly' | 'doneCount'> = { volumeDO: null, gainLoss: null, densityAnomaly: false, doneCount: 0 }
 
+const toDaily = (r: DailyRow) =>
+  ({
+    id: r.id,
+    kind: r.kind,
+    tanggal: r.tanggal,
+    shift: r.shift,
+    data: r.data,
+    createdAt: Date.parse(r.created_at),
+    updatedAt: Date.parse(r.updated_at),
+    createdBy: r.created_by,
+  }) as DailyRecord
+
 export function createSupabaseBackend(sb: SupabaseClient): Backend {
   let currentUserId: string | null = null
   const dataCache = new Map<string, string>()
@@ -188,19 +200,11 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
 
     async listDaily(since) {
       const rows = check(await sb.from('bbm_daily').select('*').gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000)) as DailyRow[]
-      return rows.map(
-        (r) =>
-          ({
-            id: r.id,
-            kind: r.kind,
-            tanggal: r.tanggal,
-            shift: r.shift,
-            data: r.data,
-            createdAt: Date.parse(r.created_at),
-            updatedAt: Date.parse(r.updated_at),
-            createdBy: r.created_by,
-          }) as DailyRecord,
-      )
+      return rows.map(toDaily)
+    },
+    async listApar(from, to) {
+      const rows = check(await sb.from('bbm_daily').select('*').eq('kind', 'apar').gte('tanggal', from).lte('tanggal', to).order('tanggal').limit(5000)) as DailyRow[]
+      return rows.map(toDaily)
     },
     async saveDaily(rec) {
       check(
