@@ -119,7 +119,7 @@ Density di luar toleransi menutup bongkaran sebagai BA anomali.
 
 ```
 Density @15°C : tabel ASTM-IP 53 (interpolasi bilinear), cadangan rumus ASTM D1250 Tabel 53B
-Volume tangki : interpolasi linear tabel kalibrasi per tangki (src/data/tankTables.json)
+Volume tangki : interpolasi linear tabel kalibrasi per tangki (database tangki SPBU aktif; mode lokal: src/data/tankTables.json)
 Gain / loss   : real stok ATG − (stok awal ATG + volume DO)
 Deepstick     : volume setelah − volume sebelum, dibanding volume DO
 ```
@@ -127,6 +127,28 @@ Deepstick     : volume setelah − volume sebelum, dibanding volume DO
 Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO
 8.000 L) bisa diubah di Pengaturan. Data acuan tabel ada di `src/data/`
 (`table53.json`, `tankTables.json`).
+
+## Multi SPBU
+
+Satu aplikasi untuk banyak SPBU, polanya sama dengan aplikasi Monitoring JBT:
+
+- **ABH** mengendalikan beberapa unit bisnis. Nama SPBU di header adalah **pemilih SPBU**
+  (ketuk untuk berpindah). **Profil > Unit bisnis** (`/unit`) menampilkan dashboard semua SPBU:
+  kartu Data siap, Q&Q hari ini, Bongkaran bulan ini, Insiden terbuka; tabel **Progres per SPBU**
+  (cari, saring Semua / Perlu perhatian / Belum siap / Siap, garis Q&Q 7 hari, bongkaran & anomali,
+  APAR bulan ini, insiden, jumlah pengawas/akun). Ketuk baris untuk membuka SPBU itu. Tombol
+  **Tambah SPBU** membuat unit baru; akun pengawas/kashift/security dibuat di Anggota untuk SPBU aktif.
+- **Pengawas, kepala shift, security** terikat ke satu SPBU dan hanya melihat data SPBU itu.
+- **SPBU tanpa database wajib disiapkan dulu**: selama identitas (nama, kode, jumlah pulau pompa)
+  atau database tangki belum ada, pengawas & ABH diarahkan ke **Siapkan Data SPBU** (`/siapkan`):
+  1) Identitas SPBU, 2) Database tangki. Kepala shift & security melihat pesan "Data SPBU belum
+  lengkap" sampai pengawas selesai.
+- **Database tangki** (`/pengaturan/tangki`): tiap tangki = produk, nomor, tanggal kalibrasi,
+  tabel kalibrasi. Tabel ditempel dari Excel (blok kolom tinggi & volume, salin, tempel; beberapa
+  pasang kolom berdampingan juga terbaca) atau file CSV, satuan tinggi mm atau cm. Pratinjau
+  menampilkan jumlah baris, rentang tinggi, kapasitas, titik volume turun, dan uji tinggi → volume.
+- Semua akun & data lama milik **SPBU COCO Kediri** (SPBU pertama); tabel kalibrasi tangki Kediri
+  dipindahkan ke database tangkinya.
 
 ## Struktur
 
@@ -137,14 +159,14 @@ src/
   components/bongkaran/  langkah SOP, slot foto, panel finish, tanda tangan, filter tanggal, stok-gate, stat-tile, qq-pill
   pages/                 Dashboard, InputMenu, FormInput, FormBongkar, Plan, EditLo, QqHarian, Sample2Jam, StokShift,
                          LaporanMenu, Persediaan, BeritaAcara, RiwayatBongkaran, RiwayatLo, RiwayatKualitas, RiwayatTera,
-                         Kalkulator, Profil, Pengaturan, Anggota, Login
+                         Kalkulator, Profil, Pengaturan, Anggota, Login, Spbu (Unit Bisnis, Siapkan SPBU), Tangki
   lib/sop.ts             definisi 14 langkah, validasi & hitungan bongkaran
   lib/plan.ts            status SO/LO
   lib/shift.ts           pembagian shift
   lib/daily.ts           stok shift & Q&Q harian
   lib/report/            ekspor BA & Catatan Persediaan (xlsx dari template, PDF/JPG via canvas)
   lib/density.ts         density @15°C (ASTM 53)
-  lib/tank.ts            volume tangki dari ketinggian
+  lib/tank.ts            database tangki SPBU aktif, volume dari ketinggian, baca tabel kalibrasi tempelan
   lib/wa.ts              teks laporan WhatsApp
   lib/backend/           Supabase atau IndexedDB lokal (dipilih otomatis)
   data/                  tabel ASTM 53 dan tabel kalibrasi tangki
@@ -165,24 +187,32 @@ Skema yang dipakai aplikasi ada di
 `20261002120000_bbm_plan_meta_daily.sql`, dan
 `20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB), dan
 `20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran), dan
-`20261009120000_bbm_save_apar.sql`, `20261009130000_bbm_save_settings_terbatas.sql` (RPC: pengawas menyimpan unit & area APAR serta Sold To/Ship To saja), dan `20261009140000_bbm_daily_insiden.sql` (kind `insiden`, semua peran boleh melapor). Edge function
-`supabase/functions/bbm-akun` membuat akun & mengatur ulang kata sandi (khusus ABH):
+`20261009120000_bbm_save_apar.sql`, `20261009130000_bbm_save_settings_terbatas.sql` (RPC: pengawas menyimpan unit & area APAR serta Sold To/Ship To saja), dan `20261009140000_bbm_daily_insiden.sql` (kind `insiden`, semua peran boleh melapor), lalu
+`20261010120000_bbm_multi_spbu.sql` (multi SPBU) dan `20261010120100_bbm_tangki_kediri.sql`
+(tangki Kediri). Edge function `supabase/functions/bbm-akun` membuat akun & mengatur ulang kata
+sandi (khusus ABH, hanya untuk SPBU yang dikendalikannya):
 
 | Objek | Isi |
 |-------|-----|
-| `bbm_members` | Anggota dan peran (`abh` / `pengawas` / `kashift` / `security`) |
-| `bbm_settings` | Pengaturan SPBU |
+| `bbm_spbu` | Satu baris per SPBU (unit bisnis); nama & kode mengikuti Identitas SPBU |
+| `bbm_abh_spbu` | SPBU yang dikendalikan tiap ABH |
+| `bbm_members` | Anggota, peran (`abh` / `pengawas` / `kashift` / `security`), dan `spbu_id` tempat bertugas |
+| `bbm_settings` | Pengaturan per SPBU (`id` = `spbu_id`) |
+| `bbm_tanks` | Database tangki per SPBU: produk, nomor, tanggal kalibrasi, tabel kalibrasi (jsonb) |
 | `bbm_plans` | Plan kirim (SO & LO); data MS2, Ship To, PO SAP, supply point di kolom `meta` |
 | `bbm_daily` | Stok awal shift (`kind = stok`, satu per shift) dan Q&Q harian (`kind = qq`) |
 | `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
 | bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
 
-RLS aktif: hanya anggota yang bisa membaca. Peran:
+Semua tabel data punya `spbu_id`. RLS: hanya anggota SPBU itu dan ABH pengendalinya yang bisa
+membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_id>/…`. RPC:
+`bbm_buat_spbu`, `bbm_ringkasan_unit`, `bbm_save_settings_terbatas(p_spbu, p_patch)`,
+`bbm_add_member(…, p_spbu)`. Peran:
 
 | Peran | Modul |
 |-------|-------|
-| ABH | Semua modul + Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
-| Pengawas | Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
+| ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
+| Pengawas | Identitas SPBU & Database tangki (wajib diisi untuk SPBU baru), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
 | Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB saja |
 

@@ -54,6 +54,11 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/pengaturan/aturan', title: 'Aturan Pemeriksaan', parent: '/pengaturan' },
   { href: '/pengaturan/acuan', title: 'Data Acuan', parent: '/pengaturan' },
   { href: '/anggota', title: 'Anggota SPBU', parent: '/profil' },
+  { href: '/pengaturan/tangki', title: 'Database Tangki', parent: '/profil' },
+  { href: '/pengaturan/tangki/', title: 'Tangki & Tabel Kalibrasi', parent: '/pengaturan/tangki' },
+  { href: '/unit', title: 'Unit Bisnis', parent: '/' },
+  // Wajib sebelum modul lain dipakai: tanpa tombol kembali.
+  { href: '/siapkan', title: 'Siapkan Data SPBU', parent: '' },
 ]
 
 const pageFor = (pathname: string) => PAGES.find((p) => (p.href.endsWith('/') ? pathname.startsWith(p.href) : pathname === p.href))
@@ -77,7 +82,7 @@ export function activeNav(pathname: string): string {
 
 /** Tujuan tombol kembali di header, null untuk halaman menu dock. */
 export function parentOf(pathname: string) {
-  return pageFor(pathname)?.parent ?? null
+  return pageFor(pathname)?.parent || null
 }
 
 export function titleFor(pathname: string) {

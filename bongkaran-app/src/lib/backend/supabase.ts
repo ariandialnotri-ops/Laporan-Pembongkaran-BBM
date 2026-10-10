@@ -8,13 +8,33 @@ import type { DailyRecord } from '@/lib/daily'
 import { blobToDataUrl, genId } from '@/lib/image'
 import { normalizePlan } from '@/lib/plan'
 import type { Photo, Photos, Plan, Report, ReportStatus, ReportSummary, Settings } from '@/lib/sop'
-import type { Backend, Member, Role } from './types'
+import type { TankDef, TankTabel } from '@/lib/tank'
+import type { Backend, Member, RingkasanUnit, Role } from './types'
 
 const BUCKET = 'bbm-evidence'
 
 type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint'>
 type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; meta: Partial<PlanMeta> | null; created_at: string }
 type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift: number; data: DailyRecord['data']; created_at: string; updated_at: string; created_by: string | null }
+type TankRow = { id: string; produk: string; tank_no: string; tanggal_kalibrasi: string | null; catatan: string | null; tabel: TankTabel; urut: number }
+type RingkasanRow = {
+  spbu_id: string
+  kode: string | null
+  nama: string
+  identitas_lengkap: boolean
+  tangki: number
+  anggota: number
+  pengawas: number
+  bongkaran_bulan: number
+  anomali_bulan: number
+  draft: number
+  qq_7hari: number[]
+  stok_hari_ini: number
+  apar_unit: number
+  apar_cek_bulan: number
+  insiden_terbuka: number
+  terakhir_aktif: string | null
+}
 type ReportRow = {
   id: string
   status: ReportStatus
@@ -31,6 +51,7 @@ function translateError(msg: string) {
   if (/Invalid login credentials/i.test(msg)) return 'Email atau password salah.'
   if (/Email not confirmed/i.test(msg)) return 'Email belum dikonfirmasi.'
   if (/row-level security/i.test(msg)) return 'Anda tidak berhak melakukan tindakan ini.'
+  if (/bbm_spbu_kode_key/i.test(msg)) return 'Kode SPBU sudah dipakai SPBU lain.'
   if (/Failed to fetch|NetworkError|network/i.test(msg)) return 'Tidak ada koneksi ke server. Periksa internet lalu coba lagi.'
   return msg
 }
@@ -62,6 +83,12 @@ const toDaily = (r: DailyRow) =>
 
 export function createSupabaseBackend(sb: SupabaseClient): Backend {
   let currentUserId: string | null = null
+  // SPBU aktif; semua data dibaca & ditulis untuk SPBU ini.
+  let spbu: string | null = null
+  const aktif = () => {
+    if (!spbu) throw new Error('Pilih SPBU terlebih dahulu.')
+    return spbu
+  }
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
 
@@ -124,24 +151,94 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       urlCache.clear()
     },
 
+    async listSpbu() {
+      return check(await sb.from('bbm_spbu').select('id,kode,nama').order('nama')) as { id: string; kode: string | null; nama: string }[]
+    },
+    pilihSpbu(id) {
+      spbu = id
+    },
+    async buatSpbu(nama, kode) {
+      return check(await sb.rpc('bbm_buat_spbu', { p_nama: nama, p_kode: kode })) as string
+    },
+    async ringkasanUnit(hariIni) {
+      const rows = check(await sb.rpc('bbm_ringkasan_unit', { p_hari: hariIni })) as RingkasanRow[]
+      return rows.map(
+        (r): RingkasanUnit => ({
+          spbuId: r.spbu_id,
+          kode: r.kode,
+          nama: r.nama,
+          identitasLengkap: r.identitas_lengkap,
+          tangki: r.tangki,
+          anggota: r.anggota,
+          pengawas: r.pengawas,
+          bongkaranBulan: r.bongkaran_bulan,
+          anomaliBulan: r.anomali_bulan,
+          draft: r.draft,
+          qq7Hari: r.qq_7hari ?? [],
+          stokHariIni: r.stok_hari_ini,
+          aparUnit: r.apar_unit,
+          aparCekBulan: r.apar_cek_bulan,
+          insidenTerbuka: r.insiden_terbuka,
+          terakhirAktif: r.terakhir_aktif,
+        }),
+      )
+    },
+
     async getSettings() {
-      const row = check(await sb.from('bbm_settings').select('value').eq('id', 'default').maybeSingle()) as { value: Settings } | null
+      const row = check(await sb.from('bbm_settings').select('value').eq('spbu_id', aktif()).maybeSingle()) as { value: Settings } | null
       return row?.value ?? null
     },
     async saveSettings(settings) {
-      check(await sb.from('bbm_settings').upsert({ id: 'default', value: settings }))
+      const s = aktif()
+      check(await sb.from('bbm_settings').upsert({ id: s, spbu_id: s, value: settings }))
     },
-    async saveSettingsTerbatas({ apar, apab, aparArea, soldTo, shipTo }) {
-      check(await sb.rpc('bbm_save_settings_terbatas', { p_patch: { apar: apar ?? [], apab: apab ?? [], aparArea: aparArea ?? [], soldTo: soldTo ?? '', shipTo: shipTo ?? {} } }))
+    async saveSettingsTerbatas(d) {
+      const p_patch = {
+        namaSpbu: d.namaSpbu ?? '',
+        kodeSpbu: d.kodeSpbu ?? '',
+        alamatSpbu: d.alamatSpbu ?? '',
+        jumlahPulau: d.jumlahPulau ?? 0,
+        jumlahDispenser: d.jumlahDispenser ?? 0,
+        apar: d.apar ?? [],
+        apab: d.apab ?? [],
+        aparArea: d.aparArea ?? [],
+        soldTo: d.soldTo ?? '',
+        shipTo: d.shipTo ?? {},
+      }
+      check(await sb.rpc('bbm_save_settings_terbatas', { p_spbu: aktif(), p_patch }))
+    },
+
+    async listTanks() {
+      const rows = check(await sb.from('bbm_tanks').select('id,produk,tank_no,tanggal_kalibrasi,catatan,tabel,urut').eq('spbu_id', aktif())) as TankRow[]
+      return rows.map((r): TankDef => ({ id: r.id, produk: r.produk, tankNo: r.tank_no, tanggalKalibrasi: r.tanggal_kalibrasi, catatan: r.catatan, tabel: r.tabel, urut: r.urut }))
+    },
+    async saveTank(t) {
+      check(
+        await sb.from('bbm_tanks').upsert({
+          spbu_id: aktif(),
+          id: t.id,
+          produk: t.produk,
+          tank_no: t.tankNo,
+          tanggal_kalibrasi: t.tanggalKalibrasi || null,
+          catatan: t.catatan || null,
+          tabel: t.tabel,
+          urut: t.urut,
+        }),
+      )
+    },
+    async deleteTank(id) {
+      const rows = check(await sb.from('bbm_tanks').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Anda tidak berhak menghapus tangki ini.')
     },
 
     async listPlans() {
-      const rows = check(await sb.from('bbm_plans').select('*').order('tanggal', { ascending: false })) as PlanRow[]
+      const rows = check(await sb.from('bbm_plans').select('*').eq('spbu_id', aktif()).order('tanggal', { ascending: false })) as PlanRow[]
       return rows.map(toPlan)
     },
     async savePlan(p) {
       check(
         await sb.from('bbm_plans').upsert({
+          spbu_id: aktif(),
           id: p.id,
           tanggal: p.tanggal || null,
           no_so: p.noSO,
@@ -160,12 +257,12 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
 
     async listReports() {
       const rows = check(
-        await sb.from('bbm_reports').select('id,status,summary,created_by').order('created_at', { ascending: false }).limit(500),
+        await sb.from('bbm_reports').select('id,status,summary,created_by').eq('spbu_id', aktif()).order('created_at', { ascending: false }).limit(500),
       ) as Pick<ReportRow, 'id' | 'status' | 'summary' | 'created_by'>[]
       return rows.map((r) => ({ ...SUMMARY_DEFAULTS, ...r.summary, id: r.id, status: r.status, createdBy: r.created_by }))
     },
     async getReport(id) {
-      const r = check(await sb.from('bbm_reports').select('*').eq('id', id).maybeSingle()) as ReportRow | null
+      const r = check(await sb.from('bbm_reports').select('*').eq('spbu_id', aktif()).eq('id', id).maybeSingle()) as ReportRow | null
       if (!r) return null
       return {
         id: r.id,
@@ -181,6 +278,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async saveReport(report, summary) {
       check(
         await sb.from('bbm_reports').upsert({
+          spbu_id: aktif(),
           id: report.id,
           status: report.status,
           data: report.data,
@@ -194,38 +292,45 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteReport(id) {
       const rows = check(await sb.from('bbm_reports').delete().eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus laporan ini (hanya pengawas, atau pembuat laporan selama masih draft).')
-      const files = check(await sb.storage.from(BUCKET).list(id, { limit: 1000 }))
-      if (files?.length) await sb.storage.from(BUCKET).remove(files.map((f) => `${id}/${f.name}`))
+      // Foto di folder SPBU, dan folder lama (sebelum multi SPBU).
+      for (const folder of [`${aktif()}/${id}`, id]) {
+        const files = check(await sb.storage.from(BUCKET).list(folder, { limit: 1000 }))
+        if (files?.length) await sb.storage.from(BUCKET).remove(files.map((f) => `${folder}/${f.name}`))
+      }
     },
 
     async listDaily(since) {
-      const rows = check(await sb.from('bbm_daily').select('*').gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000)) as DailyRow[]
+      const rows = check(await sb.from('bbm_daily').select('*').eq('spbu_id', aktif()).gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000)) as DailyRow[]
       return rows.map(toDaily)
     },
     async listApar(from, to) {
-      const rows = check(await sb.from('bbm_daily').select('*').eq('kind', 'apar').gte('tanggal', from).lte('tanggal', to).order('tanggal').limit(5000)) as DailyRow[]
+      const rows = check(await sb.from('bbm_daily').select('*').eq('spbu_id', aktif()).eq('kind', 'apar').gte('tanggal', from).lte('tanggal', to).order('tanggal').limit(5000)) as DailyRow[]
       return rows.map(toDaily)
     },
     async saveDaily(rec) {
       check(
-        await sb.from('bbm_daily').upsert({
-          id: rec.id,
-          kind: rec.kind,
-          tanggal: rec.tanggal,
-          shift: rec.shift,
-          data: rec.data,
-          created_at: new Date(rec.createdAt).toISOString(),
-        }),
+        await sb.from('bbm_daily').upsert(
+          {
+            spbu_id: aktif(),
+            id: rec.id,
+            kind: rec.kind,
+            tanggal: rec.tanggal,
+            shift: rec.shift,
+            data: rec.data,
+            created_at: new Date(rec.createdAt).toISOString(),
+          },
+          { onConflict: 'spbu_id,id' },
+        ),
       )
     },
     async deleteDaily(id) {
-      const rows = check(await sb.from('bbm_daily').delete().eq('id', id).select('id'))
+      const rows = check(await sb.from('bbm_daily').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
     },
 
     async uploadPhoto(reportId, blob, name) {
       const id = genId('p')
-      const path = `${reportId}/${id}.jpg`
+      const path = `${aktif()}/${reportId}/${id}.jpg`
       check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false }))
       return { id, name, at: new Date().toISOString(), path }
     },
@@ -267,9 +372,15 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       return dataUrl
     },
 
-    listMembers: async () => check(await sb.from('bbm_members').select('*').order('created_at')) as Member[],
+    // Anggota SPBU aktif: yang bertugas di SPBU ini dan ABH pengendalinya.
+    async listMembers() {
+      const s = aktif()
+      const abh = (check(await sb.from('bbm_abh_spbu').select('user_id').eq('spbu_id', s)) as { user_id: string }[]).map((r) => r.user_id)
+      const filter = abh.length ? `spbu_id.eq.${s},user_id.in.(${abh.join(',')})` : `spbu_id.eq.${s}`
+      return check(await sb.from('bbm_members').select('*').or(filter).order('created_at')) as Member[]
+    },
     async addMember(email, nama, role) {
-      check(await sb.rpc('bbm_add_member', { p_email: email, p_nama: nama, p_role: role }))
+      check(await sb.rpc('bbm_add_member', { p_email: email, p_nama: nama, p_role: role, p_spbu: aktif() }))
     },
     async setMemberRole(userId, role) {
       const rows = check(await sb.from('bbm_members').update({ role }).eq('user_id', userId).select('user_id'))
@@ -280,7 +391,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (!rows?.length) throw new Error('Tidak dapat menghapus anggota ini.')
     },
     async createAccount(email, password, nama, role) {
-      await akun({ aksi: 'buat', email, password, nama, role })
+      await akun({ aksi: 'buat', email, password, nama, role, spbuId: aktif() })
     },
     async resetPassword(userId, password) {
       await akun({ aksi: 'sandi', userId, password })

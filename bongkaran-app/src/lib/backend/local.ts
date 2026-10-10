@@ -7,7 +7,8 @@ import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
 import { normalizePlan } from '@/lib/plan'
 import type { Photos, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
-import type { Backend } from './types'
+import { TANK_BAWAAN, type TankDef } from '@/lib/tank'
+import type { Backend, RingkasanUnit, Spbu } from './types'
 
 const DB_NAME = 'pantas-bongkaran'
 const STORE = 'kv'
@@ -38,9 +39,24 @@ function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest)
   )
 }
 
-const get = <T>(key: string) => run<T | undefined>('readonly', (s) => s.get(key))
-const set = (key: string, value: unknown) => run<IDBValidKey>('readwrite', (s) => s.put(value, key))
-const del = (key: string) => run<undefined>('readwrite', (s) => s.delete(key))
+// Multi SPBU di perangkat ini: SPBU pertama ("lokal") memakai kunci lama tanpa awalan.
+const SPBU_LOKAL: Spbu = { id: 'lokal', kode: null, nama: 'SPBU (mode lokal)' }
+let spbu = SPBU_LOKAL.id
+const kunci = (key: string, id = spbu) => (id === SPBU_LOKAL.id ? key : `${id}:${key}`)
+
+const getRaw = <T>(key: string) => run<T | undefined>('readonly', (s) => s.get(key))
+const setRaw = (key: string, value: unknown) => run<IDBValidKey>('readwrite', (s) => s.put(value, key))
+const get = <T>(key: string, id?: string) => getRaw<T>(kunci(key, id))
+const set = (key: string, value: unknown) => setRaw(kunci(key), value)
+const del = (key: string) => run<undefined>('readwrite', (s) => s.delete(kunci(key)))
+const daftarSpbu = () => getRaw<Spbu[]>('spbu-list').then((l) => (l?.length ? l : [SPBU_LOKAL]))
+// Nama & kode di daftar SPBU mengikuti Identitas SPBU (seperti trigger di Supabase).
+async function namaKeDaftar(st: Partial<Settings>) {
+  const list = await daftarSpbu()
+  const baru = list.map((u) => (u.id === spbu ? { ...u, nama: st.namaSpbu?.trim() || u.nama, kode: st.kodeSpbu?.trim() || u.kode } : u))
+  if (JSON.stringify(baru) !== JSON.stringify(list)) await setRaw('spbu-list', baru)
+}
+const tangkiDi = (id = spbu) => get<TankDef[]>('tanks', id).then((t) => t ?? (id === SPBU_LOKAL.id ? TANK_BAWAAN : []))
 
 function upsertById<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
@@ -61,10 +77,63 @@ export const localBackend: Backend = {
   async signIn() {},
   async signOut() {},
 
+  listSpbu: daftarSpbu,
+  pilihSpbu(id) {
+    spbu = id
+  },
+  async buatSpbu(nama, kode) {
+    const id = genId('spbu')
+    await setRaw('spbu-list', [...(await daftarSpbu()), { id, kode: kode.trim() || null, nama: nama.trim() }])
+    await setRaw(kunci('settings', id), { namaSpbu: nama.trim(), kodeSpbu: kode.trim() })
+    return id
+  },
+  async ringkasanUnit(hariIni) {
+    const bulan = hariIni.slice(0, 7)
+    return Promise.all(
+      (await daftarSpbu()).map(async (u): Promise<RingkasanUnit> => {
+        const [st, tanks, idx, daily] = await Promise.all([get<Partial<Settings>>('settings', u.id), tangkiDi(u.id), get<ReportSummary[]>('index', u.id), get<DailyRecord[]>('daily', u.id)])
+        const d = daily ?? []
+        const r = idx ?? []
+        const hari = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(hariIni) - (6 - i) * 864e5).toISOString().slice(0, 10))
+        const diBulan = (ms: number) => new Date(ms).toISOString().slice(0, 7) === bulan
+        return {
+          spbuId: u.id,
+          kode: st?.kodeSpbu || u.kode,
+          nama: st?.namaSpbu || u.nama,
+          identitasLengkap: !!st?.namaSpbu?.trim() && !!st?.kodeSpbu?.trim() && (st?.jumlahPulau ?? 0) > 0,
+          tangki: tanks.length,
+          anggota: 0,
+          pengawas: 0,
+          bongkaranBulan: r.filter((x) => diBulan(x.createdAt)).length,
+          anomaliBulan: r.filter((x) => x.status === 'anomali' && diBulan(x.createdAt)).length,
+          draft: r.filter((x) => x.status === 'draft').length,
+          qq7Hari: hari.map((h) => new Set(d.filter((x) => x.kind === 'qq' && x.tanggal === h).map((x) => x.shift)).size),
+          stokHariIni: new Set(d.filter((x) => x.kind === 'stok' && x.tanggal === hariIni).map((x) => x.shift)).size,
+          aparUnit: (st?.apar?.length ?? 0) + (st?.apab?.length ?? 0),
+          aparCekBulan: new Set(d.filter((x) => x.kind === 'apar' && x.id.length > 16 && x.tanggal.startsWith(bulan)).map((x) => x.id.slice(16))).size,
+          insidenTerbuka: d.filter((x) => x.kind === 'insiden' && x.data.status !== 'selesai').length,
+          terakhirAktif: d.length ? new Date(Math.max(...d.map((x) => x.updatedAt))).toISOString() : null,
+        }
+      }),
+    )
+  },
+
   getSettings: () => get('settings').then((s) => (s as never) ?? null),
-  saveSettings: (settings) => set('settings', settings).then(() => {}),
+  async saveSettings(settings) {
+    await set('settings', settings)
+    await namaKeDaftar(settings)
+  },
   async saveSettingsTerbatas(data) {
     await set('settings', { ...((await get<Settings>('settings')) ?? {}), ...data })
+    await namaKeDaftar(data)
+  },
+
+  listTanks: () => tangkiDi(),
+  async saveTank(tank) {
+    await set('tanks', upsertById(await tangkiDi(), tank))
+  },
+  async deleteTank(id) {
+    await set('tanks', (await tangkiDi()).filter((t) => t.id !== id))
   },
 
   listPlans: () => get<Plan[]>('plans').then((p) => (p ?? []).map((x) => normalizePlan(x))),

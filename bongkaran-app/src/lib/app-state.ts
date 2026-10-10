@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect } from 'react'
-import type { Backend, SessionInfo } from '@/lib/backend'
+import type { Backend, SessionInfo, Spbu } from '@/lib/backend'
 import type { DailyRecord } from '@/lib/daily'
 import type { Role } from '@/lib/roles'
 import type { Plan, ReportSummary, Rules, Settings } from '@/lib/sop'
+import type { TankDef } from '@/lib/tank'
 
 export type SessionStatus = 'loading' | 'login' | 'nomember' | 'ready' | 'error'
 
@@ -21,6 +22,24 @@ export interface AppState {
   can: (path: string) => boolean
   displayName: string
   initials: string
+
+  /** SPBU yang boleh diakses (ABH: semua unit bisnis yang dikendalikan). */
+  spbuList: Spbu[]
+  /** SPBU aktif; null bila akun belum terhubung ke SPBU mana pun. */
+  spbuId: string | null
+  spbu: Spbu | null
+  /** ABH berpindah SPBU aktif (aplikasi dimuat ulang dari Dashboard SPBU itu). */
+  pilihSpbu: (id: string) => void
+  /** ABH menambah unit bisnis baru lalu berpindah ke sana (Siapkan Data SPBU). */
+  buatSpbu: (nama: string, kode: string) => Promise<void>
+  /** Database tangki SPBU aktif. */
+  tanks: TankDef[]
+  saveTank: (tank: TankDef) => Promise<void>
+  deleteTank: (id: string) => Promise<void>
+  /** Identitas SPBU sudah diisi: nama, kode, jumlah pulau pompa. */
+  identitasLengkap: boolean
+  /** Data SPBU & tangki lengkap; bila belum, pengawas wajib mengisinya dulu. */
+  spbuSiap: boolean
 
   loaded: boolean
   settings: Settings

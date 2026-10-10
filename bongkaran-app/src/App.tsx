@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -51,6 +51,12 @@ const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) =>
 const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
 const RiwayatTera = lazy(() => import('@/pages/RiwayatTera').then((m) => ({ default: m.RiwayatTera })))
 const Sample2Jam = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2Jam })))
+const UnitBisnis = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.UnitBisnis })))
+const SiapkanSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.SiapkanSpbu })))
+const SpbuBelumSiap = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.SpbuBelumSiap })))
+const TanpaSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.TanpaSpbu })))
+const DatabaseTangki = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.DatabaseTangki })))
+const TangkiForm = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.TangkiForm })))
 const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 
 function Gate() {
@@ -66,6 +72,16 @@ function Gate() {
   if (app.status === 'login') return <Login />
   if (app.status === 'nomember') return <NotMember />
   if (app.status !== 'ready') return <SessionState />
+
+  // Multi SPBU: akun tanpa SPBU, dan SPBU yang belum punya identitas & database tangki.
+  if (app.loaded && !app.spbuId) {
+    if (!app.isAdmin) return <Layar isi={<TanpaSpbu />} />
+    if (pathname !== '/unit' && pathname !== '/profil') return <Navigate to="/unit" replace />
+  }
+  if (app.loaded && app.spbuId && !app.spbuSiap && !bebasSaatBelumSiap(pathname)) {
+    if (app.role === 'abh' || app.role === 'pengawas') return <Navigate to="/siapkan" replace />
+    return <Layar isi={<SpbuBelumSiap />} />
+  }
   // Halaman di luar hak akses peran: beranda dialihkan, halaman lain diberi keterangan.
   if (!app.can(pathname)) {
     if (pathname === '/') return <Navigate to={berandaPeran(app.role)} replace />
@@ -118,6 +134,10 @@ function Gate() {
           <Route path="/pengaturan/aturan" element={<AturanPemeriksaan />} />
           <Route path="/pengaturan/acuan" element={<DataAcuan />} />
           <Route path="/anggota" element={<Anggota />} />
+          <Route path="/pengaturan/tangki" element={<DatabaseTangki />} />
+          <Route path="/pengaturan/tangki/:id" element={<TangkiForm />} />
+          <Route path="/unit" element={<UnitBisnis />} />
+          <Route path="/siapkan" element={<SiapkanSpbu />} />
           {/* Alamat lama */}
           <Route path="/qq/*" element={<Navigate to="/kualitas" replace />} />
           <Route path="*" element={<Dashboard />} />
@@ -138,6 +158,19 @@ function App() {
 }
 
 export default App
+
+/** Halaman yang tetap terbuka saat data SPBU belum lengkap. */
+function bebasSaatBelumSiap(path: string) {
+  return ['/siapkan', '/pengaturan/identitas', '/pengaturan/tangki', '/profil', '/unit', '/anggota', '/kalkulator'].includes(path) || path.startsWith('/pengaturan/tangki/')
+}
+
+function Layar({ isi }: { isi: ReactNode }) {
+  return (
+    <AppShell>
+      <Suspense fallback={<Loading />}>{isi}</Suspense>
+    </AppShell>
+  )
+}
 
 function TanpaAkses({ peran, beranda }: { peran: string; beranda: string }) {
   return (

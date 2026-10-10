@@ -21,6 +21,7 @@ import {
 import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bongkaran/date-filter'
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
+import { KartuUnitBisnis } from '@/components/shell/kartu-unit-bisnis'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
@@ -147,6 +148,7 @@ export function Dashboard() {
   return (
     <div className="flex flex-col gap-space-md">
       {/* 1. Operasional & shift */}
+      <KartuUnitBisnis />
       <section aria-label="Operasional SPBU" className="animate-entrance-1 flex items-center justify-between gap-space-sm rounded-md bg-surface-container-lowest/85 p-3.5 shadow-sm">
         <div className="flex min-w-0 items-center gap-2.5">
           <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">

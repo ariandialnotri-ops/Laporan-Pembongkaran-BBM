@@ -1,5 +1,6 @@
 import type { DailyRecord } from '@/lib/daily'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
+import type { TankDef } from '@/lib/tank'
 
 import type { Role } from '@/lib/roles'
 
@@ -10,8 +11,39 @@ export interface Member {
   email: string
   nama: string | null
   role: Role
+  spbu_id: string | null
   created_at: string
 }
+
+/** Satu SPBU (unit bisnis). Nama & kode mengikuti Identitas SPBU. */
+export interface Spbu {
+  id: string
+  kode: string | null
+  nama: string
+}
+
+/** Ringkasan satu SPBU untuk dashboard Unit Bisnis ABH. */
+export interface RingkasanUnit {
+  spbuId: string
+  kode: string | null
+  nama: string
+  identitasLengkap: boolean
+  tangki: number
+  anggota: number
+  pengawas: number
+  bongkaranBulan: number
+  anomaliBulan: number
+  draft: number
+  /** Jumlah shift yang sudah uji Q&Q, 7 hari terakhir (lama ke baru). */
+  qq7Hari: number[]
+  stokHariIni: number
+  aparUnit: number
+  aparCekBulan: number
+  insidenTerbuka: number
+  terakhirAktif: string | null
+}
+
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo'>
 
 export interface SessionInfo {
   user: { id: string; email: string } | null
@@ -31,10 +63,24 @@ export interface Backend {
   signIn(email: string, password: string): Promise<void>
   signOut(): Promise<void>
 
+  /** SPBU yang boleh diakses: tempat bertugas, atau semua unit bisnis yang dikendalikan ABH. */
+  listSpbu(): Promise<Spbu[]>
+  /** SPBU aktif: semua data di bawah ini dibaca/ditulis untuk SPBU ini. */
+  pilihSpbu(id: string): void
+  /** ABH menambah unit bisnis baru; mengembalikan id-nya. */
+  buatSpbu(nama: string, kode: string): Promise<string>
+  /** Ringkasan semua SPBU yang dikendalikan (dashboard Unit Bisnis). */
+  ringkasanUnit(hariIni: string): Promise<RingkasanUnit[]>
+
   getSettings(): Promise<Partial<Settings> | null>
   saveSettings(settings: Settings): Promise<void>
-  /** Sebagian pengaturan yang boleh diubah pengawas: data utama APAR/APAB & area, Sold To, Ship To. */
-  saveSettingsTerbatas(data: Pick<Settings, 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo'>): Promise<void>
+  /** Sebagian pengaturan yang boleh diubah pengawas: identitas SPBU, data utama APAR/APAB & area, Sold To, Ship To. */
+  saveSettingsTerbatas(data: SettingsTerbatas): Promise<void>
+
+  /** Database tangki SPBU aktif. */
+  listTanks(): Promise<TankDef[]>
+  saveTank(tank: TankDef): Promise<void>
+  deleteTank(id: string): Promise<void>
 
   listPlans(): Promise<Plan[]>
   savePlan(plan: Plan): Promise<void>
@@ -64,7 +110,7 @@ export interface Backend {
   addMember(email: string, nama: string, role: Role): Promise<void>
   setMemberRole(userId: string, role: Role): Promise<void>
   removeMember(userId: string): Promise<void>
-  /** ABH membuat akun login baru (langsung aktif) dan mendaftarkannya sebagai anggota. */
+  /** ABH membuat akun login baru (langsung aktif) dan mendaftarkannya sebagai anggota SPBU aktif. */
   createAccount(email: string, password: string, nama: string, role: Role): Promise<void>
   /** ABH mengatur ulang kata sandi anggota. */
   resetPassword(userId: string, password: string): Promise<void>

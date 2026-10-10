@@ -9,4 +9,4 @@ import type { Backend } from './types'
  */
 export const backend: Backend = supabase ? createSupabaseBackend(supabase) : localBackend
 
-export type { Backend, Member, Role, SessionInfo } from './types'
+export type { Backend, Member, RingkasanUnit, Role, SessionInfo, Spbu } from './types'

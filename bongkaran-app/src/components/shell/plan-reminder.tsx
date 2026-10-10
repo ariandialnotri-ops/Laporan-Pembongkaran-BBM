@@ -15,10 +15,11 @@ const KEY = 'floq-pengingat-plan'
 export function PlanReminder() {
   const app = useApp()
   const toast = useToast()
-  const { loaded, plans } = app
+  const { loaded, plans, spbuSiap } = app
 
   useEffect(() => {
-    if (!loaded) return
+    // SPBU yang datanya belum lengkap belum perlu diingatkan soal plan.
+    if (!loaded || !spbuSiap) return
     const cek = () => {
       const besok = planBesokKurang(plans)
       if (!besok) return
@@ -42,7 +43,7 @@ export function PlanReminder() {
     cek()
     const t = window.setInterval(cek, 60_000)
     return () => window.clearInterval(t)
-  }, [loaded, plans, toast])
+  }, [loaded, spbuSiap, plans, toast])
 
   return null
 }

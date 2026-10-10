@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
 import { parentOf, titleFor } from '@/lib/nav'
+import { PemilihSpbu } from './pemilih-spbu'
 
 export function AppHeader() {
   const { pathname } = useLocation()
@@ -35,7 +36,7 @@ export function AppHeader() {
           )}
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>
-            <span className="truncate text-tag uppercase text-primary">{app.settings.namaSpbu || 'SPBU'}</span>
+            <PemilihSpbu />
           </div>
         </div>
 

@@ -51,9 +51,12 @@ export function Anggota() {
   const [reset, setReset] = useState<{ m: Member; password: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Anggota SPBU aktif; dimuat ulang saat ABH berpindah SPBU.
+  const { backend, loaded, spbuId } = app
   const load = useCallback(() => {
-    app.backend.listMembers().then(setMembers, (e: unknown) => setLoadError(e instanceof Error ? e : new Error(String(e))))
-  }, [app.backend])
+    if (!loaded || !spbuId) return
+    backend.listMembers().then(setMembers, (e: unknown) => setLoadError(e instanceof Error ? e : new Error(String(e))))
+  }, [backend, loaded, spbuId])
   useEffect(load, [load])
 
   const run = async (task: () => Promise<void>, ok?: string) => {
@@ -94,7 +97,7 @@ export function Anggota() {
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
         <div className="flex flex-col">
-          <span className="text-tag uppercase text-primary">Buat akun baru</span>
+          <span className="text-tag uppercase text-primary">Buat akun baru di {app.spbu?.nama || 'SPBU ini'}</span>
           <span className="text-body-sm text-on-surface-variant">Akun langsung aktif. Berikan email & kata sandi sementara ke pemiliknya, lalu minta ganti kata sandi di menu Profil.</span>
         </div>
         <div className="grid grid-cols-2 gap-space-sm">
@@ -131,7 +134,7 @@ export function Anggota() {
       </GlassCard>
 
       <section aria-labelledby="daftar-anggota" className="animate-entrance-2 flex flex-col gap-space-sm">
-        <SectionHeader id="daftar-anggota" title={`Anggota (${members.length})`} />
+        <SectionHeader id="daftar-anggota" title={`Anggota ${app.spbu?.nama || 'SPBU'} (${members.length})`} />
         <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 p-space-2xs">
           {members.map((m) => {
             const me = m.user_id === app.session.user?.id

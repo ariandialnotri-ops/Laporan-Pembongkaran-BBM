@@ -8,16 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SpringValue } from '@/components/ui/spring-value'
 import { density15, METHOD_LABEL, TABLE53_COVERAGE } from '@/lib/density'
 import { formatDensity, formatNumber } from '@/lib/format'
+import { useApp } from '@/lib/app-state'
 import { getTank, TANKS, volumeFromLevel } from '@/lib/tank'
 
 export function Kalkulator() {
+  // Berlangganan state aplikasi agar ikut memperbarui saat database tangki SPBU selesai dimuat / SPBU diganti.
+  useApp()
   const [obs, setObs] = useState('')
   const [suhu, setSuhu] = useState('')
-  const [tankId, setTankId] = useState(TANKS[0].id)
+  const [pilihan, setTankId] = useState('')
+  // Database tangki SPBU dimuat setelah halaman terbuka: pakai tangki pertama sampai dipilih.
+  const tankId = getTank(pilihan)?.id ?? TANKS[0]?.id ?? ''
   const [level, setLevel] = useState('')
   const d15 = density15(obs, suhu)
   const vol = volumeFromLevel(tankId, level)
-  const tank = getTank(tankId)!
+  const tank = getTank(tankId)
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -89,7 +94,9 @@ export function Kalkulator() {
             ? { tone: 'error', title: vol.error }
             : vol?.anomaly
               ? { tone: 'error', title: 'Data tabel tidak naik berurutan di sekitar ketinggian ini', detail: 'Cek tabel kalibrasi asli' }
-              : { tone: 'idle', title: `Kapasitas ${formatNumber(tank.capacity)} L`, detail: `Tabel ${tank.startMm}–${formatNumber(tank.maxMm)} mm per ${tank.stepMm} mm, kalibrasi ${tank.tanggalKalibrasi || '-'}` })}
+              : tank
+                ? { tone: 'idle', title: `Kapasitas ${formatNumber(tank.capacity)} L`, detail: `Tabel ${formatNumber(tank.startMm)}–${formatNumber(tank.maxMm)} mm (${formatNumber(tank.rows)} baris), kalibrasi ${tank.tanggalKalibrasi || '-'}` }
+                : { tone: 'idle', title: 'Belum ada tangki di database SPBU ini' })}
         />
       </GlassCard>
     </div>

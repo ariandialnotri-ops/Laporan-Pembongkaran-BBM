@@ -1,8 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BookOpen, Building2, ChevronRight, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, X } from 'lucide-react'
-import { Field } from '@/components/bongkaran/form-bits'
+import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, X } from 'lucide-react'
+import { Field, JumlahField } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ export function Pengaturan() {
   const teraBermasalah = nz.filter((n) => statusSertifikat(n.teraTanggal, todayIso()) !== 'ok').length
   const items: { to: string; icon: LucideIcon; title: string; desc: string; badge?: ReactNode }[] = [
     { to: '/pengaturan/identitas', icon: Building2, title: 'Identitas SPBU', desc: `${s.namaSpbu || '-'}, ${s.jumlahPulau || 0} pulau pompa, logo & nama default` },
+    { to: '/pengaturan/tangki', icon: Cylinder, title: 'Database Tangki', desc: `${app.tanks.length} tangki pendam & tabel kalibrasi` },
     { to: '/pengaturan/dispenser', icon: Fuel, title: 'Data Dispenser', desc: `${(s.dispensers ?? []).length} unit: merk & nomor seri` },
     {
       to: '/pengaturan/nozzle',
@@ -38,7 +39,7 @@ export function Pengaturan() {
     { to: '/pengaturan/sold-ship-to', icon: Receipt, title: 'Sold To & Ship To', desc: s.soldTo ? `Sold To ${s.soldTo}, Ship To per produk` : 'Belum diisi; dipakai otomatis di form bongkaran' },
     { to: '/apar/data', icon: FireExtinguisher, title: 'Data utama APAR & APAB', desc: `${(s.apar ?? []).length + (s.apab ?? []).length} unit, ${(s.aparArea ?? []).length} area` },
     { to: '/pengaturan/aturan', icon: SlidersHorizontal, title: 'Aturan Pemeriksaan', desc: 'Toleransi density, batas tera, tunggu ATG, PIN' },
-    { to: '/pengaturan/acuan', icon: BookOpen, title: 'Data Acuan', desc: 'Tabel ASTM 53 dan kalibrasi tangki (bawaan aplikasi)' },
+    { to: '/pengaturan/acuan', icon: BookOpen, title: 'Data Acuan', desc: 'Tabel ASTM 53 dan ringkasan kalibrasi tangki' },
   ]
   return (
     <nav aria-label="Menu pengaturan" className="animate-entrance-1">
@@ -76,13 +77,15 @@ export function IdentitasSpbu() {
   if (!app.loaded) return <Loading />
   const s = app.settings
   const readOnly = !app.isAdmin
+  // Pengawas melengkapi identitas dasar SPBU-nya; logo & nama default tetap ABH.
+  const dasarReadOnly = !app.isAdmin && app.role !== 'pengawas'
   const onLogo = async (file?: File) => {
     if (file) app.updateSettings({ logoDataUrl: await blobToDataUrl(await compressImage(file, { maxSize: 400, quality: 0.9 })) })
   }
   return (
     <div className="flex flex-col gap-space-md">
-      {readOnly && <HanyaAbh />}
-      <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
+      {dasarReadOnly && <HanyaAbh />}
+      <fieldset disabled={dasarReadOnly} className="flex min-w-0 flex-col gap-space-md">
         <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
           <Field label="Nama SPBU" htmlFor="set-nama">
             <Input id="set-nama" value={s.namaSpbu} onChange={(e) => app.updateSettings({ namaSpbu: e.target.value })} />
@@ -95,7 +98,8 @@ export function IdentitasSpbu() {
               <Input id="set-alamat" value={s.alamatSpbu} onChange={(e) => app.updateSettings({ alamatSpbu: e.target.value })} />
             </Field>
             <JumlahField id="set-pulau" label="Jumlah pulau pompa" value={s.jumlahPulau ?? 0} max={30} onChange={(n) => app.updateSettings({ jumlahPulau: n })} />
-            <div className="flex flex-col justify-end">
+            <JumlahField id="set-jml-dispenser" label="Jumlah dispenser" value={s.jumlahDispenser ?? 0} max={60} onChange={(n) => app.updateSettings({ jumlahDispenser: n })} />
+            <div className="col-span-2 flex flex-col justify-end">
               <Link to="/pengaturan/dispenser" className="flex min-h-12 flex-col justify-center rounded-md bg-surface-container-low px-space-sm text-body-sm">
                 <span className="tabular font-semibold text-on-surface">{(s.dispensers ?? []).length} dispenser</span>
                 <span className="text-primary">Atur di Data Dispenser</span>
@@ -103,7 +107,7 @@ export function IdentitasSpbu() {
             </div>
           </div>
           <span className="text-body-sm text-on-surface-variant">Pulau pompa otomatis menjadi lokasi APAR di data utama APAR & APAB.</span>
-          <div className="flex items-center gap-space-sm">
+          <fieldset disabled={readOnly} className="flex min-w-0 items-center gap-space-sm">
             {s.logoDataUrl ? (
               <span className="glass-1 flex h-12 items-center rounded-md px-space-sm">
                 <img src={s.logoDataUrl} alt="Logo Berita Acara" className="h-8" />
@@ -119,9 +123,10 @@ export function IdentitasSpbu() {
               </Button>
             )}
             <input ref={logoRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void onLogo(e.target.files?.[0])} />
-          </div>
+          </fieldset>
         </GlassCard>
-
+      </fieldset>
+      <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
         <section aria-labelledby="nama-default" className="animate-entrance-2 flex flex-col gap-space-sm">
           <SectionHeader id="nama-default" title="Nama default di Berita Acara" />
           <GlassCard level={2} className="grid grid-cols-2 gap-space-sm p-space-md">
@@ -203,7 +208,7 @@ export function DataAcuan() {
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-md font-semibold text-on-surface">{t.label}</span>
                 <span className="tabular text-numeric-sm text-on-surface-variant">
-                  {t.startMm}-{formatNumber(t.maxMm)} mm, {formatNumber(t.capacity)} L, kalibrasi {t.tanggalKalibrasi || '-'}
+                  {formatNumber(t.startMm)}-{formatNumber(t.maxMm)} mm, {formatNumber(t.capacity)} L, kalibrasi {t.tanggalKalibrasi || '-'}
                 </span>
               </div>
               {t.anomalyLevels.length > 0 ? <Pill tone="error">{t.anomalyLevels.length} titik janggal</Pill> : <Pill tone="primary">OK</Pill>}
@@ -235,21 +240,3 @@ function RuleInput({ id, value, suffix, onChange }: { id: string; value: number;
 }
 
 /** Angka bulat 0..max; teks disimpan sendiri agar kolom boleh kosong saat diketik. */
-function JumlahField({ id, label, value, max, onChange }: { id: string; label: string; value: number; max: number; onChange: (n: number) => void }) {
-  const [text, setText] = useState(() => (value ? String(value) : ''))
-  return (
-    <Field label={label} htmlFor={id}>
-      <Input
-        id={id}
-        numeric
-        inputMode="numeric"
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value)
-          const n = parseAngka(e.target.value)
-          onChange(n !== null && n >= 0 ? Math.min(Math.round(n), max) : 0)
-        }}
-      />
-    </Field>
-  )
-}

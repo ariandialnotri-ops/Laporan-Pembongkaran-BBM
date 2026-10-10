@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Calculator, ChevronRight, Database, FileText, FireExtinguisher, FlaskConical, KeyRound, LogOut, MapPin, Receipt, Settings2, ShieldCheck, TriangleAlert, Truck, Users } from 'lucide-react'
+import { Building2, Calculator, ChevronRight, Cylinder, Database, FileText, FireExtinguisher, FlaskConical, KeyRound, LogOut, MapPin, Receipt, Settings2, ShieldCheck, TriangleAlert, Truck, Users } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
@@ -83,7 +83,10 @@ export function Profil() {
       <section aria-labelledby="akun" className="animate-entrance-4 flex flex-col gap-space-sm">
         <SectionHeader id="akun" title="Akun & SPBU" />
         <GlassCard level={2} className="flex flex-col p-space-2xs">
+          {app.isAdmin && <MenuRow to="/unit" icon={Building2} label={`Unit bisnis (${app.spbuList.length} SPBU)`} />}
           {app.isAdmin && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (identitas, dispenser, tera)" />}
+          {!app.isAdmin && app.can('/pengaturan/identitas') && <MenuRow to="/pengaturan/identitas" icon={Settings2} label="Identitas SPBU" />}
+          {app.can('/pengaturan/tangki') && <MenuRow to="/pengaturan/tangki" icon={Cylinder} label="Database tangki & tabel kalibrasi" />}
           {app.can('/pengaturan/sold-ship-to') && <MenuRow to="/pengaturan/sold-ship-to" icon={Receipt} label="Sold To & Ship To" />}
           {remote && app.isAdmin && <MenuRow to="/anggota" icon={Users} label="Anggota & akun per peran" />}
           {app.can('/apar/data') && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
