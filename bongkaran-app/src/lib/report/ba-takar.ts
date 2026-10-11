@@ -177,17 +177,18 @@ export async function exportBaTakarPdf({ tanggal, records, settings, fotoData }:
 
   // Hasil per nozzle
   y = pita(doc, y, 'HASIL UJI TAKAR PER NOZZLE')
-  const ln = [62, 160, 52, 92, 82, LEBAR - 62 - 160 - 52 - 92 - 82]
+  const ln = [50, 86, 118, 40, 72, 70, LEBAR - 50 - 86 - 118 - 40 - 72 - 70]
   y = tabel(
     doc,
     y,
     ln,
-    ['Nozzle Number', 'Product', 'Mode', 'Hasil Tera (ml)', 'Qty Var (%)', 'Keterangan'],
+    ['Nozzle Number', 'Tanggal & Jam', 'Product', 'Mode', 'Hasil Tera (ml)', 'Qty Var (%)', 'Keterangan'],
     rows.map((r) => {
       const lewat = takarStatus(r.data.hasilMl) === 'lewat'
       const v = parseAngka(r.data.hasilMl)
       return [
         { t: r.data.nozzle },
+        { t: `${ddmmyyyy(r.tanggal)} ${r.data.jam || ''}`.trim() },
         { t: r.data.produk.toUpperCase() },
         { t: r.data.opsi },
         { t: v === null ? '-' : String(v) },
@@ -263,7 +264,7 @@ export async function exportBaTakarPdf({ tanggal, records, settings, fotoData }:
       }
       const lw = takarStatus(r.data.hasilMl) === 'lewat'
       const v = parseAngka(r.data.hasilMl)
-      y = pita(doc, y, `${i + 1}. Nozzle ${r.data.nozzle} · ${r.data.produk.toUpperCase()} · ${opsiLabel(r.data.opsi)} (${r.data.opsi}) · ${v === null ? '-' : v} ml · ${lw ? 'Tidak Sesuai' : 'Sesuai'}`)
+      y = pita(doc, y, `${i + 1}. ${ddmmyyyy(r.tanggal)} ${r.data.jam} · Nozzle ${r.data.nozzle} · ${r.data.produk.toUpperCase()} · ${opsiLabel(r.data.opsi)} (${r.data.opsi}) · ${v === null ? '-' : v} ml · ${lw ? 'Tidak Sesuai' : 'Sesuai'}`)
       y += 4
       for (let j = 0; j < fotos.length; j += 2) {
         if (y + tinggiFoto + 18 > BAWAH) {
