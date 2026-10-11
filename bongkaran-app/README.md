@@ -128,6 +128,19 @@ Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO
 8.000 L) bisa diubah di Pengaturan. Data acuan tabel ada di `src/data/`
 (`table53.json`, `tankTables.json`).
 
+## Uji Takaran (bejana 20 L)
+
+Menu tersendiri di **Input > Uji Takaran** (`/takaran`, kepala shift, pengawas, ABH):
+nomor nozzle & produk diketik manual (ada saran dari data nozzle), pilih opsi **P (Preset)** atau
+**M (Manual)**, isi selisih terhadap 20 L dalam ml. Selisih di bawah **-60 ml** = melebihi toleransi
+(merah, catatan tindak lanjut). Wajib foto **dudukan bejana & water pass (stabil)** dan **hasil
+pengukuran**; setiap foto diberi cap tanggal, jam, zona waktu, SPBU, nozzle, dan opsi yang
+tertulis di gambar. Satu hasil dikirim satu per satu; setelah kirim, nozzle & produk tetap dan
+opsi pindah ke yang belum diuji. Daftar "Hasil uji hari ini" bernomor (mis. "1. Nozzle 3
+Pertalite, Preset = -40 ml"). Keluar dengan isian/foto belum terkirim meminta konfirmasi.
+Riwayat di **Laporan > Riwayat Uji Takaran** (`/laporan/takaran`): filter tanggal, saring
+melebihi toleransi / sesuai, pop up detail + foto, hapus (pengawas/ABH atau pengirim di hari yang sama).
+
 ## Multi SPBU
 
 Satu aplikasi untuk banyak SPBU, polanya sama dengan aplikasi Monitoring JBT:
@@ -188,8 +201,8 @@ Skema yang dipakai aplikasi ada di
 `20261005120000_bbm_daily_apar.sql` (kind `apar` untuk inspeksi APAR & APAB), dan
 `20261008120000_bbm_peran.sql` (4 peran + aturan tulis per peran), dan
 `20261009120000_bbm_save_apar.sql`, `20261009130000_bbm_save_settings_terbatas.sql` (RPC: pengawas menyimpan unit & area APAR serta Sold To/Ship To saja), dan `20261009140000_bbm_daily_insiden.sql` (kind `insiden`, semua peran boleh melapor), lalu
-`20261010120000_bbm_multi_spbu.sql` (multi SPBU) dan `20261010120100_bbm_tangki_kediri.sql`
-(tangki Kediri). Edge function `supabase/functions/bbm-akun` membuat akun & mengatur ulang kata
+`20261010120000_bbm_multi_spbu.sql` (multi SPBU), `20261010120100_bbm_tangki_kediri.sql`
+(tangki Kediri), dan `20261011120000_bbm_takar.sql` (uji takaran). Edge function `supabase/functions/bbm-akun` membuat akun & mengatur ulang kata
 sandi (khusus ABH, hanya untuk SPBU yang dikendalikannya):
 
 | Objek | Isi |
@@ -201,6 +214,7 @@ sandi (khusus ABH, hanya untuk SPBU yang dikendalikannya):
 | `bbm_tanks` | Database tangki per SPBU: produk, nomor, tanggal kalibrasi, tabel kalibrasi (jsonb) |
 | `bbm_plans` | Plan kirim (SO & LO); data MS2, Ship To, PO SAP, supply point di kolom `meta` |
 | `bbm_daily` | Stok awal shift (`kind = stok`, satu per shift) dan Q&Q harian (`kind = qq`) |
+| `bbm_takar` | Uji takaran bejana 20 L: satu baris per hasil (nozzle, produk, opsi P/M, selisih ml, foto); dibaca aplikasi sebagai catatan harian kind `takar` |
 | `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
 | bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
 

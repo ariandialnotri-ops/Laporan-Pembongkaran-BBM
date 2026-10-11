@@ -6,8 +6,8 @@ export type Role = 'abh' | 'pengawas' | 'kashift' | 'security'
 
 export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
-  { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU & database tangki, bongkaran & TTD BA, stok awal, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
-  { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, tracking SO & LO, inspeksi APAR/APAB' },
+  { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU & database tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
+  { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB' },
   { key: 'security', label: 'Security', desc: 'Inspeksi APAR/APAB dan pelaporan insiden / near miss' },
 ]
 
@@ -26,6 +26,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/stok',
     '/kualitas',
     '/sample',
+    '/takaran',
     '/plan',
     '/plan/so/',
     '/apar',
@@ -50,6 +51,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/input/',
     '/stok',
     '/kualitas',
+    '/takaran',
     '/plan',
     '/plan/so/',
     '/apar',
@@ -64,6 +66,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/laporan/kualitas',
     '/laporan/kualitas/',
     '/laporan/tera',
+    '/laporan/takaran',
     '/laporan/apar',
     '/insiden/baru',
     '/laporan/insiden',

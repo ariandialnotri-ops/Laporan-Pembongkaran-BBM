@@ -57,6 +57,8 @@ const SpbuBelumSiap = lazy(() => import('@/pages/Spbu').then((m) => ({ default: 
 const TanpaSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.TanpaSpbu })))
 const DatabaseTangki = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.DatabaseTangki })))
 const TangkiForm = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.TangkiForm })))
+const UjiTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.UjiTakaran })))
+const RiwayatTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.RiwayatTakaran })))
 const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 
 function Gate() {
@@ -105,6 +107,8 @@ function Gate() {
           <Route path="/kualitas" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
           <Route path="/stok" element={<StokShift />} />
+          <Route path="/takaran" element={<UjiTakaran />} />
+          <Route path="/laporan/takaran" element={<RiwayatTakaran />} />
           <Route path="/apar" element={<AparDashboard />} />
           <Route path="/apar/inspeksi" element={<InspeksiApar />} />
           <Route path="/apar/inspeksi/:id" element={<InspeksiUnit />} />

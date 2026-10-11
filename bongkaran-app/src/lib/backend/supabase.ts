@@ -300,14 +300,28 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     },
 
     async listDaily(since) {
-      const rows = check(await sb.from('bbm_daily').select('*').eq('spbu_id', aktif()).gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000)) as DailyRow[]
-      return rows.map(toDaily)
+      const s = aktif()
+      const [harian, takar] = await Promise.all([
+        sb.from('bbm_daily').select('*').eq('spbu_id', s).gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000),
+        sb.from('bbm_takar').select('*').eq('spbu_id', s).gte('tanggal', since).order('tanggal', { ascending: false }).limit(2000),
+      ])
+      // Uji takaran ada di tabel sendiri (bbm_takar), dibaca sebagai catatan harian kind 'takar'.
+      return [...(check(harian) as DailyRow[]), ...(check(takar) as Omit<DailyRow, 'kind'>[]).map((r) => ({ ...r, kind: 'takar' as const }))].map(toDaily)
     },
     async listApar(from, to) {
       const rows = check(await sb.from('bbm_daily').select('*').eq('spbu_id', aktif()).eq('kind', 'apar').gte('tanggal', from).lte('tanggal', to).order('tanggal').limit(5000)) as DailyRow[]
       return rows.map(toDaily)
     },
     async saveDaily(rec) {
+      if (rec.kind === 'takar') {
+        check(
+          await sb.from('bbm_takar').upsert(
+            { spbu_id: aktif(), id: rec.id, tanggal: rec.tanggal, shift: rec.shift, data: rec.data, created_at: new Date(rec.createdAt).toISOString() },
+            { onConflict: 'spbu_id,id' },
+          ),
+        )
+        return
+      }
       check(
         await sb.from('bbm_daily').upsert(
           {
@@ -324,7 +338,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       )
     },
     async deleteDaily(id) {
-      const rows = check(await sb.from('bbm_daily').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      const tabel = id.startsWith('takar_') ? 'bbm_takar' : 'bbm_daily'
+      const rows = check(await sb.from(tabel).delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
     },
 

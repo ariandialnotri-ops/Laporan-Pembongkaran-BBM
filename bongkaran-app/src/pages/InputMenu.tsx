@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
+import { Beaker, ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
@@ -8,6 +8,8 @@ import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
+import { takarStatus } from '@/lib/takar'
+import { todayIso } from '@/lib/date'
 import { shiftLabel } from '@/lib/shift'
 import { cn } from '@/lib/utils'
 
@@ -33,6 +35,8 @@ export function InputMenu() {
     stok.key.tanggal,
   ).filter((k) => !k.bulanIni).length
 
+  const takarHariIni = app.daily.filter((d) => d.kind === 'takar' && d.tanggal === todayIso())
+  const takarLewat = takarHariIni.filter((d) => d.kind === 'takar' && takarStatus(d.data.hasilMl) === 'lewat').length
   const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
 
   const menus: MenuItem[] = [
@@ -59,6 +63,14 @@ export function InputMenu() {
       desc: 'Density, suhu, dan tera bejana 20 L',
       status: diuji ? `${shiftNama} sudah diuji` : `${shiftNama} belum diuji`,
       badge: diuji ? 0 : 1,
+    },
+    {
+      to: '/takaran',
+      icon: Beaker,
+      title: 'Uji Takaran',
+      desc: 'Bejana 20 L per nozzle, opsi Preset & Manual',
+      status: takarLewat ? `${takarLewat} hasil melebihi toleransi` : takarHariIni.length ? `${takarHariIni.length} hasil hari ini` : 'Belum ada uji hari ini',
+      badge: takarLewat,
     },
     {
       to: '/sample',

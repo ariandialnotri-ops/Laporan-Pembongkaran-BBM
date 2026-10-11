@@ -1,6 +1,7 @@
-import { ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, ShieldAlert, Truck } from 'lucide-react'
+import { Beaker, ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, ShieldAlert, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
+import { takarStatus } from '@/lib/takar'
 import { useApp } from '@/lib/app-state'
 import { hasilCek } from '@/lib/apar'
 import { bejanaStatus, type AparRecord, type QqRecord } from '@/lib/daily'
@@ -31,6 +32,8 @@ export function LaporanMenu() {
   const temuanApar = aparTerakhir ? aparTerakhir.data.units.filter((u) => hasilCek(u).temuan.length).length : 0
 
   const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
+  const takarBulan = app.daily.filter((d) => d.kind === 'takar' && d.tanggal >= bulan)
+  const takarLewat = takarBulan.filter((d) => d.kind === 'takar' && takarStatus(d.data.hasilMl) === 'lewat').length
 
   const menus: MenuItem[] = [
     { to: '/laporan/persediaan', icon: FileSpreadsheet, title: 'Catatan Persediaan BBM', desc: 'Per produk, satu baris per shift', status: 'Unduh Excel atau PDF' },
@@ -60,6 +63,14 @@ export function LaporanMenu() {
       desc: 'APAR, APAR cadangan, dan APAB',
       status: !aparTerakhir ? 'Belum ada inspeksi' : temuanApar ? `${temuanApar} unit ada temuan` : `Terakhir ${aparTerakhir.tanggal.slice(8)}/${aparTerakhir.tanggal.slice(5, 7)}, semua baik`,
       badge: temuanApar,
+    },
+    {
+      to: '/laporan/takaran',
+      icon: Beaker,
+      title: 'Riwayat Uji Takaran',
+      desc: 'Bejana 20 L per nozzle, Preset & Manual, foto bercap waktu',
+      status: takarLewat ? `${takarLewat} hasil melebihi toleransi bulan ini` : `${takarBulan.length} hasil bulan ini`,
+      badge: takarLewat,
     },
     {
       to: '/laporan/insiden',

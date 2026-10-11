@@ -26,6 +26,8 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/plan/so/', title: 'Edit SO & LO', parent: '/plan' },
   { href: '/kualitas', title: 'Kualitas Harian', parent: '/input' },
   { href: '/sample', title: 'Uji Pasca Penerimaan', parent: '/input' },
+  { href: '/takaran', title: 'Uji Takaran', parent: '/input' },
+  { href: '/laporan/takaran', title: 'Riwayat Uji Takaran', parent: '/laporan' },
   { href: '/stok', title: 'Stok Awal Shift', parent: '/input' },
   { href: '/apar', title: 'APAR & APAB', parent: '/input' },
   { href: '/apar/inspeksi', title: 'Inspeksi APAR & APAB', parent: '/apar' },
