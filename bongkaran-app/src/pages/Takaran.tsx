@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, CircleCheck, History, LoaderCircle, Beaker, Send, Trash2, TriangleAlert, X } from 'lucide-react'
+import { Beaker, Camera, CircleCheck, FileDown, FileText, History, LoaderCircle, Send, Trash2, TriangleAlert, X } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -483,7 +483,8 @@ export function RiwayatTakaran() {
           ]}
         />
       </GlassCard>
-      <div className="animate-entrance-2">
+      <CetakBaTakar semua={semua} />
+      <div className="animate-entrance-3">
         <RecordTable
           title="Uji takaran 20 L"
           rows={rows}
@@ -497,5 +498,77 @@ export function RiwayatTakaran() {
       </div>
       <DetailTakar r={detail} onClose={() => setDetail(null)} />
     </div>
+  )
+}
+
+/**
+ * Cetak PDF Berita Acara Uji Takar untuk satu tanggal uji: BA saja, atau BA + lampiran foto
+ * (dudukan bejana & water pass, hasil pengukuran) per hasil.
+ */
+function CetakBaTakar({ semua }: { semua: TakarRecord[] }) {
+  const app = useApp()
+  const toast = useToast()
+  const tanggalAda = [...new Set(semua.map((r) => r.tanggal))].sort().reverse()
+  const [tanggal, setTanggal] = useState(() => tanggalAda[0] ?? todayIso())
+  const [busy, setBusy] = useState<'ba' | 'lampiran' | null>(null)
+  const records = semua.filter((r) => r.tanggal === tanggal)
+  const lewat = records.filter((r) => takarStatus(r.data.hasilMl) === 'lewat').length
+
+  const cetak = async (lampiran: boolean) => {
+    setBusy(lampiran ? 'lampiran' : 'ba')
+    try {
+      const { exportBaTakarPdf } = await import('@/lib/report/ba-takar')
+      const fotoData: Record<string, string> = {}
+      if (lampiran) {
+        const fotos = records.flatMap((r) => [...r.data.foto.dudukan, ...r.data.foto.hasil])
+        await Promise.all(fotos.map(async (p) => (fotoData[p.id] = await app.backend.photoDataUrl(p).catch(() => ''))))
+      }
+      const kode = app.settings.kodeSpbu?.trim() || 'SPBU'
+      await exportBaTakarPdf({ tanggal, records, settings: app.settings, fotoData }, lampiran, `BA_Uji_Takar_SPBU_${kode}_${tanggal}${lampiran ? '_Lampiran' : ''}.pdf`)
+      toast(lampiran ? 'BA + lampiran foto diunduh' : 'Berita Acara diunduh')
+    } catch (e) {
+      toast(`Gagal membuat PDF: ${pesan(e)}`, TriangleAlert)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
+      <div className="flex items-start gap-space-sm">
+        <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary-fixed text-primary">
+          <FileText className="size-5" />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <span className="text-body-md font-bold text-on-surface">Berita Acara Uji Takar</span>
+          <span className="text-body-sm text-on-surface-variant">PDF per tanggal uji: info SPBU, hasil per nozzle, ringkasan, tanda tangan petugas & pengawas.</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-[1fr_auto] items-end gap-space-sm">
+        <Field label="Tanggal uji" htmlFor="ba-takar-tgl">
+          <Input id="ba-takar-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
+        </Field>
+        <span role="status" className="pb-3 text-body-sm text-on-surface-variant">
+          {records.length ? (
+            <>
+              <b className="text-on-surface">{records.length} hasil</b>
+              {lewat ? <span className="text-error">, {lewat} lewat</span> : null}
+            </>
+          ) : (
+            'Tidak ada hasil'
+          )}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-space-xs sm:grid-cols-2">
+        <Button variant="glass" disabled={!records.length || busy !== null} onClick={() => void cetak(false)}>
+          {busy === 'ba' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileDown aria-hidden="true" />}
+          BA saja (PDF)
+        </Button>
+        <Button disabled={!records.length || busy !== null} onClick={() => void cetak(true)}>
+          {busy === 'lampiran' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileDown aria-hidden="true" />}
+          {busy === 'lampiran' ? 'Menyiapkan foto…' : 'BA + Lampiran foto (PDF)'}
+        </Button>
+      </div>
+    </GlassCard>
   )
 }

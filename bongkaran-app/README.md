@@ -140,6 +140,14 @@ opsi pindah ke yang belum diuji. Daftar "Hasil uji hari ini" bernomor (mis. "1. 
 Pertalite, Preset = -40 ml"). Keluar dengan isian/foto belum terkirim meminta konfirmasi.
 Riwayat di **Laporan > Riwayat Uji Takaran** (`/laporan/takaran`): filter tanggal, saring
 melebihi toleransi / sesuai, pop up detail + foto, hapus (pengawas/ABH atau pengirim di hari yang sama).
+Di halaman yang sama ada **Berita Acara Uji Takar** per tanggal uji (`src/lib/report/ba-takar.ts`,
+jsPDF): **BA saja (PDF)** atau **BA + Lampiran foto (PDF)**. Isi BA: judul "Berita Acara Uji Takar
+- Tera Bejana Ukur 20 L", nama SPBU, Informasi SPBU & Uji Takar (nomor & nama SPBU, alamat,
+No. Berita Acara `UT/<kode>/<xxxx>`, tanggal uji & laporan, petugas, jam uji), tabel Hasil Uji Takar
+per Nozzle (nozzle, produk, mode P/M, hasil tera ml, Qty Var % = hasil/20.000 ml, Sesuai / Tidak
+Sesuai), ringkasan nozzle diperiksa & di bawah toleransi, tanda tangan Petugas Uji dan Manajer /
+Pengawas SPBU, kaki halaman "FLOQ · No. BA", kode verifikasi, nomor halaman. Lampiran: dua hasil per
+halaman, foto dudukan bejana & water pass dan hasil pengukuran (bercap waktu).
 
 ## Multi SPBU
 
