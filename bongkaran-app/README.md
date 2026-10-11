@@ -47,7 +47,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
 | | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), volume permintaan dipecah otomatis **tiap 8.000 L = 1 LO** (maks. 8.000 L per LO). Ketuk baris untuk membuka halaman **Edit SO & LO** (nomor segel tidak diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
 | | `/plan/so/:id` | Edit SO & LO satu permintaan dalam bentuk tabel: Nomor SO, lalu per LO produk, volume (maks. 8.000 L), shift, nomor LO, status, alih supply; LO Closed terkunci. Simpan otomatis kembali ke Tracking LO asal (Plan Pengiriman atau Riwayat Tracking LO) |
-| | `/kualitas` | Kualitas Harian: density & suhu per produk, tera bejana 20 L per nozzle; tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
+| | `/kualitas` | Kualitas Harian: density & suhu per produk (tera bejana 20 L pindah ke Uji Takaran); tiap baris disimpan sendiri, foto struk & pengembalian minyak wajib di akhir uji |
 | | `/sample` | Uji Kualitas Pasca Penerimaan: uji density tangki pendam setelah bongkar selesai, jam uji diatur petugas, wajib untuk setiap penerimaan; dibanding D15 depot |
 | | `/apar` | Dashboard APAR & APAB: kondisi baik/temuan, belum diperiksa bulan ini, isi ulang lewat/≤30 hari, **uji instansi (12 bulan) lewat/≤30 hari/belum dicatat**, per area, daftar unit; tombol Inspeksi unit, Pindai QR (lihat data unit), Label QR & Data utama (ABH) |
 | | `/apar/inspeksi` | Inspeksi **per unit di lokasi**: tombol Pindai QR unit, atau ketik kode bila label rusak; progres bulan ini (belum/sudah per unit). Tidak ada inspeksi massal |
@@ -62,7 +62,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/bongkaran` | Riwayat Pembongkaran MT: produk, tanggal penerimaan, SO, LO, nopol & supir, volume, transport loss, discharge loss (L, %), SLA (request MS2 / gate out sampai selesai bongkar), keterangan, progress |
 | | `/laporan/lo` | Riwayat Tracking LO: tanggal permintaan kirim, SO, LO, produk, volume, supply point, nopol MT, status; ketuk baris untuk ubah lewat pop up (LO Closed terkunci) |
 | | `/laporan/kualitas` | Riwayat Kualitas Harian: uji harian dan uji pasca penerimaan; baris yang baru dikirim disorot biru. Ketuk baris → `/laporan/kualitas/:kunci` (highlight data: D15 besar, selisih vs acuan, status, density, suhu, petugas, foto; info bongkaran kecil) |
-| | `/laporan/tera` | Riwayat Tera: bejana 20 L per nozzle, batas -60 ml |
+| | `/laporan/takaran` | Riwayat Uji Takaran + cetak BA (alamat lama `/laporan/tera` dialihkan ke sini) |
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
 | | `/insiden/baru` | **Lapor Insiden / Near miss / Kerusakan** (semua peran): jenis, kategori, tanggal & jam, lokasi, peralatan, uraian, dampak (wajib untuk insiden), penyebab, tindakan, tingkat risiko, foto (wajib untuk insiden & kerusakan), pelapor; kirim lalu ke riwayat |
 | | `/laporan/insiden` | Riwayat insiden: filter tanggal/jenis/status, baris terbuka oranye, baru biru; `/laporan/insiden/:id` detail + tindak lanjut (status, PIC, target, catatan) oleh ABH/Pengawas/Kashift |
@@ -129,6 +129,12 @@ Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO
 (`table53.json`, `tankTables.json`).
 
 ## Uji Takaran (bejana 20 L)
+
+Tera takaran tidak lagi diisi di Kualitas Harian (form itu kini hanya density & suhu, dengan
+tautan ke Uji Takaran). **Dashboard** punya kartu **Uji Takaran**: hasil hari ini (dan yang lewat
+toleransi), lewat toleransi bulan ini, nozzle diuji bulan ini x/total, uji terakhir, serta hasil
+terakhir per nozzle untuk P dan M (merah bila lewat). Detail tanggal di kalender Dashboard dan
+penanda anomali kalender juga memakai data Uji Takaran.
 
 Menu tersendiri di **Input > Uji Takaran** (`/takaran`, kepala shift, pengawas, ABH):
 nomor nozzle & produk diketik manual (ada saran dari data nozzle), pilih opsi **P (Preset)** atau

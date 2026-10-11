@@ -42,7 +42,6 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/laporan/lo', title: 'Riwayat Tracking LO', parent: '/laporan' },
   { href: '/laporan/kualitas', title: 'Riwayat Kualitas Harian', parent: '/laporan' },
   { href: '/laporan/kualitas/', title: 'Detail Uji Kualitas', parent: '/laporan/kualitas' },
-  { href: '/laporan/tera', title: 'Riwayat Tera', parent: '/laporan' },
   { href: '/laporan/apar', title: 'Riwayat Inspeksi APAR', parent: '/laporan' },
   { href: '/insiden/baru', title: 'Lapor Insiden & Near miss', parent: '/input' },
   { href: '/laporan/insiden', title: 'Riwayat Insiden & Near miss', parent: '/laporan' },

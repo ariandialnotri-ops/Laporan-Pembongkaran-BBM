@@ -60,7 +60,7 @@ export function InputMenu() {
       to: '/kualitas',
       icon: FlaskConical,
       title: 'Kualitas Harian',
-      desc: 'Density, suhu, dan tera bejana 20 L',
+      desc: 'Density & suhu per produk',
       status: diuji ? `${shiftNama} sudah diuji` : `${shiftNama} belum diuji`,
       badge: diuji ? 0 : 1,
     },

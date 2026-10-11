@@ -1,10 +1,10 @@
-import { Beaker, ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, Ruler, ShieldAlert, Truck } from 'lucide-react'
+import { Beaker, ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, ShieldAlert, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { takarStatus } from '@/lib/takar'
 import { useApp } from '@/lib/app-state'
 import { hasilCek } from '@/lib/apar'
-import { bejanaStatus, type AparRecord, type QqRecord } from '@/lib/daily'
+import type { AparRecord, QqRecord } from '@/lib/daily'
 import { addDays, todayIso } from '@/lib/date'
 import { loStatus } from '@/lib/plan'
 
@@ -20,13 +20,6 @@ export function LaporanMenu() {
   const loAktif = app.plans.flatMap((p) => p.los).filter((lo) => !['closed', 'deleted'].includes(loStatus(lo, app.usedLoIds))).length
   const qq = app.daily.filter((d): d is QqRecord => d.kind === 'qq' && d.tanggal >= pekan)
   const ujiKualitas = qq.reduce((n, r) => n + r.data.kualitas.length, 0)
-  // Hasil tera terakhir per nozzle yang di bawah batas.
-  const terakhir = new Map<string, string>()
-  app.daily
-    .filter((d): d is QqRecord => d.kind === 'qq')
-    .sort((a, b) => (a.tanggal + a.shift).localeCompare(b.tanggal + b.shift))
-    .forEach((r) => r.data.kuantitas.forEach((n) => n.selisihMl.trim() && terakhir.set(n.nozzleId || n.nozzle, n.selisihMl)))
-  const lewat = [...terakhir.values()].filter((v) => bejanaStatus(v) === 'lewat').length
   // Temuan pada inspeksi APAR & APAB terakhir.
   const aparTerakhir = app.daily.filter((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
   const temuanApar = aparTerakhir ? aparTerakhir.data.units.filter((u) => hasilCek(u).temuan.length).length : 0
@@ -48,14 +41,6 @@ export function LaporanMenu() {
     { to: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status', status: `${app.reports.filter((r) => r.tanggal >= bulan).length} bongkaran bulan ini` },
     { to: '/laporan/lo', icon: ClipboardList, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed', status: `${loAktif} LO aktif` },
     { to: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan', status: `${ujiKualitas} uji 7 hari terakhir` },
-    {
-      to: '/laporan/tera',
-      icon: Ruler,
-      title: 'Riwayat Tera',
-      desc: 'Bejana 20 L per nozzle',
-      status: lewat ? `${lewat} nozzle di bawah batas` : 'Semua nozzle dalam batas',
-      badge: lewat,
-    },
     {
       to: '/laporan/apar',
       icon: FireExtinguisher,

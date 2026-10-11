@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  Beaker,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -30,11 +31,12 @@ import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
 import { berlakuSertifikat, statusSertifikat } from '@/lib/berlaku'
-import { bejanaStatus, qqD15, type AparRecord, type QqKualitas, type QqRecord } from '@/lib/daily'
+import { qqD15, type AparRecord, type QqKualitas, type QqRecord, type TakarRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
 import { produkMeta } from '@/lib/produk'
+import { formatMl, opsiLabel, takarStatus } from '@/lib/takar'
 import { acuanD15, detailTanggal, kalenderMinggu, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
 import { currentShift, shiftLabel } from '@/lib/shift'
 import { formatDurasi, rataRata, slaOf } from '@/lib/sla'
@@ -438,6 +440,9 @@ export function Dashboard() {
         <KalengSample />
       </div>
 
+      {/* Uji takaran bejana 20 L */}
+      <KartuTakaran hariIni={hariIni} />
+
       {/* 7. Status alur LO */}
       <Kartu
         id="lo-tracking"
@@ -616,11 +621,109 @@ function Legend({ className, label }: { className: string; label: string }) {
 }
 
 /** Detail satu tanggal: penerimaan, kualitas, kuantitas, dan stok shift. */
+/**
+ * Dashboard > Uji Takaran: ringkasan uji bejana 20 L (hari ini, bulan ini) dan hasil terakhir
+ * tiap nozzle untuk opsi Preset & Manual. Data dari modul Input > Uji Takaran.
+ */
+function KartuTakaran({ hariIni }: { hariIni: string }) {
+  const app = useApp()
+  const semua = app.daily.filter((x): x is TakarRecord => x.kind === 'takar').sort((a, b) => a.createdAt - b.createdAt)
+  const bulan = hariIni.slice(0, 7)
+  const hari = semua.filter((r) => r.tanggal === hariIni)
+  const diBulan = semua.filter((r) => r.tanggal.startsWith(bulan))
+  const lewatBulan = diBulan.filter((r) => takarStatus(r.data.hasilMl) === 'lewat').length
+  const lewatHari = hari.filter((r) => takarStatus(r.data.hasilMl) === 'lewat').length
+  const kunci = (n: string) => n.trim().toUpperCase()
+  const nozzleBulan = new Set(diBulan.map((r) => kunci(r.data.nozzle)))
+  const totalNozzle = Math.max((app.settings.nozzles ?? []).length, nozzleBulan.size)
+  const terakhir = semua[semua.length - 1]
+  // Hasil terakhir tiap nozzle per opsi.
+  const perNozzle = new Map<string, { nozzle: string; produk: string; P?: TakarRecord; M?: TakarRecord }>()
+  for (const r of semua) {
+    const k = kunci(r.data.nozzle)
+    const cur = perNozzle.get(k) ?? { nozzle: r.data.nozzle, produk: r.data.produk }
+    perNozzle.set(k, { ...cur, produk: r.data.produk, [r.data.opsi]: r })
+  }
+  const nozzles = [...perNozzle.values()].sort((a, b) => a.nozzle.localeCompare(b.nozzle, 'id', { numeric: true }))
+  const nilai = (r?: TakarRecord) =>
+    r ? <span className={cn('tabular font-bold', takarStatus(r.data.hasilMl) === 'lewat' ? 'text-error' : 'text-on-surface')}>{formatMl(r.data.hasilMl)}</span> : <span className="text-outline">-</span>
+  return (
+    <Kartu
+      id="uji-takaran"
+      icon={Beaker}
+      title="Uji Takaran"
+      sub="Bejana ukur 20 L, batas -60 ml"
+      className="animate-entrance-5"
+      action={
+        <Link to={app.can('/laporan/takaran') ? '/laporan/takaran' : '/takaran'} className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+          Riwayat <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      }
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className={cn('flex flex-col rounded-md p-2.5', hari.length ? 'bg-emerald-50' : 'bg-amber-50')}>
+          <span className={cn('text-[10px] font-bold uppercase', hari.length ? 'text-emerald-700' : 'text-amber-700')}>Hari ini</span>
+          <span className={cn('tabular text-numeric-lg font-bold', hari.length ? 'text-emerald-700' : 'text-amber-700')}>{hari.length}</span>
+          <span className={cn('text-[10px]', lewatHari ? 'font-semibold text-error' : hari.length ? 'text-emerald-700' : 'text-amber-700')}>{lewatHari ? `${lewatHari} lewat toleransi` : hari.length ? 'hasil uji' : 'belum ada uji'}</span>
+        </div>
+        <div className={cn('flex flex-col rounded-md p-2.5', lewatBulan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+          <span className={cn('text-[10px] font-bold uppercase', lewatBulan ? 'text-error' : 'text-on-surface-variant')}>Lewat toleransi</span>
+          <span className={cn('tabular text-numeric-lg font-bold', lewatBulan ? 'text-error' : 'text-on-surface')}>{lewatBulan}</span>
+          <span className="text-[10px] text-on-surface-variant">bulan ini</span>
+        </div>
+        <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
+          <span className="text-[10px] font-bold uppercase text-on-surface-variant">Nozzle diuji</span>
+          <span className="tabular text-numeric-lg font-bold text-on-surface">
+            {nozzleBulan.size}
+            <span className="text-body-sm font-semibold text-outline">/{totalNozzle}</span>
+          </span>
+          <span className="text-[10px] text-on-surface-variant">bulan ini</span>
+        </div>
+        <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
+          <span className="text-[10px] font-bold uppercase text-on-surface-variant">Uji terakhir</span>
+          <span className="tabular truncate text-body-md font-bold text-on-surface">{terakhir ? formatTanggalIso(terakhir.tanggal) : '-'}</span>
+          <span className="truncate text-[10px] text-on-surface-variant">{terakhir ? `${terakhir.data.jam}, Nozzle ${terakhir.data.nozzle}` : 'belum ada'}</span>
+        </div>
+      </div>
+      {nozzles.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Hasil terakhir per nozzle</span>
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {nozzles.map((n) => {
+              const lewat = [n.P, n.M].some((r) => r && takarStatus(r.data.hasilMl) === 'lewat')
+              return (
+                <div key={n.nozzle} className={cn('flex items-center gap-2 rounded-md px-2.5 py-1.5 text-body-sm', lewat ? 'bg-error-container/50' : 'bg-surface-container-low')}>
+                  <span className="tabular w-16 shrink-0 font-bold text-on-surface">Nozzle {n.nozzle}</span>
+                  <span className="min-w-0 flex-1 truncate text-on-surface-variant">{n.produk}</span>
+                  <span className="text-[10px] font-bold text-outline">P</span>
+                  {nilai(n.P)}
+                  <span className="text-[10px] font-bold text-outline">M</span>
+                  {nilai(n.M)}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-container-low p-2.5 text-body-sm text-on-surface-variant">
+          Belum ada hasil uji takaran.
+          {app.can('/takaran') && (
+            <Link to="/takaran" className="font-bold text-primary">
+              Mulai uji takaran
+            </Link>
+          )}
+        </div>
+      )}
+    </Kartu>
+  )
+}
+
 function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void }) {
   const app = useApp()
   const d = iso ? detailTanggal(iso, app.reports, app.daily) : null
   const plans = iso ? app.plans.filter((p) => p.tanggal === iso) : []
   const diterima = d ? d.bongkaran.filter((r) => r.status !== 'draft').reduce((n, r) => n + (r.volumeDO ?? 0), 0) : 0
+  const takarHari = iso ? app.daily.filter((x): x is TakarRecord => x.kind === 'takar' && x.tanggal === iso).sort((a, b) => a.data.jam.localeCompare(b.data.jam)) : []
   return (
     <Sheet open={!!iso} onOpenChange={(o) => !o && onClose()} title={iso ? formatTanggalIso(iso) : ''} description="Plan pengiriman, penerimaan, kualitas, dan kuantitas pada tanggal ini.">
       {d && (
@@ -711,20 +814,18 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
 
           <section aria-label="Kuantitas" className="flex flex-col gap-space-xs">
             <h3 className="text-body-md font-bold text-on-surface">Kuantitas</h3>
-            {d.qq.every((q) => !q.data.kuantitas.length) && d.stok.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada uji bejana atau stok shift.</span>}
-            {d.qq.flatMap((q) =>
-              q.data.kuantitas.map((n) => {
-                const lewat = bejanaStatus(n.selisihMl) === 'lewat'
-                return (
-                  <div key={n.id} className="flex items-center justify-between gap-2 text-body-sm">
-                    <span className="text-on-surface">
-                      Shift {q.shift}, {n.nozzle} ({n.produk})
-                    </span>
-                    <span className={cn('tabular font-semibold', lewat ? 'text-error' : 'text-on-surface')}>{n.selisihMl || '-'} ml</span>
-                  </div>
-                )
-              }),
-            )}
+            {takarHari.length === 0 && d.stok.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada uji takaran atau stok shift.</span>}
+            {takarHari.map((r) => {
+              const lewat = takarStatus(r.data.hasilMl) === 'lewat'
+              return (
+                <div key={r.id} className="flex items-center justify-between gap-2 text-body-sm">
+                  <span className="text-on-surface">
+                    Uji takaran {r.data.jam}, Nozzle {r.data.nozzle} ({r.data.produk}) {opsiLabel(r.data.opsi)}
+                  </span>
+                  <span className={cn('tabular font-semibold', lewat ? 'text-error' : 'text-on-surface')}>{formatMl(r.data.hasilMl)}</span>
+                </div>
+              )
+            })}
             {d.stok.map((s) => (
               <div key={s.id} className="flex flex-col gap-1 text-body-sm">
                 <span className="text-on-surface">

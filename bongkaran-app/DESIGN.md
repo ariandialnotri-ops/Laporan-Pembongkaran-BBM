@@ -238,7 +238,7 @@ Peta halaman:
 | | Riwayat Pembongkaran MT | `/laporan/bongkaran` |
 | | Riwayat Tracking LO | `/laporan/lo` |
 | | Riwayat Kualitas Harian | `/laporan/kualitas` |
-| | Riwayat Tera | `/laporan/tera` |
+| | Riwayat Uji Takaran (+ BA PDF) | `/laporan/takaran` (`/laporan/tera` dialihkan) |
 | | Riwayat Inspeksi APAR | `/laporan/apar` |
 | Profil | Profil, Kalkulator, Pengaturan SPBU, Anggota | `/profil`, `/kalkulator`, `/pengaturan`, `/anggota` |
 | (tanpa dock) | Login | saat belum masuk |
@@ -381,7 +381,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
 - **Uji kualitas (density)**: kartu per produk: Produk, Density, Suhu, Pump test, tangga (density observasi, D15, acuan D15 bongkaran, selisih), baris status + **tombol Simpan per baris** ("Tersimpan jam" / "Belum disimpan"). Uji produk lain.
   - **Langkah terakhir**: PhotoSlot wajib *Foto struk pump test* & *Foto pengembalian minyak ke tangki*.
-- **Tera takaran (bejana 20 L)**: baris per nozzle: Selisih bejana (ml), Pump test (L), **Simpan per nozzle**, merah bila < −60 ml. Langkah terakhir: 2 foto yang sama.
+- **Tera takaran** tidak lagi di form ini: kartu tautan "Tera takaran bejana 20 L, sekarang di menu Input > Uji Takaran". Ladder pump test hanya uji kualitas.
 - Ringkasan pump test + tombol **Selesaikan uji** (ditolak bila ada baris belum disimpan / foto belum ada). Riwayat + DateFilter.
 
 ### 9.8 Uji Kualitas Pasca Penerimaan
@@ -425,7 +425,7 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 | **Riwayat Pembongkaran MT** | DateFilter, chip produk | **Produk, Tgl penerimaan, No SO, No LO, Nopol & supir**, Volume, Transport loss, Discharge loss (L & %), SLA (Req / Gate out), Keterangan (pill), Status, Progress tindakan |
 | **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → halaman **Edit SO & LO**, simpan kembali ke Riwayat Tracking LO |
 | **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Uji pasca penerimaan), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
-| **Riwayat Tera** | DateFilter, chip Semua / Di bawah batas | Tanggal, Shift, Nozzle, BBM, Selisih (ml), Pump test, Status |
+| **Riwayat Uji Takaran** | DateFilter, chip Semua / Melebihi toleransi / Sesuai, kartu Berita Acara Uji Takar | Tanggal, Nozzle, Produk, Opsi, Hasil, Petugas, Status |
 | **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → halaman unit (data & riwayat) |
 
 ### 9.12 Profil, Kalkulator, Pengaturan, Anggota
@@ -438,6 +438,7 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 
 
 ### 9.12b Uji Takaran (bejana 20 L)
+- **Dashboard > kartu Uji Takaran** (setelah Proteksi Kebakaran): ikon gelas ukur, sub "Bejana ukur 20 L, batas -60 ml", tautan Riwayat; 4 kotak: Hari ini (hijau / amber bila belum ada, teks merah bila ada yang lewat), Lewat toleransi bulan ini (merah bila > 0), Nozzle diuji x/total bulan ini, Uji terakhir (tanggal, jam, nozzle); daftar **Hasil terakhir per nozzle**: Nozzle n, produk, P nilai, M nilai (merah bila lewat; baris merah muda).
 - **Input > Uji Takaran** (`/takaran`): kartu kepala (ikon gelas ukur, "Uji takaran nozzle", toleransi -60 ml); Nomor nozzle & Produk (input teks + datalist); 2 tombol radio besar **P · Preset** / **M · Manual** (centang bila nozzle itu sudah diuji hari ini); Hasil (ml, sufiks ml); kotak status langsung "Nozzle 3 Pertalite, Preset = -40 ml" hijau (dalam toleransi) / merah (melebihi toleransi -60 ml). Kartu foto: **Dudukan bejana & water pass** dan **Hasil pengukuran**, masing-masing grid 3 kolom pratinjau + tombol "Ambil foto" (pill Belum / n foto); keterangan "Tanggal, jam, SPBU, nozzle, dan opsi tercetak otomatis pada foto"; Petugas, Catatan; tombol **Kirim hasil Nozzle n · Preset/Manual**. Daftar **Hasil uji hari ini (n)** bernomor, baris terbaru biru, melebihi toleransi oranye; ketuk → pop up detail (angka besar, pill, foto utuh, Hapus). Keluar saat ada isian → sheet "Keluar dari uji takaran?".
 - **Cap foto**: pita gelap di bawah foto; baris 1 kuning tebal "dd/mm/yyyy hh:mm:ss WIB", baris 2 "SPBU · Nozzle n Produk", baris 3 "Uji takaran 20 L · opsi · jenis foto".
 - **Berita Acara Uji Takar** (kartu di Riwayat Uji Takaran): ikon dokumen, keterangan, isian Tanggal uji + "n hasil, n lewat", tombol **BA saja (PDF)** (glass) dan **BA + Lampiran foto (PDF)** (utama). PDF A4: pita judul biru tua, nama SPBU, tabel info 4 kolom, tabel hasil per nozzle dengan kolom Tanggal & Jam (kepala biru, Sesuai hijau / Tidak Sesuai merah), catatan mode & batas tera, 2 kotak ringkasan, tanda tangan, kaki halaman abu.
@@ -537,7 +538,7 @@ Pertahankan struktur:
 - Menu Input: bar wajib Stok Awal Shift + 5 kartu (Input Bongkaran, Plan Pengiriman, Kualitas Harian,
   Uji Kualitas Pasca Penerimaan, APAR & APAB) dengan status hidup dan lencana merah bila perlu dikerjakan.
 - Menu Laporan: 7 kartu (Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO,
-  Riwayat Kualitas Harian, Riwayat Tera, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
+  Riwayat Kualitas Harian, Riwayat Uji Takaran, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
 - Form bongkaran 14 langkah dalam 3 fase (Bongkaran, Quality, Quantity) + Finish, setiap langkah ada foto wajib;
   buku tera: Tinggi T2, Kapasitas, Kepekaan (L/mm); tanda tangan lewat pop up dengan kotak panduan.
 - Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); halaman Edit SO & LO berbentuk tabel (Nomor SO lalu Nomor LO & status tiap LO, tanpa segel, maks. 8.000 L per LO), simpan kembali ke Tracking LO. Langkah 2 bongkaran: tombol "Ubah nomor LO / pindah station" pada LO terpilih (bottom sheet: nomor LO baru, centang pindah station + supply point baru); tersimpan ke Plan sehingga Tracking LO ikut berubah.

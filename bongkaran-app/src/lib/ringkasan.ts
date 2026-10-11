@@ -64,7 +64,10 @@ export function kalenderMinggu(rows: ReportSummary[], anchor: Date, daily: Daily
     const day = addDays(monday, i)
     const iso = todayIso(day)
     const onDay = rows.filter((r) => r.tanggal === iso)
-    const qqLewat = daily.some((d) => d.kind === 'qq' && d.tanggal === iso && d.data.kuantitas.some((n) => bejanaStatus(n.selisihMl) === 'lewat'))
+    // Tera bejana 20 L di bawah batas: uji takaran (dan data lama di Q&Q harian).
+    const qqLewat = daily.some(
+      (d) => d.tanggal === iso && ((d.kind === 'takar' && bejanaStatus(d.data.hasilMl) === 'lewat') || (d.kind === 'qq' && d.data.kuantitas.some((n) => bejanaStatus(n.selisihMl) === 'lewat'))),
+    )
     let status: CalendarDay['status'] = 'belum'
     if (onDay.some((r) => qqOf(r) === 'perhatian') || qqLewat) status = 'catatan'
     else if (onDay.some((r) => r.status === 'selesai') || daily.some((d) => d.kind === 'qq' && d.tanggal === iso)) status = 'sesuai'

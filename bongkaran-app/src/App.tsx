@@ -49,7 +49,6 @@ const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) 
 const KualitasDetail = lazy(() => import('@/pages/KualitasDetail').then((m) => ({ default: m.KualitasDetail })))
 const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
 const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
-const RiwayatTera = lazy(() => import('@/pages/RiwayatTera').then((m) => ({ default: m.RiwayatTera })))
 const Sample2Jam = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2Jam })))
 const UnitBisnis = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.UnitBisnis })))
 const SiapkanSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.SiapkanSpbu })))
@@ -123,7 +122,8 @@ function Gate() {
           <Route path="/laporan/lo" element={<RiwayatLo />} />
           <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
           <Route path="/laporan/kualitas/:kunci" element={<KualitasDetail />} />
-          <Route path="/laporan/tera" element={<RiwayatTera />} />
+          {/* Riwayat tera lama kini Riwayat Uji Takaran. */}
+          <Route path="/laporan/tera" element={<Navigate to="/laporan/takaran" replace />} />
           <Route path="/laporan/apar" element={<RiwayatApar />} />
           <Route path="/insiden/baru" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
