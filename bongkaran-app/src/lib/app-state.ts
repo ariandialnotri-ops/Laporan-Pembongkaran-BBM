@@ -38,7 +38,7 @@ export interface AppState {
   deleteTank: (id: string) => Promise<void>
   /** Identitas SPBU sudah diisi: nama, kode, jumlah pulau pompa. */
   identitasLengkap: boolean
-  /** Data SPBU & tangki lengkap; bila belum, pengawas wajib mengisinya dulu. */
+  /** Identitas SPBU lengkap; bila belum, pengawas wajib mengisinya dulu. Database tangki boleh menyusul. */
   spbuSiap: boolean
 
   loaded: boolean

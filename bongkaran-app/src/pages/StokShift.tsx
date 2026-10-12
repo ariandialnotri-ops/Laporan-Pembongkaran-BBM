@@ -4,6 +4,7 @@ import { CircleCheck, Save, TriangleAlert } from 'lucide-react'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
+import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -40,6 +41,8 @@ export function StokShift() {
   const [saving, setSaving] = useState(false)
 
   if (!app.loaded) return <Loading />
+  // Tanpa database tangki, stok awal (tinggi -> volume) belum bisa diisi.
+  if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" detail="Stok awal shift diisi per tangki (tinggi ATG/deepstick ke volume), jadi menunggu database tangki SPBU ini." />
 
   const id = stokRecordId(key.tanggal, key.shift)
   // Draf mengikuti shift terpilih; pindah shift memuat data shift itu.

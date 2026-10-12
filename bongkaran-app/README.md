@@ -166,10 +166,15 @@ Satu aplikasi untuk banyak SPBU, polanya sama dengan aplikasi Monitoring JBT:
   APAR bulan ini, insiden, jumlah pengawas/akun). Ketuk baris untuk membuka SPBU itu. Tombol
   **Tambah SPBU** membuat unit baru; akun pengawas/kashift/security dibuat di Anggota untuk SPBU aktif.
 - **Pengawas, kepala shift, security** terikat ke satu SPBU dan hanya melihat data SPBU itu.
-- **SPBU tanpa database wajib disiapkan dulu**: selama identitas (nama, kode, jumlah pulau pompa)
-  atau database tangki belum ada, pengawas & ABH diarahkan ke **Siapkan Data SPBU** (`/siapkan`):
-  1) Identitas SPBU, 2) Database tangki. Kepala shift & security melihat pesan "Data SPBU belum
-  lengkap" sampai pengawas selesai.
+- **SPBU tanpa identitas wajib disiapkan dulu**: selama identitas (nama, kode, jumlah pulau pompa)
+  belum ada, pengawas & ABH diarahkan ke **Siapkan Data SPBU** (`/siapkan`): 1) Identitas SPBU,
+  2) Database tangki (**boleh menyusul**). Kepala shift & security melihat pesan "Data SPBU belum
+  lengkap" sampai identitas diisi.
+- **Tanpa database tangki** semua modul tetap jalan (kualitas harian, uji takaran, APAR, insiden,
+  plan, bongkaran). Yang menunggu tabel kalibrasi: stok awal shift (tidak diwajibkan dulu),
+  pilihan tangki & hitung volume dari tinggi di form bongkaran, kalkulator volume. Kartu kuning
+  "Database tangki belum diisi" tampil di Dashboard, menu Input, Stok Awal, dan Input Bongkaran
+  (dengan tombol isi untuk pengawas/ABH).
 - **Database tangki** (`/pengaturan/tangki`): tiap tangki = produk, nomor, tanggal kalibrasi,
   tabel kalibrasi. Tabel ditempel dari Excel (blok kolom tinggi & volume, salin, tempel; beberapa
   pasang kolom berdampingan juga terbaca) atau file CSV, satuan tinggi mm atau cm. Pratinjau

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Beaker, ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
-import { useStokShift } from '@/components/bongkaran/stok-gate'
+import { TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
 import { kondisiSemua } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
@@ -101,7 +101,8 @@ export function InputMenu() {
   return (
     <div className="flex flex-col gap-space-md">
       {/* Kewajiban awal shift: bukan menu, tapi syarat sebelum input lain. */}
-      {app.can('/stok') && (
+      {app.can('/stok') && stok.tanpaTangki && <TangkiBelumAda className="animate-entrance-1" />}
+      {app.can('/stok') && !stok.tanpaTangki && (
         <Link
           to="/stok"
           className={cn(

@@ -7,7 +7,7 @@ import { minutesBetween, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { shiftKey, type Shift } from '@/lib/shift'
-import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
+import { getTank, TANKS, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
 import type { AparUnit } from '@/lib/apar'
 
 export interface Photo {
@@ -762,7 +762,8 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       }
       break
     case 'atg_before':
-      if (!d.tankId) issues.push('Pilih tangki pendam')
+      // SPBU tanpa database tangki: pilihan tangki belum ada, tahap tetap bisa diselesaikan.
+      if (!d.tankId && TANKS.length) issues.push('Pilih tangki pendam')
       if ([d.atgBefore.tinggi, d.atgBefore.volume, d.atgBefore.suhu].some((v) => num(v) === null)) {
         issues.push('Isi ketinggian, volume, dan suhu pembacaan ATG')
       }

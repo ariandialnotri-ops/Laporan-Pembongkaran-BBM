@@ -393,7 +393,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveTank,
       deleteTank,
       identitasLengkap,
-      spbuSiap: identitasLengkap && tanks.length > 0,
+      // Tangki boleh menyusul: modul lain tetap jalan, hitung volume menunggu database tangki.
+      spbuSiap: identitasLengkap,
       loaded,
       settings,
       rules,

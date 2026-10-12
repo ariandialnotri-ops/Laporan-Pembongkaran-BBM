@@ -175,7 +175,14 @@ export function StepContent(props: StepProps) {
         <>
           {step.id === 'atg_after' && <SettleTimer d={d} setData={setData} rules={rules} />}
           <StepPhotos {...props} />
-          {step.id === 'atg_before' && (
+          {step.id === 'atg_before' && TANKS.length === 0 && (
+            <Section>
+              <span className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">
+                Database tangki SPBU ini belum diisi: pilihan tangki dan hitung volume dari tinggi deepstick belum tersedia. Isi data ATG seperti biasa.
+              </span>
+            </Section>
+          )}
+          {step.id === 'atg_before' && TANKS.length > 0 && (
             <Section>
               <Field label="Tangki pendam" htmlFor="tangki">
                 <Select value={d.tankId} onValueChange={(v) => setData({ tankId: v })}>

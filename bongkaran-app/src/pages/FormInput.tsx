@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ChevronRight, ClipboardList, LoaderCircle, Truck, TriangleAlert } from 'lucide-react'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
+import { StokGate, TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -55,6 +55,7 @@ export function FormInput() {
           {app.backend.mode === 'local' && <Pill>Mode lokal</Pill>}
         </div>
         <StokGate />
+        <TangkiBelumAda detail="Bongkaran tetap bisa dicatat; volume dari tinggi deepstick/ATG belum dihitung otomatis sampai tabel kalibrasi tangki diisi." />
         <Button size="lg" className="w-full" disabled={busy || stok.missing} onClick={mulai}>
           {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Truck aria-hidden="true" />}
           Mulai bongkaran baru

@@ -284,7 +284,7 @@ export function SiapkanSpbu() {
   const s = app.settings
   const langkah = [
     { no: 1, judul: 'Identitas SPBU', selesai: app.identitasLengkap },
-    { no: 2, judul: 'Database tangki', selesai: app.tanks.length > 0 },
+    { no: 2, judul: app.tanks.length ? 'Database tangki' : 'Tangki (boleh menyusul)', selesai: app.tanks.length > 0 },
   ]
   return (
     <div className="flex flex-col gap-space-md">
@@ -297,7 +297,7 @@ export function SiapkanSpbu() {
             <span className="text-tag uppercase text-primary">{app.spbu?.nama || 'SPBU baru'}</span>
             <span className="text-headline-md font-bold text-on-surface">Lengkapi data SPBU dulu</span>
             <span className="text-body-sm text-on-surface-variant">
-              SPBU ini belum punya database. Isi identitas SPBU dan database tangki (tabel kalibrasi) sebelum memakai modul lain. Cukup sekali; data bisa diubah lagi kapan saja.
+              SPBU ini belum punya database. Isi identitas SPBU sebelum memakai modul lain. Database tangki (tabel kalibrasi) boleh menyusul: tanpa tangki, stok awal shift dan hitung volume dari tinggi belum tersedia.
             </span>
           </div>
         </div>
@@ -342,13 +342,13 @@ export function SiapkanSpbu() {
       </section>
 
       <section aria-labelledby="siap-tangki" className="animate-entrance-3 flex flex-col gap-space-sm">
-        <SectionHeader id="siap-tangki" title={`2. Database tangki (${app.tanks.length})`} />
+        <SectionHeader id="siap-tangki" title={`2. Database tangki (${app.tanks.length}), boleh menyusul`} />
         <DaftarTangki kembali="/siapkan" />
       </section>
 
       <Button size="lg" disabled={!app.spbuSiap} onClick={() => navigate('/')}>
         <CircleCheck aria-hidden="true" />
-        {app.spbuSiap ? 'Data lengkap, mulai pakai FLOQ' : 'Lengkapi kedua langkah di atas'}
+        {!app.spbuSiap ? 'Lengkapi identitas SPBU di atas' : app.tanks.length ? 'Data lengkap, mulai pakai FLOQ' : 'Mulai pakai FLOQ, tangki diisi nanti'}
       </Button>
     </div>
   )
@@ -364,7 +364,7 @@ export function SpbuBelumSiap() {
       </span>
       <span className="text-body-md font-bold text-on-surface">Data {app.spbu?.nama || 'SPBU'} belum lengkap</span>
       <span className="text-body-sm text-on-surface-variant">
-        Pengawas SPBU perlu mengisi identitas SPBU dan database tangki terlebih dahulu. Setelah itu modul untuk peran {roleLabel(app.role)} dapat dipakai.
+        Pengawas SPBU perlu mengisi identitas SPBU terlebih dahulu. Setelah itu modul untuk peran {roleLabel(app.role)} dapat dipakai.
       </span>
       <Button variant="glass" size="pill" onClick={() => window.location.reload()}>
         <RefreshCw aria-hidden="true" />
