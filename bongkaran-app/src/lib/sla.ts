@@ -1,7 +1,6 @@
 /**
- * SLA pengiriman: lama dari permintaan MS2 sampai bongkar selesai, dari gate out depot
- * sampai bongkar selesai, dan waktu kirim (gate out depot sampai MT tiba di SPBU).
- * Dalam menit; null bila data belum lengkap.
+ * SLA pengiriman: waktu kirim (permintaan MS2 sampai bongkar selesai) dan waktu tempuh
+ * (gate out depot sampai bongkar selesai). Dalam menit; null bila data belum lengkap.
  */
 import type { Plan, ReportSummary } from '@/lib/sop'
 
@@ -26,7 +25,6 @@ export function slaOf(r: ReportSummary, plans: Plan[]) {
   return {
     permintaan: menit(waktu(plan?.ms2Tanggal, plan?.ms2Jam), selesai),
     perjalanan: menit(waktu(r.tanggalKeluar, r.jamKeluar), selesai),
-    kirim: menit(waktu(r.tanggalKeluar, r.jamKeluar), waktu(r.tanggal, r.jam)),
   }
 }
 

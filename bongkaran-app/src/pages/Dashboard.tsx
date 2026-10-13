@@ -118,8 +118,8 @@ export function Dashboard() {
     discharge: sum(periode, (r) => r.gainLoss),
   }
   const sla = periode.map((r) => slaOf(r, app.plans))
-  const waktuKirim = sla.map((x) => x.kirim).filter((m): m is number => m !== null)
-  const rataKirim = rataRata(waktuKirim)
+  const waktuKirim = sla.map((x) => x.permintaan).filter((m): m is number => m !== null)
+  const waktuTempuh = sla.map((x) => x.perjalanan).filter((m): m is number => m !== null)
 
   // Rencana vs realisasi hari ini per produk: volume plan vs yang sudah dibongkar.
   const losHariIni = app.plans.filter((pl) => pl.tanggal === hariIni).flatMap((pl) => pl.los.filter((lo) => loStatus(lo, app.usedLoIds) !== 'deleted'))
@@ -306,12 +306,20 @@ export function Dashboard() {
           )}
         </div>
 
-        <SlaTile
-          icon={Timer}
-          label="Rata-rata waktu kirim"
-          value={formatDurasi(rataKirim)}
-          keterangan={waktuKirim.length ? `Gate out depot → tiba di SPBU · ${waktuKirim.length} MT` : 'Gate out depot → tiba di SPBU · belum ada data jam keluar depot'}
-        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <SlaTile
+            icon={Timer}
+            label="Rata-rata waktu kirim"
+            value={formatDurasi(rataRata(waktuKirim))}
+            keterangan={waktuKirim.length ? `Pemesanan (MS2) → selesai bongkar · ${waktuKirim.length} MT` : 'Pemesanan (MS2) → selesai bongkar · belum ada data'}
+          />
+          <SlaTile
+            icon={Gauge}
+            label="Rata-rata waktu tempuh"
+            value={formatDurasi(rataRata(waktuTempuh))}
+            keterangan={waktuTempuh.length ? `Gate out depot → selesai bongkar · ${waktuTempuh.length} MT` : 'Gate out depot → selesai bongkar · belum ada data'}
+          />
+        </div>
       </Kartu>
 
       {/* 4. Rencana vs realisasi */}
@@ -610,7 +618,7 @@ function SlaTile({ icon: Icon, label, value, keterangan }: { icon: typeof Timer;
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[10px] font-semibold uppercase leading-tight text-outline">{label}</span>
         <span className="tabular text-numeric-md font-bold text-on-surface">{value}</span>
-        <span className="truncate text-[11px] text-on-surface-variant">{keterangan}</span>
+        <span className="text-[11px] leading-tight text-on-surface-variant">{keterangan}</span>
       </span>
     </div>
   )
