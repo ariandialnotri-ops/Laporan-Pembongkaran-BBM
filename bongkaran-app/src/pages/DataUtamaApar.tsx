@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
-import { berlakuInstansi, DEFAULT_AREAS, kodeBerikut, lokasiOptions, namaPulau, statusInstansi, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { berlakuInstansi, DEFAULT_AREAS, jenisLengkap, kodeBerikut, lokasiOptions, namaPulau, statusInstansi, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { cn } from '@/lib/utils'
@@ -24,7 +24,7 @@ type Saring = 'semua' | 'apar' | 'cadangan' | 'apab'
 const COLS: Col<Row>[] = [
   { header: 'Kode', cell: (x) => <span className="tabular font-semibold">{x.u.kode || '-'}</span>, mobileCell: (x) => `${x.u.kode || '-'} (${tipeLabel(x.tipe, x.u.cadangan)})`, mobile: 'title' },
   { header: 'Tipe', cell: (x) => tipeLabel(x.tipe, x.u.cadangan), mobile: 'hide' },
-  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${x.u.jenis}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'sub' },
+  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${jenisLengkap(x.u)}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'sub' },
   { header: 'Lokasi', cell: (x) => x.u.lokasi || <span className="italic text-on-surface-variant">belum diatur</span>, mobile: 'sub' },
   {
     header: 'Isi ulang',

@@ -10,7 +10,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
-import { APAR_JENIS, berlakuInstansi, DEFAULT_AREAS, kodeBerikut, MASA_INSTANSI_BULAN, lokasiOptions, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { APAR_JENIS, berlakuInstansi, DEFAULT_AREAS, isDcp, kodeBerikut, MASA_INSTANSI_BULAN, lokasiOptions, SISTEM_DCP, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
@@ -25,6 +25,13 @@ export function AparUnitForm() {
   const app = useApp()
   const { id = 'baru' } = useParams()
   if (!app.loaded) return <Loading />
+  // Ubah & hapus data unit APAR/APAB hanya ABH dan pengawas.
+  if (!app.isAdmin && app.role !== 'pengawas')
+    return (
+      <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+        Data unit APAR/APAB hanya dapat ditambah, diubah, atau dihapus oleh ABH dan pengawas.
+      </GlassCard>
+    )
   const s = app.settings
   const ada = [...(s.apar ?? []).map((u) => ({ u, tipe: 'apar' as const })), ...(s.apab ?? []).map((u) => ({ u, tipe: 'apab' as const }))].find((x) => x.u.id === id)
   if (id !== 'baru' && !ada)
@@ -108,7 +115,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
             <Input id="unit-kap" numeric inputMode="decimal" suffix="kg" value={u.kapasitasKg} onChange={(e) => set({ kapasitasKg: e.target.value })} />
           </Field>
           <Field label="Jenis media" htmlFor="unit-jenis" className="col-span-2">
-            <Select value={u.jenis} onValueChange={(v) => set({ jenis: v })}>
+            <Select value={u.jenis} onValueChange={(v) => set({ jenis: v, sistem: isDcp(v) ? (u.sistem ?? 'ps') : undefined })}>
               <SelectTrigger id="unit-jenis">
                 <SelectValue />
               </SelectTrigger>
@@ -121,6 +128,11 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
               </SelectContent>
             </Select>
           </Field>
+          {isDcp(u.jenis) && (
+            <Field label="Sistem DCP" className="col-span-2" hint={u.sistem === 'cartridge' ? 'Inspeksi tanpa butir manometer; diganti pemeriksaan cartridge gas pendorong.' : 'Inspeksi memeriksa tekanan manometer di zona hijau.'}>
+              <Choice label="Sistem DCP" value={u.sistem ?? 'ps'} onChange={(v) => set({ sistem: v })} options={SISTEM_DCP.map((x) => ({ value: x.value, label: x.label }))} />
+            </Field>
+          )}
           <Field label={u.cadangan ? 'Tempat simpan' : 'Lokasi'} htmlFor="unit-lokasi" className="col-span-2">
             <Select value={u.lokasi || undefined} onValueChange={(v) => set({ lokasi: v })}>
               <SelectTrigger id="unit-lokasi">

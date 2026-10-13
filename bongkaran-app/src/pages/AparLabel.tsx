@@ -6,7 +6,7 @@ import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Loading } from '@/components/bongkaran/load-state'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
-import { aparUnitUrl, tipeLabel, type AparTipe, type AparUnit } from '@/lib/apar'
+import { aparUnitUrl, jenisLengkap, tipeLabel, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 
 type Saring = 'semua' | AparTipe
@@ -69,7 +69,7 @@ export function AparLabel() {
                   <span className="tabular break-words text-[22px] font-extrabold leading-none tracking-tight">{u.kode || '-'}</span>
                   <span className="w-fit rounded-sm border border-black px-1 text-[10px] font-bold uppercase leading-4">{tipeLabel(tipe, u.cadangan)}</span>
                   <span className="text-[11px] font-semibold leading-tight">
-                    {u.jenis}, {u.kapasitasKg || '-'} kg
+                    {jenisLengkap(u)}, {u.kapasitasKg || '-'} kg
                   </span>
                   <span className="break-words text-[11px] leading-tight">{u.lokasi || '-'}</span>
                 </div>

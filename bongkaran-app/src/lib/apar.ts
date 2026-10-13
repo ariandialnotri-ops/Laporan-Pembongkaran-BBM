@@ -23,9 +23,25 @@ export interface AparUnit {
   periksaInstansi?: string
   /** Nama instansi pemeriksa, mis. Disnaker atau Damkar. */
   instansi?: string
+  /** Khusus powder (DCP): Pressure System (ada manometer) atau Cartridge (tanpa manometer). */
+  sistem?: SistemDcp
 }
 
 export const APAR_JENIS = ['Powder (DCP)', 'CO2', 'Foam (AFFF)', 'Clean agent'] as const
+
+export type SistemDcp = 'ps' | 'cartridge'
+export const SISTEM_DCP: { value: SistemDcp; label: string; desc: string }[] = [
+  { value: 'ps', label: 'Pressure System (PS)', desc: 'Tabung bertekanan, ada manometer' },
+  { value: 'cartridge', label: 'Cartridge', desc: 'Gas pendorong di cartridge, tanpa manometer' },
+]
+export const isDcp = (jenis: string) => /powder|dcp/i.test(jenis)
+/** Sistem DCP efektif; unit lama tanpa isian dianggap Pressure System. */
+export const sistemDari = (u: { jenis: string; sistem?: SistemDcp }): SistemDcp | null => (isDcp(u.jenis) ? (u.sistem ?? 'ps') : null)
+/** "Powder (DCP) · Cartridge" */
+export const jenisLengkap = (u: { jenis: string; sistem?: SistemDcp }) => {
+  const s = sistemDari(u)
+  return s ? `${u.jenis} · ${s === 'cartridge' ? 'Cartridge' : 'Pressure System'}` : u.jenis
+}
 
 /** Area awal SPBU (data utama); pengguna dapat menambah atau menghapus area. */
 export const DEFAULT_AREAS = [
@@ -55,6 +71,7 @@ export const unitBaru = (tipe: AparTipe, kode: string, lokasi = ''): AparUnit =>
   id: genId(tipe),
   kode,
   jenis: APAR_JENIS[0],
+  sistem: 'ps',
   kapasitasKg: tipe === 'apar' ? '6' : '50',
   lokasi,
   cadangan: false,
@@ -66,13 +83,14 @@ export function lokasiOptions(jumlahPulau: number, areas: string[] = DEFAULT_ARE
   return [...Array.from({ length: Math.max(0, jumlahPulau) }, (_, i) => namaPulau(i + 1)), ...areas]
 }
 
-export type CekKey = 'lokasi' | 'tanda' | 'tekanan' | 'pin' | 'tabung' | 'selang' | 'label' | 'kartu' | 'kedaluwarsa' | 'roda'
+export type CekKey = 'lokasi' | 'tanda' | 'tekanan' | 'cartridge' | 'pin' | 'tabung' | 'selang' | 'label' | 'kartu' | 'kedaluwarsa' | 'roda'
 
 /** Butir inspeksi umum APAR/APAB (pemeriksaan bulanan). */
 export const CEK_ITEMS: { key: CekKey; label: string; hint?: string; untuk?: AparTipe; aktifSaja?: boolean }[] = [
   { key: 'lokasi', label: 'Terpasang di tempatnya, mudah dijangkau, tidak terhalang', aktifSaja: true },
   { key: 'tanda', label: 'Tanda/label lokasi pemadam terpasang dan terlihat', aktifSaja: true },
   { key: 'tekanan', label: 'Tekanan manometer di zona hijau', hint: 'CO2 tanpa manometer: berat tabung sesuai' },
+  { key: 'cartridge', label: 'Cartridge gas pendorong terpasang, tersegel, dan beratnya sesuai', hint: 'APAR DCP cartridge tidak memiliki manometer' },
   { key: 'pin', label: 'Pin pengaman dan segel utuh' },
   { key: 'tabung', label: 'Tabung tidak penyok, berkarat, atau bocor' },
   { key: 'selang', label: 'Selang dan nozzle utuh, tidak retak atau tersumbat' },
@@ -82,7 +100,13 @@ export const CEK_ITEMS: { key: CekKey; label: string; hint?: string; untuk?: Apa
   { key: 'roda', label: 'Roda dan troli berfungsi baik', untuk: 'apab' },
 ]
 
-export const cekUntuk = (tipe: AparTipe, cadangan: boolean) => CEK_ITEMS.filter((c) => (!c.untuk || c.untuk === tipe) && (!c.aktifSaja || !cadangan))
+/** Butir untuk satu unit: DCP cartridge tanpa butir manometer, diganti butir cartridge. */
+export const cekUntuk = (tipe: AparTipe, cadangan: boolean, u?: { jenis: string; sistem?: SistemDcp }) => {
+  const cartridge = !!u && sistemDari(u) === 'cartridge'
+  return CEK_ITEMS.filter(
+    (c) => (!c.untuk || c.untuk === tipe) && (!c.aktifSaja || !cadangan) && (c.key === 'tekanan' ? !cartridge : c.key === 'cartridge' ? cartridge : true),
+  )
+}
 
 export type CekNilai = 'ok' | 'tidak'
 
@@ -97,6 +121,7 @@ export interface AparCek {
   cadangan: boolean
   kedaluwarsa: string
   periksaInstansi?: string
+  sistem?: SistemDcp
   cek: Partial<Record<CekKey, CekNilai>>
   catatan: string
   foto: Photo[]
@@ -123,12 +148,12 @@ export function unitDariKode(kode: string, units: AparUnit[]) {
 }
 
 export function cekDari(u: AparUnit, tipe: AparTipe): AparCek {
-  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, periksaInstansi: u.periksaInstansi ?? '', cek: {}, catatan: '', foto: [] }
+  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, periksaInstansi: u.periksaInstansi ?? '', ...(sistemDari(u) ? { sistem: sistemDari(u)! } : {}), cek: {}, catatan: '', foto: [] }
 }
 
 /** Butir yang belum diisi, dan butir yang ditandai "Tidak" (temuan). */
 export function hasilCek(c: AparCek) {
-  const items = cekUntuk(c.tipe, c.cadangan)
+  const items = cekUntuk(c.tipe, c.cadangan, c)
   const kosong = items.filter((i) => !c.cek[i.key])
   const temuan = items.filter((i) => c.cek[i.key] === 'tidak')
   return { items, kosong, temuan }

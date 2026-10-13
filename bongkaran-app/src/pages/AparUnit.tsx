@@ -8,7 +8,7 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { aparUnitUrl, berlakuInstansi, kondisiSemua, riwayatUnit, tipeLabel } from '@/lib/apar'
+import { aparUnitUrl, berlakuInstansi, jenisLengkap, kondisiSemua, riwayatUnit, tipeLabel } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -48,7 +48,7 @@ export function AparUnit() {
             <span className="tabular text-headline-md font-bold text-on-surface">{u.kode || '-'}</span>
             <span className="text-body-sm font-semibold text-primary">{tipeLabel(k.tipe, u.cadangan)}</span>
             <span className="text-body-sm text-on-surface">
-              {u.jenis}, {u.kapasitasKg || '-'} kg
+              {jenisLengkap(u)}, {u.kapasitasKg || '-'} kg
             </span>
             <span className="text-body-sm text-on-surface-variant">{u.lokasi || 'Lokasi belum diatur'}</span>
           </div>

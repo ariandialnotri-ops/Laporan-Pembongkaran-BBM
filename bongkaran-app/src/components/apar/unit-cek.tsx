@@ -5,7 +5,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Button } from '@/components/ui/button'
-import { berlakuInstansi, hasilCek, statusInstansi, statusKedaluwarsa, type AparCek, type CekKey, type CekNilai } from '@/lib/apar'
+import { berlakuInstansi, hasilCek, jenisLengkap, statusInstansi, statusKedaluwarsa, type AparCek, type CekKey, type CekNilai } from '@/lib/apar'
 import { formatTanggalIso } from '@/lib/date'
 import type { Photo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
@@ -47,7 +47,7 @@ export function UnitCard({
             <Pill tone={u.tipe === 'apab' ? 'primary' : 'neutral'}>{u.tipe === 'apab' ? 'APAB' : u.cadangan ? 'Cadangan' : 'APAR'}</Pill>
           </span>
           <span className="text-body-sm text-on-surface-variant">
-            {u.jenis}, {u.kapasitasKg || '-'} kg, {u.lokasi || 'lokasi belum diatur'}
+            {jenisLengkap(u)}, {u.kapasitasKg || '-'} kg, {u.lokasi || 'lokasi belum diatur'}
           </span>
           {exp && (
             <span className={cn('tabular text-body-sm font-semibold', exp === 'lewat' ? 'text-error' : exp === 'segera' ? 'text-amber-700' : 'text-on-surface-variant')}>
