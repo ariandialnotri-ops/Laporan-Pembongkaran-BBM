@@ -52,26 +52,28 @@ export function AparLabel() {
           Belum ada unit di data utama.
         </GlassCard>
       ) : (
-        <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3 print:gap-3">
+        <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2 print:grid-cols-2 print:gap-[4mm]">
+          {/* Kertas A4, 2 kolom x 4 baris = 8 label per halaman; tiap label ±93 x 65 mm. */}
+          <style>{'@page { size: A4 portrait; margin: 10mm; }'}</style>
           {labels.map(({ u, tipe }) => (
             <article
               key={u.id}
-              className="flex h-full break-inside-avoid flex-col overflow-hidden rounded-lg border-2 border-black bg-white text-black [-webkit-print-color-adjust:exact] [print-color-adjust:exact]"
+              className="flex h-full break-inside-avoid flex-col overflow-hidden rounded-lg border-2 border-black bg-white text-black [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:h-[65mm]"
             >
               {/* Nama SPBU utuh (boleh dua baris), tidak dipotong. */}
-              <header className="flex items-center gap-1.5 bg-[#c62828] px-2.5 py-1.5 text-white">
-                <FireExtinguisher aria-hidden="true" className="size-4 shrink-0" />
-                <span className="min-w-0 break-words text-[11px] font-extrabold uppercase leading-tight tracking-wide">{s.namaSpbu || 'SPBU'}</span>
+              <header className="flex items-center gap-2 bg-[#c62828] px-3 py-2 text-white">
+                <FireExtinguisher aria-hidden="true" className="size-5 shrink-0" />
+                <span className="min-w-0 break-words text-[13px] font-extrabold uppercase leading-tight tracking-wide print:text-[11pt]">{s.namaSpbu || 'SPBU'}</span>
               </header>
-              <div className="flex flex-1 items-center gap-2.5 p-2.5">
-                <QrImg text={aparUnitUrl(u.id)} size={100} alt={`QR ${u.kode}`} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="tabular break-words text-[22px] font-extrabold leading-none tracking-tight">{u.kode || '-'}</span>
-                  <span className="w-fit rounded-sm border border-black px-1 text-[10px] font-bold uppercase leading-4">{tipeLabel(tipe, u.cadangan)}</span>
-                  <span className="text-[11px] font-semibold leading-tight">
-                    {jenisLengkap(u)}, {u.kapasitasKg || '-'} kg
+              <div className="flex flex-1 items-center gap-3 p-3">
+                <QrImg text={aparUnitUrl(u.id)} size={160} alt={`QR ${u.kode}`} className="print:size-[46mm]" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="tabular break-words text-[28px] font-extrabold leading-none tracking-tight print:text-[20pt]">{u.kode || '-'}</span>
+                  <span className="w-fit rounded-sm border-2 border-black px-1.5 text-[12px] font-bold uppercase leading-5 print:text-[10pt]">{tipeLabel(tipe, u.cadangan)}</span>
+                  <span className="text-[13px] font-semibold leading-tight print:text-[10.5pt]">
+                    {jenisLengkap(u)}, <span className="whitespace-nowrap">{u.kapasitasKg || '-'} kg</span>
                   </span>
-                  <span className="break-words text-[11px] leading-tight">{u.lokasi || '-'}</span>
+                  <span className="break-words text-[13px] leading-tight print:text-[10.5pt]">{u.lokasi || '-'}</span>
                 </div>
               </div>
             </article>

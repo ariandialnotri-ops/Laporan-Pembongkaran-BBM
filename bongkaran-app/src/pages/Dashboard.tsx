@@ -118,8 +118,8 @@ export function Dashboard() {
     discharge: sum(periode, (r) => r.gainLoss),
   }
   const sla = periode.map((r) => slaOf(r, app.plans))
-  const slaPermintaan = rataRata(sla.map((x) => x.permintaan))
-  const slaPerjalanan = rataRata(sla.map((x) => x.perjalanan))
+  const waktuKirim = sla.map((x) => x.kirim).filter((m): m is number => m !== null)
+  const rataKirim = rataRata(waktuKirim)
 
   // Rencana vs realisasi hari ini per produk: volume plan vs yang sudah dibongkar.
   const losHariIni = app.plans.filter((pl) => pl.tanggal === hariIni).flatMap((pl) => pl.los.filter((lo) => loStatus(lo, app.usedLoIds) !== 'deleted'))
@@ -306,10 +306,12 @@ export function Dashboard() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <SlaTile icon={Timer} label="Req MS2 → selesai" value={formatDurasi(slaPermintaan)} title="Rata-rata request MS2 sampai selesai bongkar" />
-          <SlaTile icon={Gauge} label="Gate out → selesai" value={formatDurasi(slaPerjalanan)} title="Rata-rata gate out depot sampai selesai bongkar" />
-        </div>
+        <SlaTile
+          icon={Timer}
+          label="Rata-rata waktu kirim"
+          value={formatDurasi(rataKirim)}
+          keterangan={waktuKirim.length ? `Gate out depot → tiba di SPBU · ${waktuKirim.length} MT` : 'Gate out depot → tiba di SPBU · belum ada data jam keluar depot'}
+        />
       </Kartu>
 
       {/* 4. Rencana vs realisasi */}
@@ -601,13 +603,14 @@ function Mini({ label, value, sub, bad }: { label: string; value: string; sub?: 
   )
 }
 
-function SlaTile({ icon: Icon, label, value, title }: { icon: typeof Timer; label: string; value: string; title: string }) {
+function SlaTile({ icon: Icon, label, value, keterangan }: { icon: typeof Timer; label: string; value: string; keterangan: string }) {
   return (
-    <div title={title} className="flex min-w-0 items-center gap-2.5 rounded-md bg-surface-container p-2.5">
+    <div className="flex min-w-0 items-center gap-2.5 rounded-md bg-surface-container p-2.5">
       <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[10px] font-semibold uppercase leading-tight text-outline">{label}</span>
         <span className="tabular text-numeric-md font-bold text-on-surface">{value}</span>
+        <span className="truncate text-[11px] text-on-surface-variant">{keterangan}</span>
       </span>
     </div>
   )
