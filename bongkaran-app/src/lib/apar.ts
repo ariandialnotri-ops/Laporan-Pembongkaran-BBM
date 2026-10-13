@@ -215,6 +215,9 @@ export function kondisiSemua(s: { apar?: AparUnit[]; apab?: AparUnit[] }, record
 export const tipeLabel = (tipe: AparTipe, cadangan: boolean) => (tipe === 'apab' ? 'APAB' : cadangan ? 'APAR cadangan' : 'APAR')
 
 /** Tautan yang disimpan di QR label: membuka halaman data & kondisi unit. */
+/** Warna label QR: merah untuk unit terpasang & APAB, biru untuk APAR cadangan. */
+export const warnaLabel = (tipe: AparTipe, cadangan: boolean) => (tipe === 'apar' && cadangan ? '#1565c0' : '#c62828')
+
 export const aparUnitUrl = (id: string, origin = window.location.origin) => `${origin}/apar/unit/${encodeURIComponent(id)}`
 
 /** Ambil id unit dari isi QR (URL label FLOQ), atau null bila bukan label APAR. */
