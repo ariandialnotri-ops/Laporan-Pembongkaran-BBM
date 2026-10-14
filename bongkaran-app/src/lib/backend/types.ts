@@ -1,4 +1,5 @@
 import type { DailyRecord } from '@/lib/daily'
+import type { OpsRecord } from '@/lib/ops'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 import type { TankDef } from '@/lib/tank'
 
@@ -43,7 +44,15 @@ export interface RingkasanUnit {
   terakhirAktif: string | null
 }
 
-export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo'>
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas'>
+
+export interface FotoArsip {
+  path: string
+  ukuran: number
+  dibuat: string
+  /** Foto yang diunggah sebelum batas ini dihapus pada cut-off. */
+  batas: string
+}
 
 export interface SessionInfo {
   user: { id: string; email: string } | null
@@ -98,6 +107,15 @@ export interface Backend {
   /** Inspeksi APAR/APAB pada rentang tanggal (untuk kalender kepatuhan setahun, di luar 120 hari terakhir). */
   listApar(fromIso: string, toIso: string): Promise<DailyRecord[]>
   deleteDaily(id: string): Promise<void>
+
+  /** Catatan Operasional SPBU (kartu perawatan, housekeeping, sumur pantau, oil catcher) pada rentang tanggal. */
+  listOps(fromIso: string, toIso: string): Promise<OpsRecord[]>
+  saveOps(rec: OpsRecord): Promise<void>
+  deleteOps(id: string): Promise<void>
+  /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
+  fotoArsip(): Promise<FotoArsip[]>
+  /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */
+  unduhFoto(path: string): Promise<Blob | null>
 
   uploadPhoto(reportId: string, blob: Blob, name: string): Promise<Photo>
   deletePhoto(photo: Photo): Promise<void>

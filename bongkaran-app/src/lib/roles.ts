@@ -2,13 +2,14 @@
  * Peran pengguna dan modul yang boleh dibuka. Satu tempat untuk menu dock, kartu menu
  * Input/Laporan, dan penjaga halaman. Aturan tulis di database (RLS) mengikuti tabel ini.
  */
-export type Role = 'abh' | 'pengawas' | 'kashift' | 'security'
+export type Role = 'abh' | 'pengawas' | 'kashift' | 'security' | 'cs'
 
 export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
   { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU & database tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
-  { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB' },
-  { key: 'security', label: 'Security', desc: 'Inspeksi APAR/APAB dan pelaporan insiden / near miss' },
+  { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
+  { key: 'security', label: 'Security', desc: 'Inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
+  { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
 ]
 
 export const roleLabel = (r: Role | null | undefined) => ROLES.find((x) => x.key === r)?.label ?? '-'
@@ -41,6 +42,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/pengaturan/tangki',
     '/pengaturan/tangki/',
     '/siapkan',
+    '/ops',
+    '/ops/',
     '/insiden/baru',
     '/profil',
     '/kalkulator',
@@ -68,13 +71,17 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/laporan/tera',
     '/laporan/takaran',
     '/laporan/apar',
+    '/ops',
+    '/ops/',
+    '/laporan/ops',
     '/insiden/baru',
     '/laporan/insiden',
     '/laporan/insiden/',
     '/profil',
     '/kalkulator',
   ],
-  security: ['/input', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
+  security: ['/input', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
+  cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
 }
 
 export function bolehBuka(role: Role, path: string) {
@@ -83,4 +90,4 @@ export function bolehBuka(role: Role, path: string) {
 }
 
 /** Halaman awal peran yang tidak punya Dashboard. */
-export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/apar' : '/input')
+export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/apar' : role === 'cs' ? '/ops' : '/input')

@@ -297,6 +297,10 @@ export interface Settings {
   aparArea: string[]
   apar: AparUnit[]
   apab: AparUnit[]
+  /** Fasilitas SPBU (modul Operasional); undefined = semua fasilitas ada. */
+  fasilitas?: string[]
+  /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
+  fotoSimpanBulan?: number
   rules: Rules
 }
 

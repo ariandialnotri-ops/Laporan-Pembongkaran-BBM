@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, X } from 'lucide-react'
-import { Field, JumlahField } from '@/components/bongkaran/form-bits'
+import { CheckRow, Field, JumlahField } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { todayIso } from '@/lib/date'
 import { TABLE53_CORRECTIONS, TABLE53_COVERAGE } from '@/lib/density'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { blobToDataUrl, compressImage } from '@/lib/image'
+import { FASILITAS, fotoSimpanBulan, punyaFasilitas } from '@/lib/ops'
 import type { Rules } from '@/lib/sop'
 import { TANKS } from '@/lib/tank'
 
@@ -125,8 +126,38 @@ export function IdentitasSpbu() {
             <input ref={logoRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void onLogo(e.target.files?.[0])} />
           </fieldset>
         </GlassCard>
+        <section aria-labelledby="fasilitas-spbu" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <SectionHeader id="fasilitas-spbu" title="Fasilitas SPBU" />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <span className="text-body-sm text-on-surface-variant">Menentukan kartu perawatan dan checklist housekeeping yang tampil di Operasional SPBU.</span>
+            <div className="grid grid-cols-1 gap-space-xs sm:grid-cols-2">
+              {FASILITAS.map((f) => (
+                <CheckRow
+                  key={f.key}
+                  checked={punyaFasilitas(s, f.key)}
+                  onChange={(v) => {
+                    const kini = s.fasilitas ?? FASILITAS.map((x) => x.key)
+                    app.updateSettings({ fasilitas: v ? [...new Set([...kini, f.key])] : kini.filter((k) => k !== f.key) })
+                  }}
+                >
+                  {f.label}
+                </CheckRow>
+              ))}
+            </div>
+          </GlassCard>
+        </section>
       </fieldset>
       <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
+        <section aria-labelledby="simpan-foto" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <SectionHeader id="simpan-foto" title="Penyimpanan foto bukti" />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <JumlahField id="set-simpan-foto" label="Lama foto disimpan (bulan)" value={fotoSimpanBulan(s)} max={24} onChange={(n) => app.updateSettings({ fotoSimpanBulan: Math.max(1, n) })} />
+            <span className="text-body-sm text-on-surface-variant">
+              Setiap tanggal 5 pukul 01.00 WIB, foto yang diunggah sebelum tanggal 1 {fotoSimpanBulan(s)} bulan lalu dihapus dari server agar penyimpanan gratis tidak penuh.
+              Data laporan tetap tersimpan. Tanggal 1–4 pengawas/ABH dapat mengunduh arsip ZIP foto tersebut di Laporan &gt; Operasional SPBU.
+            </span>
+          </GlassCard>
+        </section>
         <section aria-labelledby="nama-default" className="animate-entrance-2 flex flex-col gap-space-sm">
           <SectionHeader id="nama-default" title="Nama default di Berita Acara" />
           <GlassCard level={2} className="grid grid-cols-2 gap-space-sm p-space-md">

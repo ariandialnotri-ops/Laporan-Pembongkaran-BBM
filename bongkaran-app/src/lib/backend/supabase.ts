@@ -5,7 +5,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DailyRecord } from '@/lib/daily'
-import { blobToDataUrl, genId } from '@/lib/image'
+import type { OpsRecord } from '@/lib/ops'
+import { FOTO_DIARSIPKAN, blobToDataUrl, genId } from '@/lib/image'
 import { normalizePlan } from '@/lib/plan'
 import type { Photo, Photos, Plan, Report, ReportStatus, ReportSummary, Settings } from '@/lib/sop'
 import type { TankDef, TankTabel } from '@/lib/tank'
@@ -16,6 +17,7 @@ const BUCKET = 'bbm-evidence'
 type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint'>
 type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; meta: Partial<PlanMeta> | null; created_at: string }
 type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift: number; data: DailyRecord['data']; created_at: string; updated_at: string; created_by: string | null }
+type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data']; updated_at: string; updated_by: string | null }
 type TankRow = { id: string; produk: string; tank_no: string; tanggal_kalibrasi: string | null; catatan: string | null; tabel: TankTabel; urut: number }
 type RingkasanRow = {
   spbu_id: string
@@ -56,6 +58,9 @@ function translateError(msg: string) {
   return msg
 }
 
+/** Objek foto tidak ada lagi di bucket (terhapus cut-off tanggal 5). */
+const fotoHilang = (msg: string) => /not.?found|does not exist|404/i.test(msg)
+
 function check<T>({ data, error }: { data: T; error: { message: string } | null }): T {
   if (error) throw new Error(translateError(error.message))
   return data
@@ -91,6 +96,15 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
   }
   const dataCache = new Map<string, string>()
   const urlCache = new Map<string, { url: string; exp: number }>()
+  // Unduh foto; null bila sudah terhapus cut-off.
+  const unduh = async (path: string) => {
+    const { data, error } = await sb.storage.from(BUCKET).download(path)
+    if (error) {
+      if (fotoHilang(error.message)) return null
+      throw new Error(translateError(error.message))
+    }
+    return data
+  }
 
   // Edge function bbm-akun (khusus ABH): buat akun & atur ulang kata sandi.
   const akun = async (body: Record<string, string>) => {
@@ -204,6 +218,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         aparArea: d.aparArea ?? [],
         soldTo: d.soldTo ?? '',
         shipTo: d.shipTo ?? {},
+        // Belum diatur = semua fasilitas ada; jangan kirim null yang menimpa.
+        ...(d.fasilitas ? { fasilitas: d.fasilitas } : {}),
       }
       check(await sb.rpc('bbm_save_settings_terbatas', { p_spbu: aktif(), p_patch }))
     },
@@ -343,6 +359,25 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
     },
 
+    async listOps(from, to) {
+      const rows = check(
+        await sb.from('bbm_ops').select('id,form,tanggal,data,updated_at,updated_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal').limit(5000),
+      ) as OpsRow[]
+      return rows.map((r) => ({ id: r.id, form: r.form, tanggal: r.tanggal, data: r.data, updatedAt: Date.parse(r.updated_at), updatedBy: r.updated_by }))
+    },
+    async saveOps(rec) {
+      check(await sb.from('bbm_ops').upsert({ spbu_id: aktif(), id: rec.id, form: rec.form, tanggal: rec.tanggal, data: rec.data }, { onConflict: 'spbu_id,id' }))
+    },
+    async deleteOps(id) {
+      const rows = check(await sb.from('bbm_ops').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus catatan ini.')
+    },
+    async fotoArsip() {
+      const rows = check(await sb.rpc('bbm_foto_arsip', { p_spbu: aktif() })) as { name: string; ukuran: number; dibuat: string; batas: string }[] | null
+      return (rows ?? []).map((r) => ({ path: r.name, ukuran: Number(r.ukuran) || 0, dibuat: r.dibuat, batas: r.batas }))
+    },
+    unduhFoto: unduh,
+
     async uploadPhoto(reportId, blob, name) {
       const id = genId('p')
       const path = `${aktif()}/${reportId}/${id}.jpg`
@@ -368,7 +403,11 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (need.length) {
         const res = check(await sb.storage.from(BUCKET).createSignedUrls(need.map((p) => p.path!), 3600))
         ;(res ?? []).forEach((r, i) => {
-          if (!r.signedUrl) return
+          // Foto sudah dihapus cut-off: tampilkan penanda "Foto diarsipkan".
+          if (!r.signedUrl) {
+            if (r.error && fotoHilang(r.error)) out[need[i].id] = FOTO_DIARSIPKAN
+            return
+          }
           urlCache.set(need[i].path!, { url: r.signedUrl, exp: now + 50 * 60 * 1000 })
           out[need[i].id] = r.signedUrl
         })
@@ -380,7 +419,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
       if (!photo.path) return ''
       const cached = dataCache.get(photo.path)
       if (cached) return cached
-      const blob = check(await sb.storage.from(BUCKET).download(photo.path))
+      const blob = await unduh(photo.path)
+      // Foto yang sudah terhapus cut-off: PDF/JPG menulis "(gambar tidak dapat dimuat)".
       if (!blob) return ''
       const dataUrl = await blobToDataUrl(blob)
       dataCache.set(photo.path, dataUrl)

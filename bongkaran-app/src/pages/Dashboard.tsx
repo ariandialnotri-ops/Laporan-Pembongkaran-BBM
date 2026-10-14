@@ -19,6 +19,7 @@ import {
   TriangleAlert,
   Truck,
 } from 'lucide-react'
+import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bongkaran/date-filter'
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
@@ -150,6 +151,7 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      <ArsipFotoBanner />
       {/* 1. Operasional & shift */}
       <KartuUnitBisnis />
       <TangkiBelumAda className="animate-entrance-1" />

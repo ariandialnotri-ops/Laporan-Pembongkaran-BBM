@@ -82,3 +82,10 @@ export function capWaktu(d = new Date()) {
   const nama = zona === 7 ? 'WIB' : zona === 8 ? 'WITA' : zona === 9 ? 'WIT' : `GMT${zona >= 0 ? '+' : ''}${zona}`
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} ${nama}`
 }
+
+/** Pengganti thumbnail untuk foto yang sudah terhapus cut-off tanggal 5 (arsip disimpan di luar aplikasi). */
+export const FOTO_DIARSIPKAN =
+  'data:image/svg+xml;charset=utf-8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="#eceff1"/><path d="M42 44h36v8H42zm4 10h28v24H46z" fill="none" stroke="#78909c" stroke-width="3"/><text x="60" y="96" font-family="sans-serif" font-size="11" text-anchor="middle" fill="#546e7a">Foto diarsipkan</text></svg>',
+  )

@@ -1,11 +1,13 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Beaker, ChevronRight, CircleCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
+import { Beaker, ChevronRight, CircleCheck, ClipboardCheck, ClipboardList, FireExtinguisher, FlaskConical, Fuel, ShieldAlert, TestTube, Truck } from 'lucide-react'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { Loading } from '@/components/bongkaran/load-state'
 import { TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
 import { kondisiSemua } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
+import { formTampil, statusOps, type OpsRecord } from '@/lib/ops'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
 import { takarStatus } from '@/lib/takar'
@@ -17,6 +19,18 @@ import { cn } from '@/lib/utils'
 export function InputMenu() {
   const app = useApp()
   const stok = useStokShift()
+  // Form operasional hari ini (tabel terpisah, dimuat saat menu dibuka).
+  const [ops, setOps] = useState<OpsRecord[] | null>(null)
+  useEffect(() => {
+    let hidup = true
+    app.backend.listOps(todayIso(), todayIso()).then(
+      (r) => hidup && setOps(r),
+      () => hidup && setOps([]),
+    )
+    return () => {
+      hidup = false
+    }
+  }, [app.backend, app.spbuId])
   if (!app.loaded) return <Loading />
 
   const shiftNama = shiftLabel(stok.key.shift).split(' (')[0]
@@ -38,6 +52,19 @@ export function InputMenu() {
   const takarHariIni = app.daily.filter((d) => d.kind === 'takar' && d.tanggal === todayIso())
   const takarLewat = takarHariIni.filter((d) => d.kind === 'takar' && takarStatus(d.data.hasilMl) === 'lewat').length
   const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
+
+  const opsForm = formTampil(app.role, app.settings)
+    .flatMap((g) => g.forms)
+  const opsHarian = opsForm.filter((id) => !['pompa-tangki-rutin', 'outlet-ritel'].includes(id))
+  const opsBelum = ops ? opsHarian.filter((id) => statusOps(id, ops.find((r) => r.form === id)) === 'kosong').length : 0
+  const opsMenu: MenuItem = {
+    to: '/ops',
+    icon: ClipboardCheck,
+    title: 'Operasional SPBU',
+    desc: app.role === 'cs' ? 'Checklist housekeeping harian' : 'Kartu perawatan, housekeeping, sumur pantau, oil catcher',
+    status: !ops ? 'Memuat…' : opsBelum ? `${opsBelum} dari ${opsHarian.length} form belum hari ini` : 'Semua form hari ini terisi',
+    badge: opsBelum,
+  }
 
   const menus: MenuItem[] = [
     {
@@ -96,6 +123,7 @@ export function InputMenu() {
       status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
       badge: insidenTerbuka,
     },
+    opsMenu,
   ]
 
   return (

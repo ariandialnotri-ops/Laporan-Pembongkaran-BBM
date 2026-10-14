@@ -5,6 +5,7 @@
  */
 import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
+import type { OpsRecord } from '@/lib/ops'
 import { normalizePlan } from '@/lib/plan'
 import type { Photos, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 import { TANK_BAWAAN, type TankDef } from '@/lib/tank'
@@ -174,6 +175,17 @@ export const localBackend: Backend = {
   async deleteDaily(id) {
     await set('daily', ((await get<DailyRecord[]>('daily')) ?? []).filter((r) => r.id !== id))
   },
+
+  listOps: (from, to) => get<OpsRecord[]>('ops').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to)),
+  async saveOps(rec) {
+    await set('ops', upsertById((await get<OpsRecord[]>('ops')) ?? [], rec))
+  },
+  async deleteOps(id) {
+    await set('ops', ((await get<OpsRecord[]>('ops')) ?? []).filter((r) => r.id !== id))
+  },
+  // Mode lokal: foto tersimpan di perangkat, tidak ada cut-off.
+  fotoArsip: async () => [],
+  unduhFoto: async () => null,
 
   uploadPhoto: async (_reportId, blob, name) => ({ id: genId('p'), name, at: new Date().toISOString(), dataUrl: await blobToDataUrl(blob) }),
   deletePhoto: async () => {},

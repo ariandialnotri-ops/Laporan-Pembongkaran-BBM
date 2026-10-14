@@ -349,7 +349,7 @@ export function InsidenDetail() {
       </GlassCard>
     )
   const d = rec.data
-  const bolehTL = app.role !== 'security'
+  const bolehTL = app.role !== 'security' && app.role !== 'cs'
   const statusBaru = status || d.status
 
   const simpanTL = async () => {

@@ -39,6 +39,9 @@ const DataAcuan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default
 const DataDispenser = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DataDispenser })))
 const NozzleTera = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.NozzleTera })))
 const SoldShipTo = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.SoldShipTo })))
+const OpsMenu = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsMenu })))
+const OpsIsi = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsIsi })))
+const LaporanOps = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.LaporanOps })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const EditLo = lazy(() => import('@/pages/EditLo').then((m) => ({ default: m.EditLo })))
@@ -125,6 +128,9 @@ function Gate() {
           {/* Riwayat tera lama kini Riwayat Uji Takaran. */}
           <Route path="/laporan/tera" element={<Navigate to="/laporan/takaran" replace />} />
           <Route path="/laporan/apar" element={<RiwayatApar />} />
+          <Route path="/ops" element={<OpsMenu />} />
+          <Route path="/ops/:form" element={<OpsIsi />} />
+          <Route path="/laporan/ops" element={<LaporanOps />} />
           <Route path="/insiden/baru" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
           <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />

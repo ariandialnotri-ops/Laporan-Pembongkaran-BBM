@@ -1,4 +1,4 @@
-import { Beaker, ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, ShieldAlert, Truck } from 'lucide-react'
+import { Beaker, ClipboardCheck, ClipboardList, FileSpreadsheet, FileText, FireExtinguisher, FlaskConical, ShieldAlert, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { takarStatus } from '@/lib/takar'
@@ -56,6 +56,13 @@ export function LaporanMenu() {
       desc: 'Bejana 20 L per nozzle, Preset & Manual, foto bercap waktu',
       status: takarLewat ? `${takarLewat} hasil melebihi toleransi bulan ini` : `${takarBulan.length} hasil bulan ini`,
       badge: takarLewat,
+    },
+    {
+      to: '/laporan/ops',
+      icon: ClipboardCheck,
+      title: 'Operasional SPBU',
+      desc: 'Kartu perawatan, housekeeping, sumur pantau, oil catcher, breakdown',
+      status: 'Rekap bulanan & Excel format asli',
     },
     {
       to: '/laporan/insiden',

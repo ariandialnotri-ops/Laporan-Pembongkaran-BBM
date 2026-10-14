@@ -65,6 +65,8 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/takaran` | Riwayat Uji Takaran + cetak BA (alamat lama `/laporan/tera` dialihkan ke sini) |
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
 | | `/insiden/baru` | **Lapor Insiden / Near miss / Kerusakan** (semua peran): jenis, kategori, tanggal & jam, lokasi, peralatan, uraian, dampak (wajib untuk insiden), penyebab, tindakan, tingkat risiko, foto (wajib untuk insiden & kerusakan), pelapor; kirim lalu ke riwayat |
+| | `/ops` | **Operasional SPBU** (format laporan operasional SPBU): kartu perawatan (pompa & tangki pompa dorong, rutin pompa & tangki, APAR/APAB harian, ruang panel listrik, genset, totem, kanopi pompa, outlet ritel), checklist housekeeping (CS), sumur pantau & oil catcher (kashift/security). Per tanggal; tanda baik / X / –; X wajib catatan + foto (foto hanya saat temuan); paraf pengawas per form atau massal. Form yang tampil mengikuti peran dan **Fasilitas SPBU** di Identitas SPBU |
+| | `/laporan/ops` | Rekap bulanan per form (status tiap tanggal), daftar temuan, unduh **Excel format asli** (template `public/templates/ops-template.xlsx`, sheet BREAK DOWN dari laporan kerusakan) |
 | | `/laporan/insiden` | Riwayat insiden: filter tanggal/jenis/status, baris terbuka oranye, baru biru; `/laporan/insiden/:id` detail + tindak lanjut (status, PIC, target, catatan) oleh ABH/Pengawas/Kashift |
 | Profil | `/profil` | Akun & peran, ganti kata sandi, statistik, Kalkulator; Pengaturan, Anggota, Data utama APAR (ABH) |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
@@ -228,12 +230,14 @@ sandi (khusus ABH, hanya untuk SPBU yang dikendalikannya):
 |-------|-----|
 | `bbm_spbu` | Satu baris per SPBU (unit bisnis); nama & kode mengikuti Identitas SPBU |
 | `bbm_abh_spbu` | SPBU yang dikendalikan tiap ABH |
-| `bbm_members` | Anggota, peran (`abh` / `pengawas` / `kashift` / `security`), dan `spbu_id` tempat bertugas |
+| `bbm_members` | Anggota, peran (`abh` / `pengawas` / `kashift` / `security` / `cs`), dan `spbu_id` tempat bertugas |
 | `bbm_settings` | Pengaturan per SPBU (`id` = `spbu_id`) |
 | `bbm_tanks` | Database tangki per SPBU: produk, nomor, tanggal kalibrasi, tabel kalibrasi (jsonb) |
 | `bbm_plans` | Plan kirim (SO & LO); data MS2, Ship To, PO SAP, supply point di kolom `meta` |
 | `bbm_daily` | Stok awal shift (`kind = stok`, satu per shift) dan Q&Q harian (`kind = qq`) |
 | `bbm_takar` | Uji takaran bejana 20 L: satu baris per hasil (nozzle, produk, opsi P/M, selisih ml, foto); dibaca aplikasi sebagai catatan harian kind `takar` |
+| `bbm_ops` | Operasional SPBU: satu baris per form per tanggal (form bulanan: tanggal 1). Tulis: housekeeping `hk-*` CS, sumur pantau & oil catcher kashift/security, kartu perawatan kashift; ABH & pengawas semua. Paraf hanya ABH/pengawas (trigger) |
+| `bbm_cutoff_log` | Catatan cut-off foto per SPBU |
 | `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
 | bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
 
@@ -247,13 +251,21 @@ membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_
 | ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
 | Pengawas | Identitas SPBU & Database tangki (wajib diisi untuk SPBU baru), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
 | Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
-| Security | Inspeksi APAR/APAB saja |
+| Security | Inspeksi APAR/APAB, sumur pantau & oil catcher, lapor insiden |
+| Cleaning Service (CS) | Checklist housekeeping di Operasional SPBU, lapor insiden |
 
 Tulis: plan & laporan oleh ABH/Pengawas/Kashift; Security hanya `bbm_daily`
 kind `apar`; pengaturan & anggota hanya ABH; hapus plan/laporan oleh ABH/Pengawas
 (draft milik sendiri boleh dihapus pembuatnya). Daftar halaman per peran ada di
 `src/lib/roles.ts`. Pengguna pertama yang login otomatis menjadi ABH, lalu
 membuat akun lain di `/anggota`.
+
+**Cut-off foto (Supabase Free 1 GB).** Setiap tanggal 5 pukul 01.00 WIB, `pg_cron` memanggil edge
+function `bbm-cutoff` (kunci pemanggil acak di Vault `bbm_cutoff_key`, tidak ada di repo). Foto di
+`bbm-evidence` yang diunggah sebelum tanggal 1 (bulan ini − *Lama foto disimpan*, bawaan 3 bulan,
+diatur ABH di Identitas SPBU) dihapus lewat Storage API; data laporan tetap. Tanggal 1–4 ABH/pengawas
+melihat banner di Dashboard & Operasional SPBU untuk mengunduh arsip ZIP (`bbm_foto_arsip`). Foto
+yang sudah terhapus tampil sebagai "Foto diarsipkan".
 
 Tabel lama `bongkaran`, `laporan`, dan bucket `bukti-bongkaran` (migrasi
 `2026092600*`) tidak lagi dipakai aplikasi.
