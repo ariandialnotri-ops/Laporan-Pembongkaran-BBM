@@ -16,6 +16,8 @@ import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib
 import { compressImage } from '@/lib/image'
 import { evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
+import { formatTanggalIso } from '@/lib/date'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 type Phase = 'bongkaran' | 'quality' | 'quantity'
@@ -68,6 +70,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
   const app = useApp()
   const toast = useToast()
   const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const [report, setReport] = useState(initial)
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
@@ -244,7 +247,6 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       updatedAt: Date.now(),
       data: { ...prev.data, noBA: prev.data.noBA || suggestNoBA(app.settings, prev) },
     }))
-    toast(status === 'anomali' ? 'Ditutup sebagai anomali' : 'Bongkaran selesai · Berita Acara siap')
     setKeRiwayat(true)
   }
   const reopen = () => {
@@ -281,14 +283,30 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     title: 'Keluar dari form bongkaran?',
     detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
     beforeLeave: flush,
+    // Halaman turunan (ubah nomor LO) bukan meninggalkan form.
+    izinkan: (path) => path.startsWith(`/input/${report.id}/`),
   })
   // Setelah diselesaikan, pindah ke Riwayat Pembongkaran (penyimpanan terakhir dijalankan saat halaman ditutup).
   useEffect(() => {
     if (!keRiwayat || report.status === 'draft') return
     guard.bypass()
-    navigate(`/laporan/bongkaran?baru=${encodeURIComponent(report.id)}`)
+    const anomali = report.status === 'anomali'
+    keTerkirim({
+      judul: anomali ? 'Bongkaran ditutup sebagai anomali' : 'Bongkaran selesai terkirim',
+      detail: `${report.data.nopol || 'MT'}, ${formatTanggalIso(report.data.tanggalDatang)}. Berita Acara siap diunduh & ditandatangani.`,
+      peringatan: anomali ? 'Ditutup sebagai anomali: periksa catatan dan tindak lanjut.' : undefined,
+      baris: [
+        ['No. BA', report.data.noBA || '-'],
+        ['Langkah SOP', `${selesaiLangkah} dari ${evaluation.steps.length}`],
+      ],
+      aksi: [
+        ...(anomali ? [] : [{ to: `/sample/${encodeURIComponent(report.id)}`, label: 'Lanjut uji kualitas pasca penerimaan' }]),
+        { to: '/laporan/ba', label: 'Berita Acara' },
+        { to: `/laporan/bongkaran?baru=${encodeURIComponent(report.id)}`, label: 'Riwayat pembongkaran' },
+      ],
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keRiwayat, report.status, report.id, navigate])
+  }, [keRiwayat, report.status, report.id])
   const waText = useMemo(() => buildWaText(report, evaluation.derived, app.settings), [report, evaluation, app.settings])
 
   const hapus = async () => {

@@ -34,7 +34,7 @@ export function StokGate({ className, action = 'mulai bongkar' }: { className?: 
           <span className="text-body-sm text-on-surface-variant">Wajib diisi untuk setiap produk sebelum {action}.</span>
         </div>
       </div>
-      <Link to="/stok" className={buttonVariants({ size: 'pill', className: 'self-start' })}>
+      <Link to={`/stok/${key.tanggal}/${key.shift}`} className={buttonVariants({ size: 'pill', className: 'self-start' })}>
         Isi stok awal
         <ArrowRight aria-hidden="true" />
       </Link>

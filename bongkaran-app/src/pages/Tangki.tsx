@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ClipboardPaste, Cylinder, FileUp, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -12,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
+import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { produkMeta } from '@/lib/produk'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { bacaTabelKalibrasi, buatTank, tankName, volumeTank, type TankDef, type TankTabel } from '@/lib/tank'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 /** Daftar tangki SPBU aktif; dipakai di halaman Database Tangki dan langkah 2 Siapkan SPBU. */
@@ -116,6 +119,8 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const kembali = params.get('kembali') || '/pengaturan/tangki'
+  const keTerkirim = useKeTerkirim()
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form tangki?', detail: 'Data tangki yang belum disimpan akan hilang.' })
   const fileRef = useRef<HTMLInputElement>(null)
   const dipakai = new Set(app.tanks.filter((t) => t.id !== awal?.id).map((t) => t.produk))
   const [produk, setProduk] = useState(awal?.produk ?? PRODUK_OPTIONS.find((p) => !dipakai.has(p)) ?? PRODUK_OPTIONS[0])
@@ -158,8 +163,16 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
         tabel,
         urut: awal?.urut ?? app.tanks.length,
       })
-      toast(`${tankName(tankNo.trim())} (${produk}) tersimpan`)
-      navigate(kembali)
+      guard.bypass()
+      keTerkirim({
+        judul: `${tankName(tankNo.trim())} (${produk}) tersimpan`,
+        detail: 'Database tangki SPBU diperbarui; stok awal & volume bongkar memakai tabel kalibrasi ini.',
+        baris: [
+          ['Titik tabel kalibrasi', `${tabel.volumes.length}`],
+          ['Tanggal kalibrasi', tanggal ? formatTanggalIso(tanggal) : '-'],
+        ],
+        aksi: [{ to: kembali, label: 'Kembali ke Database Tangki' }],
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setSimpan(false)
@@ -171,6 +184,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
     try {
       await app.deleteTank(awal.id)
       toast('Tangki dihapus')
+      guard.bypass()
       navigate(kembali)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -308,6 +322,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
           Hapus tangki
         </Button>
       )}
+      {guard.dialog}
     </div>
   )
 }

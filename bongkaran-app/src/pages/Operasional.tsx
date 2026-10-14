@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { CheckCheck, ChevronRight, ClipboardCheck, FileDown, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
+import { CheckCheck, ClipboardCheck, FileDown, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { CheckRow, Choice, Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -14,6 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
+import type { StatusIsi } from '@/lib/status-isi'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { useApp } from '@/lib/app-state'
 import type { InsidenRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
@@ -170,28 +173,31 @@ export function OpsMenu() {
       {grup.map((g, gi) => (
         <section key={g.judul} aria-labelledby={`ops-g${gi}`} className="flex flex-col gap-space-sm">
           <SectionHeader id={`ops-g${gi}`} title={g.judul} />
-          <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 overflow-hidden">
+          <div className="flex flex-col gap-space-xs">
             {g.forms.map((id) => {
               const f = formById(id)
               const rec = recOf(id)
               const st = recs ? statusOps(id, rec) : null
               const n = f && rec?.data.jenis === 'checklist' ? Object.keys(rec.data.hasil).length : 0
+              // Hijau = sudah diisi lengkap; oranye = belum/sebagian; merah = periodenya lewat tanpa diisi lengkap.
+              const lewat = f?.periode === 'bulanan' ? tanggal.slice(0, 7) < todayIso().slice(0, 7) : tanggal < todayIso()
+              const warna: StatusIsi = !st || st === 'kosong' || st === 'sebagian' ? (lewat ? 'terlewat' : 'belum') : 'sudah'
+              const periode = f ? `${f.periode === 'bulanan' ? `Bulanan · ${BULAN[Number(tanggal.slice(5, 7)) - 1]}` : 'Harian'} · ${n}/${f.aktivitas.length} aktivitas` : 'Pantauan harian'
               return (
-                <Link key={id} to={`/ops/${id}?${filter ? `grup=${filter}&` : ''}tanggal=${tanggal}`} className="flex min-h-16 items-center gap-space-sm px-space-md py-space-sm active:bg-surface-container-low">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-body-md font-semibold text-on-surface">{judulForm(id)}</span>
-                    <span className="text-body-sm text-on-surface-variant">
-                      {f ? `${f.periode === 'bulanan' ? `Bulanan · ${BULAN[Number(tanggal.slice(5, 7)) - 1]}` : 'Harian'} · ${n}/${f.aktivitas.length} aktivitas` : 'Pantauan harian'}
-                    </span>
-                  </span>
-                  {st && <Pill tone={TONE[st]}>{STATUS_LABEL[st]}</Pill>}
-                  <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-                </Link>
+                <KartuPilih
+                  key={id}
+                  to={`/ops/${id}?${filter ? `grup=${filter}&` : ''}tanggal=${tanggal}`}
+                  status={warna}
+                  judul={judulForm(id)}
+                  sub={periode}
+                  keterangan={!st ? 'Memuat…' : warna === 'terlewat' ? (st === 'sebagian' ? 'Terlewat · baru sebagian' : 'Terlewat') : STATUS_LABEL[st]}
+                />
               )
             })}
-          </GlassCard>
+          </div>
         </section>
       ))}
+      {grup.length > 0 && <LegendaStatus />}
     </div>
   )
 }
@@ -228,6 +234,7 @@ export function OpsIsi() {
   const app = useApp()
   const toast = useToast()
   const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const { form = '' } = useParams()
   const [params] = useSearchParams()
   const tanggalPilih = params.get('tanggal') || todayIso()
@@ -241,7 +248,7 @@ export function OpsIsi() {
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa menyimpan?', detail: 'Isian form ini belum disimpan.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form?', detail: dirty ? 'Isian form ini belum dikirim dan akan hilang.' : 'Form ini belum dikirim.' })
 
   // Isian awal: catatan tersimpan atau form kosong; salinan baru dibuat saat pertama diubah.
   const [jamBuka] = useState(nowHm)
@@ -295,8 +302,21 @@ export function OpsIsi() {
     try {
       await app.backend.saveOps({ id, form, tanggal, data: { ...d, petugas: d.petugas.trim() }, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
       guard.bypass()
-      toast(`${judulForm(form)} tersimpan`)
-      navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`)
+      const kembali = `/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`
+      const x = Object.values(d.jenis === 'checklist' ? d.hasil : {}).filter((v) => v === 'X').length
+      keTerkirim({
+        judul: `${judulForm(form)} terkirim`,
+        detail: f?.periode === 'bulanan' ? `Bulan ${BULAN[Number(tanggal.slice(5, 7)) - 1]} ${tanggal.slice(0, 4)}` : formatTanggalIso(tanggal),
+        peringatan: x ? `${x} temuan (X) dengan catatan & foto.` : d.jenis === 'sumur' && d.sumur.some((v) => v !== 'Nihil') ? 'Ada temuan di sumur pantau.' : undefined,
+        baris: [
+          ...(d.jenis === 'checklist'
+            ? ([['Aktivitas ditandai', `${Object.keys(d.hasil).length}${f ? ` dari ${f.aktivitas.length}` : ''}`]] as [string, string][])
+            : ([['Hasil pantauan', d.hasil]] as [string, string][])),
+          ['Petugas', d.petugas.trim()],
+          ['Paraf pengawas', d.paraf ? d.paraf.nama : 'belum'],
+        ],
+        aksi: [{ to: kembali, label: 'Form operasional lain' }],
+      })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)

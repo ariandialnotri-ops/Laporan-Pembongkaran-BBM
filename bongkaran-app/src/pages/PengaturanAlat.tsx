@@ -1,15 +1,16 @@
 import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox, ProdukSelect } from '@/components/bongkaran/lo-fields'
 import { BARIS_ORANYE, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { namaPulau } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
@@ -17,6 +18,7 @@ import { berlakuSertifikat, MASA_SERTIFIKAT_BULAN, statusSertifikat } from '@/li
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { genId } from '@/lib/image'
 import { PRODUK_OPTIONS, type Dispenser, type Nozzle } from '@/lib/sop'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 const TANPA = '__tanpa__'
@@ -29,14 +31,11 @@ function TeraPill({ tgl }: { tgl?: string }) {
 /** Pengaturan > Data Dispenser: unit dispenser (nomor/nama, merk, nomor seri, pulau). */
 export function DataDispenser() {
   const app = useApp()
-  const toast = useToast()
-  const [edit, setEdit] = useState<Dispenser | null>(null)
+  const navigate = useNavigate()
   if (!app.loaded) return <Loading />
   const s = app.settings
   const list = s.dispensers ?? []
   const ubah = app.isAdmin
-  const simpanList = (next: Dispenser[], nozzles = s.nozzles) => app.updateSettings({ dispensers: next, jumlahDispenser: next.length, nozzles })
-  const baru = (): Dispenser => ({ id: genId('disp'), nama: `Dispenser ${list.length + 1}`, merk: '', noSeri: '', pulau: '' })
 
   const cols: Col<Dispenser>[] = [
     { header: 'Unit', cell: (x) => <span className="font-semibold">{x.nama || '-'}</span>, mobile: 'title' },
@@ -52,42 +51,74 @@ export function DataDispenser() {
         <span className="tabular text-body-md font-semibold text-on-surface">{list.length} unit dispenser</span>
         <span className="text-body-sm text-on-surface-variant">Nozzle dihubungkan ke unit dispenser di menu Nozzle & Tera Metrologi.</span>
         {ubah ? (
-          <Button size="lg" onClick={() => setEdit(baru())}>
+          <Link to="/pengaturan/dispenser/baru" className={buttonVariants({ size: 'lg' })}>
             <Plus aria-hidden="true" />
             Tambah dispenser
-          </Button>
+          </Link>
         ) : (
           <span className="text-body-sm text-on-surface-variant">Data dispenser hanya dapat diubah ABH.</span>
         )}
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Data Dispenser" rows={list} total={list.length} cols={cols} rowKey={(x) => x.id} onRow={ubah ? setEdit : undefined} empty='Belum ada dispenser. Ketuk "Tambah dispenser".' />
+        <RecordTable title="Data Dispenser" rows={list} total={list.length} cols={cols} rowKey={(x) => x.id} onRow={ubah ? (x) => navigate(`/pengaturan/dispenser/${encodeURIComponent(x.id)}`) : undefined} empty='Belum ada dispenser. Ketuk "Tambah dispenser".' />
       </div>
-      <Sheet open={!!edit} onOpenChange={(o) => !o && setEdit(null)} title={edit && list.some((x) => x.id === edit.id) ? `Ubah ${edit.nama}` : 'Dispenser baru'}>
-        {edit && (
-          <FormDispenser
-            key={edit.id}
-            awal={edit}
-            pulau={Array.from({ length: s.jumlahPulau || 0 }, (_, i) => namaPulau(i + 1))}
-            ada={list.some((x) => x.id === edit.id)}
-            namaLain={list.filter((x) => x.id !== edit.id).map((x) => x.nama.trim().toLowerCase())}
-            onSimpan={(d) => {
-              simpanList(list.some((x) => x.id === d.id) ? list.map((x) => (x.id === d.id ? d : x)) : [...list, d])
-              toast(`${d.nama} tersimpan`)
-              setEdit(null)
-            }}
-            onHapus={() => {
-              if (!window.confirm(`Hapus ${edit.nama}? Nozzle di unit ini tidak lagi terhubung ke dispenser.`)) return
-              simpanList(
-                list.filter((x) => x.id !== edit.id),
-                s.nozzles.map((n) => (n.dispenserId === edit.id ? { ...n, dispenserId: undefined } : n)),
-              )
-              setEdit(null)
-            }}
-          />
-        )}
-      </Sheet>
     </div>
+  )
+}
+
+/** Pengaturan > Data Dispenser > tambah/ubah satu dispenser (halaman tersendiri). */
+export function DispenserEdit() {
+  const app = useApp()
+  const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
+  const { id = '' } = useParams()
+  const s = app.settings
+  const list = s.dispensers ?? []
+  const [baruId] = useState(() => genId('disp'))
+  const ada = list.find((x) => x.id === id)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form dispenser?', detail: 'Perubahan yang belum disimpan akan hilang.' })
+  if (!app.loaded) return <Loading />
+  if (!app.isAdmin) return <GlassCard className="p-space-md">Data dispenser hanya dapat diubah ABH.</GlassCard>
+  if (id !== 'baru' && !ada) return <GlassCard className="p-space-md">Dispenser tidak ditemukan.</GlassCard>
+  const awal: Dispenser = ada ?? { id: baruId, nama: `Dispenser ${list.length + 1}`, merk: '', noSeri: '', pulau: '' }
+  const simpanList = (next: Dispenser[], nozzles = s.nozzles) => app.updateSettings({ dispensers: next, jumlahDispenser: next.length, nozzles })
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-headline-md font-bold text-on-surface">{ada ? `Ubah ${ada.nama}` : 'Dispenser baru'}</span>
+      <FormDispenser
+        awal={awal}
+        pulau={Array.from({ length: s.jumlahPulau || 0 }, (_, i) => namaPulau(i + 1))}
+        ada={!!ada}
+        namaLain={list.filter((x) => x.id !== awal.id).map((x) => x.nama.trim().toLowerCase())}
+        onSimpan={(d) => {
+          simpanList(ada ? list.map((x) => (x.id === d.id ? d : x)) : [...list, d])
+          guard.bypass()
+          keTerkirim({
+            judul: `${d.nama} tersimpan`,
+            detail: 'Data dispenser SPBU diperbarui.',
+            baris: [
+              ['Merk', d.merk],
+              ['Nomor seri', d.noSeri],
+              ['Pulau', d.pulau || '-'],
+            ],
+            aksi: [
+              { to: '/pengaturan/dispenser', label: 'Kembali ke Data Dispenser' },
+              { to: '/pengaturan/dispenser/baru', label: 'Tambah dispenser lain' },
+            ],
+          })
+        }}
+        onHapus={() => {
+          if (!ada || !window.confirm(`Hapus ${ada.nama}? Nozzle di unit ini tidak lagi terhubung ke dispenser.`)) return
+          simpanList(
+            list.filter((x) => x.id !== ada.id),
+            s.nozzles.map((n) => (n.dispenserId === ada.id ? { ...n, dispenserId: undefined } : n)),
+          )
+          guard.bypass()
+          navigate('/pengaturan/dispenser', { replace: true })
+        }}
+      />
+      {guard.dialog}
+    </GlassCard>
   )
 }
 
@@ -149,8 +180,7 @@ function FormDispenser({ awal, pulau, ada, namaLain, onSimpan, onHapus }: { awal
 /** Pengaturan > Nozzle & Tera Metrologi: nozzle per dispenser dan masa berlaku sertifikat tera (maks. 1 tahun). */
 export function NozzleTera() {
   const app = useApp()
-  const toast = useToast()
-  const [edit, setEdit] = useState<Nozzle | null>(null)
+  const navigate = useNavigate()
   if (!app.loaded) return <Loading />
   const s = app.settings
   const list = s.nozzles ?? []
@@ -195,10 +225,10 @@ export function NozzleTera() {
           <Pill>{belum} belum dicatat</Pill>
         </div>
         {ubah ? (
-          <Button size="lg" onClick={() => setEdit({ id: genId('nz'), nama: `Nozzle ${list.length + 1}`, produk: list.at(-1)?.produk ?? PRODUK_OPTIONS[0] })}>
+          <Link to="/pengaturan/nozzle/baru" className={buttonVariants({ size: 'lg' })}>
             <Plus aria-hidden="true" />
             Tambah nozzle
-          </Button>
+          </Link>
         ) : (
           <span className="text-body-sm text-on-surface-variant">Data nozzle hanya dapat diubah ABH.</span>
         )}
@@ -210,33 +240,63 @@ export function NozzleTera() {
           total={list.length}
           cols={cols}
           rowKey={(x) => x.id}
-          onRow={ubah ? setEdit : undefined}
+          onRow={ubah ? (x) => navigate(`/pengaturan/nozzle/${encodeURIComponent(x.id)}`) : undefined}
           rowClass={(x) => (st(x) === 'lewat' || st(x) === 'segera' ? BARIS_ORANYE : undefined)}
           empty='Belum ada nozzle. Ketuk "Tambah nozzle".'
         />
       </div>
-      <Sheet open={!!edit} onOpenChange={(o) => !o && setEdit(null)} title={edit && list.some((x) => x.id === edit.id) ? `Ubah ${edit.nama}` : 'Nozzle baru'}>
-        {edit && (
-          <FormNozzle
-            key={edit.id}
-            awal={edit}
-            dispensers={disp}
-            ada={list.some((x) => x.id === edit.id)}
-            namaLain={list.filter((x) => x.id !== edit.id).map((x) => x.nama.trim().toLowerCase())}
-            onSimpan={(n) => {
-              app.updateSettings({ nozzles: list.some((x) => x.id === n.id) ? list.map((x) => (x.id === n.id ? n : x)) : [...list, n] })
-              toast(`${n.nama} tersimpan`)
-              setEdit(null)
-            }}
-            onHapus={() => {
-              if (!window.confirm(`Hapus ${edit.nama}?`)) return
-              app.updateSettings({ nozzles: list.filter((x) => x.id !== edit.id) })
-              setEdit(null)
-            }}
-          />
-        )}
-      </Sheet>
     </div>
+  )
+}
+
+/** Pengaturan > Nozzle & Tera Metrologi > tambah/ubah satu nozzle (halaman tersendiri). */
+export function NozzleEdit() {
+  const app = useApp()
+  const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
+  const { id = '' } = useParams()
+  const list = app.settings.nozzles ?? []
+  const [baruId] = useState(() => genId('nz'))
+  const ada = list.find((x) => x.id === id)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form nozzle?', detail: 'Perubahan yang belum disimpan akan hilang.' })
+  if (!app.loaded) return <Loading />
+  if (!app.isAdmin) return <GlassCard className="p-space-md">Data nozzle hanya dapat diubah ABH.</GlassCard>
+  if (id !== 'baru' && !ada) return <GlassCard className="p-space-md">Nozzle tidak ditemukan.</GlassCard>
+  const awal: Nozzle = ada ?? { id: baruId, nama: `Nozzle ${list.length + 1}`, produk: list.at(-1)?.produk ?? PRODUK_OPTIONS[0] }
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-headline-md font-bold text-on-surface">{ada ? `Ubah ${ada.nama}` : 'Nozzle baru'}</span>
+      <FormNozzle
+        awal={awal}
+        dispensers={app.settings.dispensers ?? []}
+        ada={!!ada}
+        namaLain={list.filter((x) => x.id !== awal.id).map((x) => x.nama.trim().toLowerCase())}
+        onSimpan={(n) => {
+          app.updateSettings({ nozzles: ada ? list.map((x) => (x.id === n.id ? n : x)) : [...list, n] })
+          guard.bypass()
+          keTerkirim({
+            judul: `${n.nama} tersimpan`,
+            detail: 'Data nozzle & tera metrologi diperbarui.',
+            baris: [
+              ['Produk', n.produk],
+              ['Dispenser', (app.settings.dispensers ?? []).find((d) => d.id === n.dispenserId)?.nama ?? '-'],
+              ['Sertifikat tera', n.teraTanggal ? `${n.teraNoSertifikat || '-'}, ${formatTanggalIso(n.teraTanggal)}` : 'belum dicatat'],
+            ],
+            aksi: [
+              { to: '/pengaturan/nozzle', label: 'Kembali ke Nozzle & Tera' },
+              { to: '/pengaturan/nozzle/baru', label: 'Tambah nozzle lain' },
+            ],
+          })
+        }}
+        onHapus={() => {
+          if (!ada || !window.confirm(`Hapus ${ada.nama}?`)) return
+          app.updateSettings({ nozzles: list.filter((x) => x.id !== ada.id) })
+          guard.bypass()
+          navigate('/pengaturan/nozzle', { replace: true })
+        }}
+      />
+      {guard.dialog}
+    </GlassCard>
   )
 }
 

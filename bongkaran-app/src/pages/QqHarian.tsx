@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Beaker, ChevronRight, CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Beaker, ChevronRight, CircleCheck, CircleDot, Flag, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
-import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
-import { Choice, Field, Ladder } from '@/components/bongkaran/form-bits'
+import { Field, Ladder } from '@/components/bongkaran/form-bits'
+import { PilihShift, useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { Loading } from '@/components/bongkaran/load-state'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -17,7 +17,6 @@ import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import {
-  bejanaStatus,
   newQqKualitas,
   QQ_FOTO,
   qqD15,
@@ -33,6 +32,8 @@ import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
 import { compressImage } from '@/lib/image'
 import { acuanD15 } from '@/lib/ringkasan'
 import { shiftLabel, type Shift } from '@/lib/shift'
+import { statusShift } from '@/lib/status-isi'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { PRODUK_OPTIONS, type Photo } from '@/lib/sop'
 
 /** Waktu (di luar render). */
@@ -47,14 +48,38 @@ function upsert<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
 }
 
-/** Input > Kualitas Harian: uji density per produk, disimpan per baris. Tera bejana 20 L ada di Input > Uji Takaran. */
+/** Operation > Kualitas Harian: hanya memilih shift (hijau selesai, oranye belum, merah terlewat). */
+export function QqHarianMenu() {
+  const app = useApp()
+  if (!app.loaded) return <Loading />
+  const rec = (tanggal: string, shift: Shift) => app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(tanggal, shift))
+  return (
+    <div className="flex flex-col gap-space-md">
+      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
+        Pilih shift untuk uji density & suhu per produk. Uji dinyatakan selesai setelah semua baris dan foto wajib terkirim.
+      </p>
+      <PilihShift
+        status={(k) => statusShift(k, !!rec(k.tanggal, k.shift)?.data.selesaiAt)}
+        keHalaman={(k) => `/kualitas/${k.tanggal}/${k.shift}`}
+        keterangan={(k, st) => {
+          const r = rec(k.tanggal, k.shift)
+          if (st === 'sudah' && r) return `Selesai · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}`
+          if (r) return `${st === 'terlewat' ? 'Terlewat' : 'Belum selesai'} · sebagian tersimpan`
+          return undefined
+        }}
+      />
+    </div>
+  )
+}
+
+/** Halaman form uji kualitas harian satu shift: density per produk (disimpan per baris), foto wajib, lalu kirim. */
 export function QqHarian() {
   const app = useApp()
-  const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const toast = useToast()
+  const { tanggal, shift, valid } = useKunciShift()
+  const key = { tanggal, shift }
   const { key: now } = useStokShift()
-  const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
-  const [range, setRange] = useDateRange('7d')
   const records = useMemo(() => app.daily.filter((d): d is QqRecord => d.kind === 'qq'), [app.daily])
   const id = qqRecordId(key.tanggal, key.shift)
   const existing = records.find((r) => r.id === id) ?? null
@@ -75,12 +100,15 @@ export function QqHarian() {
   const srcOf = usePhotoSrc(allPhotos)
   const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
   const guard = useLeaveGuard({
-    active: belumSimpan > 0,
+    active: true,
     title: 'Keluar dari kualitas harian?',
-    detail: `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`,
+    detail: belumSimpan
+      ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
+      : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim.',
   })
 
   if (!app.loaded) return <Loading />
+  if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
 
   const setData = (patch: Partial<QqData>) => {
     setError(null)
@@ -178,18 +206,28 @@ export function QqHarian() {
     setBusy('selesai')
     try {
       await persist(() => ({ ...data, selesaiAt: isoNow() }))
-      setDraft(null)
-      toast('Uji Q&Q harian selesai')
-      navigate(`/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`)
+      guard.bypass()
+      const namaShift = shiftLabel(key.shift).split(' (')[0]
+      const hasil = data.kualitas.map((k): [string, string] => {
+        const d15 = qqD15(k).d15
+        return [k.produk, d15 ? `D15 ${formatDensity(d15.value)}` : '-']
+      })
+      keTerkirim({
+        judul: `Uji kualitas ${namaShift} terkirim`,
+        detail: `${formatTanggalIso(key.tanggal)}, ${shiftLabel(key.shift)}`,
+        baris: [...hasil, ['Total pump test', `${formatNumber(totalPumpTest(data).kualitas, 1)} L`], ['Petugas', data.petugas.trim()]],
+        aksi: [
+          { to: '/kualitas', label: 'Pilih shift lain' },
+          { to: `/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`, label: 'Lihat riwayat kualitas' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
-    } finally {
       setBusy(null)
     }
   }
 
   const pump = totalPumpTest(data)
-  const history = records.filter((r) => inRange(r.tanggal, range)).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
   const isNow = key.tanggal === now.tanggal && key.shift === now.shift
   const selesai = !!existing?.data.selesaiAt && !draft
 
@@ -209,24 +247,9 @@ export function QqHarian() {
           </div>
           {existing?.data.selesaiAt ? <Pill tone="success">Selesai</Pill> : existing ? <Pill tone="cyan">Sebagian tersimpan</Pill> : <Pill>Belum diuji</Pill>}
         </div>
-        <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Tanggal" htmlFor="qq-tgl">
-            <Input id="qq-tgl" type="date" value={key.tanggal} onChange={(e) => e.target.value && setKey({ ...key, tanggal: e.target.value })} />
-          </Field>
-          <Field label="Jam uji" htmlFor="qq-jam">
-            <Input id="qq-jam" type="time" value={data.jam} onChange={(e) => setData({ jam: e.target.value })} />
-          </Field>
-        </div>
-        <Choice
-          label="Shift"
-          value={String(key.shift) as '1' | '2' | '3'}
-          onChange={(v) => setKey({ ...key, shift: Number(v) as Shift })}
-          options={[
-            { value: '1', label: 'Shift 1' },
-            { value: '2', label: 'Shift 2' },
-            { value: '3', label: 'Shift 3' },
-          ]}
-        />
+        <Field label="Jam uji" htmlFor="qq-jam">
+          <Input id="qq-jam" type="time" value={data.jam} onChange={(e) => setData({ jam: e.target.value })} />
+        </Field>
         <Field label="Petugas" htmlFor="qq-petugas">
           <Input id="qq-petugas" value={data.petugas} onChange={(e) => setData({ petugas: e.target.value })} />
         </Field>
@@ -315,7 +338,7 @@ export function QqHarian() {
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-body-md font-semibold text-on-surface">Tera takaran bejana 20 L</span>
-            <span className="text-body-sm text-on-surface-variant">Sekarang di menu Input &gt; Uji Takaran (per nozzle, opsi Preset & Manual, foto)</span>
+            <span className="text-body-sm text-on-surface-variant">Menu Operation &gt; Uji Takaran (per nozzle, opsi Preset & Manual, foto)</span>
           </span>
           <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
         </Link>
@@ -330,46 +353,11 @@ export function QqHarian() {
           </div>
         )}
         <Button size="lg" className="w-full" disabled={busy !== null || selesai} onClick={selesaikan}>
-          {selesai ? <CircleCheck aria-hidden="true" /> : <Save aria-hidden="true" />}
-          {selesai ? `Uji selesai ${jamDari(existing?.data.selesaiAt)}` : 'Selesaikan uji'}
+          {selesai ? <CircleCheck aria-hidden="true" /> : <Send aria-hidden="true" />}
+          {selesai ? `Uji selesai ${jamDari(existing?.data.selesaiAt)}` : 'Kirim uji kualitas'}
         </Button>
       </GlassCard>
 
-      <section aria-labelledby="riwayat-qq" className="flex flex-col gap-space-sm">
-        <SectionHeader id="riwayat-qq" title="Riwayat Q&Q harian" />
-        <DateFilter id="qq-range" value={range} onChange={setRange} />
-        {history.length === 0 ? (
-          <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-            Belum ada uji Q&Q pada rentang ini.
-          </GlassCard>
-        ) : (
-          history.map((r) => {
-            const lewat = r.data.kuantitas.filter((n) => bejanaStatus(n.selisihMl) === 'lewat')
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => {
-                  setKey({ tanggal: r.tanggal, shift: r.shift })
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                className="glass-1 flex min-h-14 items-center gap-space-sm rounded-lg p-space-sm text-left active:scale-[0.99]"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-body-md font-semibold text-on-surface">
-                    {formatTanggalIso(r.tanggal)}, shift {r.shift}
-                    {!r.data.selesaiAt && <span className="font-normal text-on-surface-variant"> (belum selesai)</span>}
-                  </span>
-                  <span className="truncate text-body-sm text-on-surface-variant">
-                    {r.data.kualitas.map((k) => `${k.produk} ${qqD15(k).d15 ? formatDensity(qqD15(k).d15!.value) : '-'}`).join(', ') || 'Tanpa uji kualitas'}
-                  </span>
-                </div>
-                {lewat.length ? <Pill tone="error">{lewat.length} nozzle lewat</Pill> : <Pill tone="success">{r.data.kualitas.length} produk</Pill>}
-              </button>
-            )
-          })
-        )}
-      </section>
       {guard.dialog}
     </div>
   )

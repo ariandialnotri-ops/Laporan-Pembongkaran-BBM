@@ -11,11 +11,12 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Sheet } from '@/components/ui/sheet'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { useToast } from '@/components/ui/toast'
 import { berlakuInstansi, DEFAULT_AREAS, jenisLengkap, kodeBerikut, lokasiOptions, namaPulau, statusInstansi, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 type Row = { u: AparUnit; tipe: AparTipe }
@@ -74,7 +75,6 @@ export function DataUtamaApar() {
   const baru = useSearchParams()[0].get('baru')
   const toast = useToast()
   const [saring, setSaring] = useState<Saring>('semua')
-  const [areaOpen, setAreaOpen] = useState(false)
   if (!app.loaded) return <Loading />
 
   const s = app.settings
@@ -165,7 +165,7 @@ export function DataUtamaApar() {
           title="Area / lokasi"
           action={
             ubah ? (
-              <button type="button" onClick={() => setAreaOpen(true)} className="touch-44 text-body-sm font-semibold text-primary">
+              <button type="button" onClick={() => navigate('/apar/data/area')} className="touch-44 text-body-sm font-semibold text-primary">
                 Tambah area
               </button>
             ) : undefined
@@ -202,10 +202,38 @@ export function DataUtamaApar() {
         </GlassCard>
       </section>
 
-      <Sheet open={areaOpen} onOpenChange={setAreaOpen} title="Tambah area" description="Area baru muncul di pilihan lokasi APAR/APAB.">
-        {areaOpen && <AreaBaru opsi={lokasiOptions(pulau, areas)} onSimpan={(nama) => (app.updateSettings({ aparArea: [...areas, nama] }), setAreaOpen(false), toast(`Area "${nama}" ditambahkan`))} />}
-      </Sheet>
     </div>
+  )
+}
+
+/** Data utama APAR > Tambah area (halaman tersendiri). */
+export function TambahAreaApar() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari tambah area?', detail: 'Area yang belum disimpan akan hilang.' })
+  if (!app.loaded) return <Loading />
+  const s = app.settings
+  const areas = s.aparArea ?? DEFAULT_AREAS
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-body-sm text-on-surface-variant">Area baru muncul di pilihan lokasi APAR/APAB.</span>
+      <AreaBaru
+        opsi={lokasiOptions(s.jumlahPulau ?? 0, areas)}
+        onSimpan={(nama) => {
+          app.updateSettings({ aparArea: [...areas, nama] })
+          guard.bypass()
+          keTerkirim({
+            judul: `Area "${nama}" tersimpan`,
+            detail: 'Area baru sudah bisa dipilih sebagai lokasi APAR/APAB.',
+            aksi: [
+              { to: '/apar/data', label: 'Kembali ke Data Utama APAR' },
+              { to: '/apar/data/area', label: 'Tambah area lain' },
+            ],
+          })
+        }}
+      />
+      {guard.dialog}
+    </GlassCard>
   )
 }
 

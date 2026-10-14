@@ -5,13 +5,26 @@ import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 
 /**
- * Konfirmasi sebelum meninggalkan form (tombol kembali, menu dock, atau tautan lain).
- * `bypass()` dipakai untuk perpindahan yang memang disengaja, mis. setelah hapus.
+ * Konfirmasi sebelum meninggalkan form (panah kembali, sidebar, bar bawah, atau tautan lain).
+ * `bypass()` dipakai untuk perpindahan yang memang disengaja, mis. setelah kirim atau hapus.
+ * `izinkan(path)` = tujuan yang tidak perlu konfirmasi (mis. halaman turunan form yang sama).
  */
-export function useLeaveGuard({ active, title, detail, beforeLeave }: { active: boolean; title: string; detail: ReactNode; beforeLeave?: () => Promise<unknown> | void }) {
+export function useLeaveGuard({
+  active,
+  title,
+  detail,
+  beforeLeave,
+  izinkan,
+}: {
+  active: boolean
+  title: string
+  detail: ReactNode
+  beforeLeave?: () => Promise<unknown> | void
+  izinkan?: (pathname: string) => boolean
+}) {
   const lewati = useRef(false)
   const [keluar, setKeluar] = useState(false)
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => active && !lewati.current && currentLocation.pathname !== nextLocation.pathname)
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => active && !lewati.current && currentLocation.pathname !== nextLocation.pathname && !izinkan?.(nextLocation.pathname))
   const open = blocker.state === 'blocked'
 
   const dialog = (

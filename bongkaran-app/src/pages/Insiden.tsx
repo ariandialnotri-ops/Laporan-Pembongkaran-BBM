@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { LoaderCircle, Plus, Send, ShieldAlert } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
@@ -9,6 +9,7 @@ import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
+import { KartuPilih } from '@/components/bongkaran/pilih-status'
 import { BARIS_BARU, BARIS_ORANYE, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -38,6 +39,7 @@ import {
 import { shiftKey } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
 import { usePhotoSrc } from '@/lib/use-photo-src'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -57,15 +59,44 @@ function StatusPill({ s }: { s: StatusInsiden }) {
 const tingkatTone = (t: TingkatInsiden) => (t === 'tinggi' ? 'text-error' : t === 'sedang' ? 'text-amber-700' : 'text-on-surface-variant')
 
 /** Input > Pelaporan Insiden: form satu laporan insiden / near miss / kerusakan. Kirim lalu ke riwayat. */
+/** HSSE > Laporan Insiden & Near miss: pilih jenis kejadian, lalu isi form di halaman berikutnya. */
+export function PilihJenisInsiden() {
+  const app = useApp()
+  if (!app.loaded) return <Loading />
+  const terbuka = (j: JenisInsiden) => app.daily.filter((x): x is InsidenRecord => x.kind === 'insiden' && x.data.jenis === j && x.data.status !== 'selesai').length
+  return (
+    <div className="flex flex-col gap-space-md">
+      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">Pilih jenis kejadian yang akan dilaporkan.</p>
+      <div className="animate-entrance-2 flex flex-col gap-space-sm">
+        {JENIS_INSIDEN.map((j) => {
+          const n = terbuka(j.value)
+          return (
+            <KartuPilih
+              key={j.value}
+              to={`/insiden/baru/${j.value}`}
+              status={n ? 'belum' : 'sudah'}
+              judul={j.label}
+              sub={j.desc}
+              keterangan={n ? `${n} laporan belum selesai ditindaklanjuti` : 'Tidak ada laporan terbuka'}
+            />
+          )
+        })}
+      </div>
+      <span className="px-space-xs text-body-sm text-on-surface-variant">Warna menunjukkan tindak lanjut: oranye = masih ada laporan terbuka, hijau = semua selesai.</span>
+    </div>
+  )
+}
+
 export function InsidenBaru() {
   const app = useApp()
-  const toast = useToast()
-  const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
+  const { jenis: jenisParam } = useParams()
+  const jenisAwal = (JENIS_INSIDEN.find((j) => j.value === jenisParam)?.value ?? 'nearmiss') as JenisInsiden
   const [id] = useState(() => genId('insiden'))
   const [tanggal, setTanggal] = useState(() => todayIso())
   const [d, setD] = useState<InsidenData>(() => ({
-    jenis: 'nearmiss',
-    kategori: KATEGORI_INSIDEN.nearmiss[0],
+    jenis: jenisAwal,
+    kategori: KATEGORI_INSIDEN[jenisAwal][0],
     jam: nowHm(),
     lokasi: '',
     aset: '',
@@ -83,9 +114,8 @@ export function InsidenBaru() {
   }))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
-  const [dirty, setDirty] = useState(false)
   const srcOf = usePhotoSrc(d.foto)
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa mengirim laporan?', detail: 'Isian laporan kejadian ini belum dikirim.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar tanpa mengirim laporan?', detail: 'Isian laporan kejadian ini belum dikirim.' })
   if (!app.loaded) return <Loading />
 
   const s = app.settings
@@ -93,7 +123,6 @@ export function InsidenBaru() {
   const aset = [...(s.dispensers ?? []).map((x) => x.nama), ...(s.nozzles ?? []).map((x) => x.nama), 'Tangki pendam', 'ATG', 'Genset', 'Kanopi', 'Kendaraan pelanggan']
   const set = (p: Partial<InsidenData>) => {
     setError(null)
-    setDirty(true)
     setD((x) => ({ ...x, ...p }))
   }
   const fotoWajib = d.jenis !== 'nearmiss'
@@ -103,8 +132,7 @@ export function InsidenBaru() {
     try {
       const baru: Photo[] = []
       for (const f of files) baru.push(await app.backend.uploadPhoto(`daily-${id}`, await compressImage(f), 'kejadian.jpg'))
-      setDirty(true)
-      setError(null)
+        setError(null)
       setD((x) => ({ ...x, foto: [...x.foto, ...baru] }))
     } catch (e) {
       setError(`Gagal menyimpan foto: ${pesan(e)}`)
@@ -129,8 +157,21 @@ export function InsidenBaru() {
       const data: InsidenData = { ...d, pelapor: d.pelapor.trim(), riwayat: [{ at: isoNow(), oleh: d.pelapor.trim(), status: 'terbuka', catatan: 'Laporan dibuat' }] }
       await app.saveDaily({ id, kind: 'insiden', tanggal, shift, data, createdAt: stamp(), updatedAt: stamp(), createdBy: app.session.user?.id ?? null })
       guard.bypass()
-      toast(`Laporan ${jenisLabel(d.jenis).toLowerCase()} terkirim`)
-      navigate(`/laporan/insiden?baru=${encodeURIComponent(id)}`)
+      keTerkirim({
+        judul: `Laporan ${jenisLabel(d.jenis).toLowerCase()} terkirim`,
+        detail: `${d.kategori}, ${formatTanggalIso(tanggal)} ${d.jam}`,
+        baris: [
+          ['Lokasi', d.lokasi],
+          ...(d.aset.trim() ? ([['Peralatan', d.aset.trim()]] as [string, string][]) : []),
+          ['Tingkat risiko', d.tingkat],
+          ['Foto', `${d.foto.length} foto`],
+          ['Pelapor', d.pelapor.trim()],
+        ],
+        aksi: [
+          { to: `/laporan/insiden/${encodeURIComponent(id)}`, label: 'Lihat laporan & tindak lanjut' },
+          { to: '/insiden/baru', label: 'Laporkan kejadian lain' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
@@ -141,24 +182,8 @@ export function InsidenBaru() {
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <span className="text-tag uppercase text-primary">Jenis kejadian</span>
-        <div role="radiogroup" aria-label="Jenis kejadian" className="grid grid-cols-1 gap-space-xs sm:grid-cols-3">
-          {JENIS_INSIDEN.map((j) => {
-            const on = d.jenis === j.value
-            return (
-              <button
-                key={j.value}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => set({ jenis: j.value, kategori: KATEGORI_INSIDEN[j.value][0] })}
-                className={cn('flex min-h-14 flex-col items-start justify-center rounded-md px-space-sm py-space-xs text-left', on ? 'bg-primary text-on-primary' : 'inset-field text-on-surface')}
-              >
-                <span className="text-body-md font-bold">{j.label}</span>
-                <span className={cn('text-body-sm', on ? 'text-on-primary' : 'text-on-surface-variant')}>{j.desc}</span>
-              </button>
-            )
-          })}
-        </div>
+        <span className="text-headline-md font-bold text-on-surface">{jenisLabel(d.jenis)}</span>
+        <span className="text-body-sm text-on-surface-variant">{JENIS_INSIDEN.find((j) => j.value === d.jenis)?.desc}</span>
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Kategori" htmlFor="ins-kategori" className="col-span-2">
             <Select value={d.kategori} onValueChange={(v) => set({ kategori: v })}>
@@ -175,7 +200,7 @@ export function InsidenBaru() {
             </Select>
           </Field>
           <Field label="Tanggal kejadian" htmlFor="ins-tgl">
-            <Input id="ins-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => (setDirty(true), setTanggal(e.target.value))} />
+            <Input id="ins-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
           </Field>
           <Field label="Jam kejadian" htmlFor="ins-jam">
             <Input id="ins-jam" type="time" value={d.jam} onChange={(e) => set({ jam: e.target.value })} />

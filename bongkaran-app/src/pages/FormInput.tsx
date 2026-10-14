@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronRight, ClipboardList, LoaderCircle, Truck, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ClipboardList, LoaderCircle, Truck, TriangleAlert } from 'lucide-react'
+import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StokGate, TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -8,7 +9,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { formatTanggalIso } from '@/lib/date'
+import { formatTanggalIso, todayIso } from '@/lib/date'
 import { loPickable } from '@/lib/plan'
 import { blankReport, evaluateAll, STEPS, summarize } from '@/lib/sop'
 import { cn } from '@/lib/utils'
@@ -76,33 +77,25 @@ export function FormInput() {
           </GlassCard>
         ) : (
           <div className="flex flex-col gap-space-xs">
-            {drafts.map((r) => (
-              <Link key={r.id} to={`/input/${r.id}`}>
-                <GlassCard level={1} className="transition-shadow duration-200 hover:shadow-md">
-                  <div className="flex items-center gap-space-sm p-space-sm">
-                    <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary-fixed text-primary">
-                      <Truck className="size-5" />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="tabular text-body-md font-semibold text-on-surface">{r.nopol || 'MT baru'}</span>
-                        {r.densityAnomaly ? (
-                          <Pill tone="error">Anomali density</Pill>
-                        ) : (
-                          <Pill tone="cyan">
-                            Tahap {Math.min(r.doneCount + 1, STEPS.length)}/{STEPS.length}
-                          </Pill>
-                        )}
-                      </div>
-                      <span className="truncate text-body-sm text-on-surface-variant">
-                        {r.produk || 'Produk belum dipilih'}, {formatTanggalIso(r.tanggal)} {r.jam}
-                      </span>
-                    </div>
-                    <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-                  </div>
-                </GlassCard>
-              </Link>
-            ))}
+            {drafts.map((r) => {
+              // Bongkaran dari hari sebelumnya yang belum diselesaikan = terlewat (merah).
+              const st = r.tanggal < todayIso() ? 'terlewat' : 'belum'
+              return (
+                <KartuPilih
+                  key={r.id}
+                  to={`/input/${r.id}`}
+                  status={st}
+                  judul={<span className="tabular">{r.nopol || 'MT baru'}</span>}
+                  sub={`${r.produk || 'Produk belum dipilih'}, ${formatTanggalIso(r.tanggal)} ${r.jam}`}
+                  keterangan={
+                    r.densityAnomaly
+                      ? 'Anomali density'
+                      : `${st === 'terlewat' ? 'Belum diselesaikan · ' : ''}Tahap ${Math.min(r.doneCount + 1, STEPS.length)}/${STEPS.length}`
+                  }
+                />
+              )
+            })}
+            <LegendaStatus />
           </div>
         )}
       </section>

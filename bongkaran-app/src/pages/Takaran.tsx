@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Beaker, Camera, CircleCheck, FileDown, FileText, History, LoaderCircle, Send, Trash2, TriangleAlert, X } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
-import { BARIS_BARU, BARIS_ORANYE, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_ORANYE, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -24,6 +25,7 @@ import { PRODUK_OPTIONS, type Photo } from '@/lib/sop'
 import { currentShift } from '@/lib/shift'
 import { FOTO_TAKAR, formatMl, OPSI_TAKAR, opsiLabel, takarStatus, TOLERANSI_TAKAR_ML, type FotoTakarKey, type OpsiTakar, type TakarData } from '@/lib/takar'
 import { usePhotoSrc } from '@/lib/use-photo-src'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -49,22 +51,103 @@ type FotoLokal = { id: string; blob: Blob; url: string }
  * produk, memilih opsi P (Preset) atau M (Manual), mengisi selisih (ml), memotret dudukan
  * bejana + water pass dan hasil pengukuran, lalu mengirim satu hasil. Ulangi untuk hasil berikutnya.
  */
-export function UjiTakaran() {
+/**
+ * Operation > Uji Takaran: pilih nozzle. Hijau = Preset & Manual sudah diuji hari ini,
+ * oranye = belum lengkap. Hasil hari ini tampil di bawah.
+ */
+export function MenuTakaran() {
   const app = useApp()
-  const toast = useToast()
   useSyncOnOpen()
   const semua = useTakar()
-  const [nozzle, setNozzle] = useState('')
-  const [produk, setProduk] = useState('')
-  const [opsi, setOpsi] = useState<OpsiTakar>('P')
+  const [detail, setDetail] = useState<TakarRecord | null>(null)
+  if (!app.loaded) return <Loading />
+  const today = todayIso()
+  const hariIni = semua.filter((r) => r.tanggal === today).sort((a, b) => a.createdAt - b.createdAt)
+  // Nozzle dari Pengaturan; nozzle yang diuji hari ini tetapi tidak terdaftar ikut tampil.
+  const daftar = new Map<string, string>()
+  for (const n of app.settings.nozzles ?? []) if (n.nama.trim()) daftar.set(n.nama.trim().toUpperCase(), n.produk)
+  for (const r of hariIni) if (!daftar.has(r.data.nozzle.toUpperCase())) daftar.set(r.data.nozzle.toUpperCase(), r.data.produk)
+  const nama = (key: string) => (app.settings.nozzles ?? []).find((n) => n.nama.trim().toUpperCase() === key)?.nama.trim() ?? hariIni.find((r) => r.data.nozzle.toUpperCase() === key)?.data.nozzle ?? key
+  return (
+    <div className="flex flex-col gap-space-md">
+      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
+        Pilih nozzle, lalu uji dengan bejana ukur 20 L untuk opsi Preset dan Manual. Toleransi: selisih tidak boleh kurang dari {TOLERANSI_TAKAR_ML} ml.
+      </p>
+      <section aria-labelledby="takar-nozzle" className="animate-entrance-2 flex flex-col gap-space-xs">
+        <SectionHeader id="takar-nozzle" title="Nozzle" action={<span className="tabular text-body-sm text-on-surface-variant">{daftar.size}</span>} />
+        {[...daftar].map(([key, prod]) => {
+          const uji = hariIni.filter((r) => r.data.nozzle.toUpperCase() === key)
+          const p = uji.some((r) => r.data.opsi === 'P')
+          const m = uji.some((r) => r.data.opsi === 'M')
+          const lewat = uji.some((r) => takarStatus(r.data.hasilMl) === 'lewat')
+          const lanjut: OpsiTakar = p && !m ? 'M' : 'P'
+          return (
+            <KartuPilih
+              key={key}
+              to={`/takaran/uji?nozzle=${encodeURIComponent(nama(key))}&produk=${encodeURIComponent(prod)}&opsi=${lanjut}`}
+              status={p && m ? 'sudah' : 'belum'}
+              judul={`Nozzle ${nama(key)}`}
+              sub={prod || '-'}
+              keterangan={`Preset ${p ? '✓' : 'belum'} · Manual ${m ? '✓' : 'belum'}${lewat ? ' · melebihi toleransi' : ''}`}
+            />
+          )
+        })}
+        <KartuPilih to="/takaran/uji" status="belum" judul="Nozzle lain" sub="Ketik nomor nozzle & produk sendiri" keterangan="Uji baru" />
+        <LegendaStatus />
+      </section>
+
+      <section aria-labelledby="takar-hari-ini" className="animate-entrance-3 flex flex-col gap-space-sm">
+        <SectionHeader id="takar-hari-ini" title={`Hasil uji hari ini (${hariIni.length})`} />
+        <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
+          {hariIni.length === 0 && <p className="p-space-md text-center text-body-sm text-on-surface-variant">Belum ada hasil terkirim hari ini.</p>}
+          {hariIni.map((r, i) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setDetail(r)}
+              className={cn('flex min-h-14 w-full items-center gap-space-sm px-space-sm py-space-xs text-left', takarStatus(r.data.hasilMl) === 'lewat' && BARIS_ORANYE)}
+            >
+              <span className="tabular w-6 shrink-0 text-body-sm font-bold text-on-surface-variant">{i + 1}.</span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-body-md font-semibold leading-snug text-on-surface">
+                  Nozzle {r.data.nozzle} {r.data.produk}, {opsiLabel(r.data.opsi)} = <span className="tabular whitespace-nowrap">{formatMl(r.data.hasilMl)}</span>
+                </span>
+                <span className="truncate text-body-sm text-on-surface-variant">
+                  {r.data.jam} oleh {r.data.petugas || '-'}
+                </span>
+              </span>
+              <StatusTakar hasil={r.data.hasilMl} />
+            </button>
+          ))}
+        </GlassCard>
+        {app.can('/laporan/takaran') && (
+          <Link to="/laporan/takaran" className={buttonVariants({ variant: 'glass' })}>
+            <History aria-hidden="true" />
+            Riwayat uji takaran
+          </Link>
+        )}
+      </section>
+      <DetailTakar r={detail} onClose={() => setDetail(null)} />
+    </div>
+  )
+}
+
+/** Halaman form uji takaran satu nozzle & opsi. */
+export function UjiTakaran() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  useSyncOnOpen()
+  const semua = useTakar()
+  const [params] = useSearchParams()
+  const [nozzle, setNozzle] = useState(() => params.get('nozzle') ?? '')
+  const [produk, setProduk] = useState(() => params.get('produk') ?? '')
+  const [opsi, setOpsi] = useState<OpsiTakar>(() => (params.get('opsi') === 'M' ? 'M' : 'P'))
   const [hasil, setHasil] = useState('')
   const [catatan, setCatatan] = useState('')
   const [petugas, setPetugas] = useState(() => (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName))
   const [foto, setFoto] = useState<Record<FotoTakarKey, FotoLokal[]>>({ dudukan: [], hasil: [] })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<FotoTakarKey | 'kirim' | null>(null)
-  const [terakhir, setTerakhir] = useState<string | null>(null)
-  const [detail, setDetail] = useState<TakarRecord | null>(null)
   const fotoRef = useRef(foto)
   useEffect(() => {
     fotoRef.current = foto
@@ -72,8 +155,7 @@ export function UjiTakaran() {
   // Lepas pratinjau foto saat halaman ditutup.
   useEffect(() => () => Object.values(fotoRef.current).flat().forEach((f) => URL.revokeObjectURL(f.url)), [])
 
-  const adaIsian = !!hasil.trim() || !!catatan.trim() || foto.dudukan.length > 0 || foto.hasil.length > 0
-  const guard = useLeaveGuard({ active: adaIsian, title: 'Keluar dari uji takaran?', detail: 'Hasil uji dan foto yang belum dikirim akan hilang.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari uji takaran?', detail: 'Hasil uji dan foto yang belum dikirim akan hilang.' })
   if (!app.loaded) return <Loading />
 
   const today = todayIso()
@@ -145,15 +227,28 @@ export function UjiTakaran() {
       // Tanggal kalender saat uji (bukan tanggal operasional shift 3), shift tetap dicatat.
       const t = stamp()
       await app.saveDaily({ id, kind: 'takar', tanggal: todayIso(), shift: currentShift().shift, data, createdAt: t, updatedAt: t, createdBy: app.session.user?.id ?? null })
-      toast(`Nozzle ${data.nozzle} ${opsiLabel(opsi)} terkirim: ${formatMl(data.hasilMl)}`)
-      // Siap untuk hasil berikutnya: nozzle & produk tetap, opsi berpindah ke yang belum diuji.
+      guard.bypass()
       Object.values(foto).flat().forEach((f) => URL.revokeObjectURL(f.url))
-      setFoto({ dudukan: [], hasil: [] })
-      setHasil('')
-      setCatatan('')
-      setTerakhir(id)
+      // Opsi lain nozzle ini yang belum diuji hari ini ditawarkan sebagai langkah berikutnya.
       const lain: OpsiTakar = opsi === 'P' ? 'M' : 'P'
-      if (!hariIni.some((r) => r.data.nozzle.toUpperCase() === data.nozzle.toUpperCase() && r.data.opsi === lain)) setOpsi(lain)
+      const lainBelum = !hariIni.some((r) => r.data.nozzle.toUpperCase() === data.nozzle.toUpperCase() && r.data.opsi === lain)
+      const q = (o: OpsiTakar) => `/takaran/uji?nozzle=${encodeURIComponent(data.nozzle)}&produk=${encodeURIComponent(data.produk)}&opsi=${o}`
+      keTerkirim({
+        judul: `Nozzle ${data.nozzle} · ${opsiLabel(opsi)} terkirim`,
+        detail: `${data.produk}, ${formatTanggalIso(todayIso())} ${data.jam}`,
+        peringatan: takarStatus(data.hasilMl) === 'lewat' ? `Melebihi toleransi ${TOLERANSI_TAKAR_ML} ml. Laporkan ke pengawas.` : undefined,
+        baris: [
+          ['Hasil (selisih dari 20 L)', formatMl(data.hasilMl)],
+          ['Foto', `${data.foto.dudukan.length + data.foto.hasil.length} foto`],
+          ['Petugas', data.petugas],
+        ],
+        aksi: [
+          ...(lainBelum ? [{ to: q(lain), label: `Lanjut uji ${opsiLabel(lain)} nozzle ${data.nozzle}` }] : []),
+          { to: '/takaran', label: 'Pilih nozzle lain' },
+          { to: '/laporan/takaran', label: 'Riwayat uji takaran' },
+        ],
+      })
+      return
     } catch (e) {
       setError(`Gagal mengirim: ${pesan(e)}`)
     } finally {
@@ -267,39 +362,6 @@ export function UjiTakaran() {
         </Button>
       </GlassCard>
 
-      <section aria-labelledby="takar-hari-ini" className="animate-entrance-3 flex flex-col gap-space-sm">
-        <SectionHeader id="takar-hari-ini" title={`Hasil uji hari ini (${hariIni.length})`} />
-        <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
-          {hariIni.length === 0 && <p className="p-space-md text-center text-body-sm text-on-surface-variant">Belum ada hasil terkirim hari ini.</p>}
-          {hariIni.map((r, i) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setDetail(r)}
-              className={cn('flex min-h-14 w-full items-center gap-space-sm px-space-sm py-space-xs text-left', r.id === terakhir ? BARIS_BARU : takarStatus(r.data.hasilMl) === 'lewat' && BARIS_ORANYE)}
-            >
-              <span className="tabular w-6 shrink-0 text-body-sm font-bold text-on-surface-variant">{i + 1}.</span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-body-md font-semibold leading-snug text-on-surface">
-                  Nozzle {r.data.nozzle} {r.data.produk}, {opsiLabel(r.data.opsi)} = <span className="tabular whitespace-nowrap">{formatMl(r.data.hasilMl)}</span>
-                </span>
-                <span className="truncate text-body-sm text-on-surface-variant">
-                  {r.data.jam} oleh {r.data.petugas || '-'}
-                </span>
-              </span>
-              <StatusTakar hasil={r.data.hasilMl} />
-            </button>
-          ))}
-        </GlassCard>
-        {app.can('/laporan/takaran') && (
-          <Link to="/laporan/takaran" className={buttonVariants({ variant: 'glass' })}>
-            <History aria-hidden="true" />
-            Riwayat uji takaran
-          </Link>
-        )}
-      </section>
-
-      <DetailTakar r={detail} onClose={() => setDetail(null)} />
       {guard.dialog}
     </div>
   )

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SupplySelect } from '@/components/bongkaran/lo-fields'
@@ -10,9 +11,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso, minutesBetween, nowHm } from '@/lib/date'
@@ -436,7 +435,7 @@ function LoStep(props: StepProps) {
     if (!props.readOnly && noLOsPlan && kunciPlan !== d.noLOs.join('|')) setData({ noLOs: noLOsPlan })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kunciPlan])
-  const [ubahLo, setUbahLo] = useState<PlanLo | null>(null)
+  const navigate = useNavigate()
 
   const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
   const removeComp = (id: string) =>
@@ -495,7 +494,7 @@ function LoStep(props: StepProps) {
                     {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
                   </CheckRow>
                   {checked && !props.readOnly && (
-                    <Button variant="soft" size="sm" className="self-start" onClick={() => setUbahLo(lo)}>
+                    <Button variant="soft" size="sm" className="self-start" onClick={() => plan && navigate(`/input/${encodeURIComponent(props.report.id)}/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(lo.id)}`)}>
                       <Repeat aria-hidden="true" />
                       Ubah nomor LO / pindah station
                     </Button>
@@ -518,7 +517,6 @@ function LoStep(props: StepProps) {
         </span>
       </Section>
 
-      {plan && <UbahLoSheet plan={plan} lo={ubahLo} onClose={() => setUbahLo(null)} />}
 
       <Section>
         <span className="text-tag uppercase text-primary">Data LO mobil tangki</span>
@@ -956,17 +954,9 @@ export function SignersSection({
  * Ubah nomor LO saat bongkar, mis. MT dialihkan ke station (supply point) lain dan LO terbit ulang.
  * Disimpan ke Plan sehingga Tracking LO dan laporan ikut berubah; LO lama tetap tercatat.
  */
-function UbahLoSheet({ plan, lo, onClose }: { plan: Plan; lo: PlanLo | null; onClose: () => void }) {
-  return (
-    <Sheet open={!!lo} onOpenChange={(o) => !o && onClose()} title="Ubah nomor LO" description={lo ? `${lo.produk}, ${formatLiter(lo.volume)}, SO ${plan.noSO || '-'}` : undefined}>
-      {lo && <UbahLoIsi key={lo.id} plan={plan} lo={lo} onClose={onClose} />}
-    </Sheet>
-  )
-}
-
-function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () => void }) {
+/** Isi halaman Ubah nomor LO (pages/UbahLo). `onClose(hasil)` dipanggil setelah tersimpan, tanpa hasil bila tidak ada perubahan. */
+export function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: (hasil?: { baru: string; pindah: boolean; sp: string }) => void }) {
   const app = useApp()
-  const toast = useToast()
   const asal = planSupply(plan, lo)
   const [no, setNo] = useState(lo.noLO)
   const [pindah, setPindah] = useState(false)
@@ -992,8 +982,7 @@ function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () 
     setSaving(true)
     try {
       await app.savePlan({ ...plan, los: plan.los.map((x) => (x.id === lo.id ? next : x)) })
-      toast(pindah ? `Pindah station: LO ${lo.noLO || '-'} menjadi ${baru}` : `Nomor LO menjadi ${baru}`)
-      onClose()
+      onClose({ baru, pindah, sp })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

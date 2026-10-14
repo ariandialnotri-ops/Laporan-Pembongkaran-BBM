@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CircleCheck, Save, TriangleAlert } from 'lucide-react'
-import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
-import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { useState } from 'react'
+import { Send, TriangleAlert } from 'lucide-react'
+import { Field } from '@/components/bongkaran/form-bits'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
+import { PilihShift, useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
-import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { stokRecordId, type StokData, type StokItem, type StokRecord } from '@/lib/daily'
 import { formatTanggalIso } from '@/lib/date'
-import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
-import { currentShift, shiftLabel, type Shift } from '@/lib/shift'
+import { formatLiter, parseAngka } from '@/lib/format'
+import { shiftLabel, type Shift } from '@/lib/shift'
+import { statusShift } from '@/lib/status-isi'
 import { TANKS, tankName, volumeFromLevel } from '@/lib/tank'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 // Ditulis lengkap agar kelas animasi ikut terbaca Tailwind.
@@ -27,34 +27,59 @@ const blankItem = (): StokItem => ({ tinggi: '', volume: '', pengeluaran: '' })
 /** Waktu simpan (di luar render). */
 const stamp = () => Date.now()
 
+const stokLengkap = (r: StokRecord | undefined) => !!r && TANKS.every((t) => (r.data.items[t.produk]?.volume ?? '').trim() !== '')
+
+/** Operation > Stok Awal Shift: hanya memilih shift (hijau sudah, oranye belum, merah terlewat). */
 export function StokShift() {
   const app = useApp()
-  const navigate = useNavigate()
-  const toast = useToast()
-  const now = currentShift()
-  const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
-  const [range, setRange] = useDateRange('7d')
-  const records = useMemo(() => app.daily.filter((d): d is StokRecord => d.kind === 'stok'), [app.daily])
-  const existing = records.find((r) => r.id === stokRecordId(key.tanggal, key.shift)) ?? null
-  const [draft, setDraft] = useState<{ id: string; data: StokData } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
   if (!app.loaded) return <Loading />
   // Tanpa database tangki, stok awal (tinggi -> volume) belum bisa diisi.
   if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" detail="Stok awal shift diisi per tangki (tinggi ATG/deepstick ke volume), jadi menunggu database tangki SPBU ini." />
+  const rec = (tanggal: string, shift: Shift) => app.daily.find((d): d is StokRecord => d.kind === 'stok' && d.id === stokRecordId(tanggal, shift))
+  return (
+    <div className="flex flex-col gap-space-md">
+      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
+        Pilih shift untuk mengisi stok awal tiap produk. Pengeluaran dispenser dilengkapi di akhir shift dari shift yang sama.
+      </p>
+      <PilihShift
+        status={(k) => statusShift(k, stokLengkap(rec(k.tanggal, k.shift)))}
+        keHalaman={(k) => `/stok/${k.tanggal}/${k.shift}`}
+        keterangan={(k, st) => {
+          const r = rec(k.tanggal, k.shift)
+          if (st !== 'sudah' || !r) return undefined
+          const jual = TANKS.every((t) => (r.data.items[t.produk]?.pengeluaran ?? '').trim() !== '')
+          return `Sudah diisi · ${r.data.petugas || '-'}${jual ? '' : ' · pengeluaran belum'}`
+        }}
+      />
+    </div>
+  )
+}
 
-  const id = stokRecordId(key.tanggal, key.shift)
-  // Draf mengikuti shift terpilih; pindah shift memuat data shift itu.
-  const data: StokData =
-    draft?.id === id ? draft.data : (existing?.data ?? { petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName, items: {}, catatan: '' })
+/** Halaman form stok awal satu shift: tinggi & volume per produk, pengeluaran di akhir shift. */
+export function StokShiftForm() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const { tanggal, shift, valid } = useKunciShift()
+  const id = stokRecordId(tanggal, shift)
+  const existing = app.daily.find((d): d is StokRecord => d.kind === 'stok' && d.id === id) ?? null
+  const [draft, setDraft] = useState<StokData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const namaShift = shiftLabel(shift).split(' (')[0]
+  const guard = useLeaveGuard({ active: true, title: `Keluar dari stok ${namaShift}?`, detail: 'Isian yang belum dikirim akan hilang.' })
+
+  if (!app.loaded) return <Loading />
+  if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" />
+  if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
+
+  const data: StokData = draft ?? existing?.data ?? { petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName, items: {}, catatan: '' }
   const setData = (patch: Partial<StokData>) => {
     setError(null)
-    setDraft({ id, data: { ...data, ...patch } })
+    setDraft({ ...data, ...patch })
   }
   const setItem = (produk: string, patch: Partial<StokItem>) => setData({ items: { ...data.items, [produk]: { ...(data.items[produk] ?? blankItem()), ...patch } } })
 
-  const simpan = async () => {
+  const kirim = async () => {
     const kosong = TANKS.filter((t) => parseAngka(data.items[t.produk]?.volume ?? '') === null)
     if (kosong.length) return setError(`Isi stok awal: ${kosong.map((t) => t.produk).join(', ')}`)
     if (!data.petugas.trim()) return setError('Isi nama petugas.')
@@ -63,63 +88,39 @@ export function StokShift() {
       const rec: StokRecord = {
         id,
         kind: 'stok',
-        tanggal: key.tanggal,
-        shift: key.shift,
+        tanggal,
+        shift,
         data,
         createdAt: existing?.createdAt ?? stamp(),
         updatedAt: stamp(),
         createdBy: existing?.createdBy ?? app.session.user?.id ?? null,
       }
       await app.saveDaily(rec)
-      setDraft(null)
-      toast(`Stok ${shiftLabel(key.shift).split(' (')[0]} tersimpan`)
-      navigate(`/laporan/persediaan?baru=${encodeURIComponent(id)}`)
+      guard.bypass()
+      const total = TANKS.reduce((n, t) => n + (parseAngka(data.items[t.produk]?.volume ?? '') ?? 0), 0)
+      keTerkirim({
+        judul: `Stok awal ${namaShift} terkirim`,
+        detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}`,
+        baris: [...TANKS.map((t): [string, string] => [t.produk, formatLiter(parseAngka(data.items[t.produk]?.volume ?? '') ?? 0)]), ['Total', formatLiter(total)], ['Petugas', data.petugas.trim()]],
+        aksi: [
+          { to: '/stok', label: 'Pilih shift lain' },
+          { to: `/laporan/persediaan?baru=${encodeURIComponent(id)}`, label: 'Lihat catatan persediaan' },
+        ],
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setSaving(false)
     }
   }
 
-  const isNow = key.tanggal === now.tanggal && key.shift === now.shift
-  const history = records.filter((r) => inRange(r.tanggal, range)).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
-
   return (
     <div className="flex flex-col gap-space-md">
-      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col">
-            <h2 className="text-headline-md font-bold text-on-surface">{shiftLabel(key.shift)}</h2>
-            <span className="text-body-sm text-on-surface-variant">
-              {formatTanggalIso(key.tanggal)}
-              {isNow ? ', shift berjalan' : ''}
-            </span>
-          </div>
-          {existing ? <Pill tone="success">Tersimpan</Pill> : <Pill tone="error">Wajib diisi</Pill>}
+      <GlassCard level={2} className="animate-entrance-1 flex items-start justify-between gap-2 p-space-md">
+        <div className="flex flex-col">
+          <h2 className="text-headline-md font-bold text-on-surface">{shiftLabel(shift)}</h2>
+          <span className="text-body-sm text-on-surface-variant">{formatTanggalIso(tanggal)}</span>
         </div>
-        <div className="grid grid-cols-[1fr_auto] items-end gap-space-sm">
-          <Field label="Tanggal shift" htmlFor="stok-tgl">
-            <Input id="stok-tgl" type="date" value={key.tanggal} onChange={(e) => e.target.value && setKey({ ...key, tanggal: e.target.value })} />
-          </Field>
-          {!isNow && (
-            <Button variant="soft" size="sm" onClick={() => setKey(now)}>
-              Shift berjalan
-            </Button>
-          )}
-        </div>
-        <Choice
-          label="Shift"
-          value={String(key.shift) as '1' | '2' | '3'}
-          onChange={(v) => setKey({ ...key, shift: Number(v) as Shift })}
-          options={[
-            { value: '1', label: 'Shift 1' },
-            { value: '2', label: 'Shift 2' },
-            { value: '3', label: 'Shift 3' },
-          ]}
-        />
-        <span className="text-body-sm text-on-surface-variant">
-          Stok awal diisi saat shift dimulai. Pengeluaran dispenser diisi di akhir shift dari catatan penjualan shift.
-        </span>
+        {existing ? <Pill tone="success">Sudah diisi</Pill> : <Pill tone="error">Wajib diisi</Pill>}
       </GlassCard>
 
       {TANKS.map((t, i) => {
@@ -167,48 +168,12 @@ export function StokShift() {
             <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
           </div>
         )}
-        <Button size="lg" className="w-full" disabled={saving} onClick={simpan}>
-          <Save aria-hidden="true" />
-          Simpan stok {shiftLabel(key.shift).split(' (')[0]}
+        <Button size="lg" className="w-full" disabled={saving} onClick={kirim}>
+          <Send aria-hidden="true" />
+          Kirim stok {namaShift}
         </Button>
       </GlassCard>
-
-      <section aria-labelledby="riwayat-stok" className="flex flex-col gap-space-sm">
-        <SectionHeader id="riwayat-stok" title="Riwayat stok shift" />
-        <DateFilter id="stok-range" value={range} onChange={setRange} />
-        {history.length === 0 ? (
-          <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-            Belum ada catatan stok pada rentang ini.
-          </GlassCard>
-        ) : (
-          history.map((r) => {
-            const total = Object.values(r.data.items).reduce((n, it) => n + (parseAngka(it.volume) ?? 0), 0)
-            const jual = Object.values(r.data.items).reduce((n, it) => n + (parseAngka(it.pengeluaran) ?? 0), 0)
-            const lengkapJual = TANKS.every((t) => (r.data.items[t.produk]?.pengeluaran ?? '').trim() !== '')
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => {
-                  setKey({ tanggal: r.tanggal, shift: r.shift })
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                className="glass-1 flex min-h-14 items-center gap-space-sm rounded-lg p-space-sm text-left active:scale-[0.99]"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-body-md font-semibold text-on-surface">
-                    {formatTanggalIso(r.tanggal)}, shift {r.shift}
-                  </span>
-                  <span className="tabular text-body-sm text-on-surface-variant">
-                    Stok awal {formatLiter(total)}, keluar {formatNumber(jual)} L, {r.data.petugas}
-                  </span>
-                </div>
-                {lengkapJual ? <CircleCheck aria-label="Pengeluaran lengkap" className="size-5 text-primary" /> : <Pill>Pengeluaran belum</Pill>}
-              </button>
-            )
-          })
-        )}
-      </section>
+      {guard.dialog}
     </div>
   )
 }

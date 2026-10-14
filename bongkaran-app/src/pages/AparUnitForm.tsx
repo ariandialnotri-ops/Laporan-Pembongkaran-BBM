@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { APAR_JENIS, berlakuInstansi, DEFAULT_AREAS, isDcp, kodeBerikut, MASA_INSTANSI_BULAN, lokasiOptions, SISTEM_DCP, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
@@ -49,6 +50,7 @@ export function AparUnitForm() {
 function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
   const app = useApp()
   const toast = useToast()
+  const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const s = app.settings
@@ -57,7 +59,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
   const [u, setU] = useState<AparUnit>(() => awal?.u ?? unitBaru(tipe, kodeBerikut(tipe, semua)))
   const [error, setError] = useState<string | null>(null)
   const dirty = !awal || JSON.stringify(u) !== JSON.stringify(awal.u)
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa menyimpan?', detail: 'Isian unit APAR/APAB ini belum disimpan.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form unit?', detail: dirty ? 'Isian unit APAR/APAB ini belum disimpan.' : 'Belum ada perubahan yang disimpan.' })
   const lokasi = [...new Set([...lokasiOptions(s.jumlahPulau ?? 0, s.aparArea ?? DEFAULT_AREAS), ...(u.lokasi ? [u.lokasi] : [])])]
   const set = (p: Partial<AparUnit>) => (setError(null), setU({ ...u, ...p }))
 
@@ -81,8 +83,19 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     const ganti = (arr: AparUnit[]) => (arr.some((x) => x.id === u.id) ? arr.map((x) => (x.id === u.id ? next : x)) : [...arr, next])
     app.updateSettings(tipe === 'apar' ? { apar: ganti(list('apar')) } : { apab: ganti(list('apab')) })
     guard.bypass()
-    toast(`${kode} ${awal ? 'diperbarui' : 'ditambahkan'}`)
-    navigate(`/apar/data?baru=${encodeURIComponent(u.id)}`)
+    keTerkirim({
+      judul: `${kode} ${awal ? 'diperbarui' : 'ditambahkan'}`,
+      detail: `${tipe === 'apar' ? (u.cadangan ? 'APAR cadangan' : 'APAR') : 'APAB'}${u.lokasi ? `, ${u.lokasi}` : ''}`,
+      baris: [
+        ['Kapasitas', `${u.kapasitasKg} kg`],
+        ['Lokasi', u.lokasi || (u.cadangan ? 'Cadangan' : '-')],
+      ],
+      aksi: [
+        { to: `/apar/data?baru=${encodeURIComponent(u.id)}`, label: 'Kembali ke Data Utama APAR' },
+        { to: `/apar/label`, label: 'Cetak label QR' },
+        { to: `/apar/data/unit/baru?tipe=${tipe}`, label: 'Tambah unit lain' },
+      ],
+    })
   }
 
   const hapus = () => {

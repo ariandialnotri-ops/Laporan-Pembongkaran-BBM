@@ -35,6 +35,18 @@ npm run lint
 
 ## Layar
 
+**Alur input.** Semua form input berupa halaman tersendiri (bukan pop-up):
+1. **Menu pilih**: kartu berwarna. Hijau = sudah diisi, oranye = belum, merah = terlewat, abu-abu = belum waktunya.
+   Contoh: Stok Awal & Kualitas Harian = strip 7 hari + 3 kartu shift; Pasca Penerimaan = per penerimaan
+   (merah bila shift selesai bongkar sudah lewat tanpa uji); Uji Takaran = per nozzle (hijau bila Preset &
+   Manual sudah diuji hari ini); APAR = per unit (merah bila bulan lalu juga terlewat); Operasional = per form.
+2. **Halaman form**: panah kembali, sidebar, atau bar bawah selalu meminta konfirmasi sebelum keluar.
+3. **Halaman Terkirim** (`/terkirim`): ringkasan data, tombol **Kembali ke Dashboard**, dan langkah berikutnya.
+
+Form pengaturan juga halaman: dispenser/nozzle (`/pengaturan/dispenser/:id`, `/pengaturan/nozzle/:id`), tambah
+area APAR, tambah SPBU (`/unit/baru`), ganti kata sandi (`/profil/sandi`), anggota (`/anggota/baru`,
+`/anggota/daftar`, `/anggota/sandi/:id`), dan ubah nomor LO saat bongkar.
+
 **Navigasi.** Menu dikelompokkan per peruntukan: **Dashboard**, **Operation** (stok awal shift, input
 bongkaran, kualitas harian, kualitas pasca penerimaan, kaleng sample, uji takaran, perawatan &
 housekeeping), **Delivery** (plan pengiriman, tracking LO), **HSSE** (inspeksi APAR/APAB, laporan insiden &

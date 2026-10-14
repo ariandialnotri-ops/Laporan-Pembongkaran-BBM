@@ -100,7 +100,7 @@ export function MenuOperation() {
       {app.can('/stok') && stok.tanpaTangki && <TangkiBelumAda className="animate-entrance-1" />}
       {app.can('/stok') && !stok.tanpaTangki && (
         <Link
-          to="/stok"
+          to={stok.missing ? `/stok/${stok.key.tanggal}/${stok.key.shift}` : '/stok'}
           className={cn(
             'animate-entrance-1 flex min-h-16 items-center gap-space-sm rounded-lg p-space-sm transition-transform active:scale-[0.99]',
             stok.missing ? 'border border-error/40 bg-error-container/70' : 'glass-1',

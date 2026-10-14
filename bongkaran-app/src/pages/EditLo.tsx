@@ -11,13 +11,13 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/components/ui/toast'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { LO_MANUAL_STATUS, LO_MAX_LITER, loStatus, loStatusMeta, pecahVolume, planSupply, SHIFT_PERMINTAAN } from '@/lib/plan'
 import type { LoStatus, Plan, PlanLo } from '@/lib/sop'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 /** Satu baris tabel edit. `asal` = LO tersimpan (kosong untuk hasil pecah LO lama di atas 8.000 L). */
@@ -75,7 +75,7 @@ export function EditLo() {
 
 function Form({ plan }: { plan: Plan }) {
   const app = useApp()
-  const toast = useToast()
+  const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const fokus = params.get('lo')
@@ -91,7 +91,7 @@ function Form({ plan }: { plan: Plan }) {
   const awal = useMemo(() => JSON.stringify({ noSO: plan.noSO, rows: barisDari(plan, bisaUbah) }), [plan]) // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = JSON.stringify({ noSO, rows }) !== awal
   const dipecah = rows.filter((r) => !r.asal).length
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa menyimpan?', detail: 'Perubahan nomor SO dan LO pada halaman ini belum disimpan.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari edit SO & LO?', detail: dirty ? 'Perubahan nomor SO dan LO pada halaman ini belum disimpan.' : 'Belum ada perubahan yang disimpan.' })
 
   useEffect(() => {
     // Baris LO yang diketuk di Tracking LO ditandai dan digulir ke tengah layar.
@@ -148,8 +148,14 @@ function Form({ plan }: { plan: Plan }) {
       if (los.length) await app.savePlan({ ...plan, noSO: noSO.trim(), los })
       else await app.deletePlan(plan)
       guard.bypass()
-      toast(los.length ? 'SO & LO tersimpan' : 'Permintaan dihapus')
-      navigate(`${kembaliKe}?baru=${encodeURIComponent(plan.id)}`)
+      keTerkirim({
+        judul: los.length ? 'SO & LO terkirim' : 'Permintaan dihapus',
+        detail: `Kirim ${formatTanggalIso(plan.tanggal)}${noSO.trim() ? `, SO ${noSO.trim()}` : ''}`,
+        baris: los.map((lo): [string, string] => [`${lo.produk} ${formatNumber(lo.volume)} L`, lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit']),
+        aksi: [
+          { to: `${kembaliKe}?baru=${encodeURIComponent(plan.id)}`, label: kembaliKe === '/plan' ? 'Kembali ke Plan Pengiriman' : 'Kembali ke Tracking LO' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
     } finally {

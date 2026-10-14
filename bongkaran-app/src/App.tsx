@@ -16,7 +16,11 @@ import { Login, NotMember, SessionState } from '@/pages/Login'
 
 // Halaman selain Dashboard & menu Input dimuat saat dibuka, agar pembukaan awal ringan.
 const Anggota = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.Anggota })))
+const AnggotaBaru = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.AnggotaBaru })))
+const AnggotaDaftar = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.AnggotaDaftar })))
+const AnggotaSandi = lazy(() => import('@/pages/Anggota').then((m) => ({ default: m.AnggotaSandi })))
 const BeritaAcara = lazy(() => import('@/pages/BeritaAcara').then((m) => ({ default: m.BeritaAcara })))
+const UbahLo = lazy(() => import('@/pages/UbahLo').then((m) => ({ default: m.UbahLo })))
 const FormBongkar = lazy(() => import('@/pages/FormBongkar').then((m) => ({ default: m.FormBongkar })))
 const FormInput = lazy(() => import('@/pages/FormInput').then((m) => ({ default: m.FormInput })))
 const AparDashboard = lazy(() => import('@/pages/AparDashboard').then((m) => ({ default: m.AparDashboard })))
@@ -24,9 +28,11 @@ const AparLabel = lazy(() => import('@/pages/AparLabel').then((m) => ({ default:
 const AparUnit = lazy(() => import('@/pages/AparUnit').then((m) => ({ default: m.AparUnit })))
 const AparUnitForm = lazy(() => import('@/pages/AparUnitForm').then((m) => ({ default: m.AparUnitForm })))
 const DataUtamaApar = lazy(() => import('@/pages/DataUtamaApar').then((m) => ({ default: m.DataUtamaApar })))
+const TambahAreaApar = lazy(() => import('@/pages/DataUtamaApar').then((m) => ({ default: m.TambahAreaApar })))
 const InspeksiUnit = lazy(() => import('@/pages/InspeksiUnit').then((m) => ({ default: m.InspeksiUnit })))
 const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
 const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenBaru })))
+const PilihJenisInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.PilihJenisInsiden })))
 const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
 const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenDetail })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
@@ -35,6 +41,8 @@ const IdentitasSpbu = lazy(() => import('@/pages/Pengaturan').then((m) => ({ def
 const AturanPemeriksaan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.AturanPemeriksaan })))
 const DataAcuan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.DataAcuan })))
 const DataDispenser = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DataDispenser })))
+const DispenserEdit = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DispenserEdit })))
+const NozzleEdit = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.NozzleEdit })))
 const NozzleTera = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.NozzleTera })))
 const SoldShipTo = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.SoldShipTo })))
 const MenuOperation = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuOperation })))
@@ -49,24 +57,32 @@ const OpsIsi = lazy(() => import('@/pages/Operasional').then((m) => ({ default: 
 const LaporanOps = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.LaporanOps })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
+const PlanBaru = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.PlanBaru })))
 const EditLo = lazy(() => import('@/pages/EditLo').then((m) => ({ default: m.EditLo })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
+const GantiSandi = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.GantiSandi })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
+const QqHarianMenu = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarianMenu })))
 const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ default: m.RiwayatApar })))
 const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
 const KualitasDetail = lazy(() => import('@/pages/KualitasDetail').then((m) => ({ default: m.KualitasDetail })))
 const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
 const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
 const Sample2Jam = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2Jam })))
+const Sample2JamForm = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2JamForm })))
 const UnitBisnis = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.UnitBisnis })))
+const TambahSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.TambahSpbu })))
 const SiapkanSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.SiapkanSpbu })))
 const SpbuBelumSiap = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.SpbuBelumSiap })))
 const TanpaSpbu = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.TanpaSpbu })))
 const DatabaseTangki = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.DatabaseTangki })))
 const TangkiForm = lazy(() => import('@/pages/Tangki').then((m) => ({ default: m.TangkiForm })))
 const UjiTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.UjiTakaran })))
+const MenuTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.MenuTakaran })))
 const RiwayatTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.RiwayatTakaran })))
 const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
+const StokShiftForm = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShiftForm })))
+const Terkirim = lazy(() => import('@/pages/Terkirim').then((m) => ({ default: m.Terkirim })))
 
 function Gate() {
   const app = useApp()
@@ -85,7 +101,7 @@ function Gate() {
   // Multi SPBU: akun tanpa SPBU, dan SPBU yang belum punya identitas & database tangki.
   if (app.loaded && !app.spbuId) {
     if (!app.isAdmin) return <Layar isi={<TanpaSpbu />} />
-    if (pathname !== '/unit' && pathname !== '/profil') return <Navigate to="/unit" replace />
+    if (pathname !== '/unit' && pathname !== '/unit/baru' && pathname !== '/profil' && pathname !== '/terkirim') return <Navigate to="/unit" replace />
   }
   if (app.loaded && app.spbuId && !app.spbuSiap && !bebasSaatBelumSiap(pathname)) {
     if (app.role === 'abh' || app.role === 'pengawas') return <Navigate to="/siapkan" replace />
@@ -114,17 +130,25 @@ function Gate() {
           <Route path="/kaleng" element={<HalamanKaleng />} />
           <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
+          <Route path="/input/:id/lo/:planId/:loId" element={<UbahLo />} />
           <Route path="/plan" element={<Plan />} />
+          <Route path="/plan/baru" element={<PlanBaru />} />
           <Route path="/plan/so/:id" element={<EditLo />} />
-          <Route path="/kualitas" element={<QqHarian />} />
+          <Route path="/kualitas" element={<QqHarianMenu />} />
+          <Route path="/kualitas/:tanggal/:shift" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
+          <Route path="/sample/:id" element={<Sample2JamForm />} />
           <Route path="/stok" element={<StokShift />} />
-          <Route path="/takaran" element={<UjiTakaran />} />
+          <Route path="/stok/:tanggal/:shift" element={<StokShiftForm />} />
+          <Route path="/terkirim" element={<Terkirim />} />
+          <Route path="/takaran" element={<MenuTakaran />} />
+          <Route path="/takaran/uji" element={<UjiTakaran />} />
           <Route path="/laporan/takaran" element={<RiwayatTakaran />} />
           <Route path="/apar" element={<AparDashboard />} />
           <Route path="/apar/inspeksi" element={<InspeksiApar />} />
           <Route path="/apar/inspeksi/:id" element={<InspeksiUnit />} />
           <Route path="/apar/data" element={<DataUtamaApar />} />
+          <Route path="/apar/data/area" element={<TambahAreaApar />} />
           <Route path="/apar/data/unit/:id" element={<AparUnitForm />} />
           <Route path="/apar/label" element={<AparLabel />} />
           <Route path="/apar/unit/:id" element={<AparUnit />} />
@@ -143,22 +167,30 @@ function Gate() {
           <Route path="/ops" element={<OpsMenu />} />
           <Route path="/ops/:form" element={<OpsIsi />} />
           <Route path="/laporan/ops" element={<LaporanOps />} />
-          <Route path="/insiden/baru" element={<InsidenBaru />} />
+          <Route path="/insiden/baru" element={<PilihJenisInsiden />} />
+          <Route path="/insiden/baru/:jenis" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
           <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />
           <Route path="/profil" element={<Profil />} />
+          <Route path="/profil/sandi" element={<GantiSandi />} />
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
           <Route path="/pengaturan/identitas" element={<IdentitasSpbu />} />
           <Route path="/pengaturan/dispenser" element={<DataDispenser />} />
+          <Route path="/pengaturan/dispenser/:id" element={<DispenserEdit />} />
           <Route path="/pengaturan/nozzle" element={<NozzleTera />} />
+          <Route path="/pengaturan/nozzle/:id" element={<NozzleEdit />} />
           <Route path="/pengaturan/sold-ship-to" element={<SoldShipTo />} />
           <Route path="/pengaturan/aturan" element={<AturanPemeriksaan />} />
           <Route path="/pengaturan/acuan" element={<DataAcuan />} />
           <Route path="/anggota" element={<Anggota />} />
+          <Route path="/anggota/baru" element={<AnggotaBaru />} />
+          <Route path="/anggota/daftar" element={<AnggotaDaftar />} />
+          <Route path="/anggota/sandi/:userId" element={<AnggotaSandi />} />
           <Route path="/pengaturan/tangki" element={<DatabaseTangki />} />
           <Route path="/pengaturan/tangki/:id" element={<TangkiForm />} />
           <Route path="/unit" element={<UnitBisnis />} />
+          <Route path="/unit/baru" element={<TambahSpbu />} />
           <Route path="/siapkan" element={<SiapkanSpbu />} />
           {/* Alamat lama */}
           <Route path="/qq/*" element={<Navigate to="/kualitas" replace />} />
@@ -183,7 +215,7 @@ export default App
 
 /** Halaman yang tetap terbuka saat data SPBU belum lengkap. */
 function bebasSaatBelumSiap(path: string) {
-  return ['/siapkan', '/pengaturan/identitas', '/pengaturan/tangki', '/profil', '/unit', '/anggota', '/kalkulator'].includes(path) || path.startsWith('/pengaturan/tangki/')
+  return ['/siapkan', '/pengaturan/identitas', '/pengaturan/tangki', '/profil', '/unit', '/unit/baru', '/anggota', '/kalkulator', '/terkirim'].includes(path) || path.startsWith('/pengaturan/tangki/') || path.startsWith('/anggota/')
 }
 
 function Layar({ isi }: { isi: ReactNode }) {

@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, RefreshCw, Trash2, TriangleAlert, UserPlus } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { KeyRound, RefreshCw, Trash2, TriangleAlert, UserCheck, UserPlus } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import type { Member, Role } from '@/lib/backend'
 import { roleLabel, ROLES } from '@/lib/roles'
+import { useKeTerkirim } from '@/lib/terkirim'
+import { cn } from '@/lib/utils'
 
 /** Kata sandi sementara: 10 karakter tanpa huruf/angka yang mirip (O/0, l/1). */
 function sandiAcak() {
@@ -39,25 +43,35 @@ function PeranSelect({ id, value, onChange, disabled, label }: { id?: string; va
   )
 }
 
-/** Profil > Anggota (khusus ABH): buat akun login per peran, ubah peran, atur ulang kata sandi. */
-export function Anggota() {
+/** Anggota SPBU aktif (dimuat ulang saat ABH berpindah SPBU). */
+function useAnggota() {
   const app = useApp()
-  const toast = useToast()
   const [members, setMembers] = useState<Member[] | null>(null)
   const [loadError, setLoadError] = useState<Error | null>(null)
-  const [form, setForm] = useState({ email: '', nama: '', role: 'kashift' as Role, password: sandiAcak() })
-  const [lama, setLama] = useState({ email: '', nama: '', role: 'kashift' as Role })
-  const [dibuat, setDibuat] = useState<{ email: string; password: string; role: Role } | null>(null)
-  const [reset, setReset] = useState<{ m: Member; password: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  // Anggota SPBU aktif; dimuat ulang saat ABH berpindah SPBU.
   const { backend, loaded, spbuId } = app
   const load = useCallback(() => {
     if (!loaded || !spbuId) return
     backend.listMembers().then(setMembers, (e: unknown) => setLoadError(e instanceof Error ? e : new Error(String(e))))
   }, [backend, loaded, spbuId])
   useEffect(load, [load])
+  return { members, loadError, load, retry: () => (setLoadError(null), load()) }
+}
+
+function KhususAbh() {
+  return (
+    <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+      Anggota hanya dapat dikelola ABH saat aplikasi tersambung ke Supabase.
+    </GlassCard>
+  )
+}
+
+/** Profil > Anggota (khusus ABH): daftar anggota, ubah peran, hapus; form akun di halaman tersendiri. */
+export function Anggota() {
+  const app = useApp()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const { members, loadError, load, retry } = useAnggota()
+  const [busy, setBusy] = useState(false)
 
   const run = async (task: () => Promise<void>, ok?: string) => {
     setBusy(true)
@@ -65,73 +79,29 @@ export function Anggota() {
       await task()
       if (ok) toast(ok)
       load()
-      return true
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Gagal', TriangleAlert)
-      return false
     } finally {
       setBusy(false)
     }
   }
 
-  if (!app.isAdmin || app.backend.mode !== 'supabase') {
-    return (
-      <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-        Anggota hanya dapat dikelola ABH saat aplikasi tersambung ke Supabase.
-      </GlassCard>
-    )
-  }
-  if (loadError) return <LoadError error={loadError} onRetry={() => (setLoadError(null), load())} />
+  if (!app.isAdmin || app.backend.mode !== 'supabase') return <KhususAbh />
+  if (loadError) return <LoadError error={loadError} onRetry={retry} />
   if (!members) return <Loading />
-
-  const buat = () =>
-    run(async () => {
-      if (!form.email.trim()) throw new Error('Isi email akun.')
-      if (form.password.length < 8) throw new Error('Kata sandi minimal 8 karakter.')
-      await app.backend.createAccount(form.email.trim(), form.password, form.nama.trim(), form.role)
-      setDibuat({ email: form.email.trim().toLowerCase(), password: form.password, role: form.role })
-      setForm({ email: '', nama: '', role: form.role, password: sandiAcak() })
-    }, 'Akun dibuat')
 
   return (
     <div className="flex flex-col gap-space-md">
-      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
-        <div className="flex flex-col">
-          <span className="text-tag uppercase text-primary">Buat akun baru di {app.spbu?.nama || 'SPBU ini'}</span>
-          <span className="text-body-sm text-on-surface-variant">Akun langsung aktif. Berikan email & kata sandi sementara ke pemiliknya, lalu minta ganti kata sandi di menu Profil.</span>
-        </div>
-        <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Nama" htmlFor="ang-nama" className="col-span-2 sm:col-span-1">
-            <Input id="ang-nama" autoComplete="off" value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
-          </Field>
-          <Field label="Peran" htmlFor="ang-role" className="col-span-2 sm:col-span-1">
-            <PeranSelect id="ang-role" value={form.role} onChange={(role) => setForm({ ...form, role })} />
-          </Field>
-          <Field label="Email" htmlFor="ang-email" className="col-span-2">
-            <Input id="ang-email" type="email" autoComplete="off" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </Field>
-          <Field label="Kata sandi sementara" htmlFor="ang-pass" className="col-span-2">
-            <div className="grid grid-cols-[1fr_auto] gap-space-xs">
-              <Input id="ang-pass" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-              <Button variant="glass" size="icon" aria-label="Buat kata sandi acak" onClick={() => setForm({ ...form, password: sandiAcak() })}>
-                <RefreshCw aria-hidden="true" />
-              </Button>
-            </div>
-          </Field>
-        </div>
-        <span className="text-body-sm text-on-surface-variant">{ROLES.find((r) => r.key === form.role)?.desc}</span>
-        <Button size="lg" className="w-full" disabled={busy || !form.email.trim()} onClick={buat}>
+      <div className="animate-entrance-1 grid grid-cols-1 gap-space-xs sm:grid-cols-2">
+        <Link to="/anggota/baru" className={buttonVariants({ size: 'lg' })}>
           <UserPlus aria-hidden="true" />
-          Buat akun {roleLabel(form.role)}
-        </Button>
-        {dibuat && (
-          <div role="status" className="flex flex-col gap-0.5 rounded-md bg-emerald-50 p-space-sm text-body-sm text-on-surface">
-            <span className="font-semibold">Akun {roleLabel(dibuat.role)} siap dipakai</span>
-            <span className="tabular">Email: {dibuat.email}</span>
-            <span className="tabular">Kata sandi: {dibuat.password}</span>
-          </div>
-        )}
-      </GlassCard>
+          Buat akun baru
+        </Link>
+        <Link to="/anggota/daftar" className={cn(buttonVariants({ variant: 'glass', size: 'lg' }))}>
+          <UserCheck aria-hidden="true" />
+          Daftarkan akun yang sudah ada
+        </Link>
+      </div>
 
       <section aria-labelledby="daftar-anggota" className="animate-entrance-2 flex flex-col gap-space-sm">
         <SectionHeader id="daftar-anggota" title={`Anggota ${app.spbu?.nama || 'SPBU'} (${members.length})`} />
@@ -149,7 +119,7 @@ export function Anggota() {
                 ) : (
                   <div className="flex items-center gap-1">
                     <PeranSelect label={`Peran ${m.email}`} value={m.role} disabled={busy} onChange={(r) => void run(() => app.backend.setMemberRole(m.user_id, r), 'Peran diperbarui')} />
-                    <Button variant="ghost" size="icon" aria-label={`Atur ulang kata sandi ${m.email}`} disabled={busy} onClick={() => setReset({ m, password: sandiAcak() })}>
+                    <Button variant="ghost" size="icon" aria-label={`Atur ulang kata sandi ${m.email}`} disabled={busy} onClick={() => navigate(`/anggota/sandi/${encodeURIComponent(m.user_id)}`)}>
                       <KeyRound aria-hidden="true" />
                     </Button>
                     <Button
@@ -180,61 +150,192 @@ export function Anggota() {
           ))}
         </GlassCard>
       </section>
+    </div>
+  )
+}
 
-      <details className="animate-entrance-3 rounded-lg bg-surface-container-low/60 p-space-sm">
-        <summary className="touch-44 cursor-pointer text-body-sm font-semibold text-on-surface">Daftarkan akun yang sudah ada</summary>
-        <div className="mt-space-sm flex flex-col gap-space-sm">
-          <Field label="Email akun" htmlFor="ang-lama-email">
-            <Input id="ang-lama-email" type="email" autoComplete="off" value={lama.email} onChange={(e) => setLama({ ...lama, email: e.target.value })} />
-          </Field>
-          <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Nama" htmlFor="ang-lama-nama">
-              <Input id="ang-lama-nama" value={lama.nama} onChange={(e) => setLama({ ...lama, nama: e.target.value })} />
-            </Field>
-            <Field label="Peran" htmlFor="ang-lama-role">
-              <PeranSelect id="ang-lama-role" value={lama.role} onChange={(role) => setLama({ ...lama, role })} />
-            </Field>
+/** Anggota > Buat akun baru (halaman tersendiri). */
+export function AnggotaBaru() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const [form, setForm] = useState({ email: '', nama: '', role: 'kashift' as Role, password: sandiAcak() })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari buat akun?', detail: 'Akun belum dibuat.' })
+  if (!app.isAdmin || app.backend.mode !== 'supabase') return <KhususAbh />
+  const set = (p: Partial<typeof form>) => (setError(null), setForm({ ...form, ...p }))
+  const buat = async () => {
+    if (!form.email.trim()) return setError('Isi email akun.')
+    if (form.password.length < 8) return setError('Kata sandi minimal 8 karakter.')
+    setBusy(true)
+    try {
+      await app.backend.createAccount(form.email.trim(), form.password, form.nama.trim(), form.role)
+      guard.bypass()
+      keTerkirim({
+        judul: `Akun ${roleLabel(form.role)} dibuat`,
+        detail: 'Akun langsung aktif. Berikan email & kata sandi sementara ini ke pemiliknya, lalu minta ganti kata sandi di menu Profil.',
+        baris: [
+          ['Nama', form.nama.trim() || '-'],
+          ['Email', form.email.trim().toLowerCase()],
+          ['Kata sandi sementara', form.password],
+          ['SPBU', app.spbu?.nama || '-'],
+        ],
+        aksi: [
+          { to: '/anggota', label: 'Kembali ke Anggota' },
+          { to: '/anggota/baru', label: 'Buat akun lain' },
+        ],
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <div className="flex flex-col">
+        <span className="text-tag uppercase text-primary">Buat akun baru di {app.spbu?.nama || 'SPBU ini'}</span>
+        <span className="text-body-sm text-on-surface-variant">Akun langsung aktif setelah dibuat.</span>
+      </div>
+      <div className="grid grid-cols-2 gap-space-sm">
+        <Field label="Nama" htmlFor="ang-nama" className="col-span-2 sm:col-span-1">
+          <Input id="ang-nama" autoComplete="off" value={form.nama} onChange={(e) => set({ nama: e.target.value })} />
+        </Field>
+        <Field label="Peran" htmlFor="ang-role" className="col-span-2 sm:col-span-1">
+          <PeranSelect id="ang-role" value={form.role} onChange={(role) => set({ role })} />
+        </Field>
+        <Field label="Email" htmlFor="ang-email" className="col-span-2">
+          <Input id="ang-email" type="email" autoComplete="off" value={form.email} onChange={(e) => set({ email: e.target.value })} />
+        </Field>
+        <Field label="Kata sandi sementara" htmlFor="ang-pass" className="col-span-2">
+          <div className="grid grid-cols-[1fr_auto] gap-space-xs">
+            <Input id="ang-pass" autoComplete="new-password" value={form.password} onChange={(e) => set({ password: e.target.value })} />
+            <Button variant="glass" size="icon" aria-label="Buat kata sandi acak" onClick={() => set({ password: sandiAcak() })}>
+              <RefreshCw aria-hidden="true" />
+            </Button>
           </div>
-          <Button
-            variant="soft"
-            disabled={busy || !lama.email.trim()}
-            onClick={() =>
-              void run(async () => {
-                await app.backend.addMember(lama.email, lama.nama, lama.role)
-                setLama({ email: '', nama: '', role: 'kashift' })
-              }, 'Anggota ditambahkan')
-            }
-          >
-            Daftarkan
+        </Field>
+      </div>
+      <span className="text-body-sm text-on-surface-variant">{ROLES.find((r) => r.key === form.role)?.desc}</span>
+      <ErrorBox text={error} />
+      <Button size="lg" className="w-full" disabled={busy || !form.email.trim()} onClick={() => void buat()}>
+        <UserPlus aria-hidden="true" />
+        Buat akun {roleLabel(form.role)}
+      </Button>
+      {guard.dialog}
+    </GlassCard>
+  )
+}
+
+/** Anggota > Daftarkan akun yang sudah ada (halaman tersendiri). */
+export function AnggotaDaftar() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const [lama, setLama] = useState({ email: '', nama: '', role: 'kashift' as Role })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari daftarkan akun?', detail: 'Akun belum didaftarkan.' })
+  if (!app.isAdmin || app.backend.mode !== 'supabase') return <KhususAbh />
+  const set = (p: Partial<typeof lama>) => (setError(null), setLama({ ...lama, ...p }))
+  const daftar = async () => {
+    setBusy(true)
+    try {
+      await app.backend.addMember(lama.email, lama.nama, lama.role)
+      guard.bypass()
+      keTerkirim({
+        judul: 'Anggota didaftarkan',
+        detail: `${lama.email.trim()} sekarang anggota ${app.spbu?.nama || 'SPBU ini'}.`,
+        baris: [
+          ['Nama', lama.nama.trim() || '-'],
+          ['Peran', roleLabel(lama.role)],
+        ],
+        aksi: [{ to: '/anggota', label: 'Kembali ke Anggota' }],
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-body-sm text-on-surface-variant">Untuk akun yang sudah dibuat sebelumnya (mis. pindah dari SPBU lain yang Anda kendalikan).</span>
+      <Field label="Email akun" htmlFor="ang-lama-email">
+        <Input id="ang-lama-email" type="email" autoComplete="off" value={lama.email} onChange={(e) => set({ email: e.target.value })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-space-sm">
+        <Field label="Nama" htmlFor="ang-lama-nama">
+          <Input id="ang-lama-nama" value={lama.nama} onChange={(e) => set({ nama: e.target.value })} />
+        </Field>
+        <Field label="Peran" htmlFor="ang-lama-role">
+          <PeranSelect id="ang-lama-role" value={lama.role} onChange={(role) => set({ role })} />
+        </Field>
+      </div>
+      <ErrorBox text={error} />
+      <Button size="lg" disabled={busy || !lama.email.trim()} onClick={() => void daftar()}>
+        <UserCheck aria-hidden="true" />
+        Daftarkan
+      </Button>
+      {guard.dialog}
+    </GlassCard>
+  )
+}
+
+/** Anggota > Atur ulang kata sandi satu anggota (halaman tersendiri). */
+export function AnggotaSandi() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const { userId = '' } = useParams()
+  const { members, loadError, retry } = useAnggota()
+  const [password, setPassword] = useState(sandiAcak)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari atur ulang kata sandi?', detail: 'Kata sandi belum diubah.' })
+  if (!app.isAdmin || app.backend.mode !== 'supabase') return <KhususAbh />
+  if (loadError) return <LoadError error={loadError} onRetry={retry} />
+  if (!members) return <Loading />
+  const m = members.find((x) => x.user_id === userId)
+  if (!m) return <GlassCard className="p-space-md">Anggota tidak ditemukan.</GlassCard>
+  const simpan = async () => {
+    if (password.length < 8) return setError('Kata sandi minimal 8 karakter.')
+    setBusy(true)
+    try {
+      await app.backend.resetPassword(m.user_id, password)
+      guard.bypass()
+      keTerkirim({
+        judul: 'Kata sandi diatur ulang',
+        detail: 'Berikan kata sandi baru ini ke pemilik akun, lalu minta ganti di menu Profil.',
+        baris: [
+          ['Akun', m.email],
+          ['Kata sandi baru', password],
+        ],
+        aksi: [{ to: '/anggota', label: 'Kembali ke Anggota' }],
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(false)
+    }
+  }
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <div className="flex flex-col">
+        <span className="text-body-md font-semibold text-on-surface">{m.nama || m.email}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {m.email} ({roleLabel(m.role)})
+        </span>
+      </div>
+      <Field label="Kata sandi baru" htmlFor="ang-reset">
+        <div className="grid grid-cols-[1fr_auto] gap-space-xs">
+          <Input id="ang-reset" autoComplete="new-password" value={password} onChange={(e) => (setError(null), setPassword(e.target.value))} />
+          <Button variant="glass" size="icon" aria-label="Buat kata sandi acak" onClick={() => setPassword(sandiAcak())}>
+            <RefreshCw aria-hidden="true" />
           </Button>
         </div>
-      </details>
-
-      <Sheet open={!!reset} onOpenChange={(o) => !o && setReset(null)} title="Atur ulang kata sandi" description={reset ? `${reset.m.nama || reset.m.email} (${roleLabel(reset.m.role)})` : undefined}>
-        {reset && (
-          <>
-            <Field label="Kata sandi baru" htmlFor="ang-reset">
-              <div className="grid grid-cols-[1fr_auto] gap-space-xs">
-                <Input id="ang-reset" autoComplete="new-password" value={reset.password} onChange={(e) => setReset({ ...reset, password: e.target.value })} />
-                <Button variant="glass" size="icon" aria-label="Buat kata sandi acak" onClick={() => setReset({ ...reset, password: sandiAcak() })}>
-                  <RefreshCw aria-hidden="true" />
-                </Button>
-              </div>
-            </Field>
-            <Button
-              size="lg"
-              disabled={busy || reset.password.length < 8}
-              onClick={async () => {
-                const ok = await run(() => app.backend.resetPassword(reset.m.user_id, reset.password), `Kata sandi ${reset.m.email}: ${reset.password}`)
-                if (ok) setReset(null)
-              }}
-            >
-              <KeyRound aria-hidden="true" />
-              Simpan kata sandi baru
-            </Button>
-          </>
-        )}
-      </Sheet>
-    </div>
+      </Field>
+      <ErrorBox text={error} />
+      <Button size="lg" disabled={busy || password.length < 8} onClick={() => void simpan()}>
+        <KeyRound aria-hidden="true" />
+        Simpan kata sandi baru
+      </Button>
+      {guard.dialog}
+    </GlassCard>
   )
 }

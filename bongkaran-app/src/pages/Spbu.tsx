@@ -12,12 +12,12 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Sheet } from '@/components/ui/sheet'
-import { useToast } from '@/components/ui/toast'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import type { RingkasanUnit } from '@/lib/backend'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { roleLabel } from '@/lib/roles'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 import { DaftarTangki } from '@/pages/Tangki'
 
@@ -54,7 +54,6 @@ export function UnitBisnis() {
   const [muat, setMuat] = useState(0)
   const [saring, setSaring] = useState<Saring>('semua')
   const [cari, setCari] = useState('')
-  const [tambah, setTambah] = useState(false)
   const jumlahUnit = app.spbuList.length
 
   useEffect(() => {
@@ -166,7 +165,7 @@ export function UnitBisnis() {
             <RefreshCw aria-hidden="true" />
             Sinkronkan
           </Button>
-          <Button size="sm" onClick={() => setTambah(true)}>
+          <Button size="sm" onClick={() => navigate('/unit/baru')}>
             <Plus aria-hidden="true" />
             Tambah SPBU
           </Button>
@@ -223,18 +222,20 @@ export function UnitBisnis() {
         </span>
       </section>
 
-      <TambahSpbu open={tambah} onClose={() => setTambah(false)} onDibuat={() => navigate('/siapkan')} />
     </div>
   )
 }
 
-function TambahSpbu({ open, onClose, onDibuat }: { open: boolean; onClose: () => void; onDibuat: () => void }) {
+/** Unit Bisnis > Tambah SPBU (halaman tersendiri, khusus ABH). */
+export function TambahSpbu() {
   const app = useApp()
-  const toast = useToast()
+  const keTerkirim = useKeTerkirim()
   const [nama, setNama] = useState('')
   const [kode, setKode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [simpan, setSimpan] = useState(false)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari tambah SPBU?', detail: 'SPBU baru belum dibuat.' })
+  if (!app.isAdmin) return <GlassCard className="p-space-md">Hanya ABH yang dapat menambah SPBU.</GlassCard>
   const kirim = async () => {
     if (!nama.trim()) return setError('Isi nama SPBU.')
     if (!kode.trim()) return setError('Isi kode / nomor SPBU.')
@@ -242,19 +243,24 @@ function TambahSpbu({ open, onClose, onDibuat }: { open: boolean; onClose: () =>
     setSimpan(true)
     try {
       await app.buatSpbu(nama, kode)
-      toast(`${nama.trim()} ditambahkan`)
-      setNama('')
-      setKode('')
-      onClose()
-      onDibuat()
+      guard.bypass()
+      keTerkirim({
+        judul: `${nama.trim()} ditambahkan`,
+        detail: 'SPBU baru menjadi SPBU aktif. Lengkapi identitas SPBU dan database tangki sebelum modul lain dipakai.',
+        baris: [['Kode SPBU', kode.trim()]],
+        aksi: [
+          { to: '/siapkan', label: 'Lengkapi data SPBU baru' },
+          { to: '/anggota', label: 'Buat akun pengawas SPBU ini' },
+        ],
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setSimpan(false)
     }
   }
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="Tambah SPBU" description="Unit bisnis baru yang Anda kendalikan sebagai ABH.">
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-body-sm text-on-surface-variant">Unit bisnis baru yang Anda kendalikan sebagai ABH.</span>
       <Field label="Nama SPBU" htmlFor="spbu-nama">
         <Input id="spbu-nama" autoComplete="off" placeholder="Mis. SPBU COCO Kertosono" value={nama} onChange={(e) => (setError(null), setNama(e.target.value))} />
       </Field>
@@ -269,7 +275,8 @@ function TambahSpbu({ open, onClose, onDibuat }: { open: boolean; onClose: () =>
         <Plus aria-hidden="true" />
         {simpan ? 'Menyimpan…' : 'Tambah SPBU'}
       </Button>
-    </Sheet>
+      {guard.dialog}
+    </GlassCard>
   )
 }
 

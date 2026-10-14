@@ -25,13 +25,19 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/input/bongkar',
     '/input/',
     '/stok',
+    '/stok/',
     '/kualitas',
+    '/kualitas/',
     '/sample',
+    '/sample/',
     '/takaran',
+    '/takaran/uji',
     '/plan',
+    '/plan/baru',
     '/plan/so/',
     '/apar',
     '/apar/data',
+    '/apar/data/area',
     '/apar/data/unit/',
     '/apar/label',
     '/apar/unit/',
@@ -47,7 +53,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/ops',
     '/ops/',
     '/insiden/baru',
-    '/profil',
+    '/insiden/baru/',
+    '/profil', '/profil/sandi',
     '/kalkulator',
   ],
   kashift: [
@@ -55,9 +62,13 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/input/bongkar',
     '/input/',
     '/stok',
+    '/stok/',
     '/kualitas',
+    '/kualitas/',
     '/takaran',
+    '/takaran/uji',
     '/plan',
+    '/plan/baru',
     '/plan/so/',
     '/apar',
     '/apar/inspeksi',
@@ -78,17 +89,18 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/ops/',
     '/laporan/ops',
     '/insiden/baru',
+    '/insiden/baru/',
     '/laporan/insiden',
     '/laporan/insiden/',
-    '/profil',
+    '/profil', '/profil/sandi',
     '/kalkulator',
   ],
-  security: ['/input', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
-  cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
+  security: ['/input', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
+  cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
 }
 
 /** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */
-const IKHTISAR = ['/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
+const IKHTISAR = ['/terkirim', '/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
 
 export function bolehBuka(role: Role, path: string) {
   if (role === 'abh' || IKHTISAR.includes(path)) return true
