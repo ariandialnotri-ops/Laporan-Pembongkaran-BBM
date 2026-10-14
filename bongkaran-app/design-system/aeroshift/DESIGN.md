@@ -134,12 +134,12 @@ spacing:
 
 ## FLOQ: Penerapan di Aplikasi Bongkaran
 
-Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistic Quality & Quantity)**, aplikasi evidence bongkaran BBM dan Q&Q SPBU. Bagian lain di dokumen ini adalah design system AeroShift yang menjadi dasarnya. Bila ada perbedaan, bagian ini yang dipakai.
+Bagian ini berlaku untuk aplikasi **FLOQ (Fuel Logistics Operations & Quality)**, aplikasi evidence bongkaran BBM dan Q&Q SPBU. Bagian lain di dokumen ini adalah design system AeroShift yang menjadi dasarnya. Bila ada perbedaan, bagian ini yang dipakai.
 
 ### Identitas
-- **Nama:** FLOQ. Tagline: *Fuel Logistic Quality & Quantity*.
+- **Nama:** FLOQ. Tagline: *Fuel Logistics Operations & Quality*.
 - **Aset logo** (di `public/`):
-  - `floq-login.webp`: ikon FQ + tagline, untuk halaman login dan layar memuat. Wordmark "FLOQ" sengaja tidak dipakai di layar ini.
+  - `floq-logo.webp`: ikon FQ tanpa teks, untuk halaman login; tagline ditulis sebagai teks (`src/lib/brand.ts`). Wordmark "FLOQ" sengaja tidak dipakai di layar ini.
   - `floq-icon.webp`: ikon aplikasi kotak biru, 36 px di header kiri atas.
   - `favicon.png`, `apple-touch-icon.png` (padat, untuk layar utama iPhone), `floq-icon-256.png` (manifest).
 - **Palet brand sheet:** latar `#F5F5F7`, teks utama `#1D1D1F`, teks sekunder `#AAAAAA`, aksen `#007AFF`. Aplikasi tetap memakai token AeroShift (primary `#0050CB`, primary-container `#0066FF`) yang senada dengan logo.

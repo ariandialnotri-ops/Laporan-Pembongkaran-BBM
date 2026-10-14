@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { useApp } from '@/lib/app-state'
+import { TAGLINE } from '@/lib/brand'
 
 /** Gelombang biru di bawah layar, mengikuti splash screen brand FLOQ. */
 function Waves() {
@@ -30,8 +31,9 @@ function Shell({ children }: { children: ReactNode }) {
       <AmbientOrbs />
       <Waves />
       <div className="flex w-full max-w-sm flex-col gap-space-lg">
-        <h1 className="animate-entrance-1 flex justify-center">
-          <img src="/floq-login.webp" alt="FLOQ, Fuel Logistic Quality & Quantity" width={672} height={428} className="h-auto w-60" />
+        <h1 className="animate-entrance-1 flex flex-col items-center gap-space-sm">
+          <img src="/floq-logo.webp" alt="FLOQ" width={672} height={340} className="h-auto w-56" />
+          <span className="text-center text-body-md font-medium tracking-[0.08em] text-on-surface-variant">{TAGLINE}</span>
         </h1>
         {children}
       </div>

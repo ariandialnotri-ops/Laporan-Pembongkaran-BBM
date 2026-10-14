@@ -1,6 +1,6 @@
 # FLOQ: Design Spec (untuk ganti desain UI)
 
-> **FLOQ (Fuel Logistic Quality & Quantity)**: aplikasi evidence pembongkaran BBM, Q&Q harian, dan proteksi kebakaran (APAR & APAB) di SPBU.
+> **FLOQ (Fuel Logistics Operations & Quality)**: aplikasi evidence pembongkaran BBM, Q&Q harian, dan proteksi kebakaran (APAR & APAB) di SPBU.
 > Dokumen ini menjelaskan **seluruh tampilan aplikasi saat ini**: token, komponen, setiap layar, dan aturan yang wajib dipertahankan.
 > Pakai sebagai brief untuk desainer atau tool desain AI (Google Stitch, Figma AI, v0, dan lain-lain). Setelah desain baru jadi, ikuti **bagian 12** untuk memasangnya ke kode.
 
@@ -69,11 +69,11 @@ Pertanyaan yang harus dijawab tiap layar dalam 3 detik:
 
 | Aset | File | Pakai di |
 |---|---|---|
-| Logo login (ikon FQ + tagline) | `public/floq-login.webp` | Halaman login, layar memuat |
+| Logo login (ikon FQ, tagline sebagai teks dari `src/lib/brand.ts`) | `public/floq-logo.webp` | Halaman login |
 | Ikon aplikasi | `public/floq-icon.webp` (36 px di header) | Header kiri atas |
 | Favicon / ikon layar utama | `public/favicon.png`, `public/apple-touch-icon.png`, `public/floq-icon-256.png` | Browser, PWA |
 
-- Nama: **FLOQ**, tagline *Fuel Logistic Quality & Quantity*.
+- Nama: **FLOQ**, tagline *Fuel Logistics Operations & Quality*.
 - Copyright di bawah form login: `© <tahun> FLOQ · Created by Ariandi Alnotri` (tahun otomatis).
 - Palet brand sheet: latar `#F5F5F7`, teks `#1D1D1F`, teks sekunder `#AAAAAA`, aksen `#007AFF`.
 
@@ -518,7 +518,7 @@ Langkah aman:
 Salin, lalu ganti bagian `[GAYA BARU]`:
 
 ```
-Redesign aplikasi mobile web "FLOQ" (Fuel Logistic Quality & Quantity) untuk petugas SPBU Pertamina.
+Redesign aplikasi mobile web "FLOQ" (Fuel Logistics Operations & Quality) untuk petugas SPBU Pertamina.
 Bahasa Indonesia. Layar utama HP 390 px, juga layar laptop 1280 px. Font Inter, angka tabular.
 
 Gaya baru: [GAYA BARU, mis. "material modern, kartu putih solid, aksen biru Pertamina #0050CB,
