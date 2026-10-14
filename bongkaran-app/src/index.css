@@ -573,6 +573,11 @@ html[data-keyboard='open'] [data-dock] {
 .sheet-content[data-state='closed'] { animation: sheetOut 0.2s cubic-bezier(0.4, 0, 1, 1); }
 .sheet-overlay[data-state='open'] { animation: fadeIn 0.25s ease-out; }
 .sheet-overlay[data-state='closed'] { animation: fadeOut 0.18s ease-in; }
+/* Laci sidebar: masuk dari kiri, keluar ke kiri. */
+@keyframes laciIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes laciOut { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.laci-sidebar[data-state='open'] { animation: laciIn 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+.laci-sidebar[data-state='closed'] { animation: laciOut 0.2s cubic-bezier(0.4, 0, 1, 1); }
 
 /* Pengguna yang meminta transparansi dikurangi (setelan aksesibilitas iOS/
    macOS) mendapat permukaan padat: teks tetap terbaca tanpa efek kaca. */

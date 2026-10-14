@@ -35,6 +35,19 @@ npm run lint
 
 ## Layar
 
+**Navigasi.** Menu dikelompokkan per peruntukan: **Dashboard**, **Operation** (stok awal shift, input
+bongkaran, kualitas harian, kualitas pasca penerimaan, kaleng sample, uji takaran, perawatan &
+housekeeping), **Delivery** (plan pengiriman, tracking LO), **HSSE** (inspeksi APAR/APAB, laporan insiden &
+near miss, sumur pantau & oil catcher), **Finance** (segera hadir), **Report** (riwayat, export file, berita
+acara). Item disaring per peran (`src/components/shell/menu-data.ts`).
+- **Sidebar**: grup bisa dibuka-tutup, garis cabang, item aktif berupa kartu putih, badge oranye (perlu
+  dikerjakan) & hijau (berjalan). Layar lebar: sidebar tetap di kiri, tombol di header menyembunyikan/
+  menampilkannya. HP/tablet: laci dibuka dari tombol menu atau **digeser dari tepi kiri layar**, ditutup
+  dengan menggeser ke kiri / mengetuk latar.
+- **Bar bawah statis** (HP/tablet): menempel penuh di bawah, tidak melayang atau bergeser; berisi grup menu.
+- Halaman ikhtisar grup: `/operation`, `/delivery`, `/hsse`, `/finance`, `/laporan` (+ `/laporan/riwayat`,
+  `/laporan/export`); `/input` lama dialihkan ke `/operation`.
+
 Dock bawah berisi 4 menu. Dashboard hanya menampilkan data, semua pengisian
 ada di Input, semua riwayat dan unduhan ada di Laporan.
 

@@ -1,21 +1,35 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
 import { parentOf, titleFor } from '@/lib/nav'
 import { PemilihSpbu } from './pemilih-spbu'
+import { useSidebar } from './sidebar-ctx'
+import { cn } from '@/lib/utils'
 
 export function AppHeader() {
   const { pathname } = useLocation()
   const app = useApp()
   const parent = parentOf(pathname)
   const navigate = useNavigate()
+  const sidebar = useSidebar()
 
   return (
-    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
+    <header data-glass-bar className={cn('fixed inset-x-0 top-0 z-40 transition-[left] duration-300 motion-reduce:transition-none', !sidebar.tertutup && 'lg:left-72', 'print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl')}>
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
-          {/* Halaman turunan: tombol kembali ke menu induk menggantikan logo. */}
-          {parent ? (
+          {/* Menu: HP = buka laci sidebar (juga bisa digeser dari tepi kiri); layar lebar = sembunyikan/tampilkan sidebar. */}
+          <button
+            type="button"
+            onClick={sidebar.toggle}
+            aria-label={sidebar.tertutup ? 'Buka menu' : 'Menu'}
+            aria-expanded={sidebar.laci}
+            className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
+          >
+            <Menu aria-hidden="true" className="size-5 lg:hidden" />
+            {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
+          </button>
+          {/* Halaman turunan: tombol kembali ke menu induk. */}
+          {parent && (
             <button
               type="button"
               aria-label="Kembali"
@@ -25,14 +39,6 @@ export function AppHeader() {
             >
               <ChevronLeft aria-hidden="true" className="size-6" />
             </button>
-          ) : (
-            <Link
-              to="/"
-              aria-label="FLOQ, buka Dashboard"
-              className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
-            >
-              <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
-            </Link>
           )}
           <div className="flex min-w-0 flex-col">
             <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>

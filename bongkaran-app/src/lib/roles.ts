@@ -42,6 +42,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/pengaturan/tangki',
     '/pengaturan/tangki/',
     '/siapkan',
+    '/kaleng',
+    '/finance',
     '/ops',
     '/ops/',
     '/insiden/baru',
@@ -71,6 +73,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/laporan/tera',
     '/laporan/takaran',
     '/laporan/apar',
+    '/kaleng',
     '/ops',
     '/ops/',
     '/laporan/ops',
@@ -84,10 +87,13 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
   cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/laporan/insiden', '/laporan/insiden/', '/profil'],
 }
 
+/** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */
+const IKHTISAR = ['/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
+
 export function bolehBuka(role: Role, path: string) {
-  if (role === 'abh') return true
+  if (role === 'abh' || IKHTISAR.includes(path)) return true
   return AKSES[role].some((p) => (p.endsWith('/') && p !== '/' ? path.startsWith(p) : path === p))
 }
 
 /** Halaman awal peran yang tidak punya Dashboard. */
-export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/apar' : role === 'cs' ? '/ops' : '/input')
+export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/apar' : role === 'cs' ? '/ops' : '/operation')

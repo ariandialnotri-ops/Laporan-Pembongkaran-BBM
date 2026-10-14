@@ -12,7 +12,6 @@ import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
 import { berandaPeran, roleLabel } from '@/lib/roles'
 import { Dashboard } from '@/pages/Dashboard'
-import { InputMenu } from '@/pages/InputMenu'
 import { Login, NotMember, SessionState } from '@/pages/Login'
 
 // Halaman selain Dashboard & menu Input dimuat saat dibuka, agar pembukaan awal ringan.
@@ -31,7 +30,6 @@ const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default:
 const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
 const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenDetail })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
-const LaporanMenu = lazy(() => import('@/pages/LaporanMenu').then((m) => ({ default: m.LaporanMenu })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
 const IdentitasSpbu = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.IdentitasSpbu })))
 const AturanPemeriksaan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.AturanPemeriksaan })))
@@ -39,6 +37,13 @@ const DataAcuan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default
 const DataDispenser = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DataDispenser })))
 const NozzleTera = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.NozzleTera })))
 const SoldShipTo = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.SoldShipTo })))
+const MenuOperation = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuOperation })))
+const MenuGrup = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuGrup })))
+const MenuFinance = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuFinance })))
+const MenuReport = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuReport })))
+const MenuRiwayat = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuRiwayat })))
+const MenuExport = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuExport })))
+const HalamanKaleng = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.HalamanKaleng })))
 const OpsMenu = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsMenu })))
 const OpsIsi = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsIsi })))
 const LaporanOps = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.LaporanOps })))
@@ -101,7 +106,12 @@ function Gate() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/input" element={<InputMenu />} />
+          <Route path="/input" element={<Navigate to="/operation" replace />} />
+          <Route path="/operation" element={<MenuOperation />} />
+          <Route path="/delivery" element={<MenuGrup grup="delivery" />} />
+          <Route path="/hsse" element={<MenuGrup grup="hsse" />} />
+          <Route path="/finance" element={<MenuFinance />} />
+          <Route path="/kaleng" element={<HalamanKaleng />} />
           <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
           <Route path="/plan" element={<Plan />} />
@@ -118,7 +128,9 @@ function Gate() {
           <Route path="/apar/data/unit/:id" element={<AparUnitForm />} />
           <Route path="/apar/label" element={<AparLabel />} />
           <Route path="/apar/unit/:id" element={<AparUnit />} />
-          <Route path="/laporan" element={<LaporanMenu />} />
+          <Route path="/laporan" element={<MenuReport />} />
+          <Route path="/laporan/riwayat" element={<MenuRiwayat />} />
+          <Route path="/laporan/export" element={<MenuExport />} />
           <Route path="/laporan/persediaan" element={<Persediaan />} />
           <Route path="/laporan/ba" element={<BeritaAcara />} />
           <Route path="/laporan/bongkaran" element={<RiwayatBongkaran />} />

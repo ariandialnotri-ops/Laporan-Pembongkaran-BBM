@@ -103,7 +103,9 @@ export function OpsMenu() {
   const [busy, setBusy] = useState(false)
   if (!app.loaded) return <Loading />
 
-  const grup = formTampil(app.role, app.settings)
+  // ?grup=operasional (Operation: perawatan & housekeeping) atau ?grup=lingkungan (HSSE).
+  const filter = params.get('grup')
+  const grup = formTampil(app.role, app.settings).filter((g) => (filter === 'lingkungan' ? g.judul === 'Pantauan lingkungan' : filter === 'operasional' ? g.judul !== 'Pantauan lingkungan' : true))
   const recOf = (id: string) => {
     const f = formById(id)
     return recs?.find((r) => r.id === opsId(id, f ? tanggalSimpan(f, tanggal) : tanggal))
@@ -144,7 +146,7 @@ export function OpsMenu() {
         </div>
         <div className="flex flex-wrap items-end gap-space-sm">
           <Field label="Tanggal" htmlFor="ops-tgl" className="min-w-40 flex-1">
-            <Input id="ops-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => e.target.value && setParams({ tanggal: e.target.value }, { replace: true })} />
+            <Input id="ops-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => e.target.value && setParams({ ...(filter ? { grup: filter } : {}), tanggal: e.target.value }, { replace: true })} />
           </Field>
           <span className="tabular pb-3 text-body-sm text-on-surface-variant">
             {recs ? `${terisi}/${semua.length} form terisi` : 'Memuat…'}
@@ -175,7 +177,7 @@ export function OpsMenu() {
               const st = recs ? statusOps(id, rec) : null
               const n = f && rec?.data.jenis === 'checklist' ? Object.keys(rec.data.hasil).length : 0
               return (
-                <Link key={id} to={`/ops/${id}?tanggal=${tanggal}`} className="flex min-h-16 items-center gap-space-sm px-space-md py-space-sm active:bg-surface-container-low">
+                <Link key={id} to={`/ops/${id}?${filter ? `grup=${filter}&` : ''}tanggal=${tanggal}`} className="flex min-h-16 items-center gap-space-sm px-space-md py-space-sm active:bg-surface-container-low">
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-body-md font-semibold text-on-surface">{judulForm(id)}</span>
                     <span className="text-body-sm text-on-surface-variant">
@@ -294,7 +296,7 @@ export function OpsIsi() {
       await app.backend.saveOps({ id, form, tanggal, data: { ...d, petugas: d.petugas.trim() }, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
       guard.bypass()
       toast(`${judulForm(form)} tersimpan`)
-      navigate(`/ops?tanggal=${tanggalPilih}`)
+      navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`)
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
@@ -308,7 +310,7 @@ export function OpsIsi() {
       for (const p of fotoOps(lama.data)) hapusFoto(p)
       guard.bypass()
       toast('Catatan dihapus')
-      navigate(`/ops?tanggal=${tanggalPilih}`)
+      navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`)
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
