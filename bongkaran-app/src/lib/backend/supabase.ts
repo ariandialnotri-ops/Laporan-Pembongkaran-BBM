@@ -222,6 +222,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         aparArea: d.aparArea ?? [],
         soldTo: d.soldTo ?? '',
         shipTo: d.shipTo ?? {},
+        dispensers: d.dispensers ?? [],
+        nozzles: d.nozzles ?? [],
         // Belum diatur = semua fasilitas ada; jangan kirim null yang menimpa.
         ...(d.fasilitas ? { fasilitas: d.fasilitas } : {}),
       }

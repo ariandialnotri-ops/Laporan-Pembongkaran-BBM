@@ -83,8 +83,8 @@ export function Profil() {
         <SectionHeader id="akun" title="Akun & SPBU" />
         <GlassCard level={2} className="flex flex-col p-space-2xs">
           {app.isAdmin && <MenuRow to="/unit" icon={Building2} label={`Unit bisnis (${app.spbuList.length} SPBU)`} />}
-          {app.isAdmin && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (identitas, dispenser, tera)" />}
-          {!app.isAdmin && app.can('/pengaturan/identitas') && <MenuRow to="/pengaturan/identitas" icon={Settings2} label="Identitas SPBU" />}
+          {app.can('/pengaturan') && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (identitas, dispenser, nozzle & tera)" />}
+          {!app.can('/pengaturan') && app.can('/pengaturan/identitas') && <MenuRow to="/pengaturan/identitas" icon={Settings2} label="Identitas SPBU" />}
           {app.can('/pengaturan/tangki') && <MenuRow to="/pengaturan/tangki" icon={Cylinder} label="Database tangki & tabel kalibrasi" />}
           {app.can('/pengaturan/sold-ship-to') && <MenuRow to="/pengaturan/sold-ship-to" icon={Receipt} label="Sold To & Ship To" />}
           {remote && app.isAdmin && <MenuRow to="/anggota" icon={Users} label="Anggota & akun per peran" />}

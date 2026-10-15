@@ -35,7 +35,7 @@ export function DataDispenser() {
   if (!app.loaded) return <Loading />
   const s = app.settings
   const list = s.dispensers ?? []
-  const ubah = app.isAdmin
+  const ubah = app.canManage
 
   const cols: Col<Dispenser>[] = [
     { header: 'Unit', cell: (x) => <span className="font-semibold">{x.nama || '-'}</span>, mobile: 'title' },
@@ -56,7 +56,7 @@ export function DataDispenser() {
             Tambah dispenser
           </Link>
         ) : (
-          <span className="text-body-sm text-on-surface-variant">Data dispenser hanya dapat diubah ABH.</span>
+          <span className="text-body-sm text-on-surface-variant">Data dispenser hanya dapat diubah ABH atau Pengawas.</span>
         )}
       </GlassCard>
       <div className="animate-entrance-2">
@@ -78,7 +78,7 @@ export function DispenserEdit() {
   const ada = list.find((x) => x.id === id)
   const guard = useLeaveGuard({ active: true, title: 'Keluar dari form dispenser?', detail: 'Perubahan yang belum disimpan akan hilang.' })
   if (!app.loaded) return <Loading />
-  if (!app.isAdmin) return <GlassCard className="p-space-md">Data dispenser hanya dapat diubah ABH.</GlassCard>
+  if (!app.canManage) return <GlassCard className="p-space-md">Data dispenser hanya dapat diubah ABH atau Pengawas.</GlassCard>
   if (id !== 'baru' && !ada) return <GlassCard className="p-space-md">Dispenser tidak ditemukan.</GlassCard>
   const awal: Dispenser = ada ?? { id: baruId, nama: `Dispenser ${list.length + 1}`, merk: '', noSeri: '', pulau: '' }
   const simpanList = (next: Dispenser[], nozzles = s.nozzles) => app.updateSettings({ dispensers: next, jumlahDispenser: next.length, nozzles })
@@ -185,7 +185,7 @@ export function NozzleTera() {
   const s = app.settings
   const list = s.nozzles ?? []
   const disp = s.dispensers ?? []
-  const ubah = app.isAdmin
+  const ubah = app.canManage
   const today = todayIso()
   const st = (n: Nozzle) => statusSertifikat(n.teraTanggal, today)
   const lewat = list.filter((n) => st(n) === 'lewat').length
@@ -230,7 +230,7 @@ export function NozzleTera() {
             Tambah nozzle
           </Link>
         ) : (
-          <span className="text-body-sm text-on-surface-variant">Data nozzle hanya dapat diubah ABH.</span>
+          <span className="text-body-sm text-on-surface-variant">Data nozzle hanya dapat diubah ABH atau Pengawas.</span>
         )}
       </GlassCard>
       <div className="animate-entrance-2">
@@ -260,7 +260,7 @@ export function NozzleEdit() {
   const ada = list.find((x) => x.id === id)
   const guard = useLeaveGuard({ active: true, title: 'Keluar dari form nozzle?', detail: 'Perubahan yang belum disimpan akan hilang.' })
   if (!app.loaded) return <Loading />
-  if (!app.isAdmin) return <GlassCard className="p-space-md">Data nozzle hanya dapat diubah ABH.</GlassCard>
+  if (!app.canManage) return <GlassCard className="p-space-md">Data nozzle hanya dapat diubah ABH atau Pengawas.</GlassCard>
   if (id !== 'baru' && !ada) return <GlassCard className="p-space-md">Nozzle tidak ditemukan.</GlassCard>
   const awal: Nozzle = ada ?? { id: baruId, nama: `Nozzle ${list.length + 1}`, produk: list.at(-1)?.produk ?? PRODUK_OPTIONS[0] }
   return (

@@ -6,7 +6,7 @@ export type Role = 'abh' | 'pengawas' | 'kashift' | 'security' | 'cs'
 
 export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
-  { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU & database tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
+  { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
   { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
   { key: 'security', label: 'Security', desc: 'Guard Tour System (sampling subsidi tepat JBT/JBKP tiap 2 jam), inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
   { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
@@ -43,8 +43,13 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/apar/unit/',
     '/laporan',
     '/laporan/',
+    '/pengaturan',
     '/pengaturan/sold-ship-to',
     '/pengaturan/identitas',
+    '/pengaturan/dispenser',
+    '/pengaturan/dispenser/',
+    '/pengaturan/nozzle',
+    '/pengaturan/nozzle/',
     '/pengaturan/tangki',
     '/pengaturan/tangki/',
     '/siapkan',

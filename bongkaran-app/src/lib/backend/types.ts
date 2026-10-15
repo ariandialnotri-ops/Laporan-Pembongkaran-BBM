@@ -46,7 +46,7 @@ export interface RingkasanUnit {
   terakhirAktif: string | null
 }
 
-export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas'>
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles'>
 
 export interface FotoArsip {
   path: string
@@ -85,7 +85,7 @@ export interface Backend {
 
   getSettings(): Promise<Partial<Settings> | null>
   saveSettings(settings: Settings): Promise<void>
-  /** Sebagian pengaturan yang boleh diubah pengawas: identitas SPBU, data utama APAR/APAB & area, Sold To, Ship To. */
+  /** Sebagian pengaturan yang boleh diubah pengawas: identitas SPBU, dispenser, nozzle & tera, data utama APAR/APAB & area, Sold To, Ship To. */
   saveSettingsTerbatas(data: SettingsTerbatas): Promise<void>
 
   /** Database tangki SPBU aktif. */

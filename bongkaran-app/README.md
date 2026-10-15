@@ -283,7 +283,7 @@ membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_
 | Peran | Modul |
 |-------|-------|
 | ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
-| Pengawas | Identitas SPBU & Database tangki (wajib diisi untuk SPBU baru), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
+| Pengawas | Identitas SPBU (termasuk jumlah pulau pompa) & Database tangki (wajib diisi untuk SPBU baru), tambah/ubah Data Dispenser (pulau pompa tiap dispenser) dan Nozzle & Tera Metrologi (`20261016120000_bbm_pengawas_dispenser_nozzle.sql`), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
 | Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB, sumur pantau & oil catcher, lapor insiden |
 | Cleaning Service (CS) | Checklist housekeeping di Operasional SPBU, lapor insiden |
