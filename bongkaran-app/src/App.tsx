@@ -89,6 +89,9 @@ const WbsDetail = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.Wbs
 const GtsMenu = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsMenu })))
 const GtsForm = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsForm })))
 const LaporanGts = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.LaporanGts })))
+const AirMenu = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirMenu })))
+const AirForm = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirForm })))
+const LaporanAir = lazy(() => import('@/pages/Air').then((m) => ({ default: m.LaporanAir })))
 const Terkirim = lazy(() => import('@/pages/Terkirim').then((m) => ({ default: m.Terkirim })))
 
 function Gate() {
@@ -147,6 +150,9 @@ function Gate() {
           <Route path="/sample/:id" element={<Sample2JamForm />} />
           <Route path="/stok" element={<StokShift />} />
           <Route path="/stok/:tanggal/:shift" element={<StokShiftForm />} />
+          <Route path="/air" element={<AirMenu />} />
+          <Route path="/air/:tanggal/:shift" element={<AirForm />} />
+          <Route path="/laporan/air" element={<LaporanAir />} />
           <Route path="/terkirim" element={<Terkirim />} />
           <Route path="/takaran" element={<MenuTakaran />} />
           <Route path="/takaran/uji" element={<UjiTakaran />} />

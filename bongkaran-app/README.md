@@ -74,6 +74,8 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | Dashboard | `/` | Kartu operasional (tanggal & shift), Status Bongkaran Pekan Ini (7 kotak hari dengan ikon status & titik plan kirim; ketuk tanggal untuk plan, penerimaan, kualitas, kuantitas), Bongkaran Hari Ini per produk (dropdown: MT, diterima, transport loss, discharge loss L & %), SLA rata-rata, Rencana vs Realisasi, Kualitas Harian, Kaleng Sample (D15 sample mobil tangki saat bongkar dari 3 bongkaran terakhir), LO Tracking |
 | Input | `/input` | Bar wajib Stok Awal Shift + kartu: |
 | | `/stok` | Stok awal tiap produk (wajib tiap awal shift) dan pengeluaran dispenser; simpan lalu ke Catatan Persediaan |
+| | `/air` | **Water Content Tangki** (ABH, pengawas, kepala shift): pilih shift (hijau/oranye/merah), lalu form semua tangki pendam: tinggi air (mm, tombol Nihil = 0), volume air dari tabel kalibrasi tangki, foto stik pasta air wajib (bercap waktu), tindakan wajib bila ada air. Bisa diubah lagi. Tabel `bbm_air` (`20261016130000_bbm_air.sql`) |
+| | `/laporan/air` | Riwayat water content per bulan: jumlah pengecekan, temuan air, shift terlewat, rincian per tangki + foto; hapus oleh ABH/pengawas |
 | | `/input/bongkar` | Input Bongkaran: mulai bongkaran baru (terkunci sampai stok awal diisi) dan bongkaran berjalan |
 | | `/input/:id` | Form bongkaran 14 langkah SOP + tab Finish. Kompartemen: tinggi T2 mobil tangki (acuan deepstick), kapasitas, dan kepekaan (L/mm) dari buku tera MT; selisih liter = kepekaan x selisih mm (0,3 L/mm x -5 mm = -1,5 L). Tanda tangan lewat pop up berkotak panduan. Unduhan: Excel, PDF BA saja (cepat), PDF + foto, JPG. Konfirmasi saat keluar dari form yang belum selesai; bongkaran selesai tidak dapat dihapus |
 | | `/plan` | Plan Pengiriman: permintaan MS2 (bottom sheet), shift permintaan dipilih per produk (tidak ada shift tingkat plan); tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status), volume permintaan dipecah otomatis **tiap 8.000 L = 1 LO** (maks. 8.000 L per LO). Ketuk baris untuk membuka halaman **Edit SO & LO** (nomor segel tidak diisi di sini; dicocokkan dengan dokumen LO fisik saat bongkar). Plan dengan tanggal kirim mendatang (mis. besok) selalu tampil, apa pun filter presetnya. Pengingat harian pukul 06:00 bila plan besok belum dibuat |
@@ -284,8 +286,8 @@ membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_
 | Peran | Modul |
 |-------|-------|
 | ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
-| Pengawas | Identitas SPBU (termasuk jumlah pulau pompa) & Database tangki (wajib diisi untuk SPBU baru), tambah/ubah Data Dispenser (pulau pompa tiap dispenser) dan Nozzle & Tera Metrologi (`20261016120000_bbm_pengawas_dispenser_nozzle.sql`), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Kualitas Harian, Uji Pasca Penerimaan, lihat APAR, semua laporan |
-| Kepala Shift | Stok awal, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
+| Pengawas | Identitas SPBU (termasuk jumlah pulau pompa) & Database tangki (wajib diisi untuk SPBU baru), tambah/ubah Data Dispenser (pulau pompa tiap dispenser) dan Nozzle & Tera Metrologi (`20261016120000_bbm_pengawas_dispenser_nozzle.sql`), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Inspeksi APAR/APAB, Water Content Tangki, Kualitas Harian, Uji Pasca Penerimaan, semua laporan |
+| Kepala Shift | Stok awal, Water Content Tangki, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB, sumur pantau & oil catcher, lapor insiden |
 | Cleaning Service (CS) | Checklist housekeeping di Operasional SPBU, lapor insiden |
 

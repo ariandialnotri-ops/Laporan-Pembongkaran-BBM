@@ -37,6 +37,9 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/takaran', title: 'Uji Takaran', parent: '/operation' },
   { href: '/takaran/uji', title: 'Form Uji Takaran', parent: '/takaran' },
   { href: '/laporan/takaran', title: 'Riwayat Uji Takaran', parent: '/laporan/riwayat' },
+  { href: '/air', title: 'Water Content Tangki', parent: '/operation' },
+  { href: '/air/', title: 'Form Water Content', parent: '/air' },
+  { href: '/laporan/air', title: 'Riwayat Water Content', parent: '/laporan/riwayat' },
   { href: '/stok', title: 'Stok Awal Shift', parent: '/operation' },
   { href: '/stok/', title: 'Form Stok Awal', parent: '/stok' },
   // Setelah form dikirim: tanpa tombol kembali (ke Dashboard lewat tombol di halaman).

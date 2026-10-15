@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Cylinder,
+  Droplet,
   Droplets,
   FileDown,
   FileSpreadsheet,
@@ -109,7 +110,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Operation',
       href: '/operation',
       icon: Fuel,
-      desc: 'Stok, bongkaran, kualitas BBM, uji takaran, perawatan & housekeeping',
+      desc: 'Stok, water content, bongkaran, kualitas BBM, uji takaran, perawatan & housekeeping',
       items: [
         {
           to: '/stok',
@@ -154,6 +155,14 @@ export function useMenu(): GrupMenu[] {
           title: 'Kaleng Sample',
           desc: 'Sample mobil tangki dari hasil pembongkaran, 3 terakhir per produk',
           status: `${app.reports.filter((r) => r.status === 'selesai').length} bongkaran selesai`,
+        },
+        {
+          to: '/air',
+          path: '/air',
+          icon: Droplet,
+          title: 'Water Content Tangki',
+          desc: 'Pasta air di setiap tangki pendam, per shift',
+          status: stok.tanpaTangki ? 'Database tangki belum diisi' : `${shiftNama}: cek air semua tangki`,
         },
         {
           to: '/takaran',
@@ -296,6 +305,7 @@ export function riwayatItems(can: (p: string) => boolean) {
 const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[] = [
   { path: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status' },
   { path: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan' },
+  { path: '/laporan/air', icon: Droplet, title: 'Riwayat Water Content', desc: 'Air di dasar tangki pendam per shift, foto pasta air, tindakan' },
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
   { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },

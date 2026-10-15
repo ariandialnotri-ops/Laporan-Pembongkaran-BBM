@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
+import type { AirRecord } from '@/lib/air'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { FOTO_DIARSIPKAN, blobToDataUrl, genId } from '@/lib/image'
@@ -22,6 +23,7 @@ type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift:
 type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data']; updated_at: string; updated_by: string | null }
 type WbsRow = { id: string; status: WbsRecord['status']; data: WbsRecord['data']; created_at: string; created_by: string | null }
 type GtsRow = { id: string; tanggal: string; slot: number; jenis: GtsRecord['jenis']; data: GtsRecord['data']; created_at: string; created_by: string | null }
+type AirRow = { id: string; tanggal: string; shift: number; data: AirRecord['data']; created_at: string; updated_at: string; created_by: string | null }
 type TankRow = { id: string; produk: string; tank_no: string; tanggal_kalibrasi: string | null; catatan: string | null; tabel: TankTabel; urut: number }
 type RingkasanRow = {
   spbu_id: string
@@ -407,6 +409,19 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteGts(id) {
       const rows = check(await sb.from('bbm_gts').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus sampling.')
+    },
+    async listAir(from, to) {
+      const rows = check(
+        await sb.from('bbm_air').select('id,tanggal,shift,data,created_at,updated_at,created_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal').order('shift').limit(5000),
+      ) as AirRow[]
+      return rows.map((r) => ({ id: r.id, tanggal: r.tanggal, shift: r.shift as AirRecord['shift'], data: r.data, createdAt: Date.parse(r.created_at), updatedAt: Date.parse(r.updated_at), createdBy: r.created_by }))
+    },
+    async saveAir(rec) {
+      check(await sb.from('bbm_air').upsert({ spbu_id: aktif(), id: rec.id, tanggal: rec.tanggal, shift: rec.shift, data: rec.data }))
+    },
+    async deleteAir(id) {
+      const rows = check(await sb.from('bbm_air').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus catatan water content.')
     },
     async fotoArsip() {
       const rows = check(await sb.rpc('bbm_foto_arsip', { p_spbu: aktif() })) as { name: string; ukuran: number; dibuat: string; batas: string }[] | null

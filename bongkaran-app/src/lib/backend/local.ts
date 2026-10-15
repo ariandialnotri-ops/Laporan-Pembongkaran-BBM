@@ -6,6 +6,7 @@
 import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
+import type { AirRecord } from '@/lib/air'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
@@ -205,6 +206,13 @@ export const localBackend: Backend = {
   },
   async deleteGts(id) {
     await set('gts', ((await get<GtsRecord[]>('gts')) ?? []).filter((r) => r.id !== id))
+  },
+  listAir: (from, to) => get<AirRecord[]>('air').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to)),
+  async saveAir(rec) {
+    await set('air', upsertById((await get<AirRecord[]>('air')) ?? [], rec))
+  },
+  async deleteAir(id) {
+    await set('air', ((await get<AirRecord[]>('air')) ?? []).filter((r) => r.id !== id))
   },
   // Mode lokal: foto tersimpan di perangkat, tidak ada cut-off.
   fotoArsip: async () => [],
