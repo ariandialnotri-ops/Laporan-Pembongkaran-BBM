@@ -28,7 +28,7 @@ export function AppHeader() {
             <Menu aria-hidden="true" className="size-5 lg:hidden" />
             {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
           </button>
-          {/* Semua halaman selain beranda punya tombol kembali (halaman asal atau menu induk). */}
+          {/* Panah kembali hanya di sub menu; menu utama (Dashboard, Operation, ..., Profil) tanpa panah. */}
           {kembali && (
             <button
               type="button"

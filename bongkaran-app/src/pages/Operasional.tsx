@@ -444,6 +444,7 @@ export function OpsIsi() {
           Hapus catatan ini
         </Button>
       )}
+      {guard.dialog}
     </div>
   )
 }

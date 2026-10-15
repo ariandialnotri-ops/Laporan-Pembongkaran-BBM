@@ -55,7 +55,8 @@ acara). Item disaring per peran (`src/components/shell/menu-data.ts`).
 - **Sidebar**: grup bisa dibuka-tutup, garis cabang, item aktif berupa kartu putih, badge oranye (perlu
   dikerjakan) & hijau (berjalan). Layar lebar: sidebar tetap di kiri, tombol di header menyembunyikan/
   menampilkannya. HP/tablet: laci dibuka dari tombol menu, ditutup dengan menggeser ke kiri / mengetuk latar.
-- **Kembali**: semua halaman selain beranda punya tombol kembali (halaman grup kembali ke Dashboard); tombol
+- **Kembali**: panah kembali hanya di sub menu; menu utama (Dashboard, Operation, Delivery, HSSE, Finance, Report, Profil)
+  tanpa panah, pindah menu lewat bar bawah/sidebar. Tombol
   tidak membuka lagi halaman Terkirim, form yang sudah ditinggalkan, maupun form/detail di bawah halaman itu
   (setelah hapus atau batal, riwayat diganti, bukan ditambah). Gerakan geser dari tepi kiri dibiarkan untuk "kembali" bawaan iPhone/
   Android; di aplikasi yang dipasang ke layar utama iPhone, geser tepi kiri menjalankan tombol kembali.

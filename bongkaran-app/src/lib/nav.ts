@@ -14,13 +14,14 @@ const GRUP: { href: string; title: string }[] = [
 
 /** Halaman di bawah grup menu: judul header dan menu induk (tujuan tombol kembali). */
 const PAGES: { href: string; title: string; parent: string }[] = [
-  // Halaman grup menu kembali ke Dashboard (di iPhone yang dipasang ke layar utama tidak ada tombol back browser).
-  { href: '/operation', title: 'Operation', parent: '/' },
-  { href: '/delivery', title: 'Delivery', parent: '/' },
-  { href: '/hsse', title: 'HSSE', parent: '/' },
-  { href: '/finance', title: 'Finance', parent: '/' },
-  { href: '/laporan', title: 'Report', parent: '/' },
-  { href: '/profil', title: 'Profil', parent: '/' },
+  // Menu utama (bar bawah, sidebar, avatar profil) tanpa panah kembali: pindah menu lewat bar bawah/sidebar.
+  // Panah kembali hanya di sub menu.
+  { href: '/operation', title: 'Operation', parent: '' },
+  { href: '/delivery', title: 'Delivery', parent: '' },
+  { href: '/hsse', title: 'HSSE', parent: '' },
+  { href: '/finance', title: 'Finance', parent: '' },
+  { href: '/laporan', title: 'Report', parent: '' },
+  { href: '/profil', title: 'Profil', parent: '' },
   { href: '/input', title: 'Operation', parent: '' },
   { href: '/input/bongkar', title: 'Input Bongkaran', parent: '/operation' },
   { href: '/input/:id/lo/', title: 'Ubah Nomor LO', parent: '/input/bongkar' },

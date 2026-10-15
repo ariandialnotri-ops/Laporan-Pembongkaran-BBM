@@ -25,8 +25,8 @@ export function tandaiForm(pathname: string) {
 
 /**
  * Tujuan tombol kembali: halaman sebelumnya bila itu memang halaman asal (mis. Riwayat), selain itu
- * menu induk. Halaman grup (Operation, Delivery, ...) kembali ke Dashboard, atau ke beranda peran
- * yang tidak punya Dashboard. null = halaman beranda, tanpa tombol kembali.
+ * menu induk (atau beranda peran yang tidak punya Dashboard). null = menu utama (Dashboard, Operation,
+ * Delivery, HSSE, Finance, Report, Profil) dan halaman Terkirim: tanpa tombol kembali.
  */
 export function useKembali() {
   const { pathname } = useLocation()
