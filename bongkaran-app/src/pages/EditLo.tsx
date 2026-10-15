@@ -163,7 +163,7 @@ function Form({ plan }: { plan: Plan }) {
     }
   }
 
-  const keluar = () => navigate(kembaliKe)
+  const keluar = () => navigate(kembaliKe, { replace: true })
 
   return (
     <div className="flex flex-col gap-space-md">

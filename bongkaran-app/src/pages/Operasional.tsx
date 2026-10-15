@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { CheckCheck, ClipboardCheck, FileDown, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
+import { CheckCheck, ClipboardCheck, FileDown, FileSpreadsheet, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { CheckRow, Choice, Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -330,7 +330,7 @@ export function OpsIsi() {
       for (const p of fotoOps(lama.data)) hapusFoto(p)
       guard.bypass()
       toast('Catatan dihapus')
-      navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`)
+      navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`, { replace: true })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
@@ -553,7 +553,7 @@ export function LaporanOps() {
   const akhir = akhirBulan(bulan)
   // Dimuat sejak 1 Januari: kartu bulanan (rutin pompa & tangki, outlet ritel) memakai kolom per bulan.
   const { recs, error } = useOps(`${tahun}-01-01`, akhir)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'xlsx' | 'pdf' | null>(null)
   const temuanFoto = useMemo(
     () => (recs ?? []).filter((r) => r.tanggal >= `${bulan}-01`).flatMap((r) => fotoOps(r.data)),
     [recs, bulan],
@@ -581,7 +581,7 @@ export function LaporanOps() {
 
   const unduh = async () => {
     if (!recs) return
-    setBusy(true)
+    setBusy('xlsx')
     try {
       const { exportOpsXlsx } = await import('@/lib/report/ops')
       const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
@@ -589,7 +589,25 @@ export function LaporanOps() {
     } catch (e) {
       toast(`Gagal membuat Excel: ${pesan(e)}`)
     } finally {
-      setBusy(false)
+      setBusy(null)
+    }
+  }
+
+  const unduhPdf = async () => {
+    if (!recs) return
+    setBusy('pdf')
+    try {
+      const [{ exportOpsPdf }, fotoData] = await Promise.all([
+        import('@/lib/report/ops-pdf'),
+        // Foto temuan disisipkan di PDF; foto yang sudah dipangkas cut-off dilewati.
+        Promise.all(temuanFoto.map(async (p) => [p.id, await app.backend.photoDataUrl(p).catch(() => '')] as const)).then((x) => Object.fromEntries(x)),
+      ])
+      const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
+      exportOpsPdf({ tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings, grup, fotoData, hariIni }, `Laporan_Operasional_SPBU_${kode}_${bulan}.pdf`)
+    } catch (e) {
+      toast(`Gagal membuat PDF: ${pesan(e)}`)
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -601,10 +619,16 @@ export function LaporanOps() {
           <Field label="Bulan" htmlFor="ops-bulan" className="min-w-40 flex-1">
             <Input id="ops-bulan" type="month" max={hariIni.slice(0, 7)} value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
           </Field>
-          <Button size="pill" disabled={!recs || busy} onClick={() => void unduh()}>
-            {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileDown aria-hidden="true" />}
-            Unduh Excel (format asli)
-          </Button>
+          <div className="flex flex-wrap gap-space-xs">
+            <Button size="pill" disabled={!recs || !!busy} onClick={() => void unduh()}>
+              {busy === 'xlsx' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
+              Unduh Excel (format asli)
+            </Button>
+            <Button size="pill" variant="glass" disabled={!recs || !!busy} onClick={() => void unduhPdf()}>
+              {busy === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileDown aria-hidden="true" />}
+              Unduh PDF
+            </Button>
+          </div>
         </div>
         <span className="text-body-sm text-on-surface-variant">
           Berisi kartu perawatan, checklist housekeeping, sumur pantau, oil catcher, dan breakdown ({kerusakan.length} laporan kerusakan). Cek tera, kualitas harian, dan persediaan BBM diunduh dari laporannya masing-masing.

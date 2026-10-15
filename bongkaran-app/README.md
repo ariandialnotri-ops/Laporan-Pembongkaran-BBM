@@ -56,7 +56,8 @@ acara). Item disaring per peran (`src/components/shell/menu-data.ts`).
   dikerjakan) & hijau (berjalan). Layar lebar: sidebar tetap di kiri, tombol di header menyembunyikan/
   menampilkannya. HP/tablet: laci dibuka dari tombol menu, ditutup dengan menggeser ke kiri / mengetuk latar.
 - **Kembali**: semua halaman selain beranda punya tombol kembali (halaman grup kembali ke Dashboard); tombol
-  tidak membuka lagi halaman Terkirim. Gerakan geser dari tepi kiri dibiarkan untuk "kembali" bawaan iPhone/
+  tidak membuka lagi halaman Terkirim, form yang sudah ditinggalkan, maupun form/detail di bawah halaman itu
+  (setelah hapus atau batal, riwayat diganti, bukan ditambah). Gerakan geser dari tepi kiri dibiarkan untuk "kembali" bawaan iPhone/
   Android; di aplikasi yang dipasang ke layar utama iPhone, geser tepi kiri menjalankan tombol kembali.
 - **Sidebar akordeon**: membuka satu grup menutup grup lain; laci HP dibuka dari tombol ☰ dan ditutup dengan
   geser ke kiri.
@@ -83,7 +84,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/apar/inspeksi/:id` | Form satu unit: checklist (posisi, tanda, tekanan, pin & segel, tabung, selang, label, kartu, masa isi ulang, roda APAB), catatan (wajib bila temuan), **foto wajib**, petugas; **Kirim** menyimpan unit itu saja lalu kembali ke pemindai. Unit yang sudah dikirim hari ini tampil hasilnya + tombol koreksi |
 | | `/apar/data` | Data utama (ABH & Pengawas): **daftar unit tersimpan** (tabel, saring APAR/cadangan/APAB) dan daftar area (tambah lewat bottom sheet, hapus bila kosong); jumlah pulau dari Pengaturan SPBU |
 | | `/apar/data/unit/:id` | Form tambah (`baru`) / ubah unit (**hanya ABH & pengawas**): tipe, kode (unik), kapasitas, jenis, **sistem DCP: Pressure System (ada manometer) / Cartridge (tanpa manometer; checklist inspeksi mengganti butir manometer dengan butir cartridge gas pendorong)**, lokasi, jadwal isi ulang, **tanggal pemeriksaan instansi berwenang + nama instansi (berlaku maks. 12 bulan)**, cadangan; Simpan kembali ke daftar; hapus, label QR |
-| | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung: pita merah berisi nama SPBU utuh, QR, kode besar, tipe, jenis & kapasitas, lokasi |
+| | `/apar/label` | Label QR per unit untuk dicetak/disimpan PDF dan ditempel di tabung: pita merah berisi nama SPBU utuh, QR, kode besar, tipe, jenis & kapasitas, lokasi. Centang label yang ingin dicetak, lalu unduh **PDF A4** (8 label per lembar) atau **JPG 300 dpi**: per label (92 × 66 mm) atau lembar A4; lebih dari satu gambar dibungkus ZIP |
 | | `/apar/unit/:id` | Tujuan QR (kamera HP): data unit, kondisi terakhir (temuan, catatan, foto), **kalender kepatuhan inspeksi bulanan** (JAN–DES per tahun: baik / temuan / terlewat / bulan ini, persentase kepatuhan, data setahun dari server), riwayat, tombol Inspeksi unit ini |
 | Laporan | `/laporan` | Kartu laporan: |
 | | `/laporan/persediaan` | Catatan Persediaan BBM, unduh Excel/PDF sesuai template |
@@ -95,7 +96,7 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/laporan/apar` | Riwayat Inspeksi APAR & APAB: satu baris per unit per inspeksi, filter temuan |
 | | `/insiden/baru` | **Lapor Insiden / Near miss / Kerusakan** (semua peran): jenis, kategori, tanggal & jam, lokasi, peralatan, uraian, dampak (wajib untuk insiden), penyebab, tindakan, tingkat risiko, foto (wajib untuk insiden & kerusakan), pelapor; kirim lalu ke riwayat |
 | | `/ops` | **Operasional SPBU** (format laporan operasional SPBU): kartu perawatan (pompa & tangki pompa dorong, rutin pompa & tangki, APAR/APAB harian, ruang panel listrik, genset, totem, kanopi pompa, outlet ritel), checklist housekeeping (CS), sumur pantau & oil catcher (kashift/security). Per tanggal; tanda baik / X / –; X wajib catatan + foto (foto hanya saat temuan); paraf pengawas per form atau massal. Form yang tampil mengikuti peran dan **Fasilitas SPBU** di Identitas SPBU |
-| | `/laporan/ops` | Rekap bulanan per form (status tiap tanggal), daftar temuan, unduh **Excel format asli** (template `public/templates/ops-template.xlsx`, sheet BREAK DOWN dari laporan kerusakan) |
+| | `/laporan/ops` | Rekap bulanan per form (status tiap tanggal), daftar temuan, unduh **Excel format asli** (template `public/templates/ops-template.xlsx`, sheet BREAK DOWN dari laporan kerusakan) atau **PDF** (A4 mendatar: kartu per form aktivitas × tanggal, form bulanan × bulan, sumur pantau, oil catcher, temuan dengan foto, breakdown, kolom pengesahan pengawas) |
 | | `/laporan/insiden` | Riwayat insiden: filter tanggal/jenis/status, baris terbuka oranye, baru biru; `/laporan/insiden/:id` detail + tindak lanjut (status, PIC, target, catatan) oleh ABH/Pengawas/Kashift |
 | | `/gts` | **Guard Tour System** (sampling subsidi tepat, khusus security): hari operasional 06:00–05:59 dibagi 12 slot 2 jam; tiap slot minimal 1 transaksi **JBT** (Biosolar) dan 1 **JBKP** (Pertalite). Kotak slot hijau (lengkap), oranye (berjalan), merah (terlewat), abu (nanti); hanya slot berjalan yang dapat diisi. Form `/gts/isi`: nopol, volume, foto **EDC**, **struk**, dan **kendaraan (nopol terlihat)** dari kamera, dicap waktu + SPBU + jenis + nopol |
 | | `/laporan/gts` | Riwayat Guard Tour per tanggal: kepatuhan slot, jumlah sampling JBT/JBKP, foto; hapus oleh ABH/Pengawas |

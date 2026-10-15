@@ -105,6 +105,16 @@ function cocok(pola: string, pathname: string) {
 
 const pageFor = (pathname: string) => PAGES.find((p) => cocok(p.href, pathname))
 
+/** true bila `pathname` berada di bawah `induk` menurut rantai menu induk (mis. form di bawah daftarnya). */
+export function turunanDari(pathname: string, induk: string) {
+  let p: string | null = pathname
+  for (let i = 0; i < 12 && p; i++) {
+    p = parentOf(p)
+    if (p === induk) return true
+  }
+  return false
+}
+
 /** Tujuan tombol kembali di header, null untuk halaman grup menu. */
 export function parentOf(pathname: string) {
   return pageFor(pathname)?.parent || null

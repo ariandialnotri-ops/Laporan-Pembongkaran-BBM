@@ -320,7 +320,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
       guard.bypass()
-      navigate('/input/bongkar')
+      navigate('/input/bongkar', { replace: true })
     } catch (e) {
       toast(pesan(e), TriangleAlert)
     }

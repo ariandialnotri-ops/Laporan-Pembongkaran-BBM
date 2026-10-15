@@ -185,7 +185,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
       await app.deleteTank(awal.id)
       toast('Tangki dihapus')
       guard.bypass()
-      navigate(kembali)
+      navigate(kembali, { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -308,7 +308,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
 
       <ErrorBox text={error} />
       <div className="flex gap-space-xs">
-        <Button size="lg" variant="glass" onClick={() => navigate(kembali)}>
+        <Button size="lg" variant="glass" onClick={() => navigate(kembali, { replace: true })}>
           Batal
         </Button>
         <Button size="lg" className="flex-1" disabled={simpan} onClick={() => void kirim()}>

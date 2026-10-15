@@ -38,14 +38,14 @@ export function Terkirim() {
         )}
       </GlassCard>
 
-      <Link to={beranda} className={cn(buttonVariants({ size: 'lg' }), 'animate-entrance-2 w-full')}>
+      <Link to={beranda} replace className={cn(buttonVariants({ size: 'lg' }), 'animate-entrance-2 w-full')}>
         <House aria-hidden="true" />
         Kembali ke {beranda === '/' ? 'Dashboard' : 'menu'}
       </Link>
       {!!info.aksi?.length && (
         <div className="animate-entrance-3 flex flex-col gap-space-xs">
           {info.aksi.filter((a) => app.can(a.to.split('?')[0])).map((a) => (
-            <Link key={a.to + a.label} to={a.to} className={cn(buttonVariants({ variant: 'glass', size: 'lg' }), 'w-full justify-between')}>
+            <Link key={a.to + a.label} to={a.to} replace className={cn(buttonVariants({ variant: 'glass', size: 'lg' }), 'w-full justify-between')}>
               {a.label}
               <ChevronRight aria-hidden="true" />
             </Link>

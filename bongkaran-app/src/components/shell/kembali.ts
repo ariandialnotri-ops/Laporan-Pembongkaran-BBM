@@ -1,11 +1,13 @@
 import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp } from '@/lib/app-state'
-import { parentOf } from '@/lib/nav'
+import { parentOf, turunanDari } from '@/lib/nav'
 import { berandaPeran } from '@/lib/roles'
 
 /** Jalur halaman per indeks riwayat browser (sesi ini), supaya "kembali" tidak membuka halaman Terkirim lagi. */
 const jejak = new Map<number, string>()
+/** Indeks riwayat yang berisi form (berpenjaga): tombol kembali tidak membuka lagi form yang sudah ditinggalkan. */
+const jejakForm = new Map<number, string>()
 const idxSekarang = () => (window.history.state as { idx?: number } | null)?.idx ?? 0
 
 /** Catat jalur tiap halaman yang dibuka (dipanggil sekali di AppShell). */
@@ -14,6 +16,11 @@ export function useCatatJejak() {
   useEffect(() => {
     jejak.set(idxSekarang(), pathname)
   }, [pathname, key])
+}
+
+/** Dipanggil form yang memakai konfirmasi keluar (useLeaveGuard). */
+export function tandaiForm(pathname: string) {
+  jejakForm.set(idxSekarang(), pathname)
 }
 
 /**
@@ -32,7 +39,11 @@ export function useKembali() {
     if (!parent) return
     const idx = idxSekarang()
     const sebelum = jejak.get(idx - 1)
-    if (idx > 0 && sebelum && sebelum !== '/terkirim' && sebelum !== pathname) navigate(-1)
+    // Halaman sebelumnya yang merupakan turunan halaman ini (form/detail yang baru ditutup) tidak
+    // dibuka lagi: kembali ke menu induk supaya tidak bolak-balik daftar ↔ form.
+    // Form yang sudah ditinggalkan juga tidak dibuka lagi.
+    const bolehMundur = idx > 0 && sebelum && sebelum !== '/terkirim' && sebelum !== pathname && !turunanDari(sebelum, pathname) && jejakForm.get(idx - 1) !== sebelum
+    if (bolehMundur) navigate(-1)
     else navigate(parent, { replace: true })
   }, [navigate, parent, pathname])
   return parent ? kembali : null

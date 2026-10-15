@@ -1,8 +1,9 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { useBlocker } from 'react-router-dom'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useBlocker, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
+import { tandaiForm } from '@/components/shell/kembali'
 import { lepasKunciGulir } from '@/components/shell/viewport'
 
 /**
@@ -23,6 +24,10 @@ export function useLeaveGuard({
   beforeLeave?: () => Promise<unknown> | void
   izinkan?: (pathname: string) => boolean
 }) {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (active) tandaiForm(pathname)
+  }, [active, pathname])
   const lewati = useRef(false)
   const [keluar, setKeluar] = useState(false)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => active && !lewati.current && currentLocation.pathname !== nextLocation.pathname && !izinkan?.(nextLocation.pathname))

@@ -307,5 +307,5 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
 /** File yang dapat diunduh (Report > Export File). */
 export const EXPORT: { path: string; icon: LucideIcon; title: string; desc: string }[] = [
   { path: '/laporan/persediaan', icon: FileSpreadsheet, title: 'Catatan Persediaan BBM', desc: 'Per produk, satu baris per shift · Excel atau PDF' },
-  { path: '/laporan/ops', icon: Droplets, title: 'Laporan Operasional SPBU', desc: 'Kartu perawatan, housekeeping, sumur pantau, oil catcher, breakdown · Excel format asli' },
+  { path: '/laporan/ops', icon: Droplets, title: 'Laporan Operasional SPBU', desc: 'Kartu perawatan, housekeeping, sumur pantau, oil catcher, breakdown · Excel format asli & PDF' },
 ]

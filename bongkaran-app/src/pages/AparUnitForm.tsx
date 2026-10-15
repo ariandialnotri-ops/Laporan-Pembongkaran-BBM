@@ -103,7 +103,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     app.updateSettings(awal.tipe === 'apar' ? { apar: (s.apar ?? []).filter((x) => x.id !== awal.u.id) } : { apab: (s.apab ?? []).filter((x) => x.id !== awal.u.id) })
     guard.bypass()
     toast(`${awal.u.kode} dihapus`)
-    navigate('/apar/data')
+    navigate('/apar/data', { replace: true })
   }
 
   return (
@@ -181,7 +181,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
         )}
         <ErrorBox text={error} />
         <div className="flex gap-space-xs">
-          <Button size="lg" variant="glass" onClick={() => navigate('/apar/data')}>
+          <Button size="lg" variant="glass" onClick={() => navigate('/apar/data', { replace: true })}>
             Batal
           </Button>
           <Button size="lg" className="flex-1" onClick={simpan}>
