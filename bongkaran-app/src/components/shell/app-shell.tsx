@@ -5,7 +5,8 @@ import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
 import { PlanReminder } from './plan-reminder'
-import { SidebarLaci, SidebarTetap, useGeserBukaLaci } from './sidebar'
+import { useCatatJejak, useGeserKembali, useKembali } from './kembali'
+import { SidebarLaci, SidebarTetap } from './sidebar'
 import { SidebarContext } from './sidebar-ctx'
 import { useViewportVars } from './viewport'
 
@@ -26,8 +27,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const laci = laciDi === pathname
   const setLaci = useCallback((o: boolean) => setLaciDi(o ? window.location.pathname : null), [])
   const [tertutup, setTertutup] = useState(bacaTutup)
-  const bukaLaci = useCallback(() => setLaci(true), [setLaci])
-  useGeserBukaLaci(bukaLaci)
+  useCatatJejak()
+  useGeserKembali(useKembali())
 
   const toggle = useCallback(() => {
     if (window.matchMedia('(min-width: 1024px)').matches) {

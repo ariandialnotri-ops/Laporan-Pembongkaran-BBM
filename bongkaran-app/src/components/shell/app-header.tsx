@@ -1,7 +1,8 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
-import { parentOf, titleFor } from '@/lib/nav'
+import { titleFor } from '@/lib/nav'
+import { useKembali } from './kembali'
 import { PemilihSpbu } from './pemilih-spbu'
 import { useSidebar } from './sidebar-ctx'
 import { cn } from '@/lib/utils'
@@ -9,15 +10,14 @@ import { cn } from '@/lib/utils'
 export function AppHeader() {
   const { pathname } = useLocation()
   const app = useApp()
-  const parent = parentOf(pathname)
-  const navigate = useNavigate()
+  const kembali = useKembali()
   const sidebar = useSidebar()
 
   return (
     <header data-glass-bar className={cn('fixed inset-x-0 top-0 z-40 transition-[left] duration-300 motion-reduce:transition-none', !sidebar.tertutup && 'lg:left-72', 'print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl')}>
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
-          {/* Menu: HP = buka laci sidebar (juga bisa digeser dari tepi kiri); layar lebar = sembunyikan/tampilkan sidebar. */}
+          {/* Menu: HP = buka laci sidebar; layar lebar = sembunyikan/tampilkan sidebar. */}
           <button
             type="button"
             onClick={sidebar.toggle}
@@ -28,13 +28,12 @@ export function AppHeader() {
             <Menu aria-hidden="true" className="size-5 lg:hidden" />
             {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
           </button>
-          {/* Halaman turunan: tombol kembali ke menu induk. */}
-          {parent && (
+          {/* Semua halaman selain beranda punya tombol kembali (halaman asal atau menu induk). */}
+          {kembali && (
             <button
               type="button"
               aria-label="Kembali"
-              // Kembali ke halaman asal (mis. Riwayat), bukan ke form; tanpa riwayat, ke menu induk.
-              onClick={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate(parent, { replace: true }))}
+              onClick={kembali}
               className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
             >
               <ChevronLeft aria-hidden="true" className="size-6" />

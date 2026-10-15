@@ -36,17 +36,19 @@ function SelectContent({
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        data-slot="select-content"
         position={position}
         sideOffset={6}
         className={cn(
-          'glass-3 z-[70] overflow-hidden rounded-lg',
+          // Latar padat: teks di belakang daftar tidak ikut terlihat (terutama di iOS tanpa blur).
+          'z-[70] overflow-hidden rounded-lg border border-outline-variant/50 bg-surface-container-lowest shadow-[0_12px_32px_rgba(15,23,42,0.18)]',
           // Daftar panjang dibatasi setinggi ruang yang tersedia di layar, lalu digulir.
           position === 'popper' && 'max-h-[min(var(--radix-select-content-available-height),24rem)] w-[var(--radix-select-trigger-width)]',
           className,
         )}
         {...props}
       >
-        <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+        <SelectPrimitive.Viewport className="overscroll-contain p-1">{children}</SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   )

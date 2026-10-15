@@ -573,6 +573,9 @@ html[data-keyboard='open'] [data-dock] {
 .sheet-content[data-state='closed'] { animation: sheetOut 0.2s cubic-bezier(0.4, 0, 1, 1); }
 .sheet-overlay[data-state='open'] { animation: fadeIn 0.25s ease-out; }
 .sheet-overlay[data-state='closed'] { animation: fadeOut 0.18s ease-in; }
+/* Daftar pilihan (dropdown) muncul halus dari pemicunya. */
+@keyframes pilihanMuncul { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+[data-slot='select-content'][data-state='open'] { animation: pilihanMuncul 140ms cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: var(--radix-select-content-transform-origin); }
 /* Laci sidebar: masuk dari kiri, keluar ke kiri. */
 @keyframes laciIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 @keyframes laciOut { from { transform: translateX(0); } to { transform: translateX(-100%); } }

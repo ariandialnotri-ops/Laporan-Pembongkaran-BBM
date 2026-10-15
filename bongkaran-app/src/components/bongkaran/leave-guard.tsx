@@ -3,6 +3,7 @@ import { useBlocker } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
+import { lepasKunciGulir } from '@/components/shell/viewport'
 
 /**
  * Konfirmasi sebelum meninggalkan form (panah kembali, sidebar, bar bawah, atau tautan lain).
@@ -41,6 +42,8 @@ export function useLeaveGuard({
             } finally {
               setKeluar(false)
               if (blocker.state === 'blocked') blocker.proceed()
+              // iOS: pastikan kunci gulir/sentuh dari dialog tidak tertinggal di halaman tujuan.
+              lepasKunciGulir()
             }
           }}
         >

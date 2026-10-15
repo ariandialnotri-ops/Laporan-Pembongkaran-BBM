@@ -54,8 +54,12 @@ near miss, sumur pantau & oil catcher), **Finance** (segera hadir), **Report** (
 acara). Item disaring per peran (`src/components/shell/menu-data.ts`).
 - **Sidebar**: grup bisa dibuka-tutup, garis cabang, item aktif berupa kartu putih, badge oranye (perlu
   dikerjakan) & hijau (berjalan). Layar lebar: sidebar tetap di kiri, tombol di header menyembunyikan/
-  menampilkannya. HP/tablet: laci dibuka dari tombol menu atau **digeser dari tepi kiri layar**, ditutup
-  dengan menggeser ke kiri / mengetuk latar.
+  menampilkannya. HP/tablet: laci dibuka dari tombol menu, ditutup dengan menggeser ke kiri / mengetuk latar.
+- **Kembali**: semua halaman selain beranda punya tombol kembali (halaman grup kembali ke Dashboard); tombol
+  tidak membuka lagi halaman Terkirim. Gerakan geser dari tepi kiri dibiarkan untuk "kembali" bawaan iPhone/
+  Android; di aplikasi yang dipasang ke layar utama iPhone, geser tepi kiri menjalankan tombol kembali.
+- **Sidebar akordeon**: membuka satu grup menutup grup lain; laci HP dibuka dari tombol ☰ dan ditutup dengan
+  geser ke kiri.
 - **Bar bawah statis** (HP/tablet): menempel penuh di bawah, tidak melayang atau bergeser; berisi grup menu.
 - Halaman ikhtisar grup: `/operation`, `/delivery`, `/hsse`, `/finance`, `/laporan` (+ `/laporan/riwayat`,
   `/laporan/export`); `/input` lama dialihkan ke `/operation`.

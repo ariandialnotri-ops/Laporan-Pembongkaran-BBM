@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { ChevronDown, Settings, UserRound, X } from 'lucide-react'
@@ -59,9 +59,11 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname, search } = useLocation()
   const grup = useMenu()
   const aktifKey = grupAktif(grup, pathname, search)
-  // Grup yang dibuka pengguna; grup halaman aktif selalu terbuka saat berpindah halaman.
-  const [buka, setBuka] = useState<Record<string, boolean>>({})
-  const terbuka = (key: string) => buka[key] ?? key === aktifKey
+  // Akordeon: hanya satu grup terbuka. Pilihan pengguna berlaku di halaman ini; pindah halaman
+  // membuka grup halaman itu (tanpa efek, diturunkan dari alamat).
+  const [pilih, setPilih] = useState<{ path: string; key: string | null } | null>(null)
+  const grupTerbuka = pilih?.path === pathname ? pilih.key : aktifKey
+  const terbuka = (key: string) => grupTerbuka === key
 
   const anakAktif = (g: GrupMenu) => {
     // Item paling spesifik yang cocok dengan halaman ini.
@@ -111,7 +113,7 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
               <button
                 type="button"
                 aria-expanded={open}
-                onClick={() => setBuka((b) => ({ ...b, [g.key]: !open }))}
+                onClick={() => setPilih({ path: pathname, key: open ? null : g.key })}
                 className={cn(kelasBaris, 'hover:bg-surface-container-lowest/60', aktifKey === g.key ? 'font-semibold text-on-surface' : 'text-on-surface')}
               >
                 <Icon aria-hidden="true" className={cn('size-[22px] shrink-0', aktifKey === g.key ? 'text-on-surface' : 'text-on-surface-variant')} strokeWidth={1.6} />
@@ -119,13 +121,16 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
                 {!open && jumlah > 0 && <Badge n={jumlah} tone="warn" />}
                 <ChevronDown aria-hidden="true" className={cn('size-5 shrink-0 text-on-surface-variant transition-transform', open && 'rotate-180')} />
               </button>
-              {open && (
-                <ul className="ml-[18px] mt-1 flex flex-col gap-0.5 pb-1">
-                  {anak.map((i, k) => (
-                    <ItemAnak key={i.to} item={i} aktif={aktifTo === i.to} terakhir={k === anak.length - 1} onNavigate={onNavigate} />
-                  ))}
-                </ul>
-              )}
+              {/* Buka-tutup beranimasi (tinggi 0fr -> 1fr); daftar yang tertutup tidak bisa difokus. */}
+              <div className={cn('grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+                <div className="overflow-hidden">
+                  <ul inert={!open} className="ml-[18px] mt-1 flex flex-col gap-0.5 pb-1">
+                    {anak.map((i, k) => (
+                      <ItemAnak key={i.to} item={i} aktif={aktifTo === i.to} terakhir={k === anak.length - 1} onNavigate={onNavigate} />
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
           )
         })}
@@ -174,15 +179,25 @@ export function SidebarTetap({ tertutup }: { tertutup: boolean }) {
 }
 
 /**
- * Laci sidebar di HP/tablet: dibuka dari tombol menu di header atau digeser dari tepi kiri layar,
- * ditutup dengan menggeser ke kiri, mengetuk latar, atau tombol tutup. Laci mengikuti jari saat digeser.
+ * Laci sidebar di HP/tablet: dibuka dari tombol menu di header, ditutup dengan menggeser ke kiri,
+ * mengetuk latar, atau tombol tutup. Laci mengikuti jari (langsung lewat style, tanpa render ulang)
+ * supaya halus di iPhone & Android. Gerakan tepi kiri layar dibiarkan untuk "kembali" bawaan sistem.
  */
 export function SidebarLaci({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const [geser, setGeser] = useState(0)
-  const awal = useRef<{ x: number; y: number; arah: 'h' | 'v' | null } | null>(null)
+  const isi = useRef<HTMLDivElement>(null)
+  const latar = useRef<HTMLDivElement>(null)
+  const awal = useRef<{ x: number; y: number; arah: 'h' | 'v' | null; dx: number } | null>(null)
+  const atur = (dx: number, animasi: boolean) => {
+    const el = isi.current
+    if (el) {
+      el.style.transition = animasi ? 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none'
+      el.style.transform = dx ? `translate3d(${dx}px,0,0)` : ''
+    }
+    if (latar.current) latar.current.style.opacity = dx ? String(Math.max(0.15, 1 + dx / 320)) : ''
+  }
   const mulai = (e: React.TouchEvent) => {
     const t = e.touches[0]
-    awal.current = { x: t.clientX, y: t.clientY, arah: null }
+    awal.current = { x: t.clientX, y: t.clientY, arah: null, dx: 0 }
   }
   const gerak = (e: React.TouchEvent) => {
     const a = awal.current
@@ -192,25 +207,30 @@ export function SidebarLaci({ open, onOpenChange }: { open: boolean; onOpenChang
     const dy = t.clientY - a.y
     // Kunci arah setelah 8 px: geser vertikal = gulir daftar menu, bukan menutup laci.
     if (!a.arah && Math.abs(dx) + Math.abs(dy) > 8) a.arah = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-    if (a.arah === 'h') setGeser(Math.min(0, dx))
+    if (a.arah !== 'h') return
+    a.dx = Math.min(0, dx)
+    atur(a.dx, false)
   }
   const lepas = () => {
-    const tutup = geser < -70
+    const a = awal.current
     awal.current = null
-    setGeser(0)
-    if (tutup) onOpenChange(false)
+    if (!a || a.arah !== 'h') return
+    if (a.dx < -70) {
+      onOpenChange(false)
+      atur(0, false)
+    } else atur(0, true)
   }
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="sheet-overlay fixed inset-0 z-[60] bg-on-surface/30" style={geser ? { opacity: Math.max(0.2, 1 + geser / 320) } : undefined} />
+        <Dialog.Overlay ref={latar} className="sheet-overlay fixed inset-0 z-[60] bg-on-surface/30" />
         <Dialog.Content
+          ref={isi}
           onTouchStart={mulai}
           onTouchMove={gerak}
           onTouchEnd={lepas}
           onTouchCancel={lepas}
-          style={geser ? { transform: `translateX(${geser}px)`, transition: 'none' } : undefined}
-          className="laci-sidebar fixed inset-y-0 left-0 z-[61] w-[86vw] max-w-80 rounded-r-[28px] bg-[#f1f2f4] shadow-2xl transition-transform duration-200 focus:outline-none"
+          className="laci-sidebar fixed inset-y-0 left-0 z-[61] w-[86vw] max-w-80 rounded-r-[28px] bg-[#f1f2f4] shadow-2xl will-change-transform focus:outline-none"
         >
           <Dialog.Title className="sr-only">Menu {APP_NAME}</Dialog.Title>
           <Dialog.Description className="sr-only">Semua fitur dikelompokkan per peruntukan. Geser ke kiri untuk menutup.</Dialog.Description>
@@ -224,37 +244,4 @@ export function SidebarLaci({ open, onOpenChange }: { open: boolean; onOpenChang
       </Dialog.Portal>
     </Dialog.Root>
   )
-}
-
-/**
- * Buka laci dengan menggeser dari tepi kiri layar (HP/tablet). Gerakan harus dimulai
- * di 24 px pertama dan lebih ke samping daripada ke bawah.
- */
-export function useGeserBukaLaci(buka: () => void) {
-  useEffect(() => {
-    let a: { x: number; y: number } | null = null
-    const mulai = (e: TouchEvent) => {
-      const t = e.touches[0]
-      const lebar = window.matchMedia('(min-width: 1024px)').matches
-      a = !lebar && t.clientX <= 24 && !document.querySelector('[role="dialog"][data-state="open"]') ? { x: t.clientX, y: t.clientY } : null
-    }
-    const gerak = (e: TouchEvent) => {
-      if (!a) return
-      const t = e.touches[0]
-      const dx = t.clientX - a.x
-      if (dx > 50 && dx > Math.abs(t.clientY - a.y) * 1.5) {
-        a = null
-        buka()
-      }
-    }
-    const lepas = () => (a = null)
-    window.addEventListener('touchstart', mulai, { passive: true })
-    window.addEventListener('touchmove', gerak, { passive: true })
-    window.addEventListener('touchend', lepas, { passive: true })
-    return () => {
-      window.removeEventListener('touchstart', mulai)
-      window.removeEventListener('touchmove', gerak)
-      window.removeEventListener('touchend', lepas)
-    }
-  }, [buka])
 }
