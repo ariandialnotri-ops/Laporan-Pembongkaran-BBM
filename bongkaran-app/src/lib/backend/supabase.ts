@@ -6,6 +6,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
+import type { GtsRecord } from '@/lib/gts'
+import type { WbsRecord } from '@/lib/wbs'
 import { FOTO_DIARSIPKAN, blobToDataUrl, genId } from '@/lib/image'
 import { normalizePlan } from '@/lib/plan'
 import type { Photo, Photos, Plan, Report, ReportStatus, ReportSummary, Settings } from '@/lib/sop'
@@ -18,6 +20,8 @@ type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shi
 type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; meta: Partial<PlanMeta> | null; created_at: string }
 type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift: number; data: DailyRecord['data']; created_at: string; updated_at: string; created_by: string | null }
 type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data']; updated_at: string; updated_by: string | null }
+type WbsRow = { id: string; status: WbsRecord['status']; data: WbsRecord['data']; created_at: string; created_by: string | null }
+type GtsRow = { id: string; tanggal: string; slot: number; jenis: GtsRecord['jenis']; data: GtsRecord['data']; created_at: string; created_by: string | null }
 type TankRow = { id: string; produk: string; tank_no: string; tanggal_kalibrasi: string | null; catatan: string | null; tabel: TankTabel; urut: number }
 type RingkasanRow = {
   spbu_id: string
@@ -371,6 +375,36 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteOps(id) {
       const rows = check(await sb.from('bbm_ops').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus catatan ini.')
+    },
+    async kirimWbs(id, data, foto) {
+      const { data: res, error } = await sb.functions.invoke('bbm-wbs', { body: { spbuId: aktif(), id, data, foto: await Promise.all(foto.map(blobToDataUrl)) } })
+      if (error) {
+        const r = (error as { context?: Response }).context
+        const detail = r && typeof r.json === 'function' ? ((await r.json().catch(() => null)) as { error?: string } | null)?.error : null
+        throw new Error(translateError(detail || error.message))
+      }
+      if ((res as { error?: string } | null)?.error) throw new Error((res as { error: string }).error)
+    },
+    async listWbs() {
+      const rows = check(await sb.from('bbm_wbs').select('id,status,data,created_at,created_by').eq('spbu_id', aktif()).order('created_at', { ascending: false }).limit(1000)) as WbsRow[]
+      return rows.map((r) => ({ id: r.id, status: r.status, data: r.data, createdAt: r.created_at, createdBy: r.created_by }))
+    },
+    async updateWbs(id, status, data) {
+      const rows = check(await sb.from('bbm_wbs').update({ status, data }).eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Hanya ABH yang dapat menindaklanjuti laporan WBS.')
+    },
+    async listGts(from, to) {
+      const rows = check(
+        await sb.from('bbm_gts').select('id,tanggal,slot,jenis,data,created_at,created_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal').order('slot').limit(5000),
+      ) as GtsRow[]
+      return rows.map((r) => ({ id: r.id, tanggal: r.tanggal, slot: r.slot, jenis: r.jenis, data: r.data, createdAt: Date.parse(r.created_at), createdBy: r.created_by }))
+    },
+    async saveGts(rec) {
+      check(await sb.from('bbm_gts').insert({ spbu_id: aktif(), id: rec.id, tanggal: rec.tanggal, slot: rec.slot, jenis: rec.jenis, data: rec.data }))
+    },
+    async deleteGts(id) {
+      const rows = check(await sb.from('bbm_gts').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus sampling.')
     },
     async fotoArsip() {
       const rows = check(await sb.rpc('bbm_foto_arsip', { p_spbu: aktif() })) as { name: string; ukuran: number; dibuat: string; batas: string }[] | null

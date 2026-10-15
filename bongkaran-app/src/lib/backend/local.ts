@@ -6,6 +6,8 @@
 import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
+import type { GtsRecord } from '@/lib/gts'
+import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
 import type { Photos, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 import { TANK_BAWAAN, type TankDef } from '@/lib/tank'
@@ -182,6 +184,27 @@ export const localBackend: Backend = {
   },
   async deleteOps(id) {
     await set('ops', ((await get<OpsRecord[]>('ops')) ?? []).filter((r) => r.id !== id))
+  },
+  async kirimWbs(id, data, foto) {
+    const rec: WbsRecord = {
+      id,
+      status: 'baru',
+      createdAt: new Date().toISOString(),
+      createdBy: null,
+      data: { ...data, kontak: data.anonim ? '' : data.kontak, riwayat: [], foto: await Promise.all(foto.map(async (b, i) => ({ id: `${id}-${i + 1}`, name: `bukti-${i + 1}.jpg`, at: new Date().toISOString(), dataUrl: await blobToDataUrl(b) }))) },
+    }
+    await set('wbs', [rec, ...((await get<WbsRecord[]>('wbs')) ?? [])])
+  },
+  listWbs: () => get<WbsRecord[]>('wbs').then((d) => d ?? []),
+  async updateWbs(id, status, data) {
+    await set('wbs', ((await get<WbsRecord[]>('wbs')) ?? []).map((r) => (r.id === id ? { ...r, status, data } : r)))
+  },
+  listGts: (from, to) => get<GtsRecord[]>('gts').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to)),
+  async saveGts(rec) {
+    await set('gts', [...((await get<GtsRecord[]>('gts')) ?? []), rec])
+  },
+  async deleteGts(id) {
+    await set('gts', ((await get<GtsRecord[]>('gts')) ?? []).filter((r) => r.id !== id))
   },
   // Mode lokal: foto tersimpan di perangkat, tidak ada cut-off.
   fotoArsip: async () => [],

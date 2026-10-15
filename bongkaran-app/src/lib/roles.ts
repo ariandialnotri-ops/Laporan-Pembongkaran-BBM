@@ -8,7 +8,7 @@ export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
   { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU & database tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
   { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
-  { key: 'security', label: 'Security', desc: 'Inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
+  { key: 'security', label: 'Security', desc: 'Guard Tour System (sampling subsidi tepat JBT/JBKP tiap 2 jam), inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
   { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
 ]
 
@@ -95,7 +95,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/profil', '/profil/sandi',
     '/kalkulator',
   ],
-  security: ['/input', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
+  security: ['/input', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
   cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
 }
 
@@ -103,9 +103,14 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
 const IKHTISAR = ['/terkirim', '/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
 
 export function bolehBuka(role: Role, path: string) {
-  if (role === 'abh' || IKHTISAR.includes(path)) return true
+  if (role === 'abh') return true
+  // Laporan WBS hanya untuk ABH (pengawas pun tidak, meski boleh membuka semua /laporan/).
+  if (path === '/laporan/wbs' || path.startsWith('/laporan/wbs/')) return false
+  // WBS: setiap anggota boleh melapor.
+  if (path === '/wbs' || path.startsWith('/wbs/')) return true
+  if (IKHTISAR.includes(path)) return true
   return AKSES[role].some((p) => (p.endsWith('/') && p !== '/' ? path.startsWith(p) : path === p))
 }
 
 /** Halaman awal peran yang tidak punya Dashboard. */
-export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/apar' : role === 'cs' ? '/ops' : '/operation')
+export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/hsse' : role === 'cs' ? '/ops' : '/operation')

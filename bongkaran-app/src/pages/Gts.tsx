@@ -1,0 +1,438 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Camera, ChevronRight, LoaderCircle, ScanEye, Send, Trash2 } from 'lucide-react'
+import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { Loading } from '@/components/bongkaran/load-state'
+import { ErrorBox } from '@/components/bongkaran/lo-fields'
+import { GAYA_STATUS, LegendaStatus } from '@/components/bongkaran/pilih-status'
+import { SectionHeader } from '@/components/bongkaran/section-header'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { GlassCard } from '@/components/ui/glass-card'
+import { Input } from '@/components/ui/input'
+import { Pill } from '@/components/ui/pill'
+import { useToast } from '@/components/ui/toast'
+import { useApp } from '@/lib/app-state'
+import { addDays, formatTanggalIso, hariSingkat, nowHm, todayIso } from '@/lib/date'
+import { parseAngka } from '@/lib/format'
+import { FOTO_GTS, gtsId, JENIS_GTS, jenisGts, JUMLAH_SLOT, labelSlot, slotKini, statusSlot, type FotoGtsKey, type GtsRecord, type JenisGts } from '@/lib/gts'
+import { capWaktu, compressImage, genId } from '@/lib/image'
+import type { Photo } from '@/lib/sop'
+import type { StatusIsi } from '@/lib/status-isi'
+import { useKeTerkirim } from '@/lib/terkirim'
+import { usePhotoSrc } from '@/lib/use-photo-src'
+import { cn } from '@/lib/utils'
+
+const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const SLOTS = Array.from({ length: JUMLAH_SLOT }, (_, i) => i)
+const tanggalLalu = (tgl: string, n: number) => todayIso(addDays(new Date(`${tgl}T00:00:00`), -n))
+
+/** Sampling GTS pada rentang tanggal operasional; dimuat ulang saat SPBU/rentang berubah. */
+function useGts(from: string, to: string) {
+  const app = useApp()
+  const kunci = `${app.spbuId}|${from}|${to}`
+  const [hasil, setHasil] = useState<{ kunci: string; recs: GtsRecord[]; error: string | null } | null>(null)
+  const muat = useCallback(
+    () =>
+      app.backend.listGts(from, to).then(
+        (recs) => setHasil({ kunci, recs, error: null }),
+        (e) => setHasil({ kunci, recs: [], error: pesan(e) }),
+      ),
+    [app.backend, from, to, kunci],
+  )
+  useEffect(() => {
+    void muat()
+  }, [muat])
+  const kini = hasil?.kunci === kunci ? hasil : null
+  return { recs: kini?.recs ?? null, error: kini?.error ?? null, muat }
+}
+
+const ada = (recs: GtsRecord[], tanggal: string, slot: number, jenis: JenisGts) => recs.some((r) => r.tanggal === tanggal && r.slot === slot && r.jenis === jenis)
+
+/** Kotak slot ringkas berwarna status, dengan tanda JBT/JBKP. */
+function KotakSlot({ slot, status, jbt, jbkp, kini }: { slot: number; status: StatusIsi; jbt: boolean; jbkp: boolean; kini?: boolean }) {
+  const g = GAYA_STATUS[status]
+  return (
+    <div className={cn('flex flex-col gap-1 rounded-lg border p-space-xs', g.kartu, kini && 'ring-2 ring-primary')}>
+      <span className="tabular text-body-sm font-bold text-on-surface">{labelSlot(slot).replace(' - ', '–')}</span>
+      <span className="flex gap-1">
+        <span className={cn('rounded px-1.5 text-[11px] font-bold', jbt ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBT</span>
+        <span className={cn('rounded px-1.5 text-[11px] font-bold', jbkp ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBKP</span>
+      </span>
+      <span className={cn('text-[11px] font-semibold', g.label)}>{status === 'sudah' ? 'Lengkap' : status === 'belum' ? 'Berjalan' : status === 'terlewat' ? 'Terlewat' : 'Nanti'}</span>
+    </div>
+  )
+}
+
+/**
+ * HSSE > Guard Tour System (khusus security): sampling subsidi tepat. Minimal 1 transaksi JBT dan
+ * 1 JBKP per 2 jam. Hanya slot yang sedang berjalan yang dapat diisi (foto diambil saat itu juga).
+ */
+export function GtsMenu() {
+  const app = useApp()
+  const now = slotKini()
+  const [tanggal, setTanggal] = useState(now.tanggal)
+  const { recs, error } = useGts(tanggalLalu(now.tanggal, 6), now.tanggal)
+  if (!app.loaded) return <Loading />
+  const hari = Array.from({ length: 7 }, (_, i) => tanggalLalu(now.tanggal, i))
+  const data = recs ?? []
+  const jbt = ada(data, now.tanggal, now.slot, 'JBT')
+  const jbkp = ada(data, now.tanggal, now.slot, 'JBKP')
+  const bisaIsi = app.role === 'security' || app.role === 'abh'
+  const kurang: JenisGts | null = !jbt ? 'JBT' : !jbkp ? 'JBKP' : null
+  const lengkap = (t: string) => SLOTS.filter((s) => statusSlot(t, s, data, now) === 'sudah').length
+  const lewat = (t: string) => SLOTS.filter((s) => statusSlot(t, s, data, now) !== 'nanti').length
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <GlassCard level={2} className={cn('animate-entrance-1 flex flex-col gap-space-sm border p-space-md', GAYA_STATUS[kurang ? 'belum' : 'sudah'].kartu)}>
+        <div className="flex items-start gap-space-sm">
+          <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-full', GAYA_STATUS[kurang ? 'belum' : 'sudah'].ikon)}>
+            <ScanEye className="size-6" />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-tag uppercase text-on-surface-variant">Slot berjalan · {formatTanggalIso(now.tanggal)}</span>
+            <span className="tabular text-headline-md font-bold text-on-surface">{labelSlot(now.slot)}</span>
+            <span className="text-body-sm text-on-surface-variant">
+              JBT {jbt ? '✓' : 'belum'} · JBKP {jbkp ? '✓' : 'belum'} · minimal 1 transaksi tiap jenis per 2 jam
+            </span>
+          </div>
+        </div>
+        {bisaIsi ? (
+          <Link to={`/gts/isi?jenis=${kurang ?? 'JBT'}`} className={buttonVariants({ size: 'lg' })}>
+            <Camera aria-hidden="true" />
+            {kurang ? `Sampling ${kurang} sekarang` : 'Tambah sampling'}
+          </Link>
+        ) : (
+          <span className="text-body-sm text-on-surface-variant">Sampling diisi oleh security.</span>
+        )}
+        <ErrorBox text={error} />
+      </GlassCard>
+
+      <div className="animate-entrance-2 -mx-margin overflow-x-auto px-margin pb-1">
+        <div role="radiogroup" aria-label="Tanggal" className="flex min-w-max gap-space-xs">
+          {hari.map((t) => {
+            const d = new Date(`${t}T00:00:00`)
+            const on = t === tanggal
+            const n = lengkap(t)
+            const m = lewat(t)
+            const st: StatusIsi = recs === null ? 'nanti' : n >= m && m > 0 ? 'sudah' : t === now.tanggal ? 'belum' : 'terlewat'
+            return (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setTanggal(t)}
+                className={cn('flex w-16 flex-col items-center gap-0.5 rounded-[14px] py-2', on ? 'bg-primary text-on-primary shadow-md' : 'bg-surface-container-lowest/80 text-on-surface')}
+              >
+                <span className={cn('text-[11px] uppercase', on ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
+                <span className="tabular text-body-md font-bold">{d.getDate()}</span>
+                <span className={cn('tabular rounded-full px-1.5 text-[11px] font-bold', GAYA_STATUS[st].ikon)}>
+                  {n}/{m || JUMLAH_SLOT}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <section aria-labelledby="gts-slot" className="animate-entrance-3 flex flex-col gap-space-sm">
+        <SectionHeader id="gts-slot" title={`Slot ${formatTanggalIso(tanggal)}`} />
+        {recs === null ? (
+          <Loading />
+        ) : (
+          <div className="grid grid-cols-3 gap-space-xs sm:grid-cols-4 lg:grid-cols-6">
+            {SLOTS.map((s) => (
+              <KotakSlot key={s} slot={s} status={statusSlot(tanggal, s, data, now)} jbt={ada(data, tanggal, s, 'JBT')} jbkp={ada(data, tanggal, s, 'JBKP')} kini={tanggal === now.tanggal && s === now.slot} />
+            ))}
+          </div>
+        )}
+        <LegendaStatus nanti />
+        {app.can('/laporan/gts') && (
+          <Link to={`/laporan/gts?tanggal=${tanggal}`} className={buttonVariants({ variant: 'glass' })}>
+            Lihat foto sampling tanggal ini
+            <ChevronRight aria-hidden="true" />
+          </Link>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** Halaman form satu sampling (slot berjalan): jenis, nopol, liter, foto EDC/struk/kendaraan. */
+export function GtsForm() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const [params] = useSearchParams()
+  const [jenis, setJenis] = useState<JenisGts>(params.get('jenis') === 'JBKP' ? 'JBKP' : 'JBT')
+  const [nopol, setNopol] = useState('')
+  const [liter, setLiter] = useState('')
+  const [petugas, setPetugas] = useState(() => (app.displayName === 'Mode lokal' ? app.settings.namaSecurityDefault || '' : app.displayName))
+  const [catatan, setCatatan] = useState('')
+  const [foto, setFoto] = useState<Record<FotoGtsKey, FotoLokal[]>>({ edc: [], struk: [], kendaraan: [] })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<FotoGtsKey | 'kirim' | null>(null)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari sampling?', detail: 'Foto dan isian sampling yang belum dikirim akan hilang.' })
+  const kini = slotKini()
+  if (!app.loaded) return <Loading />
+  if (app.role !== 'security' && app.role !== 'abh') return <GlassCard className="p-space-md">Sampling Guard Tour diisi oleh security SPBU.</GlassCard>
+  const j = jenisGts(jenis)
+
+  const ambil = async (key: FotoGtsKey, files: File[]) => {
+    if (!nopol.trim()) return setError('Isi nomor polisi dulu: ikut tercetak pada foto.')
+    setBusy(key)
+    try {
+      const label = FOTO_GTS.find((f) => f.key === key)!.label
+      const baru: FotoLokal[] = []
+      for (const f of files) {
+        const blob = await compressImage(f, { cap: [capWaktu(), `${app.settings.namaSpbu || 'SPBU'} · GTS ${jenis} ${j.produk}`, `${nopol.trim().toUpperCase()} · ${label}`] })
+        baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
+      }
+      setFoto((x) => ({ ...x, [key]: [...x[key], ...baru] }))
+      setError(null)
+    } catch (e) {
+      setError(`Gagal memproses foto: ${pesan(e)}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const kirim = async () => {
+    if (!nopol.trim()) return setError('Isi nomor polisi kendaraan.')
+    for (const f of FOTO_GTS) if (!foto[f.key].length) return setError(`${f.label} wajib diunggah.`)
+    if (!petugas.trim()) return setError('Isi nama petugas.')
+    setBusy('kirim')
+    const id = gtsId()
+    // Slot mengikuti waktu kirim (foto diambil saat itu).
+    const slot = slotKini()
+    try {
+      const unggah = async (key: FotoGtsKey) => {
+        const out: Photo[] = []
+        for (const [i, f] of foto[key].entries()) out.push(await app.backend.uploadPhoto(`gts-${id}`, f.blob, `gts-${jenis}-${key}-${i + 1}.jpg`))
+        return out
+      }
+      const rec: GtsRecord = {
+        id,
+        tanggal: slot.tanggal,
+        slot: slot.slot,
+        jenis,
+        createdAt: Date.now(),
+        createdBy: app.session.user?.id ?? null,
+        data: {
+          nopol: nopol.trim().toUpperCase(),
+          produk: j.produk,
+          liter: liter.trim(),
+          jam: nowHm(),
+          petugas: petugas.trim(),
+          catatan: catatan.trim(),
+          foto: { edc: await unggah('edc'), struk: await unggah('struk'), kendaraan: await unggah('kendaraan') },
+        },
+      }
+      await app.backend.saveGts(rec)
+      Object.values(foto).flat().forEach((f) => URL.revokeObjectURL(f.url))
+      guard.bypass()
+      const recs = await app.backend.listGts(slot.tanggal, slot.tanggal).catch(() => [rec])
+      const lain: JenisGts = jenis === 'JBT' ? 'JBKP' : 'JBT'
+      const lainBelum = !ada(recs, slot.tanggal, slot.slot, lain)
+      keTerkirim({
+        judul: `Sampling ${jenis} terkirim`,
+        detail: `Slot ${labelSlot(slot.slot)}, ${formatTanggalIso(slot.tanggal)}`,
+        peringatan: lainBelum ? `Sampling ${lain} slot ini belum ada.` : undefined,
+        baris: [
+          ['Nomor polisi', rec.data.nopol],
+          ['Produk', `${j.produk}${rec.data.liter ? ` · ${rec.data.liter} L` : ''}`],
+          ['Foto', `${FOTO_GTS.reduce((n, f) => n + rec.data.foto[f.key].length, 0)} foto (EDC, struk, kendaraan)`],
+          ['Petugas', rec.data.petugas],
+        ],
+        aksi: [...(lainBelum ? [{ to: `/gts/isi?jenis=${lain}`, label: `Lanjut sampling ${lain}` }] : []), { to: '/gts', label: 'Kembali ke Guard Tour' }],
+      })
+    } catch (e) {
+      setError(pesan(e))
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+        <div className="flex flex-col">
+          <span className="text-tag uppercase text-primary">Sampling subsidi tepat · slot {labelSlot(kini.slot)}</span>
+          <span className="text-headline-md font-bold text-on-surface">
+            {j.label} · {j.produk}
+          </span>
+          <span className="text-body-sm text-on-surface-variant">{j.desc}</span>
+        </div>
+        <Choice label="Jenis BBM" value={jenis} onChange={(v) => (setError(null), setJenis(v))} options={JENIS_GTS.map((x) => ({ value: x.value, label: `${x.label} (${x.produk})` }))} />
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Nomor polisi" htmlFor="gts-nopol">
+            <Input id="gts-nopol" autoComplete="off" autoCapitalize="characters" placeholder="AG 1234 XY" value={nopol} onChange={(e) => (setError(null), setNopol(e.target.value))} />
+          </Field>
+          <Field label="Volume (opsional)" htmlFor="gts-liter">
+            <Input id="gts-liter" numeric inputMode="decimal" suffix="L" value={liter} onChange={(e) => setLiter(e.target.value)} />
+          </Field>
+        </div>
+      </GlassCard>
+      <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
+        {FOTO_GTS.map((f) => (
+          <FotoWajib
+            key={f.key}
+            label={f.label}
+            hint={f.hint}
+            fotos={foto[f.key]}
+            busy={busy === f.key}
+            disabled={busy === 'kirim'}
+            onAdd={(files) => void ambil(f.key, files)}
+            onRemove={(fid) =>
+              setFoto((x) => {
+                const t = x[f.key].find((p) => p.id === fid)
+                if (t) URL.revokeObjectURL(t.url)
+                return { ...x, [f.key]: x[f.key].filter((p) => p.id !== fid) }
+              })
+            }
+          />
+        ))}
+        <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+          <Camera aria-hidden="true" className="size-4 shrink-0" />
+          Tanggal, jam, SPBU, jenis, dan nomor polisi tercetak otomatis pada foto.
+        </span>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Petugas" htmlFor="gts-petugas">
+            <Input id="gts-petugas" value={petugas} onChange={(e) => setPetugas(e.target.value)} />
+          </Field>
+          <Field label="Catatan (opsional)" htmlFor="gts-catatan">
+            <Input id="gts-catatan" autoComplete="off" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+          </Field>
+        </div>
+        <ErrorBox text={error} />
+        <Button size="lg" disabled={busy !== null} onClick={() => void kirim()}>
+          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+          {busy === 'kirim' ? 'Mengirim…' : `Kirim sampling ${jenis}`}
+        </Button>
+      </GlassCard>
+      {guard.dialog}
+    </div>
+  )
+}
+
+/** Report > Riwayat Guard Tour: kepatuhan slot dan foto sampling per tanggal (pengawas/ABH/security). */
+export function LaporanGts() {
+  const app = useApp()
+  const toast = useToast()
+  const [params, setParams] = useSearchParams()
+  const now = slotKini()
+  const tanggal = params.get('tanggal') || now.tanggal
+  const { recs, error, muat } = useGts(tanggal, tanggal)
+  const fotos = useMemo(() => (recs ?? []).flatMap((r) => FOTO_GTS.flatMap((f) => r.data.foto[f.key] ?? [])), [recs])
+  const srcOf = usePhotoSrc(fotos)
+  if (!app.loaded) return <Loading />
+  const data = recs ?? []
+  const status = SLOTS.map((s) => statusSlot(tanggal, s, data, now))
+  const lewat = status.filter((s) => s !== 'nanti').length
+  const lengkap = status.filter((s) => s === 'sudah').length
+  const bolehHapus = app.role === 'abh' || app.role === 'pengawas'
+
+  const hapus = async (r: GtsRecord) => {
+    if (!window.confirm(`Hapus sampling ${r.jenis} ${r.data.nopol}?`)) return
+    try {
+      await app.backend.deleteGts(r.id)
+      for (const f of FOTO_GTS) for (const p of r.data.foto[f.key] ?? []) void app.backend.deletePhoto(p).catch(() => {})
+      toast('Sampling dihapus')
+      void muat()
+    } catch (e) {
+      toast(pesan(e))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <Field label="Tanggal operasional (06:00–05:59)" htmlFor="lgts-tgl">
+          <Input id="lgts-tgl" type="date" max={now.tanggal} value={tanggal} onChange={(e) => e.target.value && setParams({ tanggal: e.target.value }, { replace: true })} />
+        </Field>
+        <div className="grid grid-cols-3 gap-space-xs text-center">
+          <div className="rounded-md bg-surface-container-low p-space-xs">
+            <span className="tabular block text-numeric-md font-bold text-on-surface">
+              {lengkap}/{lewat || 0}
+            </span>
+            <span className="text-[11px] uppercase text-on-surface-variant">Slot lengkap</span>
+          </div>
+          <div className="rounded-md bg-surface-container-low p-space-xs">
+            <span className="tabular block text-numeric-md font-bold text-on-surface">{data.filter((r) => r.jenis === 'JBT').length}</span>
+            <span className="text-[11px] uppercase text-on-surface-variant">Sampling JBT</span>
+          </div>
+          <div className="rounded-md bg-surface-container-low p-space-xs">
+            <span className="tabular block text-numeric-md font-bold text-on-surface">{data.filter((r) => r.jenis === 'JBKP').length}</span>
+            <span className="text-[11px] uppercase text-on-surface-variant">Sampling JBKP</span>
+          </div>
+        </div>
+        <ErrorBox text={error} />
+      </GlassCard>
+
+      {recs === null ? (
+        <Loading />
+      ) : (
+        <div className="grid grid-cols-3 gap-space-xs sm:grid-cols-4 lg:grid-cols-6">
+          {SLOTS.map((s) => (
+            <KotakSlot key={s} slot={s} status={status[s]} jbt={ada(data, tanggal, s, 'JBT')} jbkp={ada(data, tanggal, s, 'JBKP')} kini={tanggal === now.tanggal && s === now.slot} />
+          ))}
+        </div>
+      )}
+
+      <section aria-labelledby="lgts-daftar" className="flex flex-col gap-space-sm">
+        <SectionHeader id="lgts-daftar" title={`Sampling (${data.length})`} />
+        {!data.length && (
+          <GlassCard level={1} className="p-space-md text-center text-body-md text-on-surface-variant">
+            Belum ada sampling pada tanggal ini.
+          </GlassCard>
+        )}
+        {[...data]
+          .sort((a, b) => a.slot - b.slot || a.createdAt - b.createdAt)
+          .map((r) => (
+            <GlassCard key={r.id} level={2} className="flex flex-col gap-space-sm p-space-md">
+              <div className="flex items-start justify-between gap-space-sm">
+                <span className="flex min-w-0 flex-col">
+                  <span className="tabular text-tag uppercase text-on-surface-variant">
+                    Slot {labelSlot(r.slot)} · {r.data.jam}
+                  </span>
+                  <span className="tabular text-body-md font-bold text-on-surface">{r.data.nopol}</span>
+                  <span className="text-body-sm text-on-surface-variant">
+                    {r.data.produk}
+                    {r.data.liter ? ` · ${parseAngka(r.data.liter) ?? r.data.liter} L` : ''} · {r.data.petugas}
+                    {r.data.catatan ? ` · ${r.data.catatan}` : ''}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <Pill tone={r.jenis === 'JBT' ? 'cyan' : 'primary'}>{r.jenis}</Pill>
+                  {bolehHapus && (
+                    <Button variant="ghost" size="icon" aria-label={`Hapus sampling ${r.data.nopol}`} onClick={() => void hapus(r)}>
+                      <Trash2 aria-hidden="true" />
+                    </Button>
+                  )}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-space-xs">
+                {FOTO_GTS.map((f) => {
+                  const p = r.data.foto[f.key]?.[0]
+                  const src = p ? srcOf(p) : undefined
+                  return (
+                    <figure key={f.key} className="flex flex-col gap-1">
+                      {src ? (
+                        <a href={src} target="_blank" rel="noreferrer">
+                          <img src={src} alt={`${f.label} ${r.data.nopol}`} className="aspect-[3/4] w-full rounded-md bg-black object-cover" />
+                        </a>
+                      ) : (
+                        <span className="aspect-[3/4] w-full rounded-md bg-surface-container" />
+                      )}
+                      <figcaption className="text-center text-[11px] text-on-surface-variant">{f.label.replace('Foto ', '')}</figcaption>
+                    </figure>
+                  )
+                })}
+              </div>
+            </GlassCard>
+          ))}
+      </section>
+    </div>
+  )
+}

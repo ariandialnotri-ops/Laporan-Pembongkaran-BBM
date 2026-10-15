@@ -6,7 +6,7 @@ import type { StatusIsi } from '@/lib/status-isi'
 
 export type { StatusIsi }
 
-const GAYA: Record<StatusIsi, { kartu: string; ikon: string; label: string; Ikon: typeof CircleCheck }> = {
+export const GAYA_STATUS: Record<StatusIsi, { kartu: string; ikon: string; label: string; Ikon: typeof CircleCheck }> = {
   sudah: { kartu: 'border-emerald-300 bg-emerald-50', ikon: 'bg-emerald-600 text-white', label: 'text-emerald-800', Ikon: CircleCheck },
   belum: { kartu: 'border-orange-300 bg-orange-50', ikon: 'bg-orange-500 text-white', label: 'text-orange-800', Ikon: Clock },
   terlewat: { kartu: 'border-red-300 bg-red-50', ikon: 'bg-red-600 text-white', label: 'text-red-800', Ikon: CircleAlert },
@@ -35,7 +35,7 @@ export function KartuPilih({
   keterangan?: ReactNode
   className?: string
 }) {
-  const g = GAYA[status]
+  const g = GAYA_STATUS[status]
   const isi = (
     <>
       <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-full', g.ikon)}>
@@ -70,7 +70,7 @@ export function LegendaStatus({ nanti = false }: { nanti?: boolean }) {
     <div className="flex flex-wrap gap-x-space-sm gap-y-1 px-space-xs text-body-sm text-on-surface-variant">
       {daftar.map((s) => (
         <span key={s} className="flex items-center gap-1.5">
-          <span aria-hidden="true" className={cn('size-3 rounded-full', GAYA[s].ikon)} />
+          <span aria-hidden="true" className={cn('size-3 rounded-full', GAYA_STATUS[s].ikon)} />
           {s === 'sudah' ? 'Sudah' : s === 'belum' ? 'Belum' : s === 'terlewat' ? 'Terlewat' : 'Belum waktunya'}
         </span>
       ))}
@@ -80,5 +80,5 @@ export function LegendaStatus({ nanti = false }: { nanti?: boolean }) {
 
 /** Titik warna status kecil (strip tanggal). */
 export function TitikStatus({ status, label }: { status: StatusIsi; label: string }) {
-  return <span role="img" aria-label={label} title={label} className={cn('size-2.5 rounded-full', GAYA[status].ikon)} />
+  return <span role="img" aria-label={label} title={label} className={cn('size-2.5 rounded-full', GAYA_STATUS[status].ikon)} />
 }

@@ -82,6 +82,13 @@ const MenuTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default:
 const RiwayatTakaran = lazy(() => import('@/pages/Takaran').then((m) => ({ default: m.RiwayatTakaran })))
 const StokShift = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShift })))
 const StokShiftForm = lazy(() => import('@/pages/StokShift').then((m) => ({ default: m.StokShiftForm })))
+const WbsMenu = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.WbsMenu })))
+const WbsForm = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.WbsForm })))
+const LaporanWbs = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.LaporanWbs })))
+const WbsDetail = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.WbsDetail })))
+const GtsMenu = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsMenu })))
+const GtsForm = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsForm })))
+const LaporanGts = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.LaporanGts })))
 const Terkirim = lazy(() => import('@/pages/Terkirim').then((m) => ({ default: m.Terkirim })))
 
 function Gate() {
@@ -171,6 +178,13 @@ function Gate() {
           <Route path="/insiden/baru/:jenis" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
           <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />
+          <Route path="/wbs" element={<WbsMenu />} />
+          <Route path="/wbs/:kategori" element={<WbsForm />} />
+          <Route path="/laporan/wbs" element={<LaporanWbs />} />
+          <Route path="/laporan/wbs/:id" element={<WbsDetail />} />
+          <Route path="/gts" element={<GtsMenu />} />
+          <Route path="/gts/isi" element={<GtsForm />} />
+          <Route path="/laporan/gts" element={<LaporanGts />} />
           <Route path="/profil" element={<Profil />} />
           <Route path="/profil/sandi" element={<GantiSandi />} />
           <Route path="/kalkulator" element={<Kalkulator />} />

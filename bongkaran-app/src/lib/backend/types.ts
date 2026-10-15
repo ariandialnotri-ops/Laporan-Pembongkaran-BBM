@@ -1,5 +1,7 @@
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
+import type { GtsRecord } from '@/lib/gts'
+import type { StatusWbs, WbsData, WbsInput, WbsRecord } from '@/lib/wbs'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
 import type { TankDef } from '@/lib/tank'
 
@@ -112,6 +114,16 @@ export interface Backend {
   listOps(fromIso: string, toIso: string): Promise<OpsRecord[]>
   saveOps(rec: OpsRecord): Promise<void>
   deleteOps(id: string): Promise<void>
+  /** Kirim laporan WBS (lewat server: laporan anonim tidak menyimpan akun pelapor). Foto = JPEG terkompres. */
+  kirimWbs(id: string, data: WbsInput, foto: Blob[]): Promise<void>
+  /** Laporan WBS SPBU aktif (hanya ABH yang mendapat data). */
+  listWbs(): Promise<WbsRecord[]>
+  /** Tindak lanjut ABH. */
+  updateWbs(id: string, status: StatusWbs, data: WbsData): Promise<void>
+  /** Sampling Guard Tour System pada rentang tanggal operasional. */
+  listGts(fromIso: string, toIso: string): Promise<GtsRecord[]>
+  saveGts(rec: GtsRecord): Promise<void>
+  deleteGts(id: string): Promise<void>
   /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
   fotoArsip(): Promise<FotoArsip[]>
   /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */

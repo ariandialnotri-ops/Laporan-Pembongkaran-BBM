@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Beaker, Camera, CircleCheck, FileDown, FileText, History, LoaderCircle, Send, Trash2, TriangleAlert, X } from 'lucide-react'
+import { Beaker, Camera, CircleCheck, FileDown, FileText, History, LoaderCircle, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Field } from '@/components/bongkaran/form-bits'
+import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -42,9 +43,6 @@ function useTakar() {
 function StatusTakar({ hasil }: { hasil: string }) {
   return takarStatus(hasil) === 'lewat' ? <Pill tone="error">Melebihi toleransi</Pill> : <Pill tone="success">Sesuai</Pill>
 }
-
-/** Foto yang sudah diambil tetapi belum dikirim: disimpan di perangkat, diunggah saat hasil dikirim. */
-type FotoLokal = { id: string; blob: Blob; url: string }
 
 /**
  * Input > Uji Takaran: uji nozzle dengan bejana ukur 20 L. Petugas mengetik nomor nozzle &
@@ -363,76 +361,6 @@ export function UjiTakaran() {
       </GlassCard>
 
       {guard.dialog}
-    </div>
-  )
-}
-
-/** Slot foto wajib dengan pratinjau; foto belum diunggah sampai hasil dikirim. */
-function FotoWajib({
-  label,
-  hint,
-  fotos,
-  busy,
-  disabled,
-  onAdd,
-  onRemove,
-}: {
-  label: string
-  hint: string
-  fotos: FotoLokal[]
-  busy: boolean
-  disabled: boolean
-  onAdd: (files: File[]) => void
-  onRemove: (id: string) => void
-}) {
-  const ref = useRef<HTMLInputElement>(null)
-  return (
-    <div className="flex flex-col gap-space-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-tag uppercase text-on-surface-variant">{label} (wajib)</span>
-        {fotos.length > 0 ? <Pill tone="success">{fotos.length} foto</Pill> : <Pill tone="error">Belum</Pill>}
-      </div>
-      <span className="text-body-sm text-on-surface-variant">{hint}</span>
-      <div className="grid grid-cols-3 gap-space-xs">
-        {fotos.map((f) => (
-          <div key={f.id} className="relative overflow-hidden rounded-md">
-            <img src={f.url} alt={label} className="aspect-[3/4] w-full bg-black object-contain" />
-            <button
-              type="button"
-              aria-label={`Hapus foto ${label}`}
-              disabled={disabled}
-              onClick={() => onRemove(f.id)}
-              className="absolute right-1 top-1 flex size-9 items-center justify-center rounded-full bg-black/55 text-white"
-            >
-              <X aria-hidden="true" className="size-4" />
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          disabled={busy || disabled}
-          onClick={() => ref.current?.click()}
-          className="inset-field flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded-md border-[1.5px] border-dashed border-outline-variant text-body-sm font-semibold text-primary"
-        >
-          {busy ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" /> : <Camera aria-hidden="true" className="size-5" />}
-          {busy ? 'Memproses' : 'Ambil foto'}
-        </button>
-      </div>
-      <input
-        ref={ref}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])]
-          e.target.value = ''
-          if (files.length) onAdd(files)
-        }}
-      />
     </div>
   )
 }

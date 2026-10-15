@@ -18,7 +18,9 @@ import {
   FlaskConical,
   Fuel,
   History,
+  Megaphone,
   Route,
+  ScanEye,
   ShieldAlert,
   ShieldCheck,
   TestTube,
@@ -32,6 +34,7 @@ import { kondisiSemua, hasilCek } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { todayIso } from '@/lib/date'
+import { labelSlot, slotKini } from '@/lib/gts'
 import { formTampil } from '@/lib/ops'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
@@ -207,7 +210,7 @@ export function useMenu(): GrupMenu[] {
       label: 'HSSE',
       href: '/hsse',
       icon: ShieldCheck,
-      desc: 'Proteksi kebakaran, insiden & near miss, pantauan lingkungan',
+      desc: 'Guard tour, proteksi kebakaran, insiden & near miss, pantauan lingkungan, whistle blowing',
       items: [
         {
           to: '/apar',
@@ -227,6 +230,14 @@ export function useMenu(): GrupMenu[] {
           status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
           badge: insidenTerbuka,
         },
+        {
+          to: '/gts',
+          path: '/gts',
+          icon: ScanEye,
+          title: 'Guard Tour System',
+          desc: 'Sampling subsidi tepat: 1 JBT + 1 JBKP tiap 2 jam',
+          status: `Slot berjalan ${labelSlot(slotKini().slot)}`,
+        },
         ...(adaOpsLingkungan
           ? [
               {
@@ -239,6 +250,14 @@ export function useMenu(): GrupMenu[] {
               },
             ]
           : []),
+        {
+          to: '/wbs',
+          path: '/wbs',
+          icon: Megaphone,
+          title: 'Whistle Blowing System',
+          desc: 'Laporkan pelanggaran secara rahasia',
+          status: 'Hanya dibaca ABH, boleh anonim',
+        },
       ],
     },
     { key: 'finance', label: 'Finance', href: '/finance', icon: Wallet, desc: 'Segera hadir', items: [], segera: true },
@@ -280,6 +299,8 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
   { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },
+  { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Guard Tour', desc: 'Sampling subsidi tepat JBT/JBKP per slot 2 jam, foto EDC, struk, kendaraan' },
+  { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistle blowing system: rahasia, khusus ABH' },
   { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },
 ]
 
