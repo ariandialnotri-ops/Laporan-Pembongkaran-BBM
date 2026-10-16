@@ -94,21 +94,30 @@ export function namaSpbuWa(s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>) {
   return m ? [m[1], kode, m[2]].filter(Boolean).join(' ') : `${nama} ${kode}`
 }
 
-/** Teks laporan WhatsApp satu sampling (format laporan sampling penyaluran subsidi tepat). */
-export function teksWaGts(rec: Pick<GtsRecord, 'jenis' | 'data'>, s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>, tanggalKalender: string) {
+/**
+ * Teks laporan WhatsApp satu sampling. Isian dalam blok monospace WhatsApp (```) supaya titik dua
+ * sejajar di semua HP; judul tebal (*...*).
+ */
+export function teksWaGts(rec: Pick<GtsRecord, 'jenis' | 'data'>, s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>, tanggalKalender: string, zona = '') {
   const d = rec.data
-  const sesuai = d.sesuai === 'Tidak sesuai' ? `Tidak sesuai${d.keterangan ? ` (${d.keterangan})` : ''}` : (d.sesuai ?? 'Sesuai')
+  const baris: [string, string][] = [
+    ['Shift', d.shift ? String(d.shift) : '-'],
+    ['Petugas', d.petugas || '-'],
+    ['Jenis Penyaluran', rec.jenis],
+    ['Nopol Kendaraan', d.nopol || '-'],
+    ['Jenis Kendaraan', d.jenisKendaraan || '-'],
+    ['Volume Pembelian', d.liter ? `${d.liter} L` : '-'],
+    ['Sesuai Ketentuan', d.sesuai ?? 'Sesuai'],
+  ]
+  if (d.sesuai === 'Tidak sesuai' && d.keterangan) baris.push(['Keterangan', d.keterangan])
+  const lebar = Math.max(...baris.map(([k]) => k.length))
   return [
-    'Laporan Sampling penyaluran subsidi tepat JBT/JBKP ',
+    '*Laporan Sampling Penyaluran Subsidi Tepat JBT/JBKP*',
     namaSpbuWa(s),
-    `Tanggal ${tanggalPanjang(tanggalKalender)} , ${d.jam} `,
+    `Tanggal ${tanggalPanjang(tanggalKalender)}, ${d.jam}${zona ? ` ${zona}` : ''}`,
     '',
-    `Shift                                 : ${d.shift ?? '-'}`,
-    `Petugas                          : ${d.petugas}`,
-    `- Jenis Penyaluran   : ${rec.jenis}`,
-    `- Nopol Kendaraan  : ${d.nopol}`,
-    `- Jenis Kendaraan   :  ${d.jenisKendaraan || '-'}`,
-    `- Volume Pembelian : ${d.liter ? `${d.liter}L` : '-'}`,
-    `- Sesuai ketentuan :  ${sesuai}`,
+    '```',
+    ...baris.map(([k, v]) => `${k.padEnd(lebar)} : ${v}`),
+    '```',
   ].join('\n')
 }

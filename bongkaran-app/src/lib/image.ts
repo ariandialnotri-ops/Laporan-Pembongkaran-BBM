@@ -75,11 +75,16 @@ function capFoto(ctx: CanvasRenderingContext2D, w: number, h: number, baris: str
   })
 }
 
+/** "WIB" / "WITA" / "WIT" dari zona waktu perangkat. */
+export function zonaWaktu(d = new Date()) {
+  const zona = -d.getTimezoneOffset() / 60
+  return zona === 7 ? 'WIB' : zona === 8 ? 'WITA' : zona === 9 ? 'WIT' : `GMT${zona >= 0 ? '+' : ''}${zona}`
+}
+
 /** "11/10/2026 14:05:09 WIB" dari jam perangkat. */
 export function capWaktu(d = new Date()) {
   const p = (n: number) => String(n).padStart(2, '0')
-  const zona = -d.getTimezoneOffset() / 60
-  const nama = zona === 7 ? 'WIB' : zona === 8 ? 'WITA' : zona === 9 ? 'WIT' : `GMT${zona >= 0 ? '+' : ''}${zona}`
+  const nama = zonaWaktu(d)
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} ${nama}`
 }
 

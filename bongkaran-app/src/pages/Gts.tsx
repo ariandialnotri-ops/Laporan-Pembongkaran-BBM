@@ -17,7 +17,8 @@ import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, hariSingkat, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { FOTO_GTS, gtsId, JENIS_GTS, JENIS_KENDARAAN, jenisGts, JUMLAH_SLOT, labelSlot, namaSpbuWa, slotKini, statusSlot, teksWaGts, type FotoGtsKey, type GtsRecord, type JenisGts, type SesuaiGts } from '@/lib/gts'
-import { capWaktu, compressImage, genId } from '@/lib/image'
+import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
+import { buatKolase } from '@/lib/kolase'
 import { currentShift } from '@/lib/shift'
 import type { StatusIsi } from '@/lib/status-isi'
 import { usePhotoSrc } from '@/lib/use-photo-src'
@@ -162,15 +163,36 @@ export function GtsMenu() {
   )
 }
 
-/** Foto lokal menjadi file untuk dibagikan ke WhatsApp (tidak diunggah ke server). */
-const keFile = (f: FotoLokal, nama: string) => new File([f.blob], nama, { type: 'image/jpeg' })
-
 type Selesai = { rec: GtsRecord; teks: string; files: File[]; urls: string[] }
+
+/** Pratinjau teks seperti tampil di WhatsApp: *tebal* dan blok ``` monospace (tanda format disembunyikan). */
+function PratinjauWa({ teks }: { teks: string }) {
+  const out: React.ReactNode[] = []
+  let mono: string[] | null = null
+  teks.split('\n').forEach((l, i) => {
+    if (l.trim() === '```') {
+      if (mono) {
+        out.push(
+          <pre key={i} className="my-1 overflow-x-auto font-mono text-[12.5px] leading-relaxed">
+            {mono.join('\n')}
+          </pre>,
+        )
+        mono = null
+      } else mono = []
+      return
+    }
+    if (mono) return void mono.push(l)
+    const tebal = /^\*(.+)\*$/.exec(l)
+    out.push(tebal ? <strong key={i} className="block">{tebal[1]}</strong> : <span key={i} className="block min-h-[1em]">{l}</span>)
+  })
+  return <div className="rounded-md bg-[#e7fbe0] p-space-sm text-body-sm text-[#111b21] shadow-sm">{out}</div>
+}
 
 /**
  * Halaman form satu sampling (slot berjalan): jenis, nopol, jenis kendaraan, volume, sesuai ketentuan,
  * foto EDC/struk/kendaraan. Isian disimpan; foto hanya diolah di HP (cap waktu & SPBU) lalu dikirim
- * ke WhatsApp bersama teks laporan, tidak disimpan di database/penyimpanan.
+ * ke WhatsApp bersama teks laporan, tidak disimpan di database/penyimpanan. Tiga foto digabung otomatis
+ * menjadi satu kolase (kiri atas EDC, kiri bawah struk, kanan kendaraan) dengan garis putih tipis.
  */
 export function GtsForm() {
   const app = useApp()
@@ -185,6 +207,8 @@ export function GtsForm() {
   const [petugas, setPetugas] = useState(() => (app.displayName === 'Mode lokal' ? app.settings.namaSecurityDefault || '' : app.displayName))
   const [catatan, setCatatan] = useState('')
   const [foto, setFoto] = useState<Record<FotoGtsKey, FotoLokal[]>>({ edc: [], struk: [], kendaraan: [] })
+  // Jam pengambilan tiap foto (dicap pada kolase).
+  const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<FotoGtsKey | 'kirim' | 'wa' | null>(null)
   const [selesai, setSelesai] = useState<Selesai | null>(null)
@@ -206,13 +230,16 @@ export function GtsForm() {
     if (!nopol.trim()) return setError('Isi nomor polisi dulu: ikut tercetak pada foto.')
     setBusy(key)
     try {
-      const label = FOTO_GTS.find((f) => f.key === key)!.label
-      const baru: FotoLokal[] = []
-      for (const f of files) {
-        const blob = await compressImage(f, { cap: [capWaktu(), namaSpbuWa(app.settings), `GTS ${jenis} ${j.produk} · ${nopol.trim().toUpperCase()} · ${label}`] })
-        baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
-      }
-      setFoto((x) => ({ ...x, [key]: [...x[key], ...baru] }))
+      // Satu foto per bagian kolase: foto baru menggantikan yang lama. Cap ditulis saat kolase dibuat.
+      const f = files[files.length - 1]
+      const waktu = capWaktu()
+      const blob = await compressImage(f, { maxSize: 1600, quality: 0.85 })
+      const baru: FotoLokal = { id: genId('f'), blob, url: URL.createObjectURL(blob) }
+      setFoto((x) => {
+        for (const lama of x[key]) URL.revokeObjectURL(lama.url)
+        return { ...x, [key]: [baru] }
+      })
+      setWaktuFoto((w) => ({ ...w, [baru.id]: waktu }))
       setError(null)
     } catch (e) {
       setError(`Gagal memproses foto: ${pesan(e)}`)
@@ -256,10 +283,17 @@ export function GtsForm() {
       // Hanya isian yang disimpan; foto tetap di HP untuk dikirim ke WhatsApp.
       await app.backend.saveGts(rec)
       const nama = nopolBesar.replace(/[^0-9A-Z]+/g, '')
-      const files = FOTO_GTS.flatMap((f) => foto[f.key].map((x, i) => keFile(x, `GTS_${jenis}_${nama}_${f.key}${foto[f.key].length > 1 ? `_${i + 1}` : ''}.jpg`)))
-      const urls = FOTO_GTS.flatMap((f) => foto[f.key].map((x) => x.url))
+      const spbu = namaSpbuWa(app.settings)
+      const bagian = (key: FotoGtsKey) => {
+        const x = foto[key][0]
+        const label = FOTO_GTS.find((f) => f.key === key)!.label
+        return { blob: x.blob, cap: [waktuFoto[x.id] ?? capWaktu(), spbu, `${label} · ${jenis} ${j.produk} · ${nopolBesar}`] }
+      }
+      const kolase = await buatKolase([bagian('edc'), bagian('struk'), bagian('kendaraan')])
+      const files = [new File([kolase], `GTS_${jenis}_${nama}_${todayIso()}.jpg`, { type: 'image/jpeg' })]
+      const urls = [URL.createObjectURL(kolase)]
       setRecsSlot(await app.backend.listGts(slot.tanggal, slot.tanggal).catch(() => [rec]))
-      setSelesai({ rec, teks: teksWaGts(rec, app.settings, todayIso()), files, urls })
+      setSelesai({ rec, teks: teksWaGts(rec, app.settings, todayIso(), zonaWaktu()), files, urls })
       setBusy(null)
       window.scrollTo({ top: 0 })
     } catch (e) {
@@ -330,16 +364,14 @@ export function GtsForm() {
         </GlassCard>
 
         <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
-          <div className="grid grid-cols-3 gap-space-xs">
-            {selesai.urls.map((u, i) => (
-              <img key={u} src={u} alt={`Foto sampling ${i + 1}`} className="aspect-[3/4] w-full rounded-md bg-black object-cover" />
-            ))}
-          </div>
-          <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-container-low p-space-sm font-sans text-body-sm text-on-surface">{selesai.teks}</pre>
+          {selesai.urls.map((u) => (
+            <img key={u} src={u} alt="Kolase foto EDC, struk, dan kendaraan" className="w-full rounded-md bg-white shadow-sm" />
+          ))}
+          <PratinjauWa teks={selesai.teks} />
           <ErrorBox text={error} />
           <Button size="lg" className="bg-[#1fa855] text-white hover:bg-[#1a9149]" disabled={busy === 'wa'} onClick={() => void keWa()}>
             {busy === 'wa' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-            {dibagikan ? 'Kirim ulang ke WhatsApp' : `Kirim ke WhatsApp (${selesai.files.length} foto + teks)`}
+            {dibagikan ? 'Kirim ulang ke WhatsApp' : 'Kirim ke WhatsApp (kolase foto + teks)'}
           </Button>
           <Button variant="glass" onClick={() => void salin(selesai.teks).then((ok) => toast(ok ? 'Teks laporan disalin' : 'Gagal menyalin teks'))}>
             <Copy aria-hidden="true" />
@@ -428,7 +460,7 @@ export function GtsForm() {
         ))}
         <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
           <Camera aria-hidden="true" className="size-4 shrink-0" />
-          Tanggal, jam, nama SPBU, jenis, dan nomor polisi tercetak pada foto. Foto tidak disimpan di aplikasi, hanya dikirim ke WhatsApp.
+          Ketiga foto otomatis digabung menjadi satu kolase (kiri: EDC & struk, kanan: kendaraan) dengan jam, nama SPBU, jenis, dan nomor polisi. Foto tidak disimpan di aplikasi, hanya dikirim ke WhatsApp.
         </span>
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Petugas" htmlFor="gts-petugas">
@@ -545,7 +577,7 @@ export function LaporanGts() {
                   <Pill tone={r.jenis === 'JBT' ? 'cyan' : 'primary'}>{r.jenis}</Pill>
                   {r.data.sesuai && <Pill tone={r.data.sesuai === 'Sesuai' ? 'success' : 'error'}>{r.data.sesuai}</Pill>}
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(teksWaGts(r, app.settings, r.data.jam < '06:00' ? tanggalBesok(r.tanggal) : r.tanggal))}`}
+                    href={`https://wa.me/?text=${encodeURIComponent(teksWaGts(r, app.settings, r.data.jam < '06:00' ? tanggalBesok(r.tanggal) : r.tanggal, zonaWaktu()))}`}
                     target="_blank"
                     rel="noreferrer"
                     aria-label={`Kirim teks laporan ${r.data.nopol} ke WhatsApp`}
