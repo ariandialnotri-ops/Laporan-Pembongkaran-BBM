@@ -1,16 +1,18 @@
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { useApp } from '@/lib/app-state'
 import { useMenu } from './menu-data'
 import { grupAktif } from './sidebar'
 
 /**
  * Bar navigasi bawah yang statis: menempel penuh di bawah layar (di atas garis home iPhone),
  * tidak melayang, tidak bergeser, dan tanpa animasi. Berisi grup menu sesuai peran;
- * Finance dan Profil ada di sidebar. Di layar lebar diganti sidebar tetap.
+ * Finance (kecuali Admin/Cashier, modul utamanya) dan Profil ada di sidebar. Di layar lebar diganti sidebar tetap.
  */
 export function DockNav() {
   const { pathname, search } = useLocation()
-  const grup = useMenu().filter((g) => g.key !== 'finance')
+  const app = useApp()
+  const grup = useMenu().filter((g) => g.key !== 'finance' || app.role === 'admin')
   const aktif = grupAktif(grup, pathname, search)
 
   return (

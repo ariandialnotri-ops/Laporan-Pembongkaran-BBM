@@ -93,6 +93,12 @@ const LaporanGts = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.La
 const AirMenu = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirMenu })))
 const AirForm = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirForm })))
 const LaporanAir = lazy(() => import('@/pages/Air').then((m) => ({ default: m.LaporanAir })))
+const PettyMenu = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PettyMenu })))
+const PengajuanPetty = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PengajuanPetty })))
+const PengajuanPettyForm = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PengajuanPettyForm })))
+const PengajuanPettyDetail = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PengajuanPettyDetail })))
+const RealisasiPetty = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.RealisasiPetty })))
+const RealisasiPettyForm = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.RealisasiPettyForm })))
 const Terkirim = lazy(() => import('@/pages/Terkirim').then((m) => ({ default: m.Terkirim })))
 
 function Gate() {
@@ -139,6 +145,12 @@ function Gate() {
           <Route path="/hsse" element={<MenuGrup grup="hsse" />} />
           <Route path="/patrol" element={<MenuPatrol />} />
           <Route path="/finance" element={<MenuFinance />} />
+          <Route path="/finance/petty" element={<PettyMenu />} />
+          <Route path="/finance/petty/pengajuan" element={<PengajuanPetty />} />
+          <Route path="/finance/petty/pengajuan/baru" element={<PengajuanPettyForm />} />
+          <Route path="/finance/petty/pengajuan/:id" element={<PengajuanPettyDetail />} />
+          <Route path="/finance/petty/realisasi" element={<RealisasiPetty />} />
+          <Route path="/finance/petty/realisasi/:id" element={<RealisasiPettyForm />} />
           <Route path="/kaleng" element={<HalamanKaleng />} />
           <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />

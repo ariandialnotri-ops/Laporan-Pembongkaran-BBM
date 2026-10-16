@@ -138,16 +138,27 @@ export function MenuPatrol() {
   )
 }
 
-/** Finance: belum ada fitur. */
+/** Finance: Petty Cash (pengajuan pengadaan barang/jasa & realisasi anggaran). */
 export function MenuFinance() {
+  const app = useApp()
+  const menu = useMenu()
+  if (!app.loaded) return <Loading />
+  const items = menu.find((g) => g.key === 'finance')?.items ?? []
+  if (!items.length)
+    return (
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col items-center gap-space-sm p-space-xl text-center">
+        <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+          <Wallet className="size-6" strokeWidth={1.6} />
+        </span>
+        <span className="text-headline-md font-bold text-on-surface">Finance</span>
+        <span className="max-w-sm text-body-md text-on-surface-variant">Modul keuangan SPBU untuk ABH, pengawas, dan kepala shift.</span>
+      </GlassCard>
+    )
   return (
-    <GlassCard level={2} className="animate-entrance-1 flex flex-col items-center gap-space-sm p-space-xl text-center">
-      <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
-        <Wallet className="size-6" strokeWidth={1.6} />
-      </span>
-      <span className="text-headline-md font-bold text-on-surface">Finance segera hadir</span>
-      <span className="max-w-sm text-body-md text-on-surface-variant">Modul keuangan SPBU sedang disiapkan. Menu ini akan aktif setelah fiturnya tersedia.</span>
-    </GlassCard>
+    <div className="flex flex-col gap-space-md">
+      <Judul grup="finance" />
+      <Grid items={items} label="Menu Finance" />
+    </div>
   )
 }
 

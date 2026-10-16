@@ -429,7 +429,7 @@ function peranUjiLokal(): Role {
   if (!import.meta.env.DEV) return 'abh'
   try {
     const r = localStorage.getItem('floq-peran')
-    return r === 'pengawas' || r === 'kashift' || r === 'security' || r === 'cs' ? r : 'abh'
+    return r === 'pengawas' || r === 'kashift' || r === 'security' || r === 'cs' || r === 'admin' ? r : 'abh'
   } catch {
     return 'abh'
   }

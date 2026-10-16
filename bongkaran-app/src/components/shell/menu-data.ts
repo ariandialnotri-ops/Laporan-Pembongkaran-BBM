@@ -20,6 +20,7 @@ import {
   Fuel,
   History,
   Megaphone,
+  PiggyBank,
   Route,
   ScanEye,
   ShieldAlert,
@@ -267,7 +268,23 @@ export function useMenu(): GrupMenu[] {
           : []),
       ],
     },
-    { key: 'finance', label: 'Finance', href: '/finance', icon: Wallet, desc: 'Segera hadir', items: [], segera: true },
+    {
+      key: 'finance',
+      label: 'Finance',
+      href: '/finance',
+      icon: Wallet,
+      desc: 'Petty cash: pengajuan pengadaan barang/jasa (akun COA) dan realisasi anggaran',
+      items: [
+        {
+          to: '/finance/petty',
+          path: '/finance/petty',
+          icon: PiggyBank,
+          title: 'Petty Cash',
+          desc: 'Pengajuan pengadaan barang/jasa & realisasi anggaran',
+          status: 'Wajib akun COA, nota untuk realisasi',
+        },
+      ],
+    },
     {
       key: 'report',
       label: 'Report',
@@ -292,7 +309,7 @@ export function useMenu(): GrupMenu[] {
 
   return grup
     .map((g) => ({ ...g, items: g.items.filter((i) => app.can(i.path) && (i.path !== '/laporan/riwayat' || riwayatItems(app.can).length > 0)) }))
-    .filter((g) => (g.key === 'dashboard' ? app.can('/') : g.key === 'finance' ? app.canManage : g.items.length > 0))
+    .filter((g) => (g.key === 'dashboard' ? app.can('/') : g.items.length > 0))
 }
 
 /** HSSE > Guard Patrol System: sampling penyaluran subsidi (security) dan whistleblowing (semua peran). */

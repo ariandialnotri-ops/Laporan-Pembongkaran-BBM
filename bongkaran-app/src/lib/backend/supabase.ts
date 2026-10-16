@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
+import type { PettyRecord } from '@/lib/petty'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { FOTO_DIARSIPKAN, blobToDataUrl, genId } from '@/lib/image'
@@ -24,6 +25,8 @@ type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data
 type WbsRow = { id: string; status: WbsRecord['status']; data: WbsRecord['data']; created_at: string; created_by: string | null }
 type GtsRow = { id: string; tanggal: string; slot: number; jenis: GtsRecord['jenis']; data: GtsRecord['data']; created_at: string; created_by: string | null }
 type AirRow = { id: string; tanggal: string; shift: number; data: AirRecord['data']; created_at: string; updated_at: string; created_by: string | null }
+type PettyRow = { id: string; no: string; tanggal: string; status: PettyRecord['status']; total: number | string; data: PettyRecord['data']; created_at: string; created_by: string | null }
+const pettyDari = (r: PettyRow): PettyRecord => ({ id: r.id, no: r.no, tanggal: r.tanggal, status: r.status, total: Number(r.total), data: r.data, createdAt: Date.parse(r.created_at), createdBy: r.created_by })
 type TankRow = { id: string; produk: string; tank_no: string; tanggal_kalibrasi: string | null; catatan: string | null; tabel: TankTabel; urut: number }
 type RingkasanRow = {
   spbu_id: string
@@ -422,6 +425,25 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteAir(id) {
       const rows = check(await sb.from('bbm_air').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus catatan water content.')
+    },
+    async listPetty(from, to) {
+      const rows = check(
+        await sb.from('bbm_petty').select('id,no,tanggal,status,total,data,created_at,created_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal', { ascending: false }).limit(5000),
+      ) as PettyRow[]
+      return rows.map(pettyDari)
+    },
+    async savePetty(rec, baru) {
+      const isi = { no: rec.no, tanggal: rec.tanggal, status: rec.status, total: rec.total, data: rec.data }
+      const q = baru
+        ? sb.from('bbm_petty').insert({ spbu_id: aktif(), id: rec.id, ...isi })
+        : sb.from('bbm_petty').update(isi).eq('spbu_id', aktif()).eq('id', rec.id)
+      const rows = check(await q.select('id,no,tanggal,status,total,data,created_at,created_by')) as PettyRow[]
+      if (!rows.length) throw new Error('Pengajuan tidak dapat disimpan (tidak ditemukan atau tidak berhak).')
+      return pettyDari(rows[0])
+    },
+    async deletePetty(id) {
+      const rows = check(await sb.from('bbm_petty').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Pengajuan hanya dapat dihapus ABH, atau pengaju selagi menunggu pengawas.')
     },
     async fotoArsip() {
       const rows = check(await sb.rpc('bbm_foto_arsip', { p_spbu: aktif() })) as { name: string; ukuran: number; dibuat: string; batas: string }[] | null

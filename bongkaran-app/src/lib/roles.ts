@@ -2,14 +2,15 @@
  * Peran pengguna dan modul yang boleh dibuka. Satu tempat untuk menu dock, kartu menu
  * Input/Laporan, dan penjaga halaman. Aturan tulis di database (RLS) mengikuti tabel ini.
  */
-export type Role = 'abh' | 'pengawas' | 'kashift' | 'security' | 'cs'
+export type Role = 'abh' | 'pengawas' | 'kashift' | 'security' | 'cs' | 'admin'
 
 export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
-  { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, inspeksi APAR/APAB, water content tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
-  { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
+  { key: 'pengawas', label: 'Pengawas', desc: 'Pengajuan petty cash, identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, inspeksi APAR/APAB, water content tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
+  { key: 'kashift', label: 'Kepala Shift', desc: 'Pengajuan petty cash & realisasi, stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
   { key: 'security', label: 'Security', desc: 'Guard Patrol System: sampling penyaluran subsidi JBT/JBKP tiap 2 jam, inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
   { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
+  { key: 'admin', label: 'Admin / Cashier', desc: 'Finance: persetujuan 1 petty cash (pengajuan pengadaan barang/jasa) sebelum persetujuan akhir ABH, pengajuan & realisasi anggaran' },
 ]
 
 export const roleLabel = (r: Role | null | undefined) => ROLES.find((x) => x.key === r)?.label ?? '-'
@@ -59,6 +60,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/siapkan',
     '/kaleng',
     '/finance',
+    '/finance/',
     '/ops',
     '/ops/',
     '/insiden/baru',
@@ -96,6 +98,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/laporan/tera',
     '/laporan/takaran',
     '/laporan/apar',
+    '/finance',
+    '/finance/',
     '/kaleng',
     '/ops',
     '/ops/',
@@ -108,6 +112,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/kalkulator',
   ],
   security: ['/input', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
+  admin: ['/finance', '/finance/', '/profil', '/profil/sandi'],
   cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/profil', '/profil/sandi'],
 }
 
@@ -125,4 +130,4 @@ export function bolehBuka(role: Role, path: string) {
 }
 
 /** Halaman awal peran yang tidak punya Dashboard. */
-export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/hsse' : role === 'cs' ? '/ops' : '/operation')
+export const berandaPeran = (role: Role) => (bolehBuka(role, '/') ? '/' : role === 'security' ? '/hsse' : role === 'cs' ? '/ops' : role === 'admin' ? '/finance' : '/operation')

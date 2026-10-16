@@ -7,6 +7,7 @@ import { blobToDataUrl, genId } from '@/lib/image'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
+import type { PettyRecord } from '@/lib/petty'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
@@ -213,6 +214,17 @@ export const localBackend: Backend = {
   },
   async deleteAir(id) {
     await set('air', ((await get<AirRecord[]>('air')) ?? []).filter((r) => r.id !== id))
+  },
+  listPetty: (from, to) => get<PettyRecord[]>('petty').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
+  // Mode lokal: status awal mengikuti peran uji (sama dengan trigger database).
+  async savePetty(rec, baru) {
+    const peran = localStorage.getItem('floq-peran') || 'abh'
+    const isi = baru ? { ...rec, status: (peran === 'abh' ? 'Disetujui' : peran === 'admin' ? 'Menunggu ABH' : 'Menunggu Admin') as PettyRecord['status'] } : rec
+    await set('petty', upsertById((await get<PettyRecord[]>('petty')) ?? [], isi))
+    return isi
+  },
+  async deletePetty(id) {
+    await set('petty', ((await get<PettyRecord[]>('petty')) ?? []).filter((r) => r.id !== id))
   },
   // Mode lokal: foto tersimpan di perangkat, tidak ada cut-off.
   fotoArsip: async () => [],

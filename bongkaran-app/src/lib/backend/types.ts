@@ -1,6 +1,7 @@
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
+import type { PettyRecord } from '@/lib/petty'
 import type { GtsRecord } from '@/lib/gts'
 import type { StatusWbs, WbsData, WbsInput, WbsRecord } from '@/lib/wbs'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
@@ -129,6 +130,11 @@ export interface Backend {
   listAir(fromIso: string, toIso: string): Promise<AirRecord[]>
   saveAir(rec: AirRecord): Promise<void>
   deleteAir(id: string): Promise<void>
+  /** Petty cash: pengajuan pengadaan barang/jasa & realisasi anggaran. */
+  listPetty(fromIso: string, toIso: string): Promise<PettyRecord[]>
+  /** Tambah (status awal ditentukan server menurut peran) atau ubah pengajuan. */
+  savePetty(rec: PettyRecord, baru: boolean): Promise<PettyRecord>
+  deletePetty(id: string): Promise<void>
   /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
   fotoArsip(): Promise<FotoArsip[]>
   /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */

@@ -301,6 +301,8 @@ export interface Settings {
   fasilitas?: string[]
   /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
   fotoSimpanBulan?: number
+  /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */
+  pettyPlafon?: number
   rules: Rules
 }
 

@@ -106,6 +106,10 @@ ada di Input, semua riwayat dan unduhan ada di Laporan.
 | | `/patrol` | **Guard Patrol System** (HSSE & Guard Patrol System): menu Sampling Penyaluran Subsidi (`/gts`, security) dan Whistleblowing System (`/wbs`, semua peran) |
 | | `/wbs` | **Whistleblowing System** (semua peran): pilih jenis pelanggaran → form (waktu, lokasi, pihak terlibat, uraian, foto bukti opsional, anonim bawaan). Laporan dikirim lewat edge function `bbm-wbs`; laporan anonim tidak menyimpan akun pelapor (termasuk pemilik objek foto) |
 | | `/laporan/wbs` | Laporan WBS, **hanya ABH**: filter status (baru/ditinjau/selesai), detail `/laporan/wbs/:id`, tindak lanjut + riwayat. Pengawas, kepala shift, security, dan CS tidak dapat membaca laporan maupun foto buktinya (RLS tabel `bbm_wbs` & storage folder `wbs-*`) |
+| Finance | `/finance` | Grup Finance: **Petty Cash** (ABH, Admin/Cashier, pengawas, kepala shift). Admin/Cashier juga melihat Finance di bar bawah |
+| | `/finance/petty` | Ringkasan petty cash bulan berjalan (plafon, anggaran disetujui, realisasi, sisa), sub menu Pengajuan & Realisasi; plafon per bulan diatur ABH |
+| | `/finance/petty/pengajuan` | **Pengajuan Pengadaan Barang/Jasa**: daftar per bulan (filter perlu tindakan/menunggu/disetujui/ditolak). Form `/finance/petty/pengajuan/baru`: **akun COA wajib** (28 akun dari aplikasi One Touch Solution, `src/lib/coa.ts`), barang/jasa, jumlah × harga, vendor, keperluan, lampiran opsional; nomor `PC-YYYYMM-001`. Alur: **persetujuan 1 Admin/Cashier → persetujuan akhir ABH** (pengajuan admin langsung ke ABH, pengajuan ABH langsung disetujui; tolak wajib catatan). Detail `/finance/petty/pengajuan/:id` |
+| | `/finance/petty/realisasi` | **Realisasi Anggaran**: pengajuan disetujui yang belum direalisasi, progres terhadap plafon, rekap anggaran vs realisasi per akun COA. Form `/finance/petty/realisasi/:id`: tanggal, nominal, **foto nota wajib**, catatan. Foto petty (`petty-*`) tidak ikut cut-off tanggal 5 |
 | Profil | `/profil` | Akun & peran, ganti kata sandi, statistik, Kalkulator; Pengaturan, Anggota, Data utama APAR (ABH) |
 | | `/kalkulator` | Density @15°C (ASTM 53) dan volume tangki pendam |
 | | `/pengaturan` | Menu Pengaturan SPBU (ABH): **Identitas SPBU** (`/pengaturan/identitas`: nama, kode, alamat, jumlah pulau, logo, nama default), **Data Dispenser** (`/pengaturan/dispenser`: unit, merk, nomor seri, pulau), **Nozzle & Tera Metrologi** (`/pengaturan/nozzle`: produk, dispenser, no. & tanggal sertifikat tera, berlaku maks. 1 tahun), Sold To & Ship To, Data utama APAR, **Aturan Pemeriksaan** (`/pengaturan/aturan`), **Data Acuan** (`/pengaturan/acuan`) |
@@ -268,13 +272,14 @@ sandi (khusus ABH, hanya untuk SPBU yang dikendalikannya):
 |-------|-----|
 | `bbm_spbu` | Satu baris per SPBU (unit bisnis); nama & kode mengikuti Identitas SPBU |
 | `bbm_abh_spbu` | SPBU yang dikendalikan tiap ABH |
-| `bbm_members` | Anggota, peran (`abh` / `pengawas` / `kashift` / `security` / `cs`), dan `spbu_id` tempat bertugas |
+| `bbm_members` | Anggota, peran (`abh` / `pengawas` / `kashift` / `security` / `cs` / `admin`), dan `spbu_id` tempat bertugas |
 | `bbm_settings` | Pengaturan per SPBU (`id` = `spbu_id`) |
 | `bbm_tanks` | Database tangki per SPBU: produk, nomor, tanggal kalibrasi, tabel kalibrasi (jsonb) |
 | `bbm_plans` | Plan kirim (SO & LO); data MS2, Ship To, PO SAP, supply point di kolom `meta` |
 | `bbm_daily` | Stok awal shift (`kind = stok`, satu per shift) dan Q&Q harian (`kind = qq`) |
 | `bbm_takar` | Uji takaran bejana 20 L: satu baris per hasil (nozzle, produk, opsi P/M, selisih ml, foto); dibaca aplikasi sebagai catatan harian kind `takar` |
 | `bbm_ops` | Operasional SPBU: satu baris per form per tanggal (form bulanan: tanggal 1). Tulis: housekeeping `hk-*` CS, sumur pantau & oil catcher kashift/security, kartu perawatan kashift; ABH & pengawas semua. Paraf hanya ABH/pengawas (trigger) |
+| `bbm_petty` | Petty cash: pengajuan pengadaan barang/jasa (akun COA, total, status `Menunggu Admin` → `Menunggu ABH` → `Disetujui`/`Ditolak`) + realisasi & nota di kolom `data`. Alur dijaga trigger `bbm_petty_alur` (`20261016140000_bbm_petty.sql`, `20261016150000_bbm_admin_peran.sql`, `20261016150100_bbm_admin_petty_alur.sql`) |
 | `bbm_cutoff_log` | Catatan cut-off foto per SPBU |
 | `bbm_reports` | Satu baris per bongkaran; isi langkah SOP di kolom JSON |
 | bucket `bbm-evidence` | Foto evidence (privat, diakses lewat signed URL) |
@@ -288,9 +293,10 @@ membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_
 |-------|-------|
 | ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
 | Pengawas | Identitas SPBU (termasuk jumlah pulau pompa) & Database tangki (wajib diisi untuk SPBU baru), tambah/ubah Data Dispenser (pulau pompa tiap dispenser) dan Nozzle & Tera Metrologi (`20261016120000_bbm_pengawas_dispenser_nozzle.sql`), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Inspeksi APAR/APAB, Water Content Tangki, Kualitas Harian, Uji Pasca Penerimaan, semua laporan |
-| Kepala Shift | Stok awal, Water Content Tangki, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
+| Kepala Shift | Pengajuan & realisasi petty cash, stok awal, Water Content Tangki, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Inspeksi APAR/APAB, sumur pantau & oil catcher, lapor insiden |
 | Cleaning Service (CS) | Checklist housekeeping di Operasional SPBU, lapor insiden |
+| Admin / Cashier | Finance: persetujuan 1 petty cash (lalu diteruskan ke ABH), pengajuan & realisasi anggaran |
 
 Tulis: plan & laporan oleh ABH/Pengawas/Kashift; Security hanya `bbm_daily`
 kind `apar`; pengaturan & anggota hanya ABH; hapus plan/laporan oleh ABH/Pengawas

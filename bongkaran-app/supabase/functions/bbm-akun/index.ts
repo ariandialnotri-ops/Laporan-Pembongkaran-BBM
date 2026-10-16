@@ -4,7 +4,7 @@
 // Pemanggil diverifikasi dari JWT-nya; operasi admin memakai service role yang hanya ada di server.
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1'
 
-const PERAN = ['abh', 'pengawas', 'kashift', 'security', 'cs']
+const PERAN = ['abh', 'pengawas', 'kashift', 'security', 'cs', 'admin']
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
