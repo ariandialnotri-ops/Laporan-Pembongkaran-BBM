@@ -1,40 +1,40 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Beaker, ChevronRight, CircleCheck, CircleDot, Flag, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
+import { Beaker, Camera, ChevronRight, CircleCheck, CircleDot, Flag, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
-import { PilihShift, useKunciShift } from '@/components/bongkaran/pilih-shift'
+import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
+import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
+import { PilihHarian } from '@/components/bongkaran/pilih-harian'
+import { useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { Loading } from '@/components/bongkaran/load-state'
-import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { usePhotoSrc } from '@/lib/use-photo-src'
 import {
   newQqKualitas,
-  QQ_FOTO,
   qqD15,
   qqRecordId,
   totalPumpTest,
   type QqData,
-  type QqFotoKey,
   type QqKualitas,
   type QqRecord,
 } from '@/lib/daily'
-import { formatTanggalIso, nowHm } from '@/lib/date'
+import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
-import { compressImage } from '@/lib/image'
+import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
+import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
+import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
+import { buatKolaseGrid } from '@/lib/kolase'
 import { acuanD15 } from '@/lib/ringkasan'
-import { shiftLabel, type Shift } from '@/lib/shift'
-import { statusShift } from '@/lib/status-isi'
-import { useKeTerkirim } from '@/lib/terkirim'
-import { PRODUK_OPTIONS, type Photo } from '@/lib/sop'
+import { PRODUK_OPTIONS } from '@/lib/sop'
+import { buildWaQq, type BarisQqWa } from '@/lib/wa'
 
 /** Waktu (di luar render). */
 const stamp = () => Date.now()
@@ -48,36 +48,51 @@ function upsert<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
 }
 
-/** Operation > Kualitas Harian: hanya memilih shift (hijau selesai, oranye belum, merah terlewat). */
+/** Operation > Kualitas Harian: sekali sehari di shift 1, paling lambat 10:00 (hijau selesai, oranye belum, merah terlewat). */
 export function QqHarianMenu() {
   const app = useApp()
   if (!app.loaded) return <Loading />
-  const rec = (tanggal: string, shift: Shift) => app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(tanggal, shift))
+  // Catatan lama per shift tetap dihitung untuk tanggalnya.
+  const rec = (tanggal: string) =>
+    app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(tanggal, 1)) ??
+    app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.tanggal === tanggal && !!d.data.selesaiAt)
   return (
     <div className="flex flex-col gap-space-md">
       <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Pilih shift untuk uji density & suhu per produk. Uji dinyatakan selesai setelah semua baris dan foto wajib terkirim.
+        Uji density & suhu per produk sekali sehari di shift 1, paling lambat pukul {BATAS_HARIAN}. Foto hydrometer tiap produk, struk pump test, dan pengembalian minyak digabung menjadi satu kolase dan dikirim ke WhatsApp; foto tidak disimpan di aplikasi.
       </p>
-      <PilihShift
-        status={(k) => statusShift(k, !!rec(k.tanggal, k.shift)?.data.selesaiAt)}
-        keHalaman={(k) => `/kualitas/${k.tanggal}/${k.shift}`}
-        keterangan={(k, st) => {
-          const r = rec(k.tanggal, k.shift)
-          if (st === 'sudah' && r) return `Selesai · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}`
+      <PilihHarian
+        judul="Uji kualitas harian"
+        status={(t) => statusHarian(t, !!rec(t)?.data.selesaiAt)}
+        keHalaman={(t) => `/kualitas/${t}/1`}
+        keterangan={(t, st) => {
+          const r = rec(t)
+          if (r?.data.selesaiAt) return `Selesai ${r.data.jam}${r.data.terlambat ? ' (terlambat)' : ''} · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}`
           if (r) return `${st === 'terlewat' ? 'Terlewat' : 'Belum selesai'} · sebagian tersimpan`
-          return undefined
+          return st === 'belum' ? `Belum diuji · batas ${BATAS_HARIAN}` : undefined
         }}
       />
     </div>
   )
 }
 
-/** Halaman form uji kualitas harian satu shift: density per produk (disimpan per baris), foto wajib, lalu kirim. */
+type SelesaiQq = { teks: string; files: File[]; urls: string[] }
+type FotoUmum = 'struk' | 'kembali'
+const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
+  { key: 'struk', label: 'Foto struk pump test', hint: 'Struk pump test uji kualitas terbaca.' },
+  { key: 'kembali', label: 'Foto pengembalian minyak ke tangki', hint: 'Minyak sampel dituang kembali ke tangki pendam.' },
+]
+
+/**
+ * Halaman form uji kualitas harian (hari ini, shift 1, paling lambat 10:00): density per produk (disimpan
+ * per baris), foto hydrometer tiap produk + struk + pengembalian, lalu kolase foto & laporan WhatsApp.
+ * Foto tidak disimpan di aplikasi.
+ */
 export function QqHarian() {
   const app = useApp()
-  const keTerkirim = useKeTerkirim()
   const toast = useToast()
   const { tanggal, shift, valid } = useKunciShift()
+  const bolehIsi = tanggal === todayIso() && shift === 1
   const key = { tanggal, shift }
   const { key: now } = useStokShift()
   const records = useMemo(() => app.daily.filter((d): d is QqRecord => d.kind === 'qq'), [app.daily])
@@ -96,19 +111,36 @@ export function QqHarian() {
     catatan: '',
   })
   const data: QqData = draft?.id === id ? draft.data : (existing?.data ?? fresh())
-  const allPhotos = Object.values(data.foto ?? {}).flat()
-  const srcOf = usePhotoSrc(allPhotos)
+  // Foto hanya di HP sampai dikirim ke WhatsApp: per baris produk + struk & pengembalian.
+  const [foto, setFoto] = useState<Record<string, FotoLokal>>({})
+  const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
+  const [selesaiWa, setSelesaiWa] = useState<SelesaiQq | null>(null)
+  const [dibagikan, setDibagikan] = useState(false)
   const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
   const guard = useLeaveGuard({
-    active: true,
-    title: 'Keluar dari kualitas harian?',
-    detail: belumSimpan
-      ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
-      : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim.',
+    active: bolehIsi && (!selesaiWa || !dibagikan),
+    title: selesaiWa ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari kualitas harian?',
+    detail: selesaiWa
+      ? 'Hasil uji sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.'
+      : belumSimpan
+        ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
+        : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim. Foto yang sudah diambil akan hilang.',
   })
 
   if (!app.loaded) return <Loading />
   if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
+  if (!bolehIsi)
+    return (
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="text-body-md font-bold text-on-surface">Uji kualitas harian {formatTanggalIso(tanggal)}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          Uji kualitas harian diisi sekali sehari pada hari yang sama, shift 1, paling lambat pukul {BATAS_HARIAN}.{existing?.data.selesaiAt ? ` Uji tanggal ini selesai pukul ${existing.data.jam}.` : ''}
+        </span>
+        <Link to="/laporan/kualitas" className={buttonVariants({ variant: 'glass' })}>
+          Lihat riwayat kualitas
+        </Link>
+      </GlassCard>
+    )
 
   const setData = (patch: Partial<QqData>) => {
     setError(null)
@@ -154,7 +186,10 @@ export function QqHarian() {
 
   const hapusBaris = async (kind: 'kualitas' | 'kuantitas', rowId: string) => {
     const tersimpan = (existing?.data[kind] as { id: string }[] | undefined)?.some((x) => x.id === rowId)
-    if (kind === 'kualitas') setData({ kualitas: data.kualitas.filter((x) => x.id !== rowId) })
+    if (kind === 'kualitas') {
+      setData({ kualitas: data.kualitas.filter((x) => x.id !== rowId) })
+      buangFoto(rowId)
+    }
     else setData({ kuantitas: data.kuantitas.filter((x) => x.id !== rowId) })
     if (tersimpan) {
       try {
@@ -165,75 +200,120 @@ export function QqHarian() {
     }
   }
 
-  // Foto langsung diunggah & disimpan, supaya tidak hilang bila HP menutup aplikasi.
-  const tambahFoto = async (k: QqFotoKey, files: File[]) => {
-    setBusy(k)
+  const ambilFoto = async (key: string, files: File[]) => {
+    setBusy(`foto-${key}`)
     try {
-      const baru: Photo[] = []
-      for (const f of files) {
-        const blob = await compressImage(f)
-        baru.push(await app.backend.uploadPhoto(`daily-${id}`, blob, `${k}.jpg`))
-      }
-      const foto = { ...(data.foto ?? {}), [k]: [...(data.foto?.[k] ?? []), ...baru] }
-      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: [...(b.foto?.[k] ?? []), ...baru] } }))
-      setDraft({ id, data: { ...data, foto } })
+      // Satu foto per bagian: foto baru menggantikan yang lama. Cap ditulis saat kolase dibuat.
+      const waktu = capWaktu()
+      const blob = await compressImage(files[files.length - 1], { maxSize: 1600, quality: 0.85 })
+      const baru: FotoLokal = { id: genId('f'), blob, url: URL.createObjectURL(blob) }
+      setFoto((x) => {
+        if (x[key]) URL.revokeObjectURL(x[key].url)
+        return { ...x, [key]: baru }
+      })
+      setWaktuFoto((w) => ({ ...w, [baru.id]: waktu }))
     } catch (e) {
-      setError(`Gagal menyimpan foto: ${pesan(e)}`)
+      setError(`Gagal memproses foto: ${pesan(e)}`)
     } finally {
       setBusy(null)
     }
   }
-  const hapusFoto = async (k: QqFotoKey, index: number) => {
-    const target = data.foto?.[k]?.[index]
-    if (!target) return
-    const foto = { ...(data.foto ?? {}), [k]: (data.foto?.[k] ?? []).filter((_, j) => j !== index) }
-    setDraft({ id, data: { ...data, foto } })
-    try {
-      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: (b.foto?.[k] ?? []).filter((p) => p.id !== target.id) } }))
-      await app.backend.deletePhoto(target)
-    } catch (e) {
-      setError(pesan(e))
-    }
-  }
+  const buangFoto = (key: string) =>
+    setFoto((x) => {
+      if (x[key]) URL.revokeObjectURL(x[key].url)
+      const { [key]: _, ...sisa } = x
+      return sisa
+    })
+  const fotoSlot = (key: string, label: string, hint: string) => (
+    <FotoWajib
+      key={key}
+      label={label}
+      hint={hint}
+      fotos={foto[key] ? [foto[key]] : []}
+      busy={busy === `foto-${key}`}
+      disabled={busy === 'selesai'}
+      onAdd={(files) => void ambilFoto(key, files)}
+      onRemove={() => buangFoto(key)}
+    />
+  )
 
-  const fotoKurang = (keys: QqFotoKey[]) => keys.filter((k) => !(data.foto?.[k]?.length))
+  /** Baris laporan per produk (D15, acuan bongkaran terakhir, selisih). */
+  const barisWa = (): BarisQqWa[] =>
+    data.kualitas.map((k) => {
+      const { obs, d15 } = qqD15(k)
+      const ref = acuanD15(app.reports, k.produk, key.tanggal)
+      const selisih = d15 && ref ? Math.round((d15.value - ref.d15) * 10000) / 10000 : null
+      return { produk: k.produk, obs, suhu: k.suhu, d15: d15?.value ?? null, acuan: ref?.d15 ?? null, selisih, ok: selisih === null ? null : Math.abs(selisih) <= app.rules.densityTolerance + 1e-9, pumpTest: k.pumpTest }
+    })
+
   const selesaikan = async () => {
-    if (!data.kualitas.length && !data.kuantitas.length) return setError('Isi minimal satu uji kualitas.')
-    if (data.kualitas.some((k) => !k.savedAt) || data.kuantitas.some((n) => !n.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk/nozzle).')
-    const kurang = [...(data.kualitas.length ? fotoKurang(['kualitasStruk', 'kualitasKembali']) : []), ...(data.kuantitas.length ? fotoKurang(['kuantitasStruk', 'kuantitasKembali']) : [])]
-    if (kurang.length) return setError(`Foto wajib belum ada: ${[...new Set(kurang.map((k) => `${QQ_FOTO[k]} (${k.startsWith('kualitas') ? 'kualitas' : 'tera'})`))].join(', ')}.`)
+    if (!data.kualitas.length) return setError('Isi minimal satu uji kualitas.')
+    if (data.kualitas.some((k) => !k.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk).')
+    const tanpaFoto = data.kualitas.filter((k) => !foto[k.id]).map((k) => k.produk)
+    if (tanpaFoto.length) return setError(`Foto hydrometer belum ada: ${tanpaFoto.join(', ')}.`)
+    const kurang = FOTO_UMUM.filter((f) => !foto[f.key]).map((f) => f.label)
+    if (kurang.length) return setError(`Foto wajib belum ada: ${kurang.join(', ')}.`)
     if (!data.petugas.trim()) return setError('Isi nama petugas.')
     setBusy('selesai')
     try {
-      await persist(() => ({ ...data, selesaiAt: isoNow() }))
-      guard.bypass()
-      const namaShift = shiftLabel(key.shift).split(' (')[0]
-      const hasil = data.kualitas.map((k): [string, string] => {
-        const d15 = qqD15(k).d15
-        return [k.produk, d15 ? `D15 ${formatDensity(d15.value)}` : '-']
-      })
-      keTerkirim({
-        judul: `Uji kualitas ${namaShift} terkirim`,
-        detail: `${formatTanggalIso(key.tanggal)}, ${shiftLabel(key.shift)}`,
-        baris: [...hasil, ['Total pump test', `${formatNumber(totalPumpTest(data).kualitas, 1)} L`], ['Petugas', data.petugas.trim()]],
-        aksi: [
-          { to: '/kualitas', label: 'Pilih shift lain' },
-          { to: `/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`, label: 'Lihat riwayat kualitas' },
-        ],
-      })
+      const jam = nowHm()
+      const terlambat = lewatBatas(jam)
+      await persist(() => ({ ...data, jam, foto: undefined, selesaiAt: isoNow(), terlambat }))
+      const spbu = namaSpbuWa(app.settings)
+      const baris = barisWa()
+      const cap = (f: FotoLokal, ket: string) => ({ blob: f.blob, cap: [waktuFoto[f.id] ?? capWaktu(), spbu, ket] })
+      const kolase = await buatKolaseGrid([
+        ...data.kualitas.map((k, i) => {
+          const b = baris[i]
+          return cap(foto[k.id], `${k.produk} · D15 ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
+        }),
+        ...FOTO_UMUM.map((f) => cap(foto[f.key], f.label.replace('Foto ', ''))),
+      ])
+      const files = [new File([kolase], `Kualitas_Harian_${key.tanggal}.jpg`, { type: 'image/jpeg' })]
+      const teks = buildWaQq(
+        { tanggal: key.tanggal, jam, petugas: data.petugas.trim(), terlambat, totalPumpTest: totalPumpTest(data).kualitas, catatan: data.catatan?.trim() ?? '' },
+        baris,
+        spbu,
+        tanggalPanjang(key.tanggal),
+        zonaWaktu(),
+      )
+      setSelesaiWa({ teks, files, urls: [URL.createObjectURL(kolase)] })
+      setBusy(null)
+      window.scrollTo({ top: 0 })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
     }
+  }
+
+  if (selesaiWa) {
+    const lewat = barisWa().filter((b) => b.ok === false).map((b) => b.produk)
+    return (
+      <>
+        <LayarKirimWa
+          judul="Uji kualitas harian tersimpan"
+          keterangan={lewat.length ? `${lewat.join(', ')} melebihi toleransi density. Kirim laporan ke WhatsApp sekarang.` : 'Semua produk sesuai toleransi. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp.'}
+          teks={selesaiWa.teks}
+          files={selesaiWa.files}
+          urls={selesaiWa.urls}
+          dibagikan={dibagikan}
+          onDibagikan={() => setDibagikan(true)}
+        >
+          <Link to={`/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`} replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Lihat riwayat kualitas
+          </Link>
+          <Link to="/kualitas" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Kembali ke Kualitas Harian
+          </Link>
+        </LayarKirimWa>
+        {guard.dialog}
+      </>
+    )
   }
 
   const pump = totalPumpTest(data)
   const isNow = key.tanggal === now.tanggal && key.shift === now.shift
   const selesai = !!existing?.data.selesaiAt && !draft
-
-  const fotoSlot = (k: QqFotoKey) => (
-    <PhotoSlot key={k} label={QQ_FOTO[k]} photos={data.foto?.[k] ?? []} busy={busy === k} srcOf={srcOf} onAdd={(f) => void tambahFoto(k, f)} onRemove={(i) => void hapusFoto(k, i)} />
-  )
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -242,8 +322,11 @@ export function QqHarian() {
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
-            <h2 className="text-headline-md font-bold text-on-surface">Uji Q&Q {shiftLabel(key.shift).split(' (')[0]}</h2>
-            <span className="text-body-sm text-on-surface-variant">{formatTanggalIso(key.tanggal)}</span>
+            <h2 className="text-headline-md font-bold text-on-surface">Uji kualitas harian</h2>
+            <span className="text-body-sm text-on-surface-variant">
+              {formatTanggalIso(key.tanggal)} · Shift 1 · batas {BATAS_HARIAN}
+            </span>
+            {lewatBatas(nowHm()) && !existing?.data.selesaiAt && <span className="text-body-sm font-semibold text-error">Sudah lewat pukul {BATAS_HARIAN}: laporan dicatat terlambat.</span>}
           </div>
           {existing?.data.selesaiAt ? <Pill tone="success">Selesai</Pill> : existing ? <Pill tone="cyan">Sebagian tersimpan</Pill> : <Pill>Belum diuji</Pill>}
         </div>
@@ -302,6 +385,7 @@ export function QqHarian() {
                 ]}
                 total={['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-']}
               />
+              {fotoSlot(k.id, `Foto hydrometer ${k.produk}`, 'Hydrometer & termometer di gelas ukur, angka density dan suhu terbaca.')}
               <SimpanBaris
                 ok={ok}
                 okText={ok ? 'Sesuai toleransi' : `Melebihi toleransi ${formatDensity(app.rules.densityTolerance)}`}
@@ -324,8 +408,11 @@ export function QqHarian() {
               <Flag aria-hidden="true" className="size-4 text-primary" />
               Langkah terakhir uji kualitas
             </span>
-            {fotoSlot('kualitasStruk')}
-            {fotoSlot('kualitasKembali')}
+            {FOTO_UMUM.map((f) => fotoSlot(f.key, f.label, f.hint))}
+            <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+              <Camera aria-hidden="true" className="size-4 shrink-0" />
+              Semua foto digabung otomatis menjadi satu kolase (jam, SPBU, produk, D15) dan dikirim ke WhatsApp; tidak disimpan di aplikasi.
+            </span>
           </GlassCard>
         )}
       </section>
@@ -352,9 +439,15 @@ export function QqHarian() {
             <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
           </div>
         )}
-        <Button size="lg" className="w-full" disabled={busy !== null || selesai} onClick={selesaikan}>
-          {selesai ? <CircleCheck aria-hidden="true" /> : <Send aria-hidden="true" />}
-          {selesai ? `Uji selesai ${jamDari(existing?.data.selesaiAt)}` : 'Kirim uji kualitas'}
+        {selesai && (
+          <span className="flex items-center gap-1.5 text-body-sm font-semibold text-primary">
+            <CircleCheck aria-hidden="true" className="size-4" />
+            Uji selesai {jamDari(existing?.data.selesaiAt)}; kirim ulang bila ada koreksi (ambil foto lagi).
+          </span>
+        )}
+        <Button size="lg" className="w-full" disabled={busy !== null} onClick={selesaikan}>
+          <Send aria-hidden="true" />
+          {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang laporan ke WhatsApp' : 'Selesaikan & lanjut kirim ke WhatsApp'}
         </Button>
       </GlassCard>
 

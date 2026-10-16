@@ -47,6 +47,7 @@ const NozzleTera = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ de
 const SoldShipTo = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.SoldShipTo })))
 const MenuOperation = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuOperation })))
 const MenuGrup = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuGrup })))
+const MenuPatrol = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuPatrol })))
 const MenuFinance = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuFinance })))
 const MenuReport = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuReport })))
 const MenuRiwayat = lazy(() => import('@/pages/MenuGrup').then((m) => ({ default: m.MenuRiwayat })))
@@ -136,6 +137,7 @@ function Gate() {
           <Route path="/operation" element={<MenuOperation />} />
           <Route path="/delivery" element={<MenuGrup grup="delivery" />} />
           <Route path="/hsse" element={<MenuGrup grup="hsse" />} />
+          <Route path="/patrol" element={<MenuPatrol />} />
           <Route path="/finance" element={<MenuFinance />} />
           <Route path="/kaleng" element={<HalamanKaleng />} />
           <Route path="/input/bongkar" element={<FormInput />} />
@@ -151,7 +153,7 @@ function Gate() {
           <Route path="/stok" element={<StokShift />} />
           <Route path="/stok/:tanggal/:shift" element={<StokShiftForm />} />
           <Route path="/air" element={<AirMenu />} />
-          <Route path="/air/:tanggal/:shift" element={<AirForm />} />
+          <Route path="/air/isi" element={<AirForm />} />
           <Route path="/laporan/air" element={<LaporanAir />} />
           <Route path="/terkirim" element={<Terkirim />} />
           <Route path="/takaran" element={<MenuTakaran />} />

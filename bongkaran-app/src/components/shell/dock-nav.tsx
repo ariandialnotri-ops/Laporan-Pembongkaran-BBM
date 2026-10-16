@@ -40,7 +40,7 @@ export function DockNav() {
                   </span>
                 )}
               </span>
-              <span className="max-w-full truncate text-[11px] tracking-normal">{g.label}</span>
+              <span className="max-w-full truncate text-[11px] tracking-normal">{g.labelPendek ?? g.label}</span>
             </Link>
           )
         })}

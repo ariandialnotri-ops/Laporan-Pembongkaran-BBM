@@ -22,7 +22,7 @@ import { KATEGORI_WBS, kategoriWbs, nomorWbs, STATUS_WBS, statusWbs, type Status
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
-/** HSSE > Whistle Blowing System: penjelasan kerahasiaan lalu pilih kategori pelanggaran. */
+/** HSSE & Guard Patrol System > Whistleblowing System: penjelasan kerahasiaan lalu pilih kategori pelanggaran. */
 export function WbsMenu() {
   const app = useApp()
   if (!app.loaded) return <Loading />
@@ -34,7 +34,7 @@ export function WbsMenu() {
             <Megaphone className="size-5" />
           </span>
           <div className="flex min-w-0 flex-col">
-            <span className="text-tag uppercase text-primary">Whistle Blowing System</span>
+            <span className="text-tag uppercase text-primary">Whistleblowing System</span>
             <span className="text-headline-md font-bold text-on-surface">Laporkan pelanggaran</span>
             <span className="text-body-sm text-on-surface-variant">Untuk semua petugas SPBU. Laporan bersifat rahasia.</span>
           </div>

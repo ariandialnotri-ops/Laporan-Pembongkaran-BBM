@@ -68,6 +68,8 @@ export interface QqData {
   foto?: Partial<Record<QqFotoKey, Photo[]>>
   /** Diisi saat uji diselesaikan (semua baris & foto lengkap). */
   selesaiAt?: string
+  /** Diselesaikan setelah batas harian pukul 10:00. */
+  terlambat?: boolean
 }
 
 interface DailyBase {

@@ -36,6 +36,7 @@ import { useApp } from '@/lib/app-state'
 import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { todayIso } from '@/lib/date'
 import { labelSlot, slotKini } from '@/lib/gts'
+import { lewatBatas } from '@/lib/harian'
 import { formTampil } from '@/lib/ops'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
@@ -62,6 +63,8 @@ export interface ItemMenu {
 export interface GrupMenu {
   key: GrupKey
   label: string
+  /** Label ringkas untuk bar bawah (bila label panjang). */
+  labelPendek?: string
   /** Halaman ikhtisar grup. */
   href: string
   icon: LucideIcon
@@ -86,7 +89,9 @@ export function useMenu(): GrupMenu[] {
   const kirim = los.filter((x) => x === 'delivery').length
   const loAktif = app.plans.flatMap((p) => p.los).filter((lo) => !['closed', 'deleted'].includes(loStatus(lo, app.usedLoIds))).length
   const besok = planBesokKurang(app.plans)
-  const diuji = app.daily.some((d) => d.kind === 'qq' && d.id === qqRecordId(stok.key.tanggal, stok.key.shift))
+  // Kualitas harian sekali sehari (shift 1, paling lambat 10:00).
+  const diuji = app.daily.some((d) => d.kind === 'qq' && d.id === qqRecordId(hariIni, 1) && !!d.data.selesaiAt)
+  const lewat10 = lewatBatas(`${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`)
   const sample = sampleMenunggu(app.reports)
   const unitApar = (s.apar?.length ?? 0) + (s.apab?.length ?? 0)
   const aparBelum = kondisiSemua(s, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), stok.key.tanggal).filter((k) => !k.bulanIni).length
@@ -135,8 +140,8 @@ export function useMenu(): GrupMenu[] {
           path: '/kualitas',
           icon: FlaskConical,
           title: 'Kualitas Harian',
-          desc: 'Density & suhu per produk',
-          status: diuji ? `${shiftNama} sudah diuji` : `${shiftNama} belum diuji`,
+          desc: 'Density & suhu per produk, sekali sehari (shift 1, maks. 10:00)',
+          status: diuji ? 'Hari ini sudah diuji' : lewat10 ? 'Terlewat (batas 10:00)' : 'Belum diuji (batas 10:00)',
           badge: diuji ? 0 : 1,
         },
         {
@@ -161,8 +166,8 @@ export function useMenu(): GrupMenu[] {
           path: '/air',
           icon: Droplet,
           title: 'Water Content Tangki',
-          desc: 'Pasta air di setiap tangki pendam, per shift',
-          status: stok.tanpaTangki ? 'Database tangki belum diisi' : `${shiftNama}: cek air semua tangki`,
+          desc: 'Pasta air di setiap tangki pendam, sekali sehari (shift 1, maks. 10:00)',
+          status: stok.tanpaTangki ? 'Database tangki belum diisi' : 'Kolase foto + laporan WhatsApp',
         },
         {
           to: '/takaran',
@@ -216,10 +221,11 @@ export function useMenu(): GrupMenu[] {
     },
     {
       key: 'hsse',
-      label: 'HSSE',
+      label: 'HSSE & Guard Patrol System',
+      labelPendek: 'HSSE & Patrol',
       href: '/hsse',
       icon: ShieldCheck,
-      desc: 'Guard tour, proteksi kebakaran, insiden & near miss, pantauan lingkungan, whistle blowing',
+      desc: 'Proteksi kebakaran, insiden & near miss, pantauan lingkungan, guard patrol (sampling penyaluran subsidi, whistleblowing)',
       items: [
         {
           to: '/apar',
@@ -240,12 +246,12 @@ export function useMenu(): GrupMenu[] {
           badge: insidenTerbuka,
         },
         {
-          to: '/gts',
-          path: '/gts',
+          to: '/patrol',
+          path: '/patrol',
           icon: ScanEye,
-          title: 'Guard Tour System',
-          desc: 'Sampling subsidi tepat: 1 JBT + 1 JBKP tiap 2 jam',
-          status: `Slot berjalan ${labelSlot(slotKini().slot)}`,
+          title: 'Guard Patrol System',
+          desc: 'Sampling penyaluran subsidi dan whistleblowing system',
+          status: app.can('/gts') ? `Slot sampling berjalan ${labelSlot(slotKini().slot)}` : 'Whistleblowing system',
         },
         ...(adaOpsLingkungan
           ? [
@@ -259,14 +265,6 @@ export function useMenu(): GrupMenu[] {
               },
             ]
           : []),
-        {
-          to: '/wbs',
-          path: '/wbs',
-          icon: Megaphone,
-          title: 'Whistle Blowing System',
-          desc: 'Laporkan pelanggaran secara rahasia',
-          status: 'Hanya dibaca ABH, boleh anonim',
-        },
       ],
     },
     { key: 'finance', label: 'Finance', href: '/finance', icon: Wallet, desc: 'Segera hadir', items: [], segera: true },
@@ -297,6 +295,29 @@ export function useMenu(): GrupMenu[] {
     .filter((g) => (g.key === 'dashboard' ? app.can('/') : g.key === 'finance' ? app.canManage : g.items.length > 0))
 }
 
+/** HSSE > Guard Patrol System: sampling penyaluran subsidi (security) dan whistleblowing (semua peran). */
+export function patrolItems(can: (p: string) => boolean): ItemMenu[] {
+  const items: ItemMenu[] = [
+    {
+      to: '/gts',
+      path: '/gts',
+      icon: ScanEye,
+      title: 'Sampling Penyaluran Subsidi',
+      desc: 'Sampling JBT/JBKP tiap 2 jam: kolase foto EDC, struk, kendaraan + laporan WhatsApp',
+      status: `Slot berjalan ${labelSlot(slotKini().slot)}`,
+    },
+    {
+      to: '/wbs',
+      path: '/wbs',
+      icon: Megaphone,
+      title: 'Whistleblowing System',
+      desc: 'Laporkan pelanggaran secara rahasia',
+      status: 'Hanya dibaca ABH, boleh anonim',
+    },
+  ]
+  return items.filter((i) => can(i.path))
+}
+
 /** Halaman riwayat (Report > Riwayat). */
 export function riwayatItems(can: (p: string) => boolean) {
   return RIWAYAT.filter((r) => can(r.path))
@@ -305,12 +326,12 @@ export function riwayatItems(can: (p: string) => boolean) {
 const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[] = [
   { path: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status' },
   { path: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan' },
-  { path: '/laporan/air', icon: Droplet, title: 'Riwayat Water Content', desc: 'Air di dasar tangki pendam per shift, foto pasta air, tindakan' },
+  { path: '/laporan/air', icon: Droplet, title: 'Riwayat Water Content', desc: 'Air di dasar tangki pendam, sekali sehari (shift 1, maks. 10:00), tindakan' },
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
   { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },
-  { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Guard Tour', desc: 'Sampling subsidi tepat JBT/JBKP per slot 2 jam, foto EDC, struk, kendaraan' },
-  { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistle blowing system: rahasia, khusus ABH' },
+  { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
+  { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
   { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },
 ]
 

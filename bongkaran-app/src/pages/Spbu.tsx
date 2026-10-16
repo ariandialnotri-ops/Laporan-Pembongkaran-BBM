@@ -29,12 +29,13 @@ const perluPerhatian = (r: RingkasanUnit) => !siap(r) || r.anomaliBulan > 0 || r
 /** Q&Q 7 hari terakhir: kotak per hari (abu = belum uji, kuning = sebagian shift, hijau = 3 shift). */
 function GarisQq({ hari, akhir }: { hari: number[]; akhir: string }) {
   return (
-    <span className="flex items-center gap-0.5" aria-label={`Uji Q&Q 7 hari terakhir: ${hari.join(', ')} shift`}>
+    // Uji kualitas harian sekali sehari (shift 1): hijau = sudah diuji hari itu.
+    <span className="flex items-center gap-0.5" aria-label={`Uji kualitas 7 hari terakhir: ${hari.map((n) => (n > 0 ? 'ya' : 'tidak')).join(', ')}`}>
       {hari.map((n, i) => (
         <span
           key={i}
-          title={`${formatTanggalIso(todayIso(addDays(new Date(`${akhir}T00:00:00`), i - hari.length + 1)))}: ${n} shift`}
-          className={cn('size-3.5 rounded-[3px]', n >= 3 ? 'bg-emerald-500' : n > 0 ? 'bg-amber-400' : 'bg-outline-variant/70')}
+          title={`${formatTanggalIso(todayIso(addDays(new Date(`${akhir}T00:00:00`), i - hari.length + 1)))}: ${n > 0 ? 'sudah diuji' : 'belum diuji'}`}
+          className={cn('size-3.5 rounded-[3px]', n > 0 ? 'bg-emerald-500' : 'bg-outline-variant/70')}
         />
       ))}
     </span>

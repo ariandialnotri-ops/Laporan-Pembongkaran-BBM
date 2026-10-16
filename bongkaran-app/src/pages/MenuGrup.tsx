@@ -7,7 +7,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
-import { EXPORT, riwayatItems, useMenu, type GrupKey, type ItemMenu } from '@/components/shell/menu-data'
+import { EXPORT, patrolItems, riwayatItems, useMenu, type GrupKey, type ItemMenu } from '@/components/shell/menu-data'
 import { GlassCard } from '@/components/ui/glass-card'
 import { useApp } from '@/lib/app-state'
 import { todayIso } from '@/lib/date'
@@ -121,6 +121,19 @@ export function MenuOperation() {
         </Link>
       )}
       {items.length ? <Grid items={items} label="Menu Operation" /> : <Kosong />}
+    </div>
+  )
+}
+
+/** HSSE & Guard Patrol System > Guard Patrol System: Sampling Penyaluran Subsidi dan Whistleblowing System. */
+export function MenuPatrol() {
+  const app = useApp()
+  if (!app.loaded) return <Loading />
+  const items = patrolItems(app.can)
+  return (
+    <div className="flex flex-col gap-space-md">
+      <p className="animate-entrance-1 px-space-xs text-body-md text-on-surface-variant">Pengawasan penyaluran BBM subsidi oleh security dan pelaporan pelanggaran secara rahasia.</p>
+      {items.length ? <Grid items={items} label="Menu Guard Patrol System" /> : <Kosong />}
     </div>
   )
 }

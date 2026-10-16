@@ -68,3 +68,53 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   if (d.catatan) L.push(`Catatan: ${d.catatan}`)
   return L.join('\n')
 }
+
+export interface BarisQqWa {
+  produk: string
+  obs: number | null
+  suhu: string
+  d15: number | null
+  acuan: number | null
+  selisih: number | null
+  ok: boolean | null
+  pumpTest: string
+}
+
+/**
+ * Teks WhatsApp uji kualitas harian (sekali sehari, shift 1): data per produk dalam blok monospace
+ * WhatsApp (```) supaya titik dua sejajar di semua HP.
+ */
+export function buildWaQq(
+  q: { tanggal: string; jam: string; petugas: string; terlambat: boolean; totalPumpTest: number; catatan: string },
+  baris: BarisQqWa[],
+  spbu: string,
+  tanggalPanjang: string,
+  zona = '',
+) {
+  const kv = (k: string, v: string) => `${k.padEnd(10)}: ${v}`
+  const L: string[] = [
+    '*Laporan Uji Kualitas Harian BBM*',
+    spbu,
+    `Tanggal ${tanggalPanjang}, ${q.jam}${zona ? ` ${zona}` : ''}`,
+    '',
+    '```',
+    kv('Shift', '1'),
+    kv('Petugas', q.petugas || '-'),
+    kv('Status', q.terlambat ? 'Terlambat (lewat 10:00)' : 'Tepat waktu'),
+    '```',
+  ]
+  for (const b of baris) {
+    L.push(`*${b.produk}*`, '```')
+    L.push(kv('Density', `${formatDensity(b.obs)} / ${b.suhu ? `${formatMaybe(parseAngka(b.suhu), 1)}°C` : '-'}`))
+    L.push(kv('D15', formatDensity(b.d15)))
+    L.push(kv('Acuan D15', b.acuan === null ? 'belum ada' : formatDensity(b.acuan)))
+    L.push(kv('Selisih', b.selisih === null ? '-' : `${formatDensitySigned(b.selisih)} (${b.ok ? 'Sesuai' : 'Melebihi toleransi'})`))
+    L.push(kv('Pump test', b.pumpTest ? `${b.pumpTest} L` : '-'))
+    L.push('```')
+  }
+  const lewat = baris.filter((b) => b.ok === false).map((b) => b.produk)
+  L.push(`Total pump test: ${formatMaybe(q.totalPumpTest, 1)} L`)
+  L.push(lewat.length ? `Hasil: *${lewat.join(', ')} melebihi toleransi* ❗` : 'Hasil: *semua produk sesuai toleransi* ✅')
+  if (q.catatan) L.push(`Catatan: ${q.catatan}`)
+  return L.join('\n')
+}

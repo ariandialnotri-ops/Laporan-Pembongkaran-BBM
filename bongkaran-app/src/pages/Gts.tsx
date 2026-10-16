@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronRight, CircleCheck, Copy, LoaderCircle, Save, ScanEye, Send, Trash2 } from 'lucide-react'
+import { Camera, ChevronRight, LoaderCircle, Save, ScanEye, Send, Trash2 } from 'lucide-react'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
+import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
@@ -68,7 +69,7 @@ function KotakSlot({ slot, status, jbt, jbkp, kini }: { slot: number; status: St
 }
 
 /**
- * HSSE > Guard Tour System (khusus security): sampling subsidi tepat. Minimal 1 transaksi JBT dan
+ * HSSE & Guard Patrol System > Sampling Penyaluran Subsidi (khusus security). Minimal 1 transaksi JBT dan
  * 1 JBKP per 2 jam. Hanya slot yang sedang berjalan yang dapat diisi (foto diambil saat itu juga).
  */
 export function GtsMenu() {
@@ -104,7 +105,7 @@ export function GtsMenu() {
         {bisaIsi ? (
           <Link to={`/gts/isi?jenis=${kurang ?? 'JBT'}`} className={buttonVariants({ size: 'lg' })}>
             <Camera aria-hidden="true" />
-            {kurang ? `Sampling ${kurang} sekarang` : 'Tambah sampling'}
+            Sampling Penyaluran Subsidi
           </Link>
         ) : (
           <span className="text-body-sm text-on-surface-variant">Sampling diisi oleh security.</span>
@@ -165,29 +166,6 @@ export function GtsMenu() {
 
 type Selesai = { rec: GtsRecord; teks: string; files: File[]; urls: string[] }
 
-/** Pratinjau teks seperti tampil di WhatsApp: *tebal* dan blok ``` monospace (tanda format disembunyikan). */
-function PratinjauWa({ teks }: { teks: string }) {
-  const out: React.ReactNode[] = []
-  let mono: string[] | null = null
-  teks.split('\n').forEach((l, i) => {
-    if (l.trim() === '```') {
-      if (mono) {
-        out.push(
-          <pre key={i} className="my-1 overflow-x-auto font-mono text-[12.5px] leading-relaxed">
-            {mono.join('\n')}
-          </pre>,
-        )
-        mono = null
-      } else mono = []
-      return
-    }
-    if (mono) return void mono.push(l)
-    const tebal = /^\*(.+)\*$/.exec(l)
-    out.push(tebal ? <strong key={i} className="block">{tebal[1]}</strong> : <span key={i} className="block min-h-[1em]">{l}</span>)
-  })
-  return <div className="rounded-md bg-[#e7fbe0] p-space-sm text-body-sm text-[#111b21] shadow-sm">{out}</div>
-}
-
 /**
  * Halaman form satu sampling (slot berjalan): jenis, nopol, jenis kendaraan, volume, sesuai ketentuan,
  * foto EDC/struk/kendaraan. Isian disimpan; foto hanya diolah di HP (cap waktu & SPBU) lalu dikirim
@@ -196,7 +174,6 @@ function PratinjauWa({ teks }: { teks: string }) {
  */
 export function GtsForm() {
   const app = useApp()
-  const toast = useToast()
   const [params] = useSearchParams()
   const [jenis, setJenis] = useState<JenisGts>(params.get('jenis') === 'JBKP' ? 'JBKP' : 'JBT')
   const [nopol, setNopol] = useState('')
@@ -222,7 +199,7 @@ export function GtsForm() {
   const kini = slotKini()
   const [recsSlot, setRecsSlot] = useState<GtsRecord[]>([])
   if (!app.loaded) return <Loading />
-  if (app.role !== 'security' && app.role !== 'abh') return <GlassCard className="p-space-md">Sampling Guard Tour diisi oleh security SPBU.</GlassCard>
+  if (app.role !== 'security' && app.role !== 'abh') return <GlassCard className="p-space-md">Sampling penyaluran subsidi diisi oleh security SPBU.</GlassCard>
   const j = jenisGts(jenis)
   const shift = currentShift().shift
 
@@ -302,96 +279,32 @@ export function GtsForm() {
     }
   }
 
-  const salin = async (teks: string) => {
-    try {
-      await navigator.clipboard.writeText(teks)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  const keWa = async () => {
-    if (!selesai) return
-    setBusy('wa')
-    // Teks juga disalin: bila aplikasi tujuan tidak memakai teks bersama foto, cukup ditempel.
-    const tersalin = await salin(selesai.teks)
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
-    try {
-      if (nav.canShare?.({ files: selesai.files, text: selesai.teks })) {
-        await navigator.share({ files: selesai.files, text: selesai.teks })
-        setDibagikan(true)
-        toast(tersalin ? 'Dibagikan. Teks laporan juga sudah disalin.' : 'Dibagikan.')
-      } else {
-        // Perangkat tanpa berbagi file (mis. komputer): unduh foto, lalu buka WhatsApp dengan teks laporan.
-        for (const f of selesai.files) {
-          const a = document.createElement('a')
-          a.href = URL.createObjectURL(f)
-          a.download = f.name
-          document.body.appendChild(a)
-          a.click()
-          a.remove()
-          setTimeout(() => URL.revokeObjectURL(a.href), 2000)
-        }
-        window.open(`https://wa.me/?text=${encodeURIComponent(selesai.teks)}`, '_blank', 'noopener')
-        setDibagikan(true)
-        toast('Foto diunduh; lampirkan di WhatsApp bersama teks laporan.')
-      }
-    } catch (e) {
-      // Batal dari lembar berbagi bukan kesalahan.
-      if (!(e instanceof DOMException && e.name === 'AbortError')) setError(`Gagal membagikan: ${pesan(e)}`)
-    } finally {
-      setBusy(null)
-    }
-  }
-
   if (selesai) {
     const r = selesai.rec
     const lain: JenisGts = r.jenis === 'JBT' ? 'JBKP' : 'JBT'
     const lainBelum = !ada(recsSlot, r.tanggal, r.slot, lain)
     return (
-      <div className="flex flex-col gap-space-md">
-        <GlassCard level={2} className={cn('animate-entrance-1 flex items-start gap-space-sm border p-space-md', GAYA_STATUS.sudah.kartu)}>
-          <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-full', GAYA_STATUS.sudah.ikon)}>
-            <CircleCheck className="size-6" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="text-headline-md font-bold text-on-surface">Data sampling {r.jenis} tersimpan</span>
-            <span className="text-body-sm text-on-surface-variant">
-              Slot {labelSlot(r.slot)}. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp bersama teks laporan.
-            </span>
-          </span>
-        </GlassCard>
-
-        <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
-          {selesai.urls.map((u) => (
-            <img key={u} src={u} alt="Kolase foto EDC, struk, dan kendaraan" className="w-full rounded-md bg-white shadow-sm" />
-          ))}
-          <PratinjauWa teks={selesai.teks} />
-          <ErrorBox text={error} />
-          <Button size="lg" className="bg-[#1fa855] text-white hover:bg-[#1a9149]" disabled={busy === 'wa'} onClick={() => void keWa()}>
-            {busy === 'wa' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-            {dibagikan ? 'Kirim ulang ke WhatsApp' : 'Kirim ke WhatsApp (kolase foto + teks)'}
-          </Button>
-          <Button variant="glass" onClick={() => void salin(selesai.teks).then((ok) => toast(ok ? 'Teks laporan disalin' : 'Gagal menyalin teks'))}>
-            <Copy aria-hidden="true" />
-            Salin teks laporan
-          </Button>
-          <span className="text-body-sm text-on-surface-variant">Pilih WhatsApp lalu grup laporan di lembar berbagi. Bila teks tidak ikut, tempel dari salinan sebagai keterangan foto.</span>
-        </GlassCard>
-
-        <div className="flex flex-col gap-space-xs">
+      <>
+        <LayarKirimWa
+          judul={`Data sampling ${r.jenis} tersimpan`}
+          keterangan={`Slot ${labelSlot(r.slot)}. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp bersama teks laporan.`}
+          teks={selesai.teks}
+          files={selesai.files}
+          urls={selesai.urls}
+          dibagikan={dibagikan}
+          onDibagikan={() => setDibagikan(true)}
+        >
           {lainBelum && (
             <Link to={`/gts/isi?jenis=${lain}`} replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
               Lanjut sampling {lain} slot ini
             </Link>
           )}
           <Link to="/gts" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
-            Kembali ke Guard Tour
+            Kembali ke Sampling Penyaluran Subsidi
           </Link>
-        </div>
+        </LayarKirimWa>
         {guard.dialog}
-      </div>
+      </>
     )
   }
 
@@ -400,7 +313,7 @@ export function GtsForm() {
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
         <div className="flex flex-col">
           <span className="text-tag uppercase text-primary">
-            Sampling subsidi tepat · slot {labelSlot(kini.slot)} · Shift {shift}
+            Sampling penyaluran subsidi · slot {labelSlot(kini.slot)} · Shift {shift}
           </span>
           <span className="text-headline-md font-bold text-on-surface">
             {j.label} · {j.produk}
@@ -481,7 +394,7 @@ export function GtsForm() {
   )
 }
 
-/** Report > Riwayat Guard Tour: kepatuhan slot dan isian sampling per tanggal (pengawas/ABH/security); foto dikirim lewat WhatsApp. */
+/** Report > Riwayat Sampling Penyaluran Subsidi: kepatuhan slot dan isian sampling per tanggal (pengawas/ABH/security); foto dikirim lewat WhatsApp. */
 export function LaporanGts() {
   const app = useApp()
   const toast = useToast()

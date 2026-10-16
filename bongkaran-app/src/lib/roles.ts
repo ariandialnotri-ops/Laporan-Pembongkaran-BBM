@@ -8,7 +8,7 @@ export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
   { key: 'pengawas', label: 'Pengawas', desc: 'Identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, inspeksi APAR/APAB, water content tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
   { key: 'kashift', label: 'Kepala Shift', desc: 'Stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
-  { key: 'security', label: 'Security', desc: 'Guard Tour System (sampling subsidi tepat JBT/JBKP tiap 2 jam), inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
+  { key: 'security', label: 'Security', desc: 'Guard Patrol System: sampling penyaluran subsidi JBT/JBKP tiap 2 jam, inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
   { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
 ]
 
@@ -112,7 +112,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
 }
 
 /** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */
-const IKHTISAR = ['/terkirim', '/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
+const IKHTISAR = ['/terkirim', '/patrol', '/operation', '/delivery', '/hsse', '/laporan', '/laporan/riwayat', '/laporan/export', '/input']
 
 export function bolehBuka(role: Role, path: string) {
   if (role === 'abh') return true

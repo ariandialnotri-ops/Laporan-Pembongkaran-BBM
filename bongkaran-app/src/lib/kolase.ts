@@ -103,3 +103,44 @@ export async function buatKolase([kiriAtas, kiriBawah, kanan]: [BagianKolase, Ba
     canvas.height = 0
   }
 }
+
+/**
+ * Kolase N foto dalam grid (2 kolom untuk 2-4 foto, 3 kolom untuk lebih), garis putih tipis; baris
+ * terakhir yang tidak penuh dilebarkan memenuhi lebar gambar. Tiga foto memakai tata letak Guard Tour.
+ */
+export async function buatKolaseGrid(bagian: BagianKolase[], quality = 0.85): Promise<Blob> {
+  if (bagian.length === 3) return buatKolase(bagian as [BagianKolase, BagianKolase, BagianKolase], quality)
+  const n = Math.max(1, bagian.length)
+  const kol = n === 1 ? 1 : n <= 4 ? 2 : 3
+  const baris = Math.ceil(n / kol)
+  const lebarSel = (LEBAR - GARIS * (kol + 1)) / kol
+  const tinggiSel = Math.round(lebarSel * (kol === 1 ? 0.75 : 0.8))
+  const tinggi = Math.round(baris * tinggiSel + GARIS * (baris + 1))
+  const canvas = document.createElement('canvas')
+  canvas.width = LEBAR
+  canvas.height = tinggi
+  try {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Perangkat tidak dapat membuat kolase foto')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, LEBAR, tinggi)
+    for (let r = 0; r < baris; r++) {
+      const isi = bagian.slice(r * kol, (r + 1) * kol)
+      const w = (LEBAR - GARIS * (isi.length + 1)) / isi.length
+      const y = GARIS + r * (tinggiSel + GARIS)
+      for (const [c, b] of isi.entries()) {
+        const x = GARIS + c * (w + GARIS)
+        const img = await muat(b.blob)
+        letakkan(ctx, img, x, y, w, tinggiSel)
+        img.removeAttribute('src')
+        cap(ctx, x, y, w, tinggiSel, b.cap)
+      }
+    }
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    if (!blob) throw new Error('Gagal membuat kolase foto')
+    return blob
+  } finally {
+    canvas.width = 0
+    canvas.height = 0
+  }
+}

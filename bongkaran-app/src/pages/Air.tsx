@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, Droplet, LoaderCircle, PenLine, Send, Trash2, X } from 'lucide-react'
+import { Camera, Droplet, LoaderCircle, Save, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
+import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
-import { PilihShift, useKunciShift } from '@/components/bongkaran/pilih-shift'
+import { PilihHarian } from '@/components/bongkaran/pilih-harian'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -14,16 +15,16 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
-import { airId, airLengkap, literAir, statusAir, tangkiBerair, type AirData, type AirRecord, type AirTangki } from '@/lib/air'
+import { airId, airLengkap, literAir, statusAir, tangkiBerair, teksWaAir, type AirData, type AirRecord, type AirTangki } from '@/lib/air'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatLiter } from '@/lib/format'
-import { capWaktu, compressImage, genId } from '@/lib/image'
-import { currentShift, shiftLabel } from '@/lib/shift'
-import type { Photo } from '@/lib/sop'
-import { statusShift } from '@/lib/status-isi'
+import { namaSpbuWa } from '@/lib/gts'
+import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
+import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
+import { buatKolaseGrid } from '@/lib/kolase'
+import { shiftLabel } from '@/lib/shift'
 import { TANKS, tankName, type Tank } from '@/lib/tank'
-import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { cn } from '@/lib/utils'
 
@@ -57,29 +58,31 @@ function useAir(from: string, to: string) {
   return { recs: kini?.recs ?? null, error: kini?.error ?? null, muat }
 }
 
-/** Operation > Water Content Tangki: pilih shift (hijau sudah, oranye belum, merah terlewat). */
+/** Operation > Water Content Tangki: sekali sehari di shift 1, paling lambat 10:00. */
 export function AirMenu() {
   const app = useApp()
-  const hariIni = currentShift().tanggal
+  const hariIni = todayIso()
   const { recs, error } = useAir(todayIso(addDays(new Date(`${hariIni}T00:00:00`), -60)), hariIni)
   if (!app.loaded || !recs) return <Loading />
   if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" detail="Water content diperiksa per tangki pendam, jadi menunggu database tangki SPBU ini." />
-  const rec = (tanggal: string, shift: AirRecord['shift']) => recs.find((r) => r.id === airId(tanggal, shift))
+  // Catatan lama per shift tetap dihitung untuk tanggalnya.
+  const rec = (tanggal: string) => recs.find((r) => r.id === airId(tanggal, 1)) ?? recs.find((r) => r.tanggal === tanggal)
   return (
     <div className="flex flex-col gap-space-md">
       <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Periksa air di dasar setiap tangki pendam dengan pasta air pada stik ukur, setiap shift. Air wajib nihil; bila ada air, catat tindakannya (penyedotan/pengurasan) dan lapor pengawas.
+        Periksa air di dasar setiap tangki pendam dengan pasta air pada stik ukur, sekali sehari di shift 1 paling lambat pukul {BATAS_HARIAN}. Foto semua tangki digabung menjadi satu kolase dan dikirim ke WhatsApp; foto tidak disimpan di aplikasi.
       </p>
       <ErrorBox text={error} />
-      <PilihShift
-        status={(k) => statusShift(k, airLengkap(rec(k.tanggal, k.shift), TANKS))}
-        keHalaman={(k) => `/air/${k.tanggal}/${k.shift}`}
-        keterangan={(k, st) => {
-          const r = rec(k.tanggal, k.shift)
-          if (!r) return undefined
+      <PilihHarian
+        judul="Water content"
+        status={(t) => statusHarian(t, airLengkap(rec(t), TANKS))}
+        keHalaman={() => '/air/isi'}
+        keterangan={(t, st) => {
+          const r = rec(t)
+          if (!r) return st === 'belum' ? `Belum diperiksa · batas ${BATAS_HARIAN}` : undefined
           const berair = tangkiBerair(r, TANKS)
-          const isi = berair.length ? `Ada air: ${berair.map((t) => tankName(t.tankNo)).join(', ')}` : st === 'sudah' ? 'Semua tangki nihil' : 'Sebagian tangki tersimpan'
-          return `${isi} · ${r.data.petugas || '-'}`
+          const isi = berair.length ? `Ada air: ${berair.map((x) => tankName(x.tankNo)).join(', ')}` : 'Semua tangki nihil'
+          return `${isi} · ${r.data.jam}${r.data.terlambat ? ' (terlambat)' : ''} · ${r.data.petugas || '-'}`
         }}
       />
       {app.can('/laporan/air') && (
@@ -91,34 +94,37 @@ export function AirMenu() {
   )
 }
 
-type IsianTangki = { airMm: string; tindakan: string; fotoLama: Photo[]; fotoBaru: FotoLokal[] }
+type IsianTangki = { airMm: string; tindakan: string; foto: FotoLokal | null }
+type SelesaiAir = { rec: AirRecord; teks: string; files: File[]; urls: string[] }
 
-/** Halaman form water content satu shift: semua tangki pendam. */
+/**
+ * Form water content hari ini: semua tangki pendam. Isian disimpan; foto stik pasta air tiap tangki
+ * digabung menjadi satu kolase lalu dikirim ke WhatsApp (tidak diunggah).
+ */
 export function AirForm() {
   const app = useApp()
-  const keTerkirim = useKeTerkirim()
-  const { tanggal, shift, valid } = useKunciShift()
-  const id = valid ? airId(tanggal, shift) : ''
-  const { recs } = useAir(tanggal || todayIso(), tanggal || todayIso())
+  const tanggal = todayIso()
+  const id = airId(tanggal, 1)
+  const { recs } = useAir(tanggal, tanggal)
   const lama = recs?.find((r) => r.id === id)
   const [isian, setIsian] = useState<Record<string, IsianTangki> | null>(null)
+  const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
   const [petugas, setPetugas] = useState<string | null>(null)
   const [catatan, setCatatan] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const namaShift = shiftLabel(shift).split(' (')[0]
-  const guard = useLeaveGuard({ active: true, title: `Keluar dari water content ${namaShift}?`, detail: 'Isian dan foto yang belum dikirim akan hilang.' })
-  const fotoLamaSemua = useMemo(() => Object.values(lama?.data.tangki ?? {}).flatMap((t) => t.foto), [lama])
-  const srcOf = usePhotoSrc(fotoLamaSemua)
+  const [selesai, setSelesai] = useState<SelesaiAir | null>(null)
+  const [dibagikan, setDibagikan] = useState(false)
+  const guard = useLeaveGuard({
+    active: !selesai || !dibagikan,
+    title: selesai ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari water content?',
+    detail: selesai ? 'Data water content sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.' : 'Isian dan foto yang belum dikirim akan hilang.',
+  })
 
-  if (!app.loaded || (valid && !recs)) return <Loading />
+  if (!app.loaded || !recs) return <Loading />
   if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" />
-  if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
 
-  const awal = (t: Tank): IsianTangki => {
-    const x = lama?.data.tangki[t.id]
-    return { airMm: x?.airMm ?? '', tindakan: x?.tindakan ?? '', fotoLama: x?.foto ?? [], fotoBaru: [] }
-  }
+  const awal = (t: Tank): IsianTangki => ({ airMm: lama?.data.tangki[t.id]?.airMm ?? '', tindakan: lama?.data.tangki[t.id]?.tindakan ?? '', foto: null })
   const nilai = (t: Tank) => isian?.[t.id] ?? awal(t)
   const ubah = (t: Tank, patch: Partial<IsianTangki>) => {
     setError(null)
@@ -126,16 +132,19 @@ export function AirForm() {
   }
   const namaPetugas = petugas ?? lama?.data.petugas ?? (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName)
   const isiCatatan = catatan ?? lama?.data.catatan ?? ''
+  const telat = lewatBatas(nowHm())
 
   const ambil = async (t: Tank, files: File[]) => {
     setBusy(t.id)
     try {
-      const baru: FotoLokal[] = []
-      for (const f of files) {
-        const blob = await compressImage(f, { cap: [capWaktu(), `${app.settings.namaSpbu || 'SPBU'} · ${namaTangki(t)}`, `Water content · ${formatTanggalIso(tanggal)} ${namaShift}`] })
-        baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
-      }
-      ubah(t, { fotoBaru: [...nilai(t).fotoBaru, ...baru] })
+      // Satu foto per tangki: foto baru menggantikan yang lama. Cap ditulis saat kolase dibuat.
+      const waktu = capWaktu()
+      const blob = await compressImage(files[files.length - 1], { maxSize: 1600, quality: 0.85 })
+      const baru: FotoLokal = { id: genId('f'), blob, url: URL.createObjectURL(blob) }
+      const lamaFoto = nilai(t).foto
+      if (lamaFoto) URL.revokeObjectURL(lamaFoto.url)
+      ubah(t, { foto: baru })
+      setWaktuFoto((w) => ({ ...w, [baru.id]: waktu }))
     } catch (e) {
       setError(`Gagal memproses foto: ${pesan(e)}`)
     } finally {
@@ -148,56 +157,80 @@ export function AirForm() {
       const v = nilai(t)
       const st = statusAir({ airMm: v.airMm, liter: null, foto: [], tindakan: '' })
       if (st === 'kosong') return setError(`${namaTangki(t)}: isi tinggi air (0 bila nihil).`)
-      if (!v.fotoLama.length && !v.fotoBaru.length) return setError(`${namaTangki(t)}: foto stik pasta air wajib.`)
+      if (!v.foto) return setError(`${namaTangki(t)}: foto stik pasta air wajib.`)
       if (st === 'ada' && !v.tindakan.trim()) return setError(`${namaTangki(t)}: ada air, isi tindakan yang dilakukan.`)
     }
     if (!namaPetugas.trim()) return setError('Isi nama petugas.')
     setBusy('kirim')
     try {
+      const jam = nowHm()
       const tangki: AirData['tangki'] = {}
-      const dibuang: Photo[] = []
       for (const t of TANKS) {
         const v = nilai(t)
-        const foto = [...v.fotoLama]
-        for (const [i, f] of v.fotoBaru.entries()) foto.push(await app.backend.uploadPhoto(`air-${id}`, f.blob, `air-${t.tankNo}-${Date.now()}-${i + 1}.jpg`))
-        dibuang.push(...(lama?.data.tangki[t.id]?.foto ?? []).filter((p) => !v.fotoLama.some((x) => x.id === p.id)))
         const nihil = statusAir({ airMm: v.airMm, liter: null, foto: [], tindakan: '' }) === 'nihil'
-        tangki[t.id] = { airMm: v.airMm.trim(), liter: literAir(t, v.airMm), foto, tindakan: nihil ? '' : v.tindakan.trim() }
+        tangki[t.id] = { airMm: v.airMm.trim(), liter: literAir(t, v.airMm), foto: [], tindakan: nihil ? '' : v.tindakan.trim() }
       }
       const rec: AirRecord = {
         id,
         tanggal,
-        shift,
-        data: { tangki, petugas: namaPetugas.trim(), jam: nowHm(), catatan: isiCatatan.trim() },
+        shift: 1,
+        data: { tangki, petugas: namaPetugas.trim(), jam, catatan: isiCatatan.trim(), terlambat: lewatBatas(jam) },
         createdAt: lama?.createdAt ?? Date.now(),
         updatedAt: Date.now(),
         createdBy: lama?.createdBy ?? app.session.user?.id ?? null,
       }
+      // Hanya isian yang disimpan; foto tetap di HP untuk kolase WhatsApp.
       await app.backend.saveAir(rec)
-      for (const p of dibuang) void app.backend.deletePhoto(p).catch(() => {})
-      for (const t of TANKS) for (const f of nilai(t).fotoBaru) URL.revokeObjectURL(f.url)
-      guard.bypass()
-      const berair = tangkiBerair(rec, TANKS)
-      keTerkirim({
-        judul: `Water content ${namaShift} terkirim`,
-        detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}`,
-        peringatan: berair.length ? `Ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}: lakukan penyedotan/pengurasan dan laporkan ke pengawas.` : undefined,
-        baris: [...TANKS.map((t): [string, string] => [namaTangki(t), keteranganMm(rec.data.tangki[t.id], t)]), ['Petugas', rec.data.petugas]],
-        aksi: [{ to: '/air', label: 'Pilih shift lain' }, ...(app.can('/laporan/air') ? [{ to: '/laporan/air', label: 'Riwayat water content' }] : [])],
-      })
+      const spbu = namaSpbuWa(app.settings)
+      const kolase = await buatKolaseGrid(
+        TANKS.map((t) => {
+          const f = nilai(t).foto!
+          return { blob: f.blob, cap: [waktuFoto[f.id] ?? capWaktu(), spbu, `${namaTangki(t)} · ${keteranganMm(rec.data.tangki[t.id], t)}`] }
+        }),
+      )
+      const files = [new File([kolase], `Water_Content_${tanggal}.jpg`, { type: 'image/jpeg' })]
+      setSelesai({ rec, teks: teksWaAir(rec, TANKS, app.settings, zonaWaktu()), files, urls: [URL.createObjectURL(kolase)] })
+      setBusy(null)
+      window.scrollTo({ top: 0 })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
     }
   }
 
+  if (selesai) {
+    const berair = tangkiBerair(selesai.rec, TANKS)
+    return (
+      <>
+        <LayarKirimWa
+          judul="Water content tersimpan"
+          keterangan={
+            berair.length
+              ? `Ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}: lakukan penyedotan/pengurasan dan laporkan ke pengawas. Kirim laporan ke WhatsApp sekarang.`
+              : 'Semua tangki nihil air. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp.'
+          }
+          teks={selesai.teks}
+          files={selesai.files}
+          urls={selesai.urls}
+          dibagikan={dibagikan}
+          onDibagikan={() => setDibagikan(true)}
+        >
+          <Link to="/air" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Kembali ke Water Content
+          </Link>
+        </LayarKirimWa>
+        {guard.dialog}
+      </>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col p-space-md">
-        <span className="text-tag uppercase text-primary">
-          Water content tangki pendam · {formatTanggalIso(tanggal)}
-        </span>
-        <span className="text-headline-md font-bold text-on-surface">{shiftLabel(shift)}</span>
+        <span className="text-tag uppercase text-primary">Water content tangki pendam · {formatTanggalIso(tanggal)}</span>
+        <span className="text-headline-md font-bold text-on-surface">Shift 1 · batas {BATAS_HARIAN}</span>
+        {telat && <span className="text-body-sm font-semibold text-error">Sudah lewat pukul {BATAS_HARIAN}: laporan dicatat terlambat.</span>}
+        {lama && <span className="text-body-sm font-semibold text-primary">Sudah diperiksa pukul {lama.data.jam}; kirim ulang bila ada koreksi (ambil foto lagi).</span>}
         <span className="text-body-sm text-on-surface-variant">Oleskan pasta air di ujung stik ukur, celupkan sampai dasar tangki, tunggu perubahan warna, lalu baca tinggi air. Tidak berubah warna = nihil (0 mm).</span>
       </GlassCard>
 
@@ -224,33 +257,16 @@ export function AirForm() {
                 Nihil
               </Button>
             </div>
-            {v.fotoLama.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <span className="text-tag uppercase text-on-surface-variant">Foto tersimpan</span>
-                <div className="flex flex-wrap gap-space-xs">
-                  {v.fotoLama.map((p) => (
-                    <span key={p.id} className="relative">
-                      {srcOf(p) ? <img src={srcOf(p)} alt={`Foto ${namaTangki(t)}`} className="size-20 rounded-md object-cover" /> : <span className="block size-20 rounded-md bg-surface-container" />}
-                      <button type="button" aria-label="Hapus foto tersimpan" onClick={() => ubah(t, { fotoLama: v.fotoLama.filter((x) => x.id !== p.id) })} className="absolute -right-2 -top-2 flex size-8 items-center justify-center rounded-full bg-on-surface text-surface">
-                        <X aria-hidden="true" className="size-4" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
             <FotoWajib
               label="Foto stik pasta air"
               hint="Ujung stik dengan pasta air setelah dicelupkan, angka tinggi air terbaca."
-              fotos={v.fotoBaru}
+              fotos={v.foto ? [v.foto] : []}
               busy={busy === t.id}
               disabled={busy === 'kirim'}
-              wajib={!v.fotoLama.length}
               onAdd={(files) => void ambil(t, files)}
-              onRemove={(fid) => {
-                const f = v.fotoBaru.find((x) => x.id === fid)
-                if (f) URL.revokeObjectURL(f.url)
-                ubah(t, { fotoBaru: v.fotoBaru.filter((x) => x.id !== fid) })
+              onRemove={() => {
+                if (v.foto) URL.revokeObjectURL(v.foto.url)
+                ubah(t, { foto: null })
               }}
             />
             {st === 'ada' && (
@@ -273,12 +289,12 @@ export function AirForm() {
         </div>
         <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
           <Camera aria-hidden="true" className="size-4 shrink-0" />
-          Tanggal, jam, SPBU, dan tangki tercetak otomatis pada foto.
+          Foto semua tangki digabung otomatis menjadi satu kolase (jam, SPBU, tangki, hasil). Foto tidak disimpan di aplikasi, hanya dikirim ke WhatsApp.
         </span>
         <ErrorBox text={error} />
         <Button size="lg" disabled={busy !== null} onClick={() => void kirim()}>
-          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-          {busy === 'kirim' ? 'Mengirim…' : lama ? 'Simpan perubahan' : `Kirim water content ${namaShift}`}
+          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
+          {busy === 'kirim' ? 'Menyimpan…' : 'Simpan & lanjut kirim ke WhatsApp'}
         </Button>
       </GlassCard>
       {guard.dialog}
@@ -290,8 +306,8 @@ export function AirForm() {
 export function LaporanAir() {
   const app = useApp()
   const toast = useToast()
-  const now = currentShift()
-  const [bulan, setBulan] = useState(now.tanggal.slice(0, 7))
+  const hariIni = todayIso()
+  const [bulan, setBulan] = useState(hariIni.slice(0, 7))
   const akhir = todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)), 0))
   const { recs, error, muat } = useAir(`${bulan}-01`, akhir)
   const fotos = useMemo(() => (recs ?? []).flatMap((r) => Object.values(r.data.tangki).flatMap((t) => t.foto.slice(0, 1))), [recs])
@@ -300,17 +316,15 @@ export function LaporanAir() {
   if (!TANKS.length) return <TangkiBelumAda className="animate-entrance-1" />
   const data = [...(recs ?? [])].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
   const temuan = data.filter((r) => tangkiBerair(r, TANKS).length).length
-  // Shift yang sudah lewat/berjalan pada bulan ini tanpa catatan lengkap.
+  // Hari pada bulan ini yang sudah lewat batas 10:00 tanpa pemeriksaan (sekali sehari).
   const nHari = Number(akhir.slice(8))
   let wajib = 0
   let terlewat = 0
   for (let d = 1; d <= nHari; d++) {
     const t = `${bulan}-${String(d).padStart(2, '0')}`
-    for (const s of [1, 2, 3] as const) {
-      const st = statusShift({ tanggal: t, shift: s }, airLengkap(data.find((r) => r.id === airId(t, s)), TANKS), now)
-      if (st !== 'nanti') wajib++
-      if (st === 'terlewat') terlewat++
-    }
+    const st = statusHarian(t, data.some((r) => r.tanggal === t && airLengkap(r, TANKS)))
+    if (st !== 'nanti') wajib++
+    if (st === 'terlewat') terlewat++
   }
   const bolehHapus = app.role === 'abh' || app.role === 'pengawas'
   const hapus = async (r: AirRecord) => {
@@ -329,7 +343,7 @@ export function LaporanAir() {
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <Field label="Bulan" htmlFor="lair-bulan">
-          <Input id="lair-bulan" type="month" max={now.tanggal.slice(0, 7)} value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
+          <Input id="lair-bulan" type="month" max={hariIni.slice(0, 7)} value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
         </Field>
         <div className="grid grid-cols-3 gap-space-xs text-center">
           <div className="rounded-md bg-surface-container-low p-space-xs">
@@ -344,7 +358,7 @@ export function LaporanAir() {
             <span className="tabular block text-numeric-md font-bold text-on-surface">
               {terlewat}/{wajib}
             </span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Shift terlewat</span>
+            <span className="text-[11px] uppercase text-on-surface-variant">Hari terlewat</span>
           </div>
         </div>
         <ErrorBox text={error} />
@@ -367,6 +381,7 @@ export function LaporanAir() {
                   <span className="flex min-w-0 flex-col">
                     <span className="text-body-md font-bold text-on-surface">
                       {formatTanggalIso(r.tanggal)} · {shiftLabel(r.shift).split(' (')[0]}
+                      {r.data.terlambat ? ' · terlambat' : ''}
                     </span>
                     <span className="text-body-sm text-on-surface-variant">
                       {r.data.petugas || '-'} · {r.data.jam}
@@ -375,11 +390,6 @@ export function LaporanAir() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Pill tone={berair ? 'error' : 'success'}>{berair ? 'Ada air' : 'Nihil'}</Pill>
-                    {app.can('/air/') && (
-                      <Link to={`/air/${r.tanggal}/${r.shift}`} aria-label="Ubah" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-                        <PenLine aria-hidden="true" />
-                      </Link>
-                    )}
                     {bolehHapus && (
                       <Button variant="ghost" size="icon" aria-label="Hapus" onClick={() => void hapus(r)}>
                         <Trash2 aria-hidden="true" />
