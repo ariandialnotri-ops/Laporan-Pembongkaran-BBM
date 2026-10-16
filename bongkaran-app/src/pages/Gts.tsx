@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronRight, LoaderCircle, ScanEye, Send, Trash2 } from 'lucide-react'
+import { Camera, ChevronRight, CircleCheck, Copy, LoaderCircle, Save, ScanEye, Send, Trash2 } from 'lucide-react'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -16,17 +16,18 @@ import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, hariSingkat, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
-import { FOTO_GTS, gtsId, JENIS_GTS, jenisGts, JUMLAH_SLOT, labelSlot, slotKini, statusSlot, type FotoGtsKey, type GtsRecord, type JenisGts } from '@/lib/gts'
+import { FOTO_GTS, gtsId, JENIS_GTS, JENIS_KENDARAAN, jenisGts, JUMLAH_SLOT, labelSlot, namaSpbuWa, slotKini, statusSlot, teksWaGts, type FotoGtsKey, type GtsRecord, type JenisGts, type SesuaiGts } from '@/lib/gts'
 import { capWaktu, compressImage, genId } from '@/lib/image'
-import type { Photo } from '@/lib/sop'
+import { currentShift } from '@/lib/shift'
 import type { StatusIsi } from '@/lib/status-isi'
-import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const SLOTS = Array.from({ length: JUMLAH_SLOT }, (_, i) => i)
 const tanggalLalu = (tgl: string, n: number) => todayIso(addDays(new Date(`${tgl}T00:00:00`), -n))
+/** Tanggal kalender sampling 00:00-05:59 (masih hari operasional sebelumnya). */
+const tanggalBesok = (tgl: string) => todayIso(addDays(new Date(`${tgl}T00:00:00`), 1))
 
 /** Sampling GTS pada rentang tanggal operasional; dimuat ulang saat SPBU/rentang berubah. */
 function useGts(from: string, to: string) {
@@ -161,24 +162,45 @@ export function GtsMenu() {
   )
 }
 
-/** Halaman form satu sampling (slot berjalan): jenis, nopol, liter, foto EDC/struk/kendaraan. */
+/** Foto lokal menjadi file untuk dibagikan ke WhatsApp (tidak diunggah ke server). */
+const keFile = (f: FotoLokal, nama: string) => new File([f.blob], nama, { type: 'image/jpeg' })
+
+type Selesai = { rec: GtsRecord; teks: string; files: File[]; urls: string[] }
+
+/**
+ * Halaman form satu sampling (slot berjalan): jenis, nopol, jenis kendaraan, volume, sesuai ketentuan,
+ * foto EDC/struk/kendaraan. Isian disimpan; foto hanya diolah di HP (cap waktu & SPBU) lalu dikirim
+ * ke WhatsApp bersama teks laporan, tidak disimpan di database/penyimpanan.
+ */
 export function GtsForm() {
   const app = useApp()
-  const keTerkirim = useKeTerkirim()
+  const toast = useToast()
   const [params] = useSearchParams()
   const [jenis, setJenis] = useState<JenisGts>(params.get('jenis') === 'JBKP' ? 'JBKP' : 'JBT')
   const [nopol, setNopol] = useState('')
+  const [kendaraan, setKendaraan] = useState('')
   const [liter, setLiter] = useState('')
+  const [sesuai, setSesuai] = useState<SesuaiGts>('Sesuai')
+  const [keterangan, setKeterangan] = useState('')
   const [petugas, setPetugas] = useState(() => (app.displayName === 'Mode lokal' ? app.settings.namaSecurityDefault || '' : app.displayName))
   const [catatan, setCatatan] = useState('')
   const [foto, setFoto] = useState<Record<FotoGtsKey, FotoLokal[]>>({ edc: [], struk: [], kendaraan: [] })
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<FotoGtsKey | 'kirim' | null>(null)
-  const guard = useLeaveGuard({ active: true, title: 'Keluar dari sampling?', detail: 'Foto dan isian sampling yang belum dikirim akan hilang.' })
+  const [busy, setBusy] = useState<FotoGtsKey | 'kirim' | 'wa' | null>(null)
+  const [selesai, setSelesai] = useState<Selesai | null>(null)
+  const [dibagikan, setDibagikan] = useState(false)
+  // Sebelum simpan: isian & foto hilang. Sesudah simpan: data aman, tetapi foto belum terkirim ke WhatsApp.
+  const guard = useLeaveGuard({
+    active: !selesai || !dibagikan,
+    title: selesai ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari sampling?',
+    detail: selesai ? 'Data sampling sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.' : 'Foto dan isian sampling yang belum dikirim akan hilang.',
+  })
   const kini = slotKini()
+  const [recsSlot, setRecsSlot] = useState<GtsRecord[]>([])
   if (!app.loaded) return <Loading />
   if (app.role !== 'security' && app.role !== 'abh') return <GlassCard className="p-space-md">Sampling Guard Tour diisi oleh security SPBU.</GlassCard>
   const j = jenisGts(jenis)
+  const shift = currentShift().shift
 
   const ambil = async (key: FotoGtsKey, files: File[]) => {
     if (!nopol.trim()) return setError('Isi nomor polisi dulu: ikut tercetak pada foto.')
@@ -187,7 +209,7 @@ export function GtsForm() {
       const label = FOTO_GTS.find((f) => f.key === key)!.label
       const baru: FotoLokal[] = []
       for (const f of files) {
-        const blob = await compressImage(f, { cap: [capWaktu(), `${app.settings.namaSpbu || 'SPBU'} · GTS ${jenis} ${j.produk}`, `${nopol.trim().toUpperCase()} · ${label}`] })
+        const blob = await compressImage(f, { cap: [capWaktu(), namaSpbuWa(app.settings), `GTS ${jenis} ${j.produk} · ${nopol.trim().toUpperCase()} · ${label}`] })
         baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
       }
       setFoto((x) => ({ ...x, [key]: [...x[key], ...baru] }))
@@ -201,78 +223,189 @@ export function GtsForm() {
 
   const kirim = async () => {
     if (!nopol.trim()) return setError('Isi nomor polisi kendaraan.')
-    for (const f of FOTO_GTS) if (!foto[f.key].length) return setError(`${f.label} wajib diunggah.`)
+    if (!kendaraan.trim()) return setError('Isi jenis kendaraan.')
+    if (parseAngka(liter) === null) return setError('Isi volume pembelian (liter).')
+    if (sesuai === 'Tidak sesuai' && !keterangan.trim()) return setError('Isi keterangan ketidaksesuaian.')
+    for (const f of FOTO_GTS) if (!foto[f.key].length) return setError(`${f.label} wajib diambil.`)
     if (!petugas.trim()) return setError('Isi nama petugas.')
     setBusy('kirim')
-    const id = gtsId()
     // Slot mengikuti waktu kirim (foto diambil saat itu).
     const slot = slotKini()
+    const nopolBesar = nopol.trim().toUpperCase()
     try {
-      const unggah = async (key: FotoGtsKey) => {
-        const out: Photo[] = []
-        for (const [i, f] of foto[key].entries()) out.push(await app.backend.uploadPhoto(`gts-${id}`, f.blob, `gts-${jenis}-${key}-${i + 1}.jpg`))
-        return out
-      }
       const rec: GtsRecord = {
-        id,
+        id: gtsId(),
         tanggal: slot.tanggal,
         slot: slot.slot,
         jenis,
         createdAt: Date.now(),
         createdBy: app.session.user?.id ?? null,
         data: {
-          nopol: nopol.trim().toUpperCase(),
+          nopol: nopolBesar,
           produk: j.produk,
+          jenisKendaraan: kendaraan.trim().toUpperCase(),
           liter: liter.trim(),
           jam: nowHm(),
+          shift,
           petugas: petugas.trim(),
+          sesuai,
+          keterangan: sesuai === 'Tidak sesuai' ? keterangan.trim() : '',
           catatan: catatan.trim(),
-          foto: { edc: await unggah('edc'), struk: await unggah('struk'), kendaraan: await unggah('kendaraan') },
         },
       }
+      // Hanya isian yang disimpan; foto tetap di HP untuk dikirim ke WhatsApp.
       await app.backend.saveGts(rec)
-      Object.values(foto).flat().forEach((f) => URL.revokeObjectURL(f.url))
-      guard.bypass()
-      const recs = await app.backend.listGts(slot.tanggal, slot.tanggal).catch(() => [rec])
-      const lain: JenisGts = jenis === 'JBT' ? 'JBKP' : 'JBT'
-      const lainBelum = !ada(recs, slot.tanggal, slot.slot, lain)
-      keTerkirim({
-        judul: `Sampling ${jenis} terkirim`,
-        detail: `Slot ${labelSlot(slot.slot)}, ${formatTanggalIso(slot.tanggal)}`,
-        peringatan: lainBelum ? `Sampling ${lain} slot ini belum ada.` : undefined,
-        baris: [
-          ['Nomor polisi', rec.data.nopol],
-          ['Produk', `${j.produk}${rec.data.liter ? ` · ${rec.data.liter} L` : ''}`],
-          ['Foto', `${FOTO_GTS.reduce((n, f) => n + rec.data.foto[f.key].length, 0)} foto (EDC, struk, kendaraan)`],
-          ['Petugas', rec.data.petugas],
-        ],
-        aksi: [...(lainBelum ? [{ to: `/gts/isi?jenis=${lain}`, label: `Lanjut sampling ${lain}` }] : []), { to: '/gts', label: 'Kembali ke Guard Tour' }],
-      })
+      const nama = nopolBesar.replace(/[^0-9A-Z]+/g, '')
+      const files = FOTO_GTS.flatMap((f) => foto[f.key].map((x, i) => keFile(x, `GTS_${jenis}_${nama}_${f.key}${foto[f.key].length > 1 ? `_${i + 1}` : ''}.jpg`)))
+      const urls = FOTO_GTS.flatMap((f) => foto[f.key].map((x) => x.url))
+      setRecsSlot(await app.backend.listGts(slot.tanggal, slot.tanggal).catch(() => [rec]))
+      setSelesai({ rec, teks: teksWaGts(rec, app.settings, todayIso()), files, urls })
+      setBusy(null)
+      window.scrollTo({ top: 0 })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
     }
   }
 
+  const salin = async (teks: string) => {
+    try {
+      await navigator.clipboard.writeText(teks)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const keWa = async () => {
+    if (!selesai) return
+    setBusy('wa')
+    // Teks juga disalin: bila aplikasi tujuan tidak memakai teks bersama foto, cukup ditempel.
+    const tersalin = await salin(selesai.teks)
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
+    try {
+      if (nav.canShare?.({ files: selesai.files, text: selesai.teks })) {
+        await navigator.share({ files: selesai.files, text: selesai.teks })
+        setDibagikan(true)
+        toast(tersalin ? 'Dibagikan. Teks laporan juga sudah disalin.' : 'Dibagikan.')
+      } else {
+        // Perangkat tanpa berbagi file (mis. komputer): unduh foto, lalu buka WhatsApp dengan teks laporan.
+        for (const f of selesai.files) {
+          const a = document.createElement('a')
+          a.href = URL.createObjectURL(f)
+          a.download = f.name
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+        }
+        window.open(`https://wa.me/?text=${encodeURIComponent(selesai.teks)}`, '_blank', 'noopener')
+        setDibagikan(true)
+        toast('Foto diunduh; lampirkan di WhatsApp bersama teks laporan.')
+      }
+    } catch (e) {
+      // Batal dari lembar berbagi bukan kesalahan.
+      if (!(e instanceof DOMException && e.name === 'AbortError')) setError(`Gagal membagikan: ${pesan(e)}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (selesai) {
+    const r = selesai.rec
+    const lain: JenisGts = r.jenis === 'JBT' ? 'JBKP' : 'JBT'
+    const lainBelum = !ada(recsSlot, r.tanggal, r.slot, lain)
+    return (
+      <div className="flex flex-col gap-space-md">
+        <GlassCard level={2} className={cn('animate-entrance-1 flex items-start gap-space-sm border p-space-md', GAYA_STATUS.sudah.kartu)}>
+          <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-full', GAYA_STATUS.sudah.ikon)}>
+            <CircleCheck className="size-6" />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-headline-md font-bold text-on-surface">Data sampling {r.jenis} tersimpan</span>
+            <span className="text-body-sm text-on-surface-variant">
+              Slot {labelSlot(r.slot)}. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp bersama teks laporan.
+            </span>
+          </span>
+        </GlassCard>
+
+        <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
+          <div className="grid grid-cols-3 gap-space-xs">
+            {selesai.urls.map((u, i) => (
+              <img key={u} src={u} alt={`Foto sampling ${i + 1}`} className="aspect-[3/4] w-full rounded-md bg-black object-cover" />
+            ))}
+          </div>
+          <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-container-low p-space-sm font-sans text-body-sm text-on-surface">{selesai.teks}</pre>
+          <ErrorBox text={error} />
+          <Button size="lg" className="bg-[#1fa855] text-white hover:bg-[#1a9149]" disabled={busy === 'wa'} onClick={() => void keWa()}>
+            {busy === 'wa' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+            {dibagikan ? 'Kirim ulang ke WhatsApp' : `Kirim ke WhatsApp (${selesai.files.length} foto + teks)`}
+          </Button>
+          <Button variant="glass" onClick={() => void salin(selesai.teks).then((ok) => toast(ok ? 'Teks laporan disalin' : 'Gagal menyalin teks'))}>
+            <Copy aria-hidden="true" />
+            Salin teks laporan
+          </Button>
+          <span className="text-body-sm text-on-surface-variant">Pilih WhatsApp lalu grup laporan di lembar berbagi. Bila teks tidak ikut, tempel dari salinan sebagai keterangan foto.</span>
+        </GlassCard>
+
+        <div className="flex flex-col gap-space-xs">
+          {lainBelum && (
+            <Link to={`/gts/isi?jenis=${lain}`} replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+              Lanjut sampling {lain} slot ini
+            </Link>
+          )}
+          <Link to="/gts" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Kembali ke Guard Tour
+          </Link>
+        </div>
+        {guard.dialog}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
         <div className="flex flex-col">
-          <span className="text-tag uppercase text-primary">Sampling subsidi tepat · slot {labelSlot(kini.slot)}</span>
+          <span className="text-tag uppercase text-primary">
+            Sampling subsidi tepat · slot {labelSlot(kini.slot)} · Shift {shift}
+          </span>
           <span className="text-headline-md font-bold text-on-surface">
             {j.label} · {j.produk}
           </span>
           <span className="text-body-sm text-on-surface-variant">{j.desc}</span>
         </div>
-        <Choice label="Jenis BBM" value={jenis} onChange={(v) => (setError(null), setJenis(v))} options={JENIS_GTS.map((x) => ({ value: x.value, label: `${x.label} (${x.produk})` }))} />
+        <Choice label="Jenis penyaluran" value={jenis} onChange={(v) => (setError(null), setJenis(v))} options={JENIS_GTS.map((x) => ({ value: x.value, label: `${x.label} (${x.produk})` }))} />
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Nomor polisi" htmlFor="gts-nopol">
             <Input id="gts-nopol" autoComplete="off" autoCapitalize="characters" placeholder="AG 1234 XY" value={nopol} onChange={(e) => (setError(null), setNopol(e.target.value))} />
           </Field>
-          <Field label="Volume (opsional)" htmlFor="gts-liter">
-            <Input id="gts-liter" numeric inputMode="decimal" suffix="L" value={liter} onChange={(e) => setLiter(e.target.value)} />
+          <Field label="Volume pembelian" htmlFor="gts-liter">
+            <Input id="gts-liter" numeric inputMode="decimal" suffix="L" value={liter} onChange={(e) => (setError(null), setLiter(e.target.value))} />
           </Field>
         </div>
+        <Field label="Jenis kendaraan" htmlFor="gts-kendaraan">
+          <Input id="gts-kendaraan" list="gts-kendaraan-list" autoComplete="off" autoCapitalize="characters" placeholder="Mis. KIJANG, MOTOR, PICK UP" value={kendaraan} onChange={(e) => (setError(null), setKendaraan(e.target.value))} />
+        </Field>
+        <datalist id="gts-kendaraan-list">
+          {JENIS_KENDARAAN.map((k) => (
+            <option key={k} value={k.toUpperCase()} />
+          ))}
+        </datalist>
+        <Choice<SesuaiGts>
+          label="Sesuai ketentuan"
+          value={sesuai}
+          onChange={(v) => (setError(null), setSesuai(v))}
+          options={[
+            { value: 'Sesuai', label: 'Sesuai' },
+            { value: 'Tidak sesuai', label: 'Tidak sesuai' },
+          ]}
+        />
+        {sesuai === 'Tidak sesuai' && (
+          <Field label="Keterangan ketidaksesuaian" htmlFor="gts-ket">
+            <Input id="gts-ket" autoComplete="off" placeholder="Mis. kendaraan tidak terdaftar QR, melebihi kuota" value={keterangan} onChange={(e) => (setError(null), setKeterangan(e.target.value))} />
+          </Field>
+        )}
       </GlassCard>
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         {FOTO_GTS.map((f) => (
@@ -295,7 +428,7 @@ export function GtsForm() {
         ))}
         <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
           <Camera aria-hidden="true" className="size-4 shrink-0" />
-          Tanggal, jam, SPBU, jenis, dan nomor polisi tercetak otomatis pada foto.
+          Tanggal, jam, nama SPBU, jenis, dan nomor polisi tercetak pada foto. Foto tidak disimpan di aplikasi, hanya dikirim ke WhatsApp.
         </span>
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Petugas" htmlFor="gts-petugas">
@@ -307,8 +440,8 @@ export function GtsForm() {
         </div>
         <ErrorBox text={error} />
         <Button size="lg" disabled={busy !== null} onClick={() => void kirim()}>
-          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-          {busy === 'kirim' ? 'Mengirim…' : `Kirim sampling ${jenis}`}
+          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
+          {busy === 'kirim' ? 'Menyimpan…' : `Simpan & lanjut kirim ke WhatsApp`}
         </Button>
       </GlassCard>
       {guard.dialog}
@@ -316,7 +449,7 @@ export function GtsForm() {
   )
 }
 
-/** Report > Riwayat Guard Tour: kepatuhan slot dan foto sampling per tanggal (pengawas/ABH/security). */
+/** Report > Riwayat Guard Tour: kepatuhan slot dan isian sampling per tanggal (pengawas/ABH/security); foto dikirim lewat WhatsApp. */
 export function LaporanGts() {
   const app = useApp()
   const toast = useToast()
@@ -324,7 +457,7 @@ export function LaporanGts() {
   const now = slotKini()
   const tanggal = params.get('tanggal') || now.tanggal
   const { recs, error, muat } = useGts(tanggal, tanggal)
-  const fotos = useMemo(() => (recs ?? []).flatMap((r) => FOTO_GTS.flatMap((f) => r.data.foto[f.key] ?? [])), [recs])
+  const fotos = useMemo(() => (recs ?? []).flatMap((r) => FOTO_GTS.flatMap((f) => r.data.foto?.[f.key] ?? [])), [recs])
   const srcOf = usePhotoSrc(fotos)
   if (!app.loaded) return <Loading />
   const data = recs ?? []
@@ -337,7 +470,7 @@ export function LaporanGts() {
     if (!window.confirm(`Hapus sampling ${r.jenis} ${r.data.nopol}?`)) return
     try {
       await app.backend.deleteGts(r.id)
-      for (const f of FOTO_GTS) for (const p of r.data.foto[f.key] ?? []) void app.backend.deletePhoto(p).catch(() => {})
+      for (const f of FOTO_GTS) for (const p of r.data.foto?.[f.key] ?? []) void app.backend.deletePhoto(p).catch(() => {})
       toast('Sampling dihapus')
       void muat()
     } catch (e) {
@@ -395,16 +528,31 @@ export function LaporanGts() {
                 <span className="flex min-w-0 flex-col">
                   <span className="tabular text-tag uppercase text-on-surface-variant">
                     Slot {labelSlot(r.slot)} · {r.data.jam}
+                    {r.data.shift ? ` · Shift ${r.data.shift}` : ''}
                   </span>
-                  <span className="tabular text-body-md font-bold text-on-surface">{r.data.nopol}</span>
+                  <span className="tabular text-body-md font-bold text-on-surface">
+                    {r.data.nopol}
+                    {r.data.jenisKendaraan ? ` · ${r.data.jenisKendaraan}` : ''}
+                  </span>
                   <span className="text-body-sm text-on-surface-variant">
                     {r.data.produk}
                     {r.data.liter ? ` · ${parseAngka(r.data.liter) ?? r.data.liter} L` : ''} · {r.data.petugas}
                     {r.data.catatan ? ` · ${r.data.catatan}` : ''}
                   </span>
+                  {r.data.sesuai === 'Tidak sesuai' && <span className="text-body-sm font-semibold text-error">Tidak sesuai ketentuan{r.data.keterangan ? `: ${r.data.keterangan}` : ''}</span>}
                 </span>
                 <span className="flex items-center gap-1">
                   <Pill tone={r.jenis === 'JBT' ? 'cyan' : 'primary'}>{r.jenis}</Pill>
+                  {r.data.sesuai && <Pill tone={r.data.sesuai === 'Sesuai' ? 'success' : 'error'}>{r.data.sesuai}</Pill>}
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(teksWaGts(r, app.settings, r.data.jam < '06:00' ? tanggalBesok(r.tanggal) : r.tanggal))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Kirim teks laporan ${r.data.nopol} ke WhatsApp`}
+                    className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                  >
+                    <Send aria-hidden="true" />
+                  </a>
                   {bolehHapus && (
                     <Button variant="ghost" size="icon" aria-label={`Hapus sampling ${r.data.nopol}`} onClick={() => void hapus(r)}>
                       <Trash2 aria-hidden="true" />
@@ -412,24 +560,26 @@ export function LaporanGts() {
                   )}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-space-xs">
-                {FOTO_GTS.map((f) => {
-                  const p = r.data.foto[f.key]?.[0]
-                  const src = p ? srcOf(p) : undefined
-                  return (
-                    <figure key={f.key} className="flex flex-col gap-1">
-                      {src ? (
-                        <a href={src} target="_blank" rel="noreferrer">
-                          <img src={src} alt={`${f.label} ${r.data.nopol}`} className="aspect-[3/4] w-full rounded-md bg-black object-cover" />
-                        </a>
-                      ) : (
-                        <span className="aspect-[3/4] w-full rounded-md bg-surface-container" />
-                      )}
-                      <figcaption className="text-center text-[11px] text-on-surface-variant">{f.label.replace('Foto ', '')}</figcaption>
-                    </figure>
-                  )
-                })}
-              </div>
+              {FOTO_GTS.some((f) => r.data.foto?.[f.key]?.length) && (
+                <div className="grid grid-cols-3 gap-space-xs">
+                  {FOTO_GTS.map((f) => {
+                    const p = r.data.foto?.[f.key]?.[0]
+                    const src = p ? srcOf(p) : undefined
+                    return (
+                      <figure key={f.key} className="flex flex-col gap-1">
+                        {src ? (
+                          <a href={src} target="_blank" rel="noreferrer">
+                            <img src={src} alt={`${f.label} ${r.data.nopol}`} className="aspect-[3/4] w-full rounded-md bg-black object-cover" />
+                          </a>
+                        ) : (
+                          <span className="aspect-[3/4] w-full rounded-md bg-surface-container" />
+                        )}
+                        <figcaption className="text-center text-[11px] text-on-surface-variant">{f.label.replace('Foto ', '')}</figcaption>
+                      </figure>
+                    )
+                  })}
+                </div>
+              )}
             </GlassCard>
           ))}
       </section>

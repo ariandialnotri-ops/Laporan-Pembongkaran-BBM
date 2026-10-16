@@ -2,9 +2,13 @@
  * Guard Tour System (GTS): sampling subsidi tepat oleh security. Hari operasional (06:00-05:59) dibagi
  * 12 slot 2 jam; tiap slot minimal 1 transaksi JBT (Biosolar) dan 1 JBKP (Pertalite), masing-masing
  * dengan foto EDC, struk, dan kendaraan dengan nomor polisi terlihat.
+ *
+ * Hemat penyimpanan: foto hanya diolah di HP (cap waktu & nama SPBU) lalu dikirim ke WhatsApp bersama
+ * teks laporan; yang disimpan di database hanya isian form.
  */
 import { addDays, todayIso } from '@/lib/date'
-import type { Photo } from '@/lib/sop'
+import type { Shift } from '@/lib/shift'
+import type { Photo, Settings } from '@/lib/sop'
 import type { StatusIsi } from '@/lib/status-isi'
 
 export type JenisGts = 'JBT' | 'JBKP'
@@ -21,15 +25,26 @@ export const FOTO_GTS: { key: FotoGtsKey; label: string; hint: string }[] = [
   { key: 'kendaraan', label: 'Foto kendaraan', hint: 'Kendaraan di depan dispenser, nomor polisi terlihat jelas.' },
 ]
 
+export type SesuaiGts = 'Sesuai' | 'Tidak sesuai'
+
 export interface GtsData {
   nopol: string
   produk: string
+  /** Mis. Motor, Kijang, Pick up, Truk. */
+  jenisKendaraan?: string
   liter: string
   jam: string
+  shift?: Shift
   petugas: string
+  sesuai?: SesuaiGts
+  /** Alasan bila tidak sesuai ketentuan. */
+  keterangan?: string
   catatan: string
-  foto: Record<FotoGtsKey, Photo[]>
+  /** Hanya catatan lama (sebelum foto dikirim lewat WhatsApp); catatan baru tanpa foto. */
+  foto?: Partial<Record<FotoGtsKey, Photo[]>>
 }
+
+export const JENIS_KENDARAAN = ['Motor', 'Mobil pribadi', 'Kijang', 'Pick up', 'Truk', 'Bus', 'Angkot', 'Bajaj / roda tiga']
 
 export interface GtsRecord {
   id: string
@@ -65,3 +80,35 @@ export function statusSlot(tanggal: string, slot: number, recs: GtsRecord[], now
 }
 
 export const gtsId = () => `gts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+/** "16 Oktober 2026". */
+export const tanggalPanjang = (iso: string) => `${Number(iso.slice(8, 10))} ${BULAN[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`
+
+/** "SPBU COCO 5164407 Nganjuk": kode SPBU disisipkan setelah jenis SPBU bila belum ada di nama. */
+export function namaSpbuWa(s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>) {
+  const nama = (s.namaSpbu || 'SPBU').trim()
+  const kode = (s.kodeSpbu || '').trim()
+  if (!kode || nama.includes(kode)) return nama
+  const m = nama.match(/^(SPBU(?:\s+(?:COCO|CODO|DODO))?)\s*(.*)$/i)
+  return m ? [m[1], kode, m[2]].filter(Boolean).join(' ') : `${nama} ${kode}`
+}
+
+/** Teks laporan WhatsApp satu sampling (format laporan sampling penyaluran subsidi tepat). */
+export function teksWaGts(rec: Pick<GtsRecord, 'jenis' | 'data'>, s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>, tanggalKalender: string) {
+  const d = rec.data
+  const sesuai = d.sesuai === 'Tidak sesuai' ? `Tidak sesuai${d.keterangan ? ` (${d.keterangan})` : ''}` : (d.sesuai ?? 'Sesuai')
+  return [
+    'Laporan Sampling penyaluran subsidi tepat JBT/JBKP ',
+    namaSpbuWa(s),
+    `Tanggal ${tanggalPanjang(tanggalKalender)} , ${d.jam} `,
+    '',
+    `Shift                                 : ${d.shift ?? '-'}`,
+    `Petugas                          : ${d.petugas}`,
+    `- Jenis Penyaluran   : ${rec.jenis}`,
+    `- Nopol Kendaraan  : ${d.nopol}`,
+    `- Jenis Kendaraan   :  ${d.jenisKendaraan || '-'}`,
+    `- Volume Pembelian : ${d.liter ? `${d.liter}L` : '-'}`,
+    `- Sesuai ketentuan :  ${sesuai}`,
+  ].join('\n')
+}
