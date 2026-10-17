@@ -58,19 +58,15 @@ begin
   return new;
 end;
 $$;
-drop function if exists bbm_private.bbm_petty_batas(uuid);
-
-drop policy "finance baca" on public.bbm_petty;
-drop policy "finance ajukan" on public.bbm_petty;
-drop policy "finance ubah" on public.bbm_petty;
-drop policy "finance hapus" on public.bbm_petty;
-create policy "finance baca" on public.bbm_petty for select to authenticated
+-- bbm_private.bbm_petty_batas (batas nominal alur lama) tidak lagi dipakai; dibiarkan, tanpa efek.
+-- Kebijakan RLS diubah di tempat (alter policy): Admin/Cashier ikut membaca, mengajukan, dan memeriksa.
+alter policy "finance baca" on public.bbm_petty
   using (spbu_id in (select bbm_private.bbm_spbu_saya()) and bbm_private.bbm_has_role('abh', 'admin', 'pengawas', 'kashift'));
-create policy "finance ajukan" on public.bbm_petty for insert to authenticated
+alter policy "finance ajukan" on public.bbm_petty
   with check (spbu_id in (select bbm_private.bbm_spbu_saya()) and bbm_private.bbm_has_role('abh', 'admin', 'pengawas', 'kashift'));
-create policy "finance ubah" on public.bbm_petty for update to authenticated
+alter policy "finance ubah" on public.bbm_petty
   using (spbu_id in (select bbm_private.bbm_spbu_saya()) and bbm_private.bbm_has_role('abh', 'admin', 'pengawas', 'kashift'))
   with check (spbu_id in (select bbm_private.bbm_spbu_saya()) and bbm_private.bbm_has_role('abh', 'admin', 'pengawas', 'kashift'));
-create policy "finance hapus" on public.bbm_petty for delete to authenticated
+alter policy "finance hapus" on public.bbm_petty
   using (spbu_id in (select bbm_private.bbm_spbu_saya())
          and (bbm_private.bbm_has_role('abh') or (status = 'Menunggu Admin' and created_by = auth.uid())));
