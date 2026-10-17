@@ -24,6 +24,19 @@ function pesanKamera(e: unknown) {
   return 'Kamera tidak dapat dibuka. Ketuk Coba lagi atau pakai tombol Ambil dari kamera HP.'
 }
 
+/** Rasio jendela kamera (lebar : tinggi), sama dengan hasil foto/video. */
+const RASIO = 3 / 4
+
+/**
+ * Potongan tengah bingkai kamera dengan rasio jendela pratinjau (sama seperti object-cover), supaya
+ * foto/video yang tersimpan persis seperti yang terlihat di layar beserta garis bantu 3×3.
+ */
+function potongan(v: HTMLVideoElement) {
+  const vw = v.videoWidth
+  const vh = v.videoHeight
+  return vw / vh > RASIO ? { sx: (vw - vh * RASIO) / 2, sy: 0, sw: vh * RASIO, sh: vh } : { sx: 0, sy: (vh - vw / RASIO) / 2, sw: vw, sh: vw / RASIO }
+}
+
 /** Format video yang didukung browser (iPhone: mp4, Android/Chrome: webm). */
 function formatVideo() {
   if (typeof MediaRecorder === 'undefined') return null
@@ -110,13 +123,14 @@ export function LaporCepat() {
   const foto = async () => {
     const v = videoRef.current
     if (!v || v.readyState < 2 || nFoto >= MAKS_FOTO) return
-    const skala = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight))
+    const p = potongan(v)
+    const skala = Math.min(1, 1600 / Math.max(p.sw, p.sh))
     const c = document.createElement('canvas')
-    c.width = Math.round(v.videoWidth * skala)
-    c.height = Math.round(v.videoHeight * skala)
+    c.width = Math.round(p.sw * skala)
+    c.height = Math.round(p.sh * skala)
     const ctx = c.getContext('2d')
     if (!ctx) return
-    ctx.drawImage(v, 0, 0, c.width, c.height)
+    ctx.drawImage(v, p.sx, p.sy, p.sw, p.sh, 0, 0, c.width, c.height)
     const waktu = capWaktu()
     capFoto(ctx, c.width, c.height, [waktu, spbu])
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.82))
@@ -132,16 +146,18 @@ export function LaporCepat() {
   const mulaiRekam = () => {
     const v = videoRef.current
     if (!v || v.readyState < 2 || !fmtVideo || adaVideo) return
-    const skala = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight))
+    const p = potongan(v)
+    const skala = Math.min(1, 1280 / Math.max(p.sw, p.sh))
     const c = document.createElement('canvas')
-    c.width = Math.round(v.videoWidth * skala)
-    c.height = Math.round(v.videoHeight * skala)
+    // Lebar & tinggi genap (encoder video).
+    c.width = Math.round((p.sw * skala) / 2) * 2
+    c.height = Math.round((p.sh * skala) / 2) * 2
     const ctx = c.getContext('2d')
     if (!ctx) return
     let jalan = true
     const gambar = () => {
       if (!jalan) return
-      ctx.drawImage(v, 0, 0, c.width, c.height)
+      ctx.drawImage(v, p.sx, p.sy, p.sw, p.sh, 0, 0, c.width, c.height)
       capFoto(ctx, c.width, c.height, [capWaktu(), spbu])
       requestAnimationFrame(gambar)
     }
@@ -237,8 +253,23 @@ export function LaporCepat() {
   const merekam = detik !== null
   return (
     <div className="flex flex-col gap-space-sm">
-      <div className="relative -mx-margin aspect-[3/4] max-h-[56dvh] overflow-hidden bg-black sm:mx-0 sm:rounded-2xl">
+      {/* Lebar mengikuti tinggi maksimal supaya rasio 3:4 tetap & kotak selalu di tengah layar. */}
+      <div className="relative mx-auto aspect-[3/4] w-full max-w-[calc(56dvh*3/4)] overflow-hidden rounded-2xl bg-black">
         <video ref={videoRef} muted playsInline autoPlay aria-label="Pratinjau kamera" className="size-full object-cover" />
+        {siap && !error && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+            {[1, 2].map((i) => (
+              <span key={`v${i}`} className="absolute inset-y-0 w-px bg-white/55 shadow-[0_0_1px_rgba(0,0,0,0.6)]" style={{ left: `${(i * 100) / 3}%` }} />
+            ))}
+            {[1, 2].map((i) => (
+              <span key={`h${i}`} className="absolute inset-x-0 h-px bg-white/55 shadow-[0_0_1px_rgba(0,0,0,0.6)]" style={{ top: `${(i * 100) / 3}%` }} />
+            ))}
+            <span className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2">
+              <span className="absolute inset-x-0 top-1/2 h-px bg-white/80" />
+              <span className="absolute inset-y-0 left-1/2 w-px bg-white/80" />
+            </span>
+          </div>
+        )}
         {kilat && <div aria-hidden="true" className="absolute inset-0 bg-white/80" />}
         {!error && (
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-3 py-2">
