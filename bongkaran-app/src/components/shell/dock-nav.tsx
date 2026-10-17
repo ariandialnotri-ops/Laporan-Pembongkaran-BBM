@@ -17,9 +17,11 @@ export function DockNav() {
   const app = useApp()
   const grup = useMenu().filter((g) => g.key !== 'report' && (g.key !== 'finance' || app.role === 'admin'))
   const aktif = grupAktif(grup, pathname, search)
-  const lapor = app.can('/insiden/baru')
+  const lapor = app.can('/lapor')
   const tengah = Math.ceil(grup.length / 2)
-  const laporAktif = pathname.startsWith('/insiden/baru')
+  const laporAktif = pathname === '/lapor' || pathname.startsWith('/insiden/baru')
+  // Layar kamera Lapor penuh tanpa bar bawah (tombol rana & Lanjut tidak tertutup).
+  if (pathname === '/lapor') return null
 
   return (
     <nav
@@ -61,12 +63,13 @@ export function DockNav() {
 }
 
 /**
- * Pintasan Lapor Insiden, Near miss & Kerusakan: tombol bulat biru (ikon pindai) yang menonjol di tengah bar.
+ * Pintasan Lapor Insiden, Near miss & Kerusakan: tombol bulat biru (ikon pindai) yang menonjol di tengah bar;
+ * membuka kamera (foto/video bercap waktu), lalu pilih jenis laporan.
  * Susunan sama dengan item lain (ruang ikon + label) supaya label sejajar.
  */
 function TombolLapor({ aktif }: { aktif: boolean }) {
   return (
-    <Link to="/insiden/baru" aria-label="Lapor insiden, near miss & kerusakan" aria-current={aktif ? 'page' : undefined} className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5">
+    <Link to="/lapor" aria-label="Lapor insiden, near miss & kerusakan" aria-current={aktif ? 'page' : undefined} className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5">
       <span aria-hidden="true" className="absolute -top-7 left-1/2 flex size-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,80,203,0.35)] ring-4 ring-surface-container-lowest">
         <ScanLine className="size-7" strokeWidth={2} />
       </span>

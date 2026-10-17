@@ -63,6 +63,8 @@ export interface InsidenData {
   tingkat: TingkatInsiden
   pelapor: string
   foto: Photo[]
+  /** Video bercap waktu dari kamera Lapor (maks. 1, 30 detik). */
+  video?: Photo[]
   status: StatusInsiden
   pic: string
   targetSelesai: string

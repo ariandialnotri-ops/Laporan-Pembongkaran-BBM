@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Ban, LoaderCircle, Plus, Send, ShieldAlert } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
@@ -24,6 +24,7 @@ import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { InsidenRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { compressImage, genId } from '@/lib/image'
+import { ambilMedia } from '@/lib/lapor-media'
 import {
   durasiHenti,
   JENIS_INSIDEN,
@@ -172,7 +173,29 @@ export function InsidenBaru() {
   const [hentiMulai, setHentiMulai] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
-  const srcOf = usePhotoSrc(d.foto)
+  const srcOf = usePhotoSrc([...d.foto, ...(d.video ?? [])])
+  // Foto & video bercap waktu dari kamera Lapor (tombol tengah bar bawah) langsung diunggah ke laporan ini.
+  const titipan = useRef(false)
+  useEffect(() => {
+    if (titipan.current) return
+    titipan.current = true
+    const media = ambilMedia()
+    if (!media.length) return
+    setBusy('foto')
+    void (async () => {
+      try {
+        for (const m of media) {
+          const p = await app.backend.uploadPhoto(`daily-${id}`, m.blob, m.jenis === 'video' ? 'video-kejadian' : 'kejadian.jpg')
+          setD((x) => (m.jenis === 'video' ? { ...x, video: [...(x.video ?? []), p] } : { ...x, foto: [...x.foto, p] }))
+          URL.revokeObjectURL(m.url)
+        }
+      } catch (e) {
+        setError(`Gagal menyimpan foto/video: ${pesan(e)}`)
+      } finally {
+        setBusy(null)
+      }
+    })()
+  }, [app.backend, id])
   const guard = useLeaveGuard({ active: true, title: 'Keluar tanpa mengirim laporan?', detail: 'Isian laporan kejadian ini belum dikirim.' })
   if (!app.loaded) return <Loading />
 
@@ -207,7 +230,7 @@ export function InsidenBaru() {
     if (d.uraian.trim().length < 10) return setError('Tulis uraian kejadian (minimal 10 karakter).')
     if (d.jenis === 'insiden' && !d.dampak.trim()) return setError('Isi dampak / korban kejadian.')
     if (!d.tindakanSegera.trim()) return setError('Isi tindakan yang sudah dilakukan.')
-    if (fotoWajib && !d.foto.length) return setError('Foto kejadian wajib diunggah.')
+    if (fotoWajib && !d.foto.length && !d.video?.length) return setError('Foto atau video kejadian wajib diunggah.')
     if (!d.pelapor.trim()) return setError('Isi nama pelapor.')
     const adaHenti = d.jenis === 'kerusakan' && henti === 'ya'
     const mulai = hentiMulai || `${tanggal}T${d.jam}`
@@ -232,7 +255,7 @@ export function InsidenBaru() {
           ...(d.aset.trim() ? ([['Peralatan', d.aset.trim()]] as [string, string][]) : []),
           ...(adaHenti ? ([['Penyaluran dihentikan', `${hentiProduk.join(', ')} sejak ${labelWaktu(mulai, formatTanggalIso)}`]] as [string, string][]) : []),
           ['Tingkat risiko', d.tingkat],
-          ['Foto', `${d.foto.length} foto`],
+          ['Foto', `${d.foto.length} foto${d.video?.length ? ` + ${d.video.length} video` : ''}`],
           ['Pelapor', d.pelapor.trim()],
         ],
         aksi: [
@@ -353,6 +376,22 @@ export function InsidenBaru() {
             if (t) void app.backend.deletePhoto(t).catch(() => {})
           }}
         />
+        {(d.video ?? []).map((v, i) => (
+          <div key={v.id} className="flex flex-col gap-space-xs">
+            <span className="text-tag uppercase text-on-surface-variant">Video kejadian</span>
+            {srcOf(v) ? <video src={srcOf(v)} controls playsInline className="max-h-72 w-full rounded-md bg-black" /> : <span className="h-40 animate-pulse rounded-md bg-surface-container" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                set({ video: (d.video ?? []).filter((_, j) => j !== i) })
+                void app.backend.deletePhoto(v).catch(() => {})
+              }}
+            >
+              Hapus video
+            </Button>
+          </div>
+        ))}
         <Field label="Pelapor" htmlFor="ins-pelapor">
           <Input id="ins-pelapor" value={d.pelapor} onChange={(e) => set({ pelapor: e.target.value })} />
         </Field>
@@ -449,7 +488,7 @@ export function InsidenDetail() {
   const { id = '' } = useParams()
   const semua = useInsiden()
   const rec = semua.find((r) => r.id === id)
-  const srcOf = usePhotoSrc(rec?.data.foto ?? [])
+  const srcOf = usePhotoSrc([...(rec?.data.foto ?? []), ...(rec?.data.video ?? [])])
   const [status, setStatus] = useState<StatusInsiden | ''>('')
   const [pic, setPic] = useState('')
   const [target, setTarget] = useState('')
@@ -541,6 +580,9 @@ export function InsidenDetail() {
         )}
       </GlassCard>
 
+      {(d.video ?? []).map((v) =>
+        srcOf(v) ? <video key={v.id} src={srcOf(v)} controls playsInline aria-label="Video kejadian" className="animate-entrance-1 max-h-80 w-full rounded-md bg-black" /> : null,
+      )}
       <section aria-labelledby="ins-riwayat" className="animate-entrance-2 flex flex-col gap-space-xs">
         <SectionHeader id="ins-riwayat" title="Tindak lanjut" />
         <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">

@@ -65,7 +65,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/finance/',
     '/ops',
     '/ops/',
-    '/insiden/baru',
+    '/lapor', '/insiden/baru',
     '/insiden/baru/',
     '/profil', '/profil/sandi',
     '/kalkulator',
@@ -111,16 +111,16 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/ops',
     '/ops/',
     '/laporan/ops',
-    '/insiden/baru',
+    '/lapor', '/insiden/baru',
     '/insiden/baru/',
     '/laporan/insiden',
     '/laporan/insiden/', '/laporan/henti',
     '/profil', '/profil/sandi',
     '/kalkulator',
   ],
-  security: ['/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  security: ['/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
   admin: ['/finance', '/finance/', '/laporan/so', '/profil', '/profil/sandi'],
-  cs: ['/input', '/ops', '/ops/', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  cs: ['/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
 }
 
 /** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */

@@ -469,8 +469,10 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
 
     async uploadPhoto(reportId, blob, name) {
       const id = genId('p')
-      const path = `${aktif()}/${reportId}/${id}.jpg`
-      check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false }))
+      // Video lapor cepat (mp4/webm) disimpan dengan tipe aslinya; selain itu foto JPEG.
+      const tipe = blob.type.startsWith('video/') ? blob.type.split(';')[0] : 'image/jpeg'
+      const path = `${aktif()}/${reportId}/${id}.${tipe === 'video/mp4' ? 'mp4' : tipe === 'video/webm' ? 'webm' : 'jpg'}`
+      check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: tipe, upsert: false }))
       return { id, name, at: new Date().toISOString(), path }
     },
     async deletePhoto(photo) {

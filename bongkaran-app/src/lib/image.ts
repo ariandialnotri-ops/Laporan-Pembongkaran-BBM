@@ -60,7 +60,7 @@ export function genId(prefix: string) {
  * (baris pertama, tebal) dan keterangan (SPBU, nozzle, dll.). Tertulis di gambar sehingga
  * ikut tersimpan, tercetak, dan terkirim.
  */
-function capFoto(ctx: CanvasRenderingContext2D, w: number, h: number, baris: string[]) {
+export function capFoto(ctx: CanvasRenderingContext2D, w: number, h: number, baris: string[]) {
   const fs = Math.max(14, Math.round(Math.min(w, h) * 0.034))
   const pad = Math.round(fs * 0.6)
   const tinggiBaris = Math.round(fs * 1.3)

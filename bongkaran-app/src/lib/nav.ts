@@ -72,6 +72,7 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/insiden/baru', title: 'Lapor Insiden & Near miss', parent: '/hsse' },
   { href: '/insiden/baru/', title: 'Form Laporan Kejadian', parent: '/insiden/baru' },
   { href: '/laporan/insiden', title: 'Riwayat Insiden & Near miss', parent: '/laporan/riwayat' },
+  { href: '/lapor', title: 'Lapor Kejadian', parent: '/hsse' },
   { href: '/laporan/henti', title: 'Riwayat Pemberhentian Penyaluran', parent: '/laporan/riwayat' },
   { href: '/laporan/insiden/', title: 'Detail Laporan Kejadian', parent: '/laporan/insiden' },
   { href: '/patrol', title: 'Guard Patrol System', parent: '/hsse' },

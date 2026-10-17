@@ -34,6 +34,7 @@ const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ de
 const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenBaru })))
 const PilihJenisInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.PilihJenisInsiden })))
 const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
+const LaporCepat = lazy(() => import('@/pages/LaporCepat').then((m) => ({ default: m.LaporCepat })))
 const RiwayatHenti = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatHenti })))
 const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenDetail })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
@@ -213,6 +214,7 @@ function Gate() {
           <Route path="/insiden/baru/:jenis" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
           <Route path="/laporan/henti" element={<RiwayatHenti />} />
+          <Route path="/lapor" element={<LaporCepat />} />
           <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />
           <Route path="/wbs" element={<WbsMenu />} />
           <Route path="/wbs/:kategori" element={<WbsForm />} />
