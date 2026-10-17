@@ -35,9 +35,44 @@ function penuhi(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number,
   ctx.drawImage(img, (img.naturalWidth - sw) / 2, (img.naturalHeight - sh) / 2, sw, sh, x, y, w, h)
 }
 
+/** Tingkat buram latar kotak yang tidak penuh foto: 95% (foto diperkecil ke 5% lalu diperbesar). */
+const BURAM = 0.95
+
+/**
+ * Latar buram dari foto itu sendiri. Diperkecil bertahap ke 5% lalu diperbesar dengan penghalusan
+ * (tanpa ctx.filter, yang belum didukung semua Safari iPhone).
+ */
+function latarBuram(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  const kanvas = (cw: number, ch: number) => {
+    const c = document.createElement('canvas')
+    c.width = Math.max(2, Math.round(cw))
+    c.height = Math.max(2, Math.round(ch))
+    const k = c.getContext('2d')!
+    k.imageSmoothingEnabled = true
+    k.imageSmoothingQuality = 'high'
+    return { c, k }
+  }
+  const sisa = 1 - BURAM
+  const tengah = kanvas(w * 0.15, h * 0.15)
+  const kecil = kanvas(w * sisa * 0.5, h * sisa * 0.5)
+  penuhi(tengah.k, img, 0, 0, tengah.c.width, tengah.c.height)
+  // Dua putaran kecil-besar: detail (tulisan struk) hilang, warna tetap.
+  for (let i = 0; i < 2; i++) {
+    kecil.k.clearRect(0, 0, kecil.c.width, kecil.c.height)
+    kecil.k.drawImage(tengah.c, 0, 0, kecil.c.width, kecil.c.height)
+    tengah.k.clearRect(0, 0, tengah.c.width, tengah.c.height)
+    tengah.k.drawImage(kecil.c, 0, 0, tengah.c.width, tengah.c.height)
+  }
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(tengah.c, x, y, w, h)
+  kecil.c.width = 0
+  tengah.c.width = 0
+}
+
 /**
  * Letakkan foto di kotak. Bila orientasinya jauh berbeda (mis. struk tegak di kotak mendatar), foto
- * ditampilkan utuh di atas versi gelapnya sendiri supaya isi struk/nopol tidak terpotong.
+ * ditampilkan utuh di atas versi buram 95% dirinya sendiri supaya isi struk/nopol tidak terpotong.
  */
 function letakkan(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const beda = img.naturalWidth / img.naturalHeight / (w / h)
@@ -46,8 +81,8 @@ function letakkan(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: numbe
   ctx.beginPath()
   ctx.rect(x, y, w, h)
   ctx.clip()
-  penuhi(ctx, img, x, y, w, h)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.62)'
+  latarBuram(ctx, img, x, y, w, h)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.18)'
   ctx.fillRect(x, y, w, h)
   const s = Math.min(w / img.naturalWidth, h / img.naturalHeight)
   const dw = img.naturalWidth * s
