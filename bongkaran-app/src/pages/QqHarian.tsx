@@ -168,7 +168,8 @@ export function QqHarian() {
 
   const simpanKualitas = async (i: number) => {
     const row = data.kualitas[i]
-    const err = kualitasValid(row)
+    const adaNozzle = (app.settings.nozzles ?? []).some((n) => n.produk === row.produk)
+    const err = kualitasValid(row) ?? (adaNozzle && !row.nozzleId ? 'Pilih nozzle tempat sampel pump test diambil.' : null)
     if (err) return setRowError({ ...rowError, [row.id]: err })
     const saved = { ...row, savedAt: isoNow() }
     setBusy(row.id)
@@ -349,7 +350,7 @@ export function QqHarian() {
             <GlassCard key={k.id} level={2} className="flex flex-col gap-space-sm p-space-md">
               <div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
                 <Field label="Produk" htmlFor={`qk-p-${k.id}`}>
-                  <Select value={k.produk} onValueChange={(v) => setK(i, { produk: v })}>
+                  <Select value={k.produk} onValueChange={(v) => setK(i, { produk: v, nozzleId: undefined, nozzle: undefined })}>
                     <SelectTrigger id={`qk-p-${k.id}`}>
                       <SelectValue />
                     </SelectTrigger>
@@ -366,6 +367,28 @@ export function QqHarian() {
                   <Trash2 aria-hidden="true" />
                 </Button>
               </div>
+              {(() => {
+                const pilihan = (app.settings.nozzles ?? []).filter((n) => n.produk === k.produk)
+                return pilihan.length ? (
+                  <Field label="Nozzle pump test" htmlFor={`qk-n-${k.id}`}>
+                    <Select
+                      value={pilihan.some((n) => n.id === k.nozzleId) ? k.nozzleId : undefined}
+                      onValueChange={(v) => setK(i, { nozzleId: v, nozzle: pilihan.find((n) => n.id === v)?.nama })}
+                    >
+                      <SelectTrigger id={`qk-n-${k.id}`}>
+                        <SelectValue placeholder="Pilih nozzle sampel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pilihan.map((n) => (
+                          <SelectItem key={n.id} value={n.id}>
+                            Nozzle {n.nama}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null
+              })()}
               <div className="grid grid-cols-3 gap-space-sm">
                 <Field label="Density" htmlFor={`qk-d-${k.id}`}>
                   <Input id={`qk-d-${k.id}`} numeric inputMode="decimal" placeholder="0,7450" value={k.densityObs} onChange={(e) => setK(i, { densityObs: e.target.value })} />

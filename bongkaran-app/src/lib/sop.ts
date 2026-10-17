@@ -303,6 +303,8 @@ export interface Settings {
   fotoSimpanBulan?: number
   /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */
   pettyPlafon?: number
+  /** Harga jual per liter per produk (closing shift: penjualan = liter totalizer × harga). */
+  hargaProduk?: Record<string, number>
   rules: Rules
 }
 

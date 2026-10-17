@@ -8,6 +8,7 @@ import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
+import type { Catatan } from '@/lib/catatan'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
@@ -214,6 +215,14 @@ export const localBackend: Backend = {
   },
   async deleteAir(id) {
     await set('air', ((await get<AirRecord[]>('air')) ?? []).filter((r) => r.id !== id))
+  },
+  listCatatan: <T,>(jenis: string, from: string, to: string) =>
+    get<Catatan<T>[]>(`catatan-${jenis}`).then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.shift - b.shift)),
+  async saveCatatan(jenis, rec) {
+    await set(`catatan-${jenis}`, upsertById((await get<Catatan<unknown>[]>(`catatan-${jenis}`)) ?? [], rec))
+  },
+  async deleteCatatan(jenis, id) {
+    await set(`catatan-${jenis}`, ((await get<Catatan<unknown>[]>(`catatan-${jenis}`)) ?? []).filter((r) => r.id !== id))
   },
   listPetty: (from, to) => get<PettyRecord[]>('petty').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
   // Mode lokal: status awal mengikuti peran uji (sama dengan trigger database).

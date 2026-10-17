@@ -4,6 +4,8 @@
  * menurut hak akses peran (roles.ts) dan fasilitas SPBU.
  */
 import {
+  Ban,
+  Banknote,
   Beaker,
   BookOpenCheck,
   ChartNoAxesCombined,
@@ -18,6 +20,7 @@ import {
   FireExtinguisher,
   FlaskConical,
   Fuel,
+  Gauge,
   History,
   Megaphone,
   PiggyBank,
@@ -26,6 +29,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   TestTube,
+  TestTubes,
   Truck,
   Wallet,
   Waves,
@@ -116,7 +120,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Operation',
       href: '/operation',
       icon: Fuel,
-      desc: 'Stok, water content, bongkaran, kualitas BBM, uji takaran, perawatan & housekeeping',
+      desc: 'Stok, totalizer, water content, bongkaran, kualitas BBM, uji takaran, perawatan & housekeeping',
       items: [
         {
           to: '/stok',
@@ -161,6 +165,14 @@ export function useMenu(): GrupMenu[] {
           title: 'Kaleng Sample',
           desc: 'Sample mobil tangki dari hasil pembongkaran, 3 terakhir per produk',
           status: `${app.reports.filter((r) => r.status === 'selesai').length} bongkaran selesai`,
+        },
+        {
+          to: '/totalizer',
+          path: '/totalizer',
+          icon: Gauge,
+          title: 'Totalizer',
+          desc: 'Totalisator digital awal & akhir shift per nozzle dan produk',
+          status: (s.nozzles ?? []).length ? `${(s.nozzles ?? []).length} nozzle · awal & akhir shift` : 'Database nozzle belum diisi',
         },
         {
           to: '/air',
@@ -273,8 +285,16 @@ export function useMenu(): GrupMenu[] {
       label: 'Finance',
       href: '/finance',
       icon: Wallet,
-      desc: 'Petty cash: pengajuan pengadaan barang/jasa (akun COA) dan realisasi anggaran',
+      desc: 'Closing shift (setoran tepat) dan petty cash: pengajuan pengadaan barang/jasa (akun COA) & realisasi anggaran',
       items: [
+        {
+          to: '/finance/closing',
+          path: '/finance/closing',
+          icon: Banknote,
+          title: 'Closing Shift',
+          desc: 'Hitung buta setoran tiap akhir shift (format One Touch), penjualan dari totalizer, laporan WhatsApp',
+          status: 'Kepala shift, setiap akhir shift',
+        },
         {
           to: '/finance/petty',
           path: '/finance/petty',
@@ -290,9 +310,10 @@ export function useMenu(): GrupMenu[] {
       label: 'Report',
       href: '/laporan',
       icon: FileText,
-      desc: 'Riwayat, export file, dan berita acara',
+      desc: 'Riwayat, stock opname, export file, dan berita acara',
       items: [
         { to: '/laporan/riwayat', path: '/laporan/riwayat', icon: History, title: 'Riwayat', desc: 'Bongkaran, kualitas, APAR, uji takaran, insiden', status: insidenTerbuka + temuanApar ? `${insidenTerbuka + temuanApar} perlu ditindaklanjuti` : 'Semua sudah ditindaklanjuti', badge: insidenTerbuka + temuanApar },
+        { to: '/laporan/so', path: '/laporan/so', icon: ClipboardList, title: 'Laporan Stock Opname', desc: 'BA Laporan Bulanan: SO tangki, totalisator, arus minyak, penerimaan, tera, cash opname', status: 'Excel BA per bulan' },
         { to: '/laporan/export', path: '/laporan/export', icon: FileDown, title: 'Export File', desc: 'Catatan persediaan BBM & laporan operasional (Excel)', status: 'Excel & PDF' },
         {
           to: '/laporan/ba',
@@ -343,10 +364,13 @@ export function riwayatItems(can: (p: string) => boolean) {
 const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[] = [
   { path: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status' },
   { path: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan' },
+  { path: '/laporan/totalizer', icon: Gauge, title: 'Riwayat Totalizer', desc: 'Totalisator digital per shift, penjualan per produk & nozzle' },
   { path: '/laporan/air', icon: Droplet, title: 'Riwayat Water Content', desc: 'Air di dasar tangki pendam, sekali sehari (shift 1, maks. 10:00), tindakan' },
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
+  { path: '/laporan/pump-test', icon: TestTubes, title: 'Riwayat Pump Test', desc: 'Pump test uji kualitas, uji kuantitas & uji takaran per nozzle dan produk' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
   { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },
+  { path: '/laporan/henti', icon: Ban, title: 'Riwayat Pemberhentian Penyaluran', desc: 'Produk yang dihentikan sementara karena kerusakan, dari–sampai, lama berhenti' },
   { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
   { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
   { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },

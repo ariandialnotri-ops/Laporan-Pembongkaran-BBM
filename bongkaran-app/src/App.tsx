@@ -34,6 +34,7 @@ const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ de
 const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenBaru })))
 const PilihJenisInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.PilihJenisInsiden })))
 const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
+const RiwayatHenti = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatHenti })))
 const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenDetail })))
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
@@ -90,6 +91,13 @@ const WbsDetail = lazy(() => import('@/pages/Wbs').then((m) => ({ default: m.Wbs
 const GtsMenu = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsMenu })))
 const GtsForm = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.GtsForm })))
 const LaporanGts = lazy(() => import('@/pages/Gts').then((m) => ({ default: m.LaporanGts })))
+const LaporanStockOpname = lazy(() => import('@/pages/StockOpname').then((m) => ({ default: m.LaporanStockOpname })))
+const RiwayatPumpTest = lazy(() => import('@/pages/PumpTest').then((m) => ({ default: m.RiwayatPumpTest })))
+const ClosingMenu = lazy(() => import('@/pages/Closing').then((m) => ({ default: m.ClosingMenu })))
+const ClosingShift = lazy(() => import('@/pages/Closing').then((m) => ({ default: m.ClosingShift })))
+const TotalizerMenu = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.TotalizerMenu })))
+const TotalizerForm = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.TotalizerForm })))
+const RiwayatTotalizer = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.RiwayatTotalizer })))
 const AirMenu = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirMenu })))
 const AirForm = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirForm })))
 const LaporanAir = lazy(() => import('@/pages/Air').then((m) => ({ default: m.LaporanAir })))
@@ -146,6 +154,8 @@ function Gate() {
           <Route path="/patrol" element={<MenuPatrol />} />
           <Route path="/finance" element={<MenuFinance />} />
           <Route path="/finance/petty" element={<PettyMenu />} />
+          <Route path="/finance/closing" element={<ClosingMenu />} />
+          <Route path="/finance/closing/:tanggal/:shift" element={<ClosingShift />} />
           <Route path="/finance/petty/pengajuan" element={<PengajuanPetty />} />
           <Route path="/finance/petty/pengajuan/baru" element={<PengajuanPettyForm />} />
           <Route path="/finance/petty/pengajuan/:id" element={<PengajuanPettyDetail />} />
@@ -164,6 +174,11 @@ function Gate() {
           <Route path="/sample/:id" element={<Sample2JamForm />} />
           <Route path="/stok" element={<StokShift />} />
           <Route path="/stok/:tanggal/:shift" element={<StokShiftForm />} />
+          <Route path="/totalizer" element={<TotalizerMenu />} />
+          <Route path="/totalizer/:tanggal/:shift" element={<TotalizerForm />} />
+          <Route path="/laporan/totalizer" element={<RiwayatTotalizer />} />
+          <Route path="/laporan/pump-test" element={<RiwayatPumpTest />} />
+          <Route path="/laporan/so" element={<LaporanStockOpname />} />
           <Route path="/air" element={<AirMenu />} />
           <Route path="/air/isi" element={<AirForm />} />
           <Route path="/laporan/air" element={<LaporanAir />} />
@@ -197,6 +212,7 @@ function Gate() {
           <Route path="/insiden/baru" element={<PilihJenisInsiden />} />
           <Route path="/insiden/baru/:jenis" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
+          <Route path="/laporan/henti" element={<RiwayatHenti />} />
           <Route path="/laporan/insiden/:id" element={<InsidenDetail />} />
           <Route path="/wbs" element={<WbsMenu />} />
           <Route path="/wbs/:kategori" element={<WbsForm />} />

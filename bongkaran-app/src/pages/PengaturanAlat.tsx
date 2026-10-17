@@ -196,6 +196,7 @@ export function NozzleTera() {
     { header: 'Nozzle', cell: (x) => <span className="font-semibold">{x.nama}</span>, mobileCell: (x) => `${x.nama} (${x.produk})`, mobile: 'title' },
     { header: 'Produk', cell: (x) => <ProdukChip produk={x.produk} />, mobile: 'hide' },
     { header: 'Dispenser', cell: (x) => disp.find((d) => d.id === x.dispenserId)?.nama ?? '-', mobile: 'sub' },
+    { header: 'Pulau pompa', cell: (x) => disp.find((d) => d.id === x.dispenserId)?.pulau || '-', mobile: 'sub' },
     { header: 'No. sertifikat tera', cell: (x) => <span className="tabular">{x.teraNoSertifikat || '-'}</span>, mobile: 'hide' },
     { header: 'Tanggal tera', cell: (x) => <span className="tabular whitespace-nowrap">{x.teraTanggal ? formatTanggalIso(x.teraTanggal) : '-'}</span>, mobile: 'hide' },
     {
@@ -217,7 +218,7 @@ export function NozzleTera() {
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <span className="text-body-sm text-on-surface-variant">
-          Sertifikat tera metrologi berlaku maks. {MASA_SERTIFIKAT_BULAN} bulan dari tanggal keluar sertifikat. Nozzle dipakai untuk totalisator bongkar dan uji bejana 20 L di Kualitas Harian.
+          Sertifikat tera metrologi berlaku maks. {MASA_SERTIFIKAT_BULAN} bulan dari tanggal keluar sertifikat. Nozzle terhubung ke dispenser & pulau pompa, dan dipakai untuk totalizer shift, totalisator bongkar, uji takaran, pump test, dan stock opname.
         </span>
         <div className="flex flex-wrap gap-space-xs">
           <Pill tone={lewat ? 'error' : 'success'}>{lewat} lewat</Pill>

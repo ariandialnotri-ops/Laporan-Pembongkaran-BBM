@@ -34,6 +34,9 @@ export interface QqKualitas {
   suhu: string
   /** Volume pump test untuk sampel uji kualitas (L). */
   pumpTest: string
+  /** Nozzle tempat sampel pump test diambil (riwayat pump test per nozzle). */
+  nozzleId?: string
+  nozzle?: string
   /** Waktu baris ini terakhir disimpan; kosong bila belum/berubah setelah disimpan. */
   savedAt?: string
 }

@@ -2,6 +2,7 @@ import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
+import type { Catatan, JenisCatatan } from '@/lib/catatan'
 import type { GtsRecord } from '@/lib/gts'
 import type { StatusWbs, WbsData, WbsInput, WbsRecord } from '@/lib/wbs'
 import type { Photo, Plan, Report, ReportSummary, Settings } from '@/lib/sop'
@@ -48,7 +49,7 @@ export interface RingkasanUnit {
   terakhirAktif: string | null
 }
 
-export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles'>
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles' | 'hargaProduk'>
 
 export interface FotoArsip {
   path: string
@@ -135,6 +136,10 @@ export interface Backend {
   /** Tambah (status awal ditentukan server menurut peran) atau ubah pengajuan. */
   savePetty(rec: PettyRecord, baru: boolean): Promise<PettyRecord>
   deletePetty(id: string): Promise<void>
+  /** Totalizer digital per shift, closing shift, stock opname bulanan (rentang tanggal inklusif). */
+  listCatatan<T>(jenis: JenisCatatan, fromIso: string, toIso: string): Promise<Catatan<T>[]>
+  saveCatatan<T>(jenis: JenisCatatan, rec: Catatan<T>): Promise<void>
+  deleteCatatan(jenis: JenisCatatan, id: string): Promise<void>
   /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
   fotoArsip(): Promise<FotoArsip[]>
   /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */

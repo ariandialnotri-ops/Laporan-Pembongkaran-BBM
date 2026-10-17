@@ -8,6 +8,7 @@ import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
+import { TABEL_CATATAN, type Catatan } from '@/lib/catatan'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { FOTO_DIARSIPKAN, blobToDataUrl, genId } from '@/lib/image'
@@ -24,6 +25,7 @@ type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift:
 type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data']; updated_at: string; updated_by: string | null }
 type WbsRow = { id: string; status: WbsRecord['status']; data: WbsRecord['data']; created_at: string; created_by: string | null }
 type GtsRow = { id: string; tanggal: string; slot: number; jenis: GtsRecord['jenis']; data: GtsRecord['data']; created_at: string; created_by: string | null }
+type CatatanRow = { id: string; tanggal: string; shift: number; data: unknown; created_at: string; updated_at: string; created_by: string | null }
 type AirRow = { id: string; tanggal: string; shift: number; data: AirRecord['data']; created_at: string; updated_at: string; created_by: string | null }
 type PettyRow = { id: string; no: string; tanggal: string; status: PettyRecord['status']; total: number | string; data: PettyRecord['data']; created_at: string; created_by: string | null }
 const pettyDari = (r: PettyRow): PettyRecord => ({ id: r.id, no: r.no, tanggal: r.tanggal, status: r.status, total: Number(r.total), data: r.data, createdAt: Date.parse(r.created_at), createdBy: r.created_by })
@@ -229,6 +231,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         shipTo: d.shipTo ?? {},
         dispensers: d.dispensers ?? [],
         nozzles: d.nozzles ?? [],
+        ...(d.hargaProduk ? { hargaProduk: d.hargaProduk } : {}),
         // Belum diatur = semua fasilitas ada; jangan kirim null yang menimpa.
         ...(d.fasilitas ? { fasilitas: d.fasilitas } : {}),
       }
@@ -425,6 +428,19 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteAir(id) {
       const rows = check(await sb.from('bbm_air').delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Hanya pengawas atau ABH yang dapat menghapus catatan water content.')
+    },
+    async listCatatan<T>(jenis: keyof typeof TABEL_CATATAN, from: string, to: string) {
+      const rows = check(
+        await sb.from(TABEL_CATATAN[jenis]).select('id,tanggal,shift,data,created_at,updated_at,created_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal').order('shift').limit(5000),
+      ) as CatatanRow[]
+      return rows.map((r): Catatan<T> => ({ id: r.id, tanggal: r.tanggal, shift: r.shift, data: r.data as T, createdAt: Date.parse(r.created_at), updatedAt: Date.parse(r.updated_at), createdBy: r.created_by }))
+    },
+    async saveCatatan(jenis, rec) {
+      check(await sb.from(TABEL_CATATAN[jenis]).upsert({ spbu_id: aktif(), id: rec.id, tanggal: rec.tanggal, shift: rec.shift, data: rec.data }))
+    },
+    async deleteCatatan(jenis, id) {
+      const rows = check(await sb.from(TABEL_CATATAN[jenis]).delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
+      if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
     },
     async listPetty(from, to) {
       const rows = check(

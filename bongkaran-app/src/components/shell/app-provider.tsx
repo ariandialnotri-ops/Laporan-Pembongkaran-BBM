@@ -204,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settingsDirty.current = true
     setSettings((prev) => ({ ...prev, ...patch }))
   }, [])
-  // Pengawas hanya boleh mengubah identitas SPBU, dispenser, nozzle & tera, data utama APAR/APAB, Sold To & Ship To; ABH menyimpan seluruh pengaturan.
+  // Pengawas hanya boleh mengubah identitas SPBU, dispenser, nozzle & tera, harga produk, data utama APAR/APAB, Sold To & Ship To; ABH menyimpan seluruh pengaturan.
   const flushSettings = useCallback(() => {
     if (!settingsDirty.current) return
     settingsDirty.current = false
@@ -226,6 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             fasilitas: st.fasilitas,
             dispensers: st.dispensers,
             nozzles: st.nozzles,
+            hargaProduk: st.hargaProduk,
           })
         : backend.saveSettings(st)
     simpan.then(
