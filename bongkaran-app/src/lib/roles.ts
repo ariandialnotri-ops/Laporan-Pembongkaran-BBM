@@ -8,9 +8,9 @@ export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
   { key: 'pengawas', label: 'Pengawas', desc: 'Pengajuan petty cash, laporan stock opname (BA bulanan), totalizer, harga jual, identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, inspeksi APAR/APAB, water content tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
   { key: 'kashift', label: 'Kepala Shift', desc: 'Closing shift (hitung buta + WhatsApp), totalizer awal/akhir shift, pengajuan petty cash & realisasi, stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
-  { key: 'security', label: 'Security', desc: 'Totalizer awal/akhir shift, Guard Patrol System: sampling penyaluran subsidi JBT/JBKP tiap 2 jam, inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss' },
-  { key: 'cs', label: 'Cleaning Service', desc: 'Checklist housekeeping harian (Operasional SPBU) dan pelaporan insiden / near miss' },
-  { key: 'admin', label: 'Admin / Cashier', desc: 'Finance: persetujuan 1 petty cash (pengajuan pengadaan barang/jasa) sebelum persetujuan akhir ABH, pengajuan & realisasi anggaran, laporan stock opname (BA bulanan)' },
+  { key: 'security', label: 'Security', desc: 'Dashboard security (pembongkaran, tracking LO, kepatuhan guard tour, laporan kejadian, petty cash security), totalizer awal/akhir shift, sampling penyaluran subsidi JBT/JBKP tiap 2 jam, inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss, pengajuan petty cash' },
+  { key: 'cs', label: 'Cleaning Service', desc: 'Satu-satunya pengisi checklist housekeeping harian; dashboard CS (progres & kepatuhan housekeeping, petty cash CS, laporan kejadian), pelaporan insiden / near miss, pengajuan petty cash' },
+  { key: 'admin', label: 'Admin / Cashier', desc: 'Finance: persetujuan 1 petty cash, realisasi petty cash (pilih akun COA, nota, bayar reimburse, voucher realisasi), pengajuan petty cash, laporan stock opname (BA bulanan)' },
 ]
 
 export const roleLabel = (r: Role | null | undefined) => ROLES.find((x) => x.key === r)?.label ?? '-'
@@ -65,6 +65,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/finance/',
     '/ops',
     '/ops/',
+    '/grounding',
+    '/grounding/',
     '/lapor', '/insiden/baru',
     '/insiden/baru/',
     '/profil', '/profil/sandi',
@@ -111,6 +113,8 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/ops',
     '/ops/',
     '/laporan/ops',
+    '/grounding',
+    '/grounding/',
     '/lapor', '/insiden/baru',
     '/insiden/baru/',
     '/laporan/insiden',
@@ -118,9 +122,9 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/profil', '/profil/sandi',
     '/kalkulator',
   ],
-  security: ['/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  security: ['/', '/laporan/bongkaran', '/laporan/lo', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
   admin: ['/finance', '/finance/', '/laporan/so', '/profil', '/profil/sandi'],
-  cs: ['/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  cs: ['/', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
 }
 
 /** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */
@@ -132,6 +136,8 @@ export function bolehBuka(role: Role, path: string) {
   if (path === '/laporan/wbs' || path.startsWith('/laporan/wbs/')) return false
   // WBS: setiap anggota boleh melapor.
   if (path === '/wbs' || path.startsWith('/wbs/')) return true
+  // Personil & jadwal shift: semua anggota melihat; daftar & jadwal diubah pengawas/ABH.
+  if (path === '/personil' || path.startsWith('/personil/')) return true
   if (IKHTISAR.includes(path)) return true
   return AKSES[role].some((p) => (p.endsWith('/') && p !== '/' ? path.startsWith(p) : path === p))
 }

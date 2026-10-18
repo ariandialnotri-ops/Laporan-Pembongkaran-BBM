@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, LoaderCircle, Plus, Send, ShieldAlert } from 'lucide-react'
+import { Ban, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
@@ -488,8 +489,13 @@ export function InsidenDetail() {
   const { id = '' } = useParams()
   const semua = useInsiden()
   const rec = semua.find((r) => r.id === id)
-  const srcOf = usePhotoSrc([...(rec?.data.foto ?? []), ...(rec?.data.video ?? [])])
+  const srcOf = usePhotoSrc([...(rec?.data.foto ?? []), ...(rec?.data.video ?? []), ...(rec?.data.riwayat ?? []).flatMap((l) => [...(l.foto ?? []), ...(l.ba ?? [])])])
   const [status, setStatus] = useState<StatusInsiden | ''>('')
+  // Lampiran tindak lanjut: foto (dikompres) dan berita acara (foto dokumen atau PDF), diunggah saat disimpan.
+  const [tlFoto, setTlFoto] = useState<FotoLokal[]>([])
+  const [tlBa, setTlBa] = useState<(FotoLokal & { nama: string; pdf: boolean })[]>([])
+  const [olahFoto, setOlahFoto] = useState(false)
+  const baRef = useRef<HTMLInputElement>(null)
   const [pic, setPic] = useState('')
   const [target, setTarget] = useState('')
   const [catatan, setCatatan] = useState('')
@@ -519,18 +525,35 @@ export function InsidenDetail() {
     setBusy(true)
     try {
       const oleh = app.displayName === 'Mode lokal' ? app.settings.namaPengawasDefault || 'Pengawas' : app.displayName
+      const foto: Photo[] = []
+      for (const [i, f] of tlFoto.entries()) foto.push(await app.backend.uploadPhoto(`daily-${rec.id}`, f.blob, `tindak-lanjut-${i + 1}.jpg`))
+      const ba: Photo[] = []
+      for (const f of tlBa) ba.push(await app.backend.uploadPhoto(`daily-${rec.id}`, f.blob, f.nama))
       const data: InsidenData = {
         ...d,
         status: statusBaru,
         pic: pic.trim() || d.pic,
         targetSelesai: target || d.targetSelesai,
-        riwayat: [...d.riwayat, { at: isoNow(), oleh, status: statusBaru, catatan: `${catatan.trim()}${bukaKembali ? ` (penyaluran ${d.henti!.produk.join(', ')} dibuka kembali)` : ''}` }],
+        riwayat: [
+          ...d.riwayat,
+          {
+            at: isoNow(),
+            oleh,
+            status: statusBaru,
+            catatan: `${catatan.trim()}${bukaKembali ? ` (penyaluran ${d.henti!.produk.join(', ')} dibuka kembali)` : ''}`,
+            ...(foto.length ? { foto } : {}),
+            ...(ba.length ? { ba } : {}),
+          },
+        ],
         ...(bukaKembali ? { henti: { ...d.henti!, selesai: waktuLokal() } } : {}),
       }
       await app.saveDaily({ ...rec, data, updatedAt: stamp() })
       setCatatan('')
       setStatus('')
       setBuka(false)
+      ;[...tlFoto, ...tlBa].forEach((f) => URL.revokeObjectURL(f.url))
+      setTlFoto([])
+      setTlBa([])
       setError(null)
       toast('Tindak lanjut tersimpan')
     } catch (e) {
@@ -595,6 +618,25 @@ export function InsidenDetail() {
                 <StatusPill s={l.status} />
               </span>
               <span className="text-on-surface">{l.catatan}</span>
+              {!!(l.foto?.length || l.ba?.length) && (
+                <div className="mt-1 flex flex-wrap gap-space-xs">
+                  {(l.foto ?? []).map((p) =>
+                    srcOf(p) ? (
+                      <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer">
+                        <img src={srcOf(p)} alt="Foto tindak lanjut" className="size-16 rounded-md object-cover" />
+                      </a>
+                    ) : (
+                      <span key={p.id} className="size-16 animate-pulse rounded-md bg-surface-container" />
+                    ),
+                  )}
+                  {(l.ba ?? []).map((p) => (
+                    <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer" className="flex h-16 items-center gap-1.5 rounded-md bg-primary/10 px-space-sm font-semibold text-primary">
+                      <FileText aria-hidden="true" className="size-4" />
+                      <span className="max-w-36 truncate">{p.name || 'Berita acara'}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </GlassCard>
@@ -617,6 +659,74 @@ export function InsidenDetail() {
           <Field label="Catatan" htmlFor="ins-catatan">
             <Textarea id="ins-catatan" className="min-h-[64px]" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
           </Field>
+          <FotoWajib
+            label="Foto tindak lanjut"
+            hint="Kondisi setelah ditangani, perbaikan, atau penggantian komponen (maks. 4)."
+            wajib={false}
+            kamera={false}
+            fotos={tlFoto}
+            busy={olahFoto}
+            disabled={busy}
+            onAdd={(files) => {
+              setOlahFoto(true)
+              void (async () => {
+                try {
+                  const baru: FotoLokal[] = []
+                  for (const f of files.slice(0, 4 - tlFoto.length)) {
+                    const blob = await compressImage(f)
+                    baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
+                  }
+                  setTlFoto((x) => [...x, ...baru].slice(0, 4))
+                } catch (e) {
+                  setError(`Gagal memproses foto: ${pesan(e)}`)
+                } finally {
+                  setOlahFoto(false)
+                }
+              })()
+            }}
+            onRemove={(fid) => setTlFoto((x) => x.filter((f) => f.id !== fid))}
+          />
+          <div className="flex flex-col gap-space-xs">
+            <span className="text-tag uppercase text-on-surface-variant">Berita acara / dokumen (opsional)</span>
+            <span className="text-body-sm text-on-surface-variant">BA perbaikan, BA serah terima, laporan vendor: PDF (maks. 8 MB) atau foto dokumen.</span>
+            {tlBa.map((f) => (
+              <span key={f.id} className="flex items-center gap-space-xs rounded-md bg-surface-container-low px-space-sm py-space-xs text-body-sm">
+                <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 truncate">{f.nama}</span>
+                <button type="button" aria-label={`Hapus ${f.nama}`} onClick={() => setTlBa((x) => x.filter((y) => y.id !== f.id))} className="flex size-8 items-center justify-center rounded-full text-on-surface-variant">
+                  <X aria-hidden="true" className="size-4" />
+                </button>
+              </span>
+            ))}
+            <input
+              ref={baRef}
+              type="file"
+              accept="application/pdf,image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])]
+                e.target.value = ''
+                void (async () => {
+                  const baru: (FotoLokal & { nama: string; pdf: boolean })[] = []
+                  for (const f of files.slice(0, 3 - tlBa.length)) {
+                    const pdf = f.type === 'application/pdf'
+                    if (pdf && f.size > 8 * 1024 * 1024) {
+                      setError(`${f.name} lebih dari 8 MB.`)
+                      continue
+                    }
+                    const blob = pdf ? f : await compressImage(f)
+                    baru.push({ id: genId('b'), blob, url: URL.createObjectURL(blob), nama: f.name || (pdf ? 'berita-acara.pdf' : 'berita-acara.jpg'), pdf })
+                  }
+                  setTlBa((x) => [...x, ...baru].slice(0, 3))
+                })()
+              }}
+            />
+            <Button variant="soft" className="self-start" disabled={busy || tlBa.length >= 3} onClick={() => baRef.current?.click()}>
+              <Paperclip aria-hidden="true" />
+              Lampirkan berita acara
+            </Button>
+          </div>
           {hentiAktif && (
             <label className="flex items-center gap-space-sm text-body-sm text-on-surface">
               <input type="checkbox" className="size-5 accent-primary" checked={bukaKembali} disabled={statusBaru === 'selesai'} onChange={(e) => setBuka(e.target.checked)} />

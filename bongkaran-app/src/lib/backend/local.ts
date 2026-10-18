@@ -8,6 +8,7 @@ import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
+import type { Role } from '@/lib/roles'
 import type { Catatan } from '@/lib/catatan'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
@@ -227,8 +228,10 @@ export const localBackend: Backend = {
   listPetty: (from, to) => get<PettyRecord[]>('petty').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
   // Mode lokal: status awal mengikuti peran uji (sama dengan trigger database).
   async savePetty(rec, baru) {
-    const peran = localStorage.getItem('floq-peran') || 'abh'
-    const isi = baru ? { ...rec, status: (peran === 'abh' ? 'Disetujui' : peran === 'admin' ? 'Menunggu ABH' : 'Menunggu Admin') as PettyRecord['status'] } : rec
+    const peran = (localStorage.getItem('floq-peran') || 'abh') as Role
+    // Sama dengan trigger database: ABH tidak mengajukan; pengajuan Admin/Cashier langsung ke ABH; peran pengaju dicatat.
+    if (baru && peran === 'abh') throw new Error('ABH memberi persetujuan akhir dan tidak dapat mengajukan petty cash.')
+    const isi = baru ? { ...rec, status: (peran === 'admin' ? 'Menunggu ABH' : 'Menunggu Admin') as PettyRecord['status'], data: { ...rec.data, peran } } : rec
     await set('petty', upsertById((await get<PettyRecord[]>('petty')) ?? [], isi))
     return isi
   },

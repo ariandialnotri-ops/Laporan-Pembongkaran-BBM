@@ -49,7 +49,7 @@ export interface RingkasanUnit {
   terakhirAktif: string | null
 }
 
-export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles' | 'hargaProduk'>
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles' | 'hargaProduk' | 'personil'>
 
 export interface FotoArsip {
   path: string

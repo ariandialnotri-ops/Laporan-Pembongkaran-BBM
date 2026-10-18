@@ -24,6 +24,7 @@ import {
   History,
   Megaphone,
   PiggyBank,
+  ReceiptText,
   Route,
   ScanEye,
   ShieldAlert,
@@ -31,8 +32,10 @@ import {
   TestTube,
   TestTubes,
   Truck,
+  Users,
   Wallet,
   Waves,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import { useStokShift } from '@/components/bongkaran/stok-gate'
@@ -198,11 +201,19 @@ export function useMenu(): GrupMenu[] {
                 path: '/ops',
                 icon: ClipboardCheck,
                 title: app.role === 'cs' ? 'Checklist Housekeeping' : 'Perawatan & Housekeeping',
-                desc: app.role === 'cs' ? 'Checklist kebersihan harian per area' : 'Kartu perawatan peralatan dan checklist housekeeping',
+                desc: app.role === 'cs' ? 'Checklist kebersihan harian per area, jadwal pembersihan & kalender progres' : 'Kartu perawatan per tangki & peralatan, checklist housekeeping (diisi CS), jadwal & kalender progres',
                 status: 'Format laporan operasional SPBU',
               },
             ]
           : []),
+        {
+          to: '/personil',
+          path: '/personil',
+          icon: Users,
+          title: 'Personil & Jadwal Shift',
+          desc: 'Daftar personil SPBU, jadwal shift bulanan, dan siapa yang sedang bertugas',
+          status: (s.personil ?? []).filter((p) => p.aktif).length ? `${(s.personil ?? []).filter((p) => p.aktif).length} personil aktif` : 'Daftar personil belum diisi',
+        },
       ],
     },
     {
@@ -259,6 +270,14 @@ export function useMenu(): GrupMenu[] {
           badge: insidenTerbuka,
         },
         {
+          to: '/grounding',
+          path: '/grounding',
+          icon: Zap,
+          title: 'Pengukuran Grounding',
+          desc: 'Tahanan pentanahan tangki, dispenser, panel, penangkal petir & fasilitas (≤ 5 Ω)',
+          status: 'Titik ukur otomatis dari data SPBU',
+        },
+        {
           to: '/patrol',
           path: '/patrol',
           icon: ScanEye,
@@ -285,7 +304,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Finance',
       href: '/finance',
       icon: Wallet,
-      desc: 'Closing shift (setoran tepat) dan petty cash: pengajuan pengadaan barang/jasa (akun COA) & realisasi anggaran',
+      desc: 'Closing shift (setoran tepat), petty cash: pengajuan pengadaan & reimburse, realisasi dengan akun COA dan voucher',
       items: [
         {
           to: '/finance/closing',
@@ -300,9 +319,21 @@ export function useMenu(): GrupMenu[] {
           path: '/finance/petty',
           icon: PiggyBank,
           title: 'Petty Cash',
-          desc: 'Pengajuan pengadaan barang/jasa & realisasi anggaran',
-          status: 'Wajib akun COA, nota untuk realisasi',
+          desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan pengadaan & reimburse' : 'Pengajuan pengadaan barang/jasa atau reimburse',
+          status: 'Persetujuan Admin/Cashier lalu ABH',
         },
+        ...(['admin', 'abh', 'pengawas'].includes(app.role)
+          ? [
+              {
+                to: '/finance/petty/realisasi',
+                path: '/finance/petty/realisasi',
+                icon: ReceiptText,
+                title: 'Realisasi Petty Cash',
+                desc: 'Admin/Cashier: pilih akun COA, catat nota, bayar reimburse, unduh voucher realisasi',
+                status: 'Voucher per tanggal realisasi',
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -374,6 +405,7 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
   { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
   { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
   { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },
+  { path: '/grounding', icon: Zap, title: 'Riwayat Pengukuran Grounding', desc: 'Tahanan pentanahan per titik, titik di atas batas & tindak lanjut' },
 ]
 
 /** File yang dapat diunduh (Report > Export File). */

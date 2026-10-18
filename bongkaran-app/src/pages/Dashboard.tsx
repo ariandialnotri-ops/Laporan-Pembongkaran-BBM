@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Beaker,
@@ -61,8 +61,23 @@ const BULAN_SINGKAT = (d: Date) => d.toLocaleDateString('id-ID', { month: 'short
  * Dashboard hanya menampilkan data: status operasional, kalender pekan,
  * bongkaran, rencana vs realisasi, kualitas harian, kaleng sample, dan alur LO.
  * Semua pengisian ada di menu Input, semua riwayat di menu Laporan.
+ * Cleaning Service dan Security memakai dashboard sesuai peruntukannya (DashboardPeran).
  */
 export function Dashboard() {
+  const app = useApp()
+  if (app.role === 'cs' || app.role === 'security')
+    return (
+      <Suspense fallback={<Loading />}>
+        {app.role === 'cs' ? <DashboardCs /> : <DashboardSecurity />}
+      </Suspense>
+    )
+  return <DashboardUtama />
+}
+
+const DashboardCs = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardCs })))
+const DashboardSecurity = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardSecurity })))
+
+function DashboardUtama() {
   const app = useApp()
   const now = new Date()
   const [weekAnchor, setWeekAnchor] = useState(() => new Date())

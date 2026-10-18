@@ -60,6 +60,11 @@ const HalamanKaleng = lazy(() => import('@/pages/MenuGrup').then((m) => ({ defau
 const OpsMenu = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsMenu })))
 const OpsIsi = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.OpsIsi })))
 const LaporanOps = lazy(() => import('@/pages/Operasional').then((m) => ({ default: m.LaporanOps })))
+const KalenderOps = lazy(() => import('@/pages/KalenderOps').then((m) => ({ default: m.KalenderOps })))
+const GroundingMenu = lazy(() => import('@/pages/Grounding').then((m) => ({ default: m.GroundingMenu })))
+const GroundingForm = lazy(() => import('@/pages/Grounding').then((m) => ({ default: m.GroundingForm })))
+const PersonilMenu = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.PersonilMenu })))
+const JadwalShift = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.JadwalShift })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const PlanBaru = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.PlanBaru })))
@@ -210,6 +215,11 @@ function Gate() {
           <Route path="/laporan/tera" element={<Navigate to="/laporan/takaran" replace />} />
           <Route path="/laporan/apar" element={<RiwayatApar />} />
           <Route path="/ops" element={<OpsMenu />} />
+          <Route path="/ops/kalender" element={<KalenderOps />} />
+          <Route path="/grounding" element={<GroundingMenu />} />
+          <Route path="/grounding/:tanggal" element={<GroundingForm />} />
+          <Route path="/personil" element={<PersonilMenu />} />
+          <Route path="/personil/jadwal" element={<JadwalShift />} />
           <Route path="/ops/:form" element={<OpsIsi />} />
           <Route path="/laporan/ops" element={<LaporanOps />} />
           <Route path="/insiden/baru" element={<PilihJenisInsiden />} />

@@ -227,6 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             dispensers: st.dispensers,
             nozzles: st.nozzles,
             hargaProduk: st.hargaProduk,
+            personil: st.personil,
           })
         : backend.saveSettings(st)
     simpan.then(

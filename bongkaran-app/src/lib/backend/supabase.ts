@@ -235,6 +235,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         ...(d.hargaProduk ? { hargaProduk: d.hargaProduk } : {}),
         // Belum diatur = semua fasilitas ada; jangan kirim null yang menimpa.
         ...(d.fasilitas ? { fasilitas: d.fasilitas } : {}),
+        ...(d.personil ? { personil: d.personil } : {}),
       }
       check(await sb.rpc('bbm_save_settings_terbatas', { p_spbu: aktif(), p_patch }))
     },
@@ -470,9 +471,9 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
 
     async uploadPhoto(reportId, blob, name) {
       const id = genId('p')
-      // Video lapor cepat (mp4/webm) disimpan dengan tipe aslinya; selain itu foto JPEG.
-      const tipe = blob.type.startsWith('video/') ? blob.type.split(';')[0] : 'image/jpeg'
-      const path = `${aktif()}/${reportId}/${id}.${tipe === 'video/mp4' ? 'mp4' : tipe === 'video/webm' ? 'webm' : 'jpg'}`
+      // Video lapor cepat (mp4/webm) dan berita acara PDF disimpan dengan tipe aslinya; selain itu foto JPEG.
+      const tipe = blob.type.startsWith('video/') || blob.type === 'application/pdf' ? blob.type.split(';')[0] : 'image/jpeg'
+      const path = `${aktif()}/${reportId}/${id}.${tipe === 'video/mp4' ? 'mp4' : tipe === 'video/webm' ? 'webm' : tipe === 'application/pdf' ? 'pdf' : 'jpg'}`
       check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: tipe, upsert: false }))
       return { id, name, at: new Date().toISOString(), path }
     },

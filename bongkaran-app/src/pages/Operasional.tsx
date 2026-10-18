@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { CheckCheck, ClipboardCheck, FileDown, FileSpreadsheet, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
+import { CalendarDays, CalendarClock, CheckCheck, ClipboardCheck, FileDown, FileSpreadsheet, Info, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { CheckRow, Choice, Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -9,7 +9,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
@@ -20,7 +20,7 @@ import type { StatusIsi } from '@/lib/status-isi'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { useApp } from '@/lib/app-state'
 import type { InsidenRecord } from '@/lib/daily'
-import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
+import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { compressImage } from '@/lib/image'
 import {
   aktivitasRapi,
@@ -36,11 +36,15 @@ import {
   fotoOps,
   jadwal,
   judulForm,
+  KETENTUAN_OPS,
+  labelTangki,
   OIL_OPSI,
   opsId,
   statusOps,
   STATUS_LABEL,
+  statusJadwal,
   SUMUR_OPSI,
+  tangkiDariKunci,
   tanggalSimpan,
   type OpsChecklist,
   type OpsData,
@@ -49,6 +53,7 @@ import {
   type Tanda,
 } from '@/lib/ops'
 import type { Photo } from '@/lib/sop'
+import { useOps } from '@/lib/use-ops'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { cn } from '@/lib/utils'
 
@@ -69,26 +74,6 @@ const WARNA: Record<OpsStatus, string> = {
   lengkap: 'bg-primary',
   temuan: 'bg-error',
   paraf: 'bg-tertiary',
-}
-
-/** Catatan bbm_ops pada rentang tanggal; dimuat ulang saat SPBU/rentang berubah. */
-function useOps(from: string, to: string) {
-  const app = useApp()
-  const kunci = `${app.spbuId}|${from}|${to}`
-  const [hasil, setHasil] = useState<{ kunci: string; recs: OpsRecord[]; error: string | null } | null>(null)
-  const muat = useCallback(
-    () =>
-      app.backend.listOps(from, to).then(
-        (recs) => setHasil({ kunci, recs, error: null }),
-        (e) => setHasil({ kunci, recs: [], error: pesan(e) }),
-      ),
-    [app.backend, from, to, kunci],
-  )
-  useEffect(() => {
-    void muat()
-  }, [muat])
-  const kini = hasil?.kunci === kunci ? hasil : null
-  return { recs: kini?.recs ?? null, error: kini?.error ?? null, muat }
 }
 
 const namaSaya = (app: ReturnType<typeof useApp>) => (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault || '' : app.displayName)
@@ -156,6 +141,10 @@ export function OpsMenu() {
             {recs ? `${terisi}/${semua.length} form terisi` : 'Memuat…'}
           </span>
         </div>
+        <Link to={`/ops/kalender${filter ? `?grup=${filter}` : ''}`} className={cn(buttonVariants({ variant: 'glass', size: 'pill' }), 'self-start')}>
+          <CalendarDays aria-hidden="true" />
+          Kalender progres & jadwal
+        </Link>
         {bisaParaf.length > 0 && (
           <Button variant="soft" size="pill" className="self-start" disabled={busy} onClick={() => void parafSemua()}>
             {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <PenLine aria-hidden="true" />}
@@ -244,7 +233,10 @@ export function OpsIsi() {
   const valid = !!f || form === FORM_SUMUR || form === FORM_OIL
   const tanggal = f ? tanggalSimpan(f, tanggalPilih) : tanggalPilih
   const id = opsId(form, tanggal)
-  const { recs, error: errMuat } = useOps(tanggal, tanggal)
+  // Riwayat untuk jadwal aktivitas berkala (mingguan/bulanan): 2 bulan, form bulanan 13 bulan.
+  const sejak = todayIso(addDays(new Date(`${tanggal}T00:00:00`), f?.periode === 'bulanan' ? -400 : -62))
+  const { recs: riwayat, error: errMuat } = useOps(sejak, tanggal)
+  const recs = useMemo(() => riwayat?.filter((r) => r.tanggal === tanggal) ?? null, [riwayat, tanggal])
   const lama = recs?.find((r) => r.id === id)
   const [edit, setD] = useState<OpsData | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -273,6 +265,8 @@ export function OpsIsi() {
 
   const bolehUbah = bolehIsi(app.role, form)
   const paraf = bolehParaf(app.role)
+  // Housekeeping diisi Cleaning Service; pengawas/ABH hanya memaraf catatan yang sudah ada.
+  const hanyaParaf = !bolehUbah && paraf && !!lama
   const ubah = (fn: (x: OpsData) => OpsData) => {
     setError(null)
     setDirty(true)
@@ -300,10 +294,12 @@ export function OpsIsi() {
   const simpan = async () => {
     const galat = cekOps(form, d)
     if (galat) return setError(galat)
-    if (lama && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah catatan terkirim?', pesan: <>Catatan <b>{judulForm(form)}</b> tanggal <b>{formatTanggalIso(tanggal)}</b> sudah terkirim. Isian baru akan menggantikan data sebelumnya.</>, ya: 'Ya, ubah data' }))) return
+    if (lama && !hanyaParaf && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah catatan terkirim?', pesan: <>Catatan <b>{judulForm(form)}</b> tanggal <b>{formatTanggalIso(tanggal)}</b> sudah terkirim. Isian baru akan menggantikan data sebelumnya.</>, ya: 'Ya, ubah data' }))) return
     setBusy('simpan')
     try {
-      await app.backend.saveOps({ id, form, tanggal, data: { ...d, petugas: d.petugas.trim() }, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
+      // Mode paraf: isian Cleaning Service dipertahankan apa adanya, hanya paraf yang berubah.
+      const data = hanyaParaf && lama ? { ...lama.data, paraf: d.paraf } : { ...d, petugas: d.petugas.trim() }
+      await app.backend.saveOps({ id, form, tanggal, data, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
       guard.bypass()
       const kembali = `/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`
       const x = Object.values(d.jenis === 'checklist' ? d.hasil : {}).filter((v) => v === 'X').length
@@ -341,6 +337,7 @@ export function OpsIsi() {
   }
 
   const periode = f?.periode === 'bulanan' ? `Bulan ${BULAN[Number(tanggal.slice(5, 7)) - 1]} ${tanggal.slice(0, 4)}` : formatTanggalIso(tanggal)
+  const tangki = tangkiDariKunci(form)
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -349,12 +346,22 @@ export function OpsIsi() {
           {f ? (f.kategori === 'hk' ? 'Checklist housekeeping' : 'Kartu perawatan') : 'Pantauan lingkungan'} · {periode}
         </span>
         <span className="text-headline-md font-bold text-on-surface">{judulForm(form)}</span>
-        {!bolehUbah && <span className="text-body-sm text-on-surface-variant">Hanya dapat dilihat: form ini diisi oleh peran lain.</span>}
+        {tangki && (
+          <span className="tabular text-body-sm text-on-surface-variant">
+            {labelTangki(tangki)}
+            {tangki.kapasitas ? ` · kapasitas ${(tangki.kapasitas / 1000).toLocaleString('id-ID', { maximumFractionDigits: 1 })} KL` : ''}
+          </span>
+        )}
+        {!bolehUbah && (
+          <span className="text-body-sm text-on-surface-variant">
+            {form.startsWith('hk-') ? 'Checklist housekeeping diisi Cleaning Service.' : 'Form ini diisi oleh peran lain.'} {hanyaParaf ? 'Anda dapat memaraf catatan ini.' : 'Hanya dapat dilihat.'}
+          </span>
+        )}
         <ErrorBox text={errMuat} />
       </GlassCard>
 
       <fieldset disabled={!bolehUbah || !!busy} className="flex min-w-0 flex-col gap-space-md">
-        {d.jenis === 'checklist' && f && <Checklist f={f} d={d} ubah={ubah} srcOf={srcOf} busy={busy} unggah={unggah} hapusFoto={hapusFoto} />}
+        {d.jenis === 'checklist' && f && <Checklist f={f} form={form} tanggal={tanggal} riwayat={riwayat ?? []} d={d} ubah={ubah} srcOf={srcOf} busy={busy} unggah={unggah} hapusFoto={hapusFoto} />}
 
         {d.jenis === 'sumur' && (
           <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
@@ -417,13 +424,15 @@ export function OpsIsi() {
           </GlassCard>
         )}
 
+      </fieldset>
+      <fieldset disabled={(!bolehUbah && !hanyaParaf) || !!busy} className="flex min-w-0 flex-col gap-space-md">
         <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Petugas" htmlFor="ops-petugas">
-              <Input id="ops-petugas" value={d.petugas} onChange={(e) => ubah((x) => ({ ...x, petugas: e.target.value }))} />
+              <Input id="ops-petugas" disabled={!bolehUbah} value={d.petugas} onChange={(e) => ubah((x) => ({ ...x, petugas: e.target.value }))} />
             </Field>
             <Field label="Jam" htmlFor="ops-jam">
-              <Input id="ops-jam" type="time" value={d.jam} onChange={(e) => ubah((x) => ({ ...x, jam: e.target.value }))} />
+              <Input id="ops-jam" type="time" disabled={!bolehUbah} value={d.jam} onChange={(e) => ubah((x) => ({ ...x, jam: e.target.value }))} />
             </Field>
           </div>
           <CheckRow
@@ -435,10 +444,12 @@ export function OpsIsi() {
             {!paraf && <span className="block text-body-sm text-on-surface-variant">Diparaf oleh pengawas atau ABH.</span>}
           </CheckRow>
           <ErrorBox text={error} />
-          <Button size="lg" onClick={() => void simpan()}>
-            {busy === 'simpan' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
-            Simpan
-          </Button>
+          {(bolehUbah || hanyaParaf) && (
+            <Button size="lg" onClick={() => void simpan()}>
+              {busy === 'simpan' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
+              {hanyaParaf ? 'Simpan paraf' : 'Simpan'}
+            </Button>
+          )}
         </GlassCard>
       </fieldset>
       {lama && paraf && (
@@ -452,8 +463,55 @@ export function OpsIsi() {
   )
 }
 
+/** Warna label jadwal aktivitas. */
+const NADA_JADWAL = (j: string) =>
+  j === 'harian' ? 'bg-primary/10 text-primary' : j === 'seminggu sekali' || j === '3 hari sekali' ? 'bg-amber-100 text-amber-800' : j.includes('bulan') ? 'bg-violet-100 text-violet-800' : 'bg-surface-container-high text-on-surface-variant'
+const tglPendek = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+
+/** Ketentuan pengisian & ringkasan jadwal aktivitas satu form (dari format asli). */
+function KetentuanJadwal({ f, tempo }: { f: NonNullable<ReturnType<typeof formById>>; tempo: number }) {
+  const per = new Map<string, number>()
+  for (const a of f.aktivitas) per.set(jadwal(a, f.periode), (per.get(jadwal(a, f.periode)) ?? 0) + 1)
+  return (
+    <GlassCard level={2} className={cn('flex flex-col gap-space-sm p-space-md', tempo > 0 && 'ring-1 ring-amber-400')}>
+      <div className="flex items-start gap-space-sm">
+        <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-800">
+          <CalendarClock className="size-5" />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <span className="text-body-md font-bold text-on-surface">Ketentuan jadwal {f.kategori === 'hk' ? 'pembersihan' : 'pemeriksaan'}</span>
+          <span className="text-body-sm text-on-surface-variant">
+            {tempo > 0 ? <b className="text-amber-800">{tempo} aktivitas berkala jatuh tempo {f.periode === 'harian' ? 'hari ini' : 'bulan ini'}.</b> : 'Tidak ada aktivitas berkala yang jatuh tempo.'}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {[...per].map(([j, n]) => (
+          <span key={j} className={cn('rounded-full px-2.5 py-1 text-[12px] font-semibold', NADA_JADWAL(j))}>
+            {n} {j}
+          </span>
+        ))}
+      </div>
+      <details className="text-body-sm text-on-surface-variant">
+        <summary className="flex cursor-pointer items-center gap-1.5 font-semibold text-primary">
+          <Info aria-hidden="true" className="size-4" />
+          Cara pengisian
+        </summary>
+        <ol className="mt-1 list-decimal space-y-1 pl-5">
+          {KETENTUAN_OPS.map((k) => (
+            <li key={k}>{k}</li>
+          ))}
+        </ol>
+      </details>
+    </GlassCard>
+  )
+}
+
 function Checklist({
   f,
+  form,
+  tanggal,
+  riwayat,
   d,
   ubah,
   srcOf,
@@ -462,6 +520,9 @@ function Checklist({
   hapusFoto,
 }: {
   f: NonNullable<ReturnType<typeof formById>>
+  form: string
+  tanggal: string
+  riwayat: OpsRecord[]
   d: OpsChecklist
   ubah: (fn: (x: OpsData) => OpsData) => void
   srcOf: (p: Photo) => string | undefined
@@ -473,7 +534,14 @@ function Checklist({
   const set = (fn: (x: OpsChecklist) => OpsChecklist) => ubah((x) => (x.jenis === 'checklist' ? fn(x) : x))
   const semuaBaik = () => set((x) => ({ ...x, hasil: { ...Object.fromEntries(wajib.map((i) => [i, 'OK' as Tanda])), ...x.hasil } }))
   const bagianList = f.aktivitas.map((a) => aktivitasRapi(a).bagian)
+  // Aktivitas berkala: jatuh tempo bila belum dikerjakan dalam selangnya (cuci tangki 5 tahunan tanpa catatan tidak disorot).
+  const sj = f.aktivitas.map((_, i) => {
+    const x = statusJadwal(form, i, tanggal, riwayat)
+    return { ...x, tempo: x.jatuhTempo && x.jadwal !== 'harian' && !(x.selang && x.selang > 365 && !x.terakhir) }
+  })
   return (
+    <>
+    <KetentuanJadwal f={f} tempo={sj.filter((x, i) => x.tempo && !d.hasil[i]).length} />
     <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
       <div className="flex flex-wrap items-center justify-between gap-space-sm">
         <span className="text-body-sm text-on-surface-variant">
@@ -487,17 +555,25 @@ function Checklist({
       <ol className="flex flex-col divide-y divide-outline-variant/40">
         {f.aktivitas.map((a, i) => {
           const { bagian, item } = aktivitasRapi(a)
-          const j = jadwal(a)
+          const j = sj[i]
           const v = d.hasil[i]
           const t = d.temuan[i]
           const judulBagian = bagian && bagian !== bagianList[i - 1] ? bagian : ''
+          const sorot = j.tempo && !v
           return (
-            <li key={i} className="flex flex-col gap-space-xs py-space-sm">
+            <li key={i} className={cn('flex flex-col gap-space-xs py-space-sm', sorot && '-mx-space-sm rounded-md bg-amber-50 px-space-sm')}>
               {judulBagian && <span className="text-tag uppercase text-primary">{judulBagian}</span>}
               <div className="flex items-center gap-space-sm">
-                <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-body-md text-on-surface">{item}</span>
-                  {f.periode === 'harian' && j !== 'harian' && <span className="text-body-sm text-on-surface-variant">{j}</span>}
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', NADA_JADWAL(j.jadwal))}>{j.jadwal}</span>
+                    {j.jadwal !== 'harian' && j.selang !== null && (
+                      <span className={cn('text-[12px]', j.tempo ? 'font-semibold text-amber-800' : 'text-on-surface-variant')}>
+                        {j.tempo ? `Jatuh tempo${j.terakhir ? ` · terakhir ${tglPendek(j.terakhir)}` : ' · belum tercatat'}` : j.berikut ? `Berikutnya ${tglPendek(j.berikut)} · terakhir ${tglPendek(j.terakhir!)}` : 'Belum tercatat dalam riwayat'}
+                      </span>
+                    )}
+                  </span>
                 </span>
                 <TandaPilih
                   label={item}
@@ -542,6 +618,7 @@ function Checklist({
         })}
       </ol>
     </GlassCard>
+    </>
   )
 }
 
@@ -606,8 +683,10 @@ export function LaporanOps() {
         // Foto temuan disisipkan di PDF; foto yang sudah dipangkas cut-off dilewati.
         Promise.all(temuanFoto.map(async (p) => [p.id, await app.backend.photoDataUrl(p).catch(() => '')] as const)).then((x) => Object.fromEntries(x)),
       ])
+      const { isiOps } = await import('@/lib/report/ops')
       const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
-      exportOpsPdf({ tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings, grup, fotoData, hariIni }, `Laporan_Operasional_SPBU_${kode}_${bulan}.pdf`)
+      const dasar = { tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings }
+      await exportOpsPdf({ ...dasar, grup, fotoData, hariIni, lembar: isiOps(dasar).lembar }, `Laporan_Operasional_SPBU_${kode}_${bulan}.pdf`)
     } catch (e) {
       toast(`Gagal membuat PDF: ${pesan(e)}`)
     } finally {

@@ -5,12 +5,14 @@
  */
 import JSZip from 'jszip'
 
-export type FormatAngka = 'int' | 'dec1' | 'dec2' | 'rp' | 'pct'
+export type FormatAngka = 'int' | 'dec1' | 'dec2' | 'rp' | 'pct' | 'akun'
 export interface Gaya {
   b?: boolean
   /** Ukuran huruf (bawaan 11). */
   sz?: number
   border?: boolean
+  /** Garis satu sisi saja (mis. kepala & kolom tanda tangan voucher). */
+  garis?: 'atas' | 'bawah'
   align?: 'left' | 'center' | 'right'
   valign?: 'top' | 'center'
   wrap?: boolean
@@ -27,6 +29,7 @@ const NUMFMT: Record<FormatAngka, [number, string]> = {
   dec2: [166, '#,##0.00'],
   rp: [167, '"Rp "#,##0'],
   pct: [168, '0.00"%"'],
+  akun: [169, '_-"Rp"* #,##0_-;\\-"Rp"* #,##0_-;_-"Rp"* "-"_-;_-@_-'],
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -96,13 +99,13 @@ class Gayaan {
     const xfs = gs.map((g) => {
       const fmt = g.fmt ? NUMFMT[g.fmt][0] : 0
       const al = g.align || g.valign || g.wrap ? `<alignment${g.align ? ` horizontal="${g.align}"` : ''} vertical="${g.valign ?? 'center'}"${g.wrap ? ' wrapText="1"' : ''}/>` : ''
-      return `<xf numFmtId="${fmt}" fontId="${fontIdx(g)}" fillId="${g.fill ? 2 : 0}" borderId="${g.border ? 1 : 0}" xfId="0"${fmt ? ' applyNumberFormat="1"' : ''} applyFont="1"${g.fill ? ' applyFill="1"' : ''}${g.border ? ' applyBorder="1"' : ''}${al ? ' applyAlignment="1"' : ''}>${al}</xf>`
+      return `<xf numFmtId="${fmt}" fontId="${fontIdx(g)}" fillId="${g.fill ? 2 : 0}" borderId="${g.border ? 1 : g.garis === 'atas' ? 2 : g.garis === 'bawah' ? 3 : 0}" xfId="0"${fmt ? ' applyNumberFormat="1"' : ''} applyFont="1"${g.fill ? ' applyFill="1"' : ''}${g.border || g.garis ? ' applyBorder="1"' : ''}${al ? ' applyAlignment="1"' : ''}>${al}</xf>`
     })
     const garis = '<left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/>'
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="${Object.keys(NUMFMT).length}">${Object.values(NUMFMT)
       .map(([id, c]) => `<numFmt numFmtId="${id}" formatCode="${esc(c)}"/>`)
-      .join('')}</numFmts><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border>${garis}</border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`
+      .join('')}</numFmts><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border>${garis}</border><border><left/><right/><top style="thin"><color auto="1"/></top><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`
   }
 }
 

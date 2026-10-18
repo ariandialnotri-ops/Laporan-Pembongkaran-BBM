@@ -299,6 +299,8 @@ export interface Settings {
   apab: AparUnit[]
   /** Fasilitas SPBU (modul Operasional); undefined = semua fasilitas ada. */
   fasilitas?: string[]
+  /** Daftar personil SPBU (termasuk yang tidak punya akun aplikasi): modul Personil & Jadwal Shift. */
+  personil?: Personil[]
   /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
   fotoSimpanBulan?: number
   /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */
@@ -321,6 +323,15 @@ export interface Nozzle {
 }
 
 /** Unit dispenser (pompa) di SPBU. */
+/** Personil SPBU. `aktif` false = tidak lagi bertugas (tetap di riwayat jadwal). */
+export interface Personil {
+  id: string
+  nama: string
+  jabatan: string
+  hp: string
+  aktif: boolean
+}
+
 export interface Dispenser {
   id: string
   /** Nomor/nama unit, mis. "Dispenser 1". */

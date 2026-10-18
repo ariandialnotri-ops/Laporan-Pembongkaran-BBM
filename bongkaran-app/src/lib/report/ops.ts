@@ -5,7 +5,7 @@
  * BBM tidak disertakan karena sudah diunduh dari modul masing-masing.
  */
 import type { InsidenRecord } from '@/lib/daily'
-import { FORM_OIL, FORM_SUMUR, OPS_FORMS, OPS_KEPALA, opsId, type OpsRecord } from '@/lib/ops'
+import { FORM_OIL, FORM_SUMUR, formTangki, OPS_FORMS, OPS_KEPALA, opsId, PER_TANGKI, tangkiOps, type OpsRecord, type TangkiOps } from '@/lib/ops'
 import type { Settings } from '@/lib/sop'
 import { Workbook, type CellSpec } from './xlsx'
 
@@ -44,46 +44,154 @@ export interface OpsExportInput {
   filename: string
 }
 
-export async function buatOpsXlsx({ tahun, bulan, recs, kerusakan, settings }: Omit<OpsExportInput, 'filename'>) {
-  const wb = await Workbook.loadTemplate('/templates/ops-template.xlsx')
-  for (const nama of SHEET_LAIN) await wb.removeSheet(nama)
+/** Kartu per tangki (format asli: satu kartu per tangki pendam) -> sheet template. */
+const SHEET_TANGKI: Record<string, string> = {
+  'PERAWATAN POMPA': 'PERAWATAN POMPA',
+  'PERAWATAN TANGKI': 'PERAWATAN TANGKI',
+  'KARTU PERAWATAN POMPA & TANGKI': 'KARTU POMPA & TANGKI',
+}
+
+/**
+ * Kepala kartu di luar kartu pertama tiap sheet (template asli masih berisi kode SPBU, bulan, dan contoh
+ * kapasitas dari SPBU lain); ditulis ulang supaya setiap kartu memuat SPBU & periode laporan.
+ */
+const KEPALA_LAIN: [string, string, string][] = [
+  ['Kartu Perawatan', 'B36', 'SPBU   : {KODE}'],
+  ['Kartu Perawatan', 'B37', 'BULAN : {BULAN}'],
+  ['Kartu Perawatan', 'B38', 'TAHUN : {TAHUN}'],
+  ['Kartu Perawatan', 'B70', 'SPBU   : {KODE}'],
+  ['Kartu Perawatan', 'B71', 'BULAN : {BULAN} {TAHUN}'],
+  ['Kartu Perawatan', 'B101', 'SPBU   : {KODE}'],
+  ['Kartu Perawatan', 'B102', 'BULAN : {BULAN} {TAHUN}'],
+  ['Kartu Perawatan', 'E102', 'Kapasitas        :   KVA'],
+  ['TOTEM & KANOPI', 'C33', '{KODE}'],
+  ['TOTEM & KANOPI', 'C34', '{BULAN}'],
+  ['TOTEM & KANOPI', 'C35', '{TAHUN}'],
+  ['KARTU PERAWATAN OUTLET RITEL', 'B5', 'SPBU : {KODE}'],
+  ['LISPLANG KANOPY RAMBU2 DLL', 'B4', 'SPBU    :  {KODE}'],
+  ...[33, 61, 88, 113, 138, 159, 185, 211, 240].flatMap((r): [string, string, string][] => [
+    ['Checklist Housekeeping', `C${r}`, 'SPBU   : {KODE}'],
+    ['Checklist Housekeeping', `C${r + 1}`, 'BULAN : {BULAN} {TAHUN}'],
+  ]),
+]
+
+/** Kartu per halaman PDF (sheet yang memuat beberapa kartu): baris awal-akhir dan form pemiliknya. */
+export const HALAMAN_SHEET: Record<string, { rows: [number, number]; form?: string }[]> = {
+  'Kartu Perawatan': [
+    { rows: [1, 32], form: 'apar-harian' },
+    { rows: [33, 66], form: 'panel-listrik' },
+    { rows: [67, 97], form: 'genset' },
+  ],
+  'Checklist Housekeeping': [
+    { rows: [1, 29], form: 'hk-driveway' },
+    { rows: [30, 57], form: 'hk-mushola' },
+    { rows: [58, 84], form: 'hk-wudhu' },
+    { rows: [85, 109], form: 'hk-kantor' },
+    { rows: [110, 134], form: 'hk-enduro' },
+    { rows: [135, 155], form: 'hk-taman' },
+    { rows: [156, 181], form: 'hk-toilet' },
+    { rows: [182, 207], form: 'hk-gudang' },
+    { rows: [208, 236], form: 'hk-ruang-buh' },
+    { rows: [237, 259], form: 'hk-ruang-istirahat' },
+  ],
+  'TOTEM & KANOPI': [
+    { rows: [1, 29], form: 'totem' },
+    { rows: [30, 56], form: 'kanopi-pompa' },
+  ],
+}
+
+/** Satu sheet hasil: `dari` = sheet template asalnya (kartu per tangki disalin dari sheet yang sama). */
+export interface LembarOps {
+  nama: string
+  dari: string
+  cells: Record<string, CellSpec>
+  /** Kartu per tangki: tangki pemiliknya. */
+  tangki?: TangkiOps
+}
+
+const kl = (liter: number) => `${(Math.round((liter / 1000) * 10) / 10).toLocaleString('id-ID')} KL`
+
+/** Nama sheet kartu per tangki (maks. 31 karakter, unik). */
+function namaSheetTangki(dasar: string, t: TangkiOps, dipakai: Set<string>) {
+  const sfx = /^\d+$/.test(t.tankNo.trim()) ? `T${t.tankNo.trim()}` : t.tankNo.replace(/[\\/?*[\]:']/g, ' ').trim()
+  let nama = `${dasar} ${sfx}`.slice(0, 31).trim()
+  for (let i = 2; dipakai.has(nama); i++) nama = `${`${dasar} ${sfx}`.slice(0, 28).trim()} ${i}`
+  dipakai.add(nama)
+  return nama
+}
+
+/** Isi semua sel laporan operasional satu bulan, dipakai bersama oleh Excel dan PDF (format asli). */
+export function isiOps({ tahun, bulan, recs, kerusakan, settings }: Omit<OpsExportInput, 'filename'>, tanks: TangkiOps[] = tangkiOps()) {
   const jumlahHari = new Date(tahun, bulan, 0).getDate()
   const byId = new Map(recs.map((r) => [r.id, r]))
   const kota = (settings.namaSpbu || '').replace(/^SPBU\s*/i, '').trim()
   const pengawas = settings.namaPengawasDefault?.trim() || ''
+  const ganti = (teks: string) =>
+    teks.replaceAll('{KODE}', settings.kodeSpbu || '').replaceAll('{KOTA}', kota).replaceAll('{BULAN}', BULAN[bulan - 1]).replaceAll('{TAHUN}', String(tahun))
 
-  // Sel per sheet dikumpulkan dulu lalu ditulis sekali per sheet.
-  const isi = new Map<string, Record<string, CellSpec>>()
-  const tulis = (sheet: string, ref: string, value: CellSpec['value'], fmt?: string) => {
-    const m = isi.get(sheet) ?? {}
-    m[ref] = fmt ? { value, fmt } : { value }
-    isi.set(sheet, m)
+  // Sheet hasil: kartu pompa/tangki disalin per tangki pendam; tanpa database tangki satu kartu umum.
+  const dipakai = new Set<string>()
+  const salinan = new Map<string, { nama: string; t: TangkiOps }[]>()
+  if (tanks.length) for (const dasar of Object.keys(SHEET_TANGKI)) salinan.set(dasar, tanks.map((t) => ({ nama: namaSheetTangki(SHEET_TANGKI[dasar], t, dipakai), t })))
+  const lembar = new Map<string, LembarOps>()
+  const buka = (nama: string, dari: string, tangki?: TangkiOps) => {
+    if (!lembar.has(nama)) lembar.set(nama, { nama, dari, cells: {}, tangki })
+    return lembar.get(nama)!
+  }
+  /** Sheet tujuan untuk sheet template (salinan per tangki: semua salinan, atau satu tangki tertentu). */
+  const tujuan = (sheet: string, tankId?: string) => {
+    const s = salinan.get(sheet)
+    if (!s) return [buka(sheet, sheet)]
+    return s.filter((x) => !tankId || x.t.id === tankId).map((x) => buka(x.nama, sheet, x.t))
+  }
+  const tulis = (sheet: string, ref: string, value: CellSpec['value'], fmt?: string, tankId?: string) => {
+    for (const l of tujuan(sheet, tankId)) l.cells[ref] = fmt ? { value, fmt } : { value }
   }
 
-  // Judul: kode SPBU, bulan, tahun.
-  for (const [sheet, ref, teks] of OPS_KEPALA) {
-    if (teks === '{TAHUN#}') tulis(sheet, ref, tahun)
-    else tulis(sheet, ref, teks.replaceAll('{KODE}', settings.kodeSpbu || '').replaceAll('{KOTA}', kota).replaceAll('{BULAN}', BULAN[bulan - 1]).replaceAll('{TAHUN}', String(tahun)))
+  // Judul: kode SPBU, bulan, tahun di setiap kartu.
+  for (const [sheet, ref, teks] of OPS_KEPALA) tulis(sheet, ref, teks === '{TAHUN#}' ? tahun : ganti(teks))
+  for (const [sheet, ref, teks] of KEPALA_LAIN) tulis(sheet, ref, ganti(teks))
+
+  // Kepala kartu per tangki: produk, kapasitas, no tangki. Merk/tipe/nomor seri pompa diisi tangan (contoh template dikosongkan).
+  const isiTangki = (t: TangkiOps | null) => {
+    const id = t?.id
+    tulis('PERAWATAN POMPA', 'I5', null, undefined, id)
+    tulis('PERAWATAN POMPA', 'I6', t ? t.produk.toUpperCase() : null, undefined, id)
+    tulis('PERAWATAN POMPA', 'I7', t?.kapasitas ? kl(t.kapasitas) : null, undefined, id)
+    tulis('PERAWATAN POMPA', 'Q5', null, undefined, id)
+    tulis('PERAWATAN POMPA', 'Q6', null, undefined, id)
+    tulis('PERAWATAN TANGKI', 'I4', null, undefined, id)
+    tulis('PERAWATAN TANGKI', 'I5', t ? `${t.kapasitas ? kl(t.kapasitas) : ''} (${t.tankNo})`.trim() : null, undefined, id)
+    tulis('PERAWATAN TANGKI', 'R4', null, undefined, id)
+    tulis('PERAWATAN TANGKI', 'R5', null, undefined, id)
+    tulis('KARTU PERAWATAN POMPA & TANGKI', 'F4', t ? (/^\d+$/.test(t.tankNo.trim()) ? Number(t.tankNo) : t.tankNo) : null, undefined, id)
+    tulis('KARTU PERAWATAN POMPA & TANGKI', 'F5', t?.kapasitas ? `( ${kl(t.kapasitas)} )` : null, undefined, id)
+    tulis('KARTU PERAWATAN POMPA & TANGKI', 'F6', t?.produk ?? null, undefined, id)
   }
+  if (tanks.length) tanks.forEach(isiTangki)
+  else isiTangki(null)
 
   // Kartu perawatan & housekeeping: kosongkan semua kolom hari/bulan, lalu isi tanda.
   for (const f of OPS_FORMS) {
-    for (const b of f.blok) {
-      const lewati = new Set(b.lewati)
-      const baris = [...b.baris.map(([r]) => r), ...(b.paraf ? [b.paraf] : [])]
-      for (const col of Object.values(b.kolom)) for (const r of baris) if (!lewati.has(`${huruf(col)}${r}`)) tulis(b.sheet, `${huruf(col)}${r}`, null)
-      for (const [kunci, col] of Object.entries(b.kolom)) {
-        const n = Number(kunci)
-        const tanggal = f.periode === 'bulanan' ? iso(tahun, n, 1) : n <= jumlahHari ? iso(tahun, bulan, n) : null
-        if (!tanggal || (f.periode === 'bulanan' && n > bulan)) continue
-        const rec = byId.get(opsId(f.id, tanggal))
-        if (rec?.data.jenis !== 'checklist') continue
-        for (const [r, ai] of b.baris) {
-          const ref = `${huruf(col)}${r}`
-          const v = rec.data.hasil[ai]
-          if (v && !lewati.has(ref)) tulis(b.sheet, ref, v === 'OK' ? f.tanda : v)
+    const kunci = PER_TANGKI.includes(f.id) && tanks.length ? tanks.map((t) => ({ form: formTangki(f.id, t.id), tankId: t.id })) : [{ form: f.id, tankId: undefined }]
+    for (const { form, tankId } of kunci) {
+      for (const b of f.blok) {
+        const lewati = new Set(b.lewati)
+        const baris = [...b.baris.map(([r]) => r), ...(b.paraf ? [b.paraf] : [])]
+        for (const col of Object.values(b.kolom)) for (const r of baris) if (!lewati.has(`${huruf(col)}${r}`)) tulis(b.sheet, `${huruf(col)}${r}`, null, undefined, tankId)
+        for (const [n0, col] of Object.entries(b.kolom)) {
+          const n = Number(n0)
+          const tanggal = f.periode === 'bulanan' ? iso(tahun, n, 1) : n <= jumlahHari ? iso(tahun, bulan, n) : null
+          if (!tanggal || (f.periode === 'bulanan' && n > bulan)) continue
+          const rec = byId.get(opsId(form, tanggal))
+          if (rec?.data.jenis !== 'checklist') continue
+          for (const [r, ai] of b.baris) {
+            const ref = `${huruf(col)}${r}`
+            const v = rec.data.hasil[ai]
+            if (v && !lewati.has(ref)) tulis(b.sheet, ref, v === 'OK' ? f.tanda : v, undefined, tankId)
+          }
+          if (b.paraf && rec.data.paraf) tulis(b.sheet, `${huruf(col)}${b.paraf}`, inisial(rec.data.paraf.nama), undefined, tankId)
         }
-        if (b.paraf && rec.data.paraf) tulis(b.sheet, `${huruf(col)}${b.paraf}`, inisial(rec.data.paraf.nama))
       }
     }
   }
@@ -114,8 +222,6 @@ export async function buatOpsXlsx({ tahun, bulan, recs, kerusakan, settings }: O
   // Breakdown: satu entri = dua baris (7-8, 9-10, ...); baris tambahan meniru entri terakhir template.
   const daftar = [...kerusakan].sort((a, b) => a.tanggal.localeCompare(b.tanggal))
   const slot = Math.max(4, daftar.length)
-  const bdPath = await wb.sheetPath('BREAK DOWN')
-  await wb.editSheet(bdPath, (doc) => siapkanBreakdown(doc, slot))
   for (let i = 0; i < slot; i++) {
     const r = 7 + i * 2
     const x = daftar[i]
@@ -133,7 +239,46 @@ export async function buatOpsXlsx({ tahun, bulan, recs, kerusakan, settings }: O
     tulis('BREAK DOWN', `J${r}`, selesai ? tgl(selesai.at) : null, 'dd/mm/yyyy')
   }
 
-  for (const [sheet, cells] of isi) await wb.setCells(await wb.sheetPath(sheet), cells)
+  // Urutan mengikuti template; salinan per tangki menggantikan sheet asalnya.
+  const urut = TEMPLATE_URUT
+  const hasil: LembarOps[] = []
+  for (const sheet of urut) {
+    const s = salinan.get(sheet)
+    if (s) for (const x of s) hasil.push(lembar.get(x.nama) ?? buka(x.nama, sheet, x.t))
+    else hasil.push(lembar.get(sheet) ?? buka(sheet, sheet))
+  }
+  return { lembar: hasil, slotBreakdown: slot }
+}
+
+/** Urutan sheet template laporan operasional (tanpa Cek Tera, Kualitas Harian, Persediaan BBM). */
+const TEMPLATE_URUT = [
+  'PERAWATAN POMPA',
+  'PERAWATAN TANGKI',
+  'KARTU PERAWATAN OUTLET RITEL',
+  'LISPLANG KANOPY RAMBU2 DLL',
+  'TOTEM & KANOPI',
+  'Kartu Perawatan',
+  'Checklist Housekeeping',
+  'BREAK DOWN',
+  'SUMUR PANTAU',
+  'OIL CATCHER',
+  'KARTU PERAWATAN POMPA & TANGKI',
+]
+
+export async function buatOpsXlsx(input: Omit<OpsExportInput, 'filename'>) {
+  const { lembar, slotBreakdown } = isiOps(input)
+  const wb = await Workbook.loadTemplate('/templates/ops-template.xlsx')
+  for (const nama of SHEET_LAIN) await wb.removeSheet(nama)
+  // Kartu per tangki: salin sheet template, lalu hapus sheet asalnya.
+  const asal = new Set<string>()
+  for (const l of lembar)
+    if (l.nama !== l.dari) {
+      await wb.cloneSheet(l.dari, l.nama)
+      asal.add(l.dari)
+    }
+  for (const nama of asal) await wb.removeSheet(nama)
+  await wb.editSheet(await wb.sheetPath('BREAK DOWN'), (doc) => siapkanBreakdown(doc, slotBreakdown))
+  for (const l of lembar) await wb.setCells(await wb.sheetPath(l.nama), l.cells)
   await wb.cleanup()
   return wb.toBlob()
 }

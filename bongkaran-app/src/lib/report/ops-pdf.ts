@@ -5,7 +5,10 @@
  */
 import { jsPDF } from 'jspdf'
 import type { InsidenRecord } from '@/lib/daily'
-import { aktivitasRapi, FORM_OIL, FORM_SUMUR, formById, jadwal, judulForm, opsId, statusOps, STATUS_LABEL, type OpsRecord, type OpsStatus } from '@/lib/ops'
+import { aktivitasRapi, FORM_OIL, FORM_SUMUR, formById, formDasar, judulForm, statusOps, type OpsRecord } from '@/lib/ops'
+import type { CellValue } from './numfmt'
+import { HALAMAN_SHEET, type LembarOps } from './ops'
+import type { Layout } from './sheet-canvas'
 import type { Photo, Settings } from '@/lib/sop'
 
 type RGB = [number, number, number]
@@ -14,8 +17,6 @@ const GARIS: RGB = [190, 190, 190]
 const HIJAU: RGB = [56, 118, 29]
 const MERAH: RGB = [192, 0, 0]
 const ABU: RGB = [110, 110, 110]
-const LATAR: RGB = [234, 241, 251]
-const PEKAN: RGB = [246, 246, 246]
 
 const PW = 841.89
 const PH = 595.28
@@ -24,7 +25,6 @@ const LEBAR = PW - M * 2
 const BAWAH = PH - 34
 
 const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
 export interface OpsPdfInput {
   tahun: number
@@ -43,13 +43,6 @@ export interface OpsPdfInput {
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const ddmm = (iso: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '-')
-const inisial = (nama: string) =>
-  nama
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 3)
-    .map((s) => s[0]!.toUpperCase())
-    .join('')
 
 class Pdf {
   doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true })
@@ -78,6 +71,18 @@ class Pdf {
     d.setTextColor(0, 0, 0)
     this.y = M + 34
     return this.y
+  }
+
+  /** Halaman berisi satu gambar kartu (sheet template), dimuat utuh di dalam margin. */
+  gambarHalaman(canvas: HTMLCanvasElement) {
+    if (this.halaman++) this.doc.addPage()
+    const lebar = PW - M * 2
+    const tinggi = PH - M * 2 - 14
+    const s = Math.min(lebar / canvas.width, tinggi / canvas.height)
+    const w = canvas.width * s
+    const h = canvas.height * s
+    this.doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', M + (lebar - w) / 2, M, w, h, undefined, 'FAST')
+    this.y = BAWAH
   }
 
   muat(h: number) {
@@ -170,117 +175,50 @@ function tinggiBaris(p: Pdf, lebar: number[], sel: Sel[], fs = 7, minH = 12) {
 }
 
 /** Tabel dengan kepala yang diulang di halaman baru. */
-function tabel(p: Pdf, lebar: number[], kepala: Sel[], isi: { sel: Sel[]; fill?: RGB; bold?: boolean }[], judulLanjut: string) {
-  baris(p, lebar, kepala, { header: true })
-  for (const r of isi) {
-    const h = tinggiBaris(p, lebar, r.sel)
-    if (!p.muat(h)) {
-      p.baru()
-      p.judul(`${judulLanjut} (lanjutan)`, '', 0)
-      baris(p, lebar, kepala, { header: true })
-    }
-    baris(p, lebar, r.bold ? r.sel.map((s) => ({ ...s, bold: true })) : r.sel, { fill: r.fill })
-  }
+
+
+
+/** Sheet template -> form pemilik (untuk menyaring kartu sesuai fasilitas SPBU). */
+const FORM_SHEET: Record<string, string> = {
+  'PERAWATAN POMPA': 'pompa-dorong',
+  'PERAWATAN TANGKI': 'tangki-dorong',
+  'KARTU PERAWATAN POMPA & TANGKI': 'pompa-tangki-rutin',
+  'KARTU PERAWATAN OUTLET RITEL': 'outlet-ritel',
+  'LISPLANG KANOPY RAMBU2 DLL': 'hk-kanopi-totem',
+  'SUMUR PANTAU': FORM_SUMUR,
+  'OIL CATCHER': FORM_OIL,
 }
 
-const selTanda = (v: string | undefined, tanda: 'OK' | '√'): Sel => {
-  if (v === 'OK') return tanda === '√' ? { t: '', centang: true } : { t: 'OK', color: HIJAU, bold: true }
-  if (v === 'X') return { t: 'X', color: MERAH, bold: true }
-  if (v === '-') return { t: '-', color: ABU }
-  return { t: '' }
-}
-
-const ringkasStatus = (st: OpsStatus[]) => {
-  const n = (s: OpsStatus) => st.filter((x) => x === s).length
-  const isi = st.filter((x) => x !== 'kosong').length
-  return `${isi}/${st.length} terisi${n('temuan') ? ` · ${n('temuan')} ada temuan` : ''}${n('paraf') ? ` · ${n('paraf')} diparaf` : ''}`
-}
-
-export function buatOpsPdf(input: OpsPdfInput) {
-  const { tahun, bulan, recs, kerusakan, settings, grup, fotoData, hariIni } = input
+/**
+ * PDF Laporan Operasional dalam format asli: setiap kartu digambar dari tata letak sheet template Excel
+ * (lebar kolom, sel gabungan, garis, font) dengan isi sel yang sama persis dengan file Excel, satu kartu
+ * per halaman A4 mendatar. Lampiran: daftar temuan beserta fotonya.
+ */
+export async function buatOpsPdf(input: OpsPdfInput & { lembar: LembarOps[] }) {
+  const { tahun, bulan, recs, settings, grup, fotoData, lembar } = input
   const bulanIso = `${tahun}-${pad2(bulan)}`
-  const nHari = new Date(tahun, bulan, 0).getDate()
-  const byId = new Map(recs.map((r) => [r.id, r]))
-  const tanggal = Array.from({ length: nHari }, (_, i) => `${bulanIso}-${pad2(i + 1)}`)
-  const minggu = (t: string) => new Date(`${t}T00:00:00`).getDay() === 0
   const spbu = [settings.namaSpbu, settings.kodeSpbu && `No. ${settings.kodeSpbu}`].filter(Boolean).join(' · ') || 'SPBU'
   const p = new Pdf('LAPORAN OPERASIONAL SPBU', `${spbu} · ${BULAN[bulan - 1]} ${tahun}`)
+  const [{ default: layouts }, { drawLayout, potongLayout }] = await Promise.all([import('@/data/ops-layouts.json'), import('./sheet-canvas')])
+  const tampil = new Set(grup.flatMap((g) => g.forms).map(formDasar))
+  const ada = (form?: string) => !form || tampil.has(formDasar(form))
+
+  for (const l of lembar) {
+    const lay = (layouts as unknown as Record<string, Layout>)[l.dari]
+    if (!lay || !ada(FORM_SHEET[l.dari])) continue
+    const values: Record<string, CellValue> = {}
+    const formats: Record<string, string> = {}
+    for (const [ref, c] of Object.entries(l.cells)) {
+      values[ref] = c.value
+      if (c.fmt) formats[ref] = c.fmt
+    }
+    const halaman = HALAMAN_SHEET[l.dari]?.filter((h) => ada(h.form)) ?? [{ rows: [lay.area.r1, lay.area.r2] as [number, number] }]
+    for (const h of halaman) {
+      const canvas = await drawLayout(potongLayout(lay, h.rows[0], h.rows[1]), values, { scale: 2, formats })
+      p.gambarHalaman(canvas)
+    }
+  }
   p.baru()
-
-  for (const g of grup) {
-    for (const id of g.forms) {
-      if (id === FORM_SUMUR || id === FORM_OIL) continue
-      const f = formById(id)
-      if (!f) continue
-      const bulanan = f.periode === 'bulanan'
-      // Form harian: kolom tanggal; form bulanan: kolom Januari–Desember.
-      const kolom = bulanan ? BLN.map((b, i) => ({ label: b, id: opsId(id, `${tahun}-${pad2(i + 1)}-01`), lewat: `${tahun}-${pad2(i + 1)}` > hariIni.slice(0, 7), libur: false })) : tanggal.map((t) => ({ label: String(Number(t.slice(8))), id: opsId(id, t), lewat: t > hariIni, libur: minggu(t) }))
-      const wNo = 16
-      const wAkt = bulanan ? 250 : 190
-      const wKol = (LEBAR - wNo - wAkt) / kolom.length
-      const lebar = [wNo, wAkt, ...kolom.map(() => wKol)]
-      const rec = kolom.map((k) => byId.get(k.id))
-      const st = kolom.flatMap((k, i) => (k.lewat ? [] : [statusOps(id, rec[i])]))
-      p.judul(`${judulForm(id)}${bulanan ? ' (bulanan)' : ''}`, `${g.judul} · ${ringkasStatus(st)}`)
-      const kepala: Sel[] = [{ t: 'No' }, { t: 'Aktivitas', align: 'left' }, ...kolom.map((k) => ({ t: k.label }))]
-      let bagian = ''
-      const isi: { sel: Sel[]; fill?: RGB; bold?: boolean }[] = []
-      f.aktivitas.forEach((a, i) => {
-        const r = aktivitasRapi(a)
-        if (r.bagian && r.bagian !== bagian) {
-          bagian = r.bagian
-          isi.push({ sel: [{ t: '' }, { t: r.bagian, align: 'left' }, ...kolom.map(() => ({ t: '' }))], fill: LATAR, bold: true })
-        }
-        const j = bulanan ? '' : jadwal(a)
-        isi.push({
-          sel: [
-            { t: String(i + 1) },
-            { t: j && j !== 'harian' ? `${r.item} (${j})` : r.item, align: 'left' },
-            ...kolom.map((k, ki): Sel => {
-              const d = rec[ki]?.data
-              const s = selTanda(d?.jenis === 'checklist' ? d.hasil[i] : undefined, f.tanda)
-              return k.libur && !s.t && !s.centang ? { ...s, fill: PEKAN } : s
-            }),
-          ],
-        })
-      })
-      isi.push({ sel: [{ t: '' }, { t: 'Petugas', align: 'left', bold: true }, ...rec.map((r): Sel => ({ t: r?.data.petugas ? inisial(r.data.petugas) : '', color: ABU }))] })
-      isi.push({ sel: [{ t: '' }, { t: 'Paraf pengawas', align: 'left', bold: true }, ...rec.map((r): Sel => ({ t: r?.data.paraf ? inisial(r.data.paraf.nama) : '', color: NAVY, bold: true }))] })
-      tabel(p, lebar, kepala, isi, judulForm(id))
-      p.y += 14
-    }
-  }
-
-  // Sumur pantau & oil catcher: satu baris per tanggal yang terisi.
-  const tampil = new Set(grup.flatMap((g) => g.forms))
-  for (const id of [FORM_SUMUR, FORM_OIL]) {
-    if (!tampil.has(id)) continue
-    const isiHari = tanggal.map((t) => byId.get(opsId(id, t))).filter((r): r is OpsRecord => !!r)
-    const st = tanggal.filter((t) => t <= hariIni).map((t) => statusOps(id, byId.get(opsId(id, t))))
-    p.judul(judulForm(id), `Pantauan lingkungan · ${ringkasStatus(st)}`)
-    if (!isiHari.length) {
-      p.doc.setFont('helvetica', 'italic')
-      p.doc.setFontSize(8)
-      p.doc.text('Belum ada catatan bulan ini.', M, p.y + 8)
-      p.y += 22
-      continue
-    }
-    const sumur = id === FORM_SUMUR
-    const lebar = sumur ? [58, 62, 62, 62, 62, 120, 165, 90, 40, 65] : [58, 120, 140, 210, 110, 40, 107.89]
-    const kepala: Sel[] = sumur
-      ? ['Tanggal', 'Sumur I', 'Sumur II', 'Sumur III', 'Sumur IV', 'Hasil', 'Keterangan', 'Petugas', 'Jam', 'Paraf'].map((t) => ({ t }))
-      : ['Tanggal', 'Kondisi', 'Hasil', 'Keterangan', 'Petugas', 'Jam', 'Paraf'].map((t) => ({ t }))
-    const isi = isiHari.map((r) => {
-      const d = r.data
-      const paraf: Sel = { t: d.paraf?.nama ?? '', color: NAVY }
-      if (d.jenis === 'sumur')
-        return { sel: [{ t: ddmm(r.tanggal) }, ...[0, 1, 2, 3].map((i): Sel => ({ t: d.sumur[i] ?? '-', color: d.sumur[i] && d.sumur[i] !== 'Nihil' ? MERAH : undefined })), { t: d.hasil, align: 'left' as const }, { t: d.keterangan, align: 'left' as const }, { t: d.petugas }, { t: d.jam }, paraf] }
-      if (d.jenis === 'oil') return { sel: [{ t: ddmm(r.tanggal) }, { t: d.kondisi, color: d.kondisi === 'Penuh' ? MERAH : undefined }, { t: d.hasil, align: 'left' as const }, { t: d.keterangan, align: 'left' as const }, { t: d.petugas }, { t: d.jam }, paraf] }
-      return { sel: [] as Sel[] }
-    })
-    tabel(p, lebar, kepala, isi, judulForm(id))
-    p.y += 14
-  }
 
   // Temuan bulan ini (tanda X, sumur tidak nihil, oil catcher penuh) beserta foto.
   const temuan = recs
@@ -334,61 +272,10 @@ export function buatOpsPdf(input: OpsPdfInput) {
     p.y += 14
   }
 
-  // Breakdown: laporan kerusakan bulan ini (modul Insiden).
-  const bd = [...kerusakan].sort((a, b) => a.tanggal.localeCompare(b.tanggal))
-  p.judul(`Breakdown peralatan (${bd.length})`, 'Dari laporan kerusakan modul Insiden')
-  if (!bd.length) {
-    p.doc.setFont('helvetica', 'italic')
-    p.doc.setFontSize(8)
-    p.doc.text('Tidak ada laporan kerusakan.', M, p.y + 8)
-    p.y += 22
-  } else {
-    const lebar = [22, 110, 190, 190, 90, 58, 58, LEBAR - 22 - 110 - 190 - 190 - 90 - 58 - 58]
-    const kepala = ['No', 'Peralatan', 'Kerusakan', 'Tindakan', 'PIC', 'Tgl rusak', 'Tgl selesai', 'Status'].map((t) => ({ t }))
-    tabel(
-      p,
-      lebar,
-      kepala,
-      bd.map((x, i) => {
-        const selesai = x.data.riwayat.find((l) => l.status === 'selesai')
-        const tindakan = [x.data.tindakanSegera, ...x.data.riwayat.slice(1).map((l) => l.catatan)].filter(Boolean).join('; ')
-        return {
-          sel: [
-            { t: String(i + 1) },
-            { t: x.data.aset || x.data.kategori, align: 'left' as const },
-            { t: x.data.uraian, align: 'left' as const },
-            { t: tindakan || '-', align: 'left' as const },
-            { t: x.data.pic || x.data.pelapor },
-            { t: ddmm(x.tanggal) },
-            { t: selesai ? ddmm(selesai.at.slice(0, 10)) : '-' },
-            { t: x.data.status === 'selesai' ? 'Selesai' : 'Belum selesai', color: x.data.status === 'selesai' ? HIJAU : MERAH },
-          ],
-        }
-      }),
-      'Breakdown peralatan',
-    )
-  }
-
-  // Keterangan tanda & pengesahan.
-  if (!p.muat(70)) p.baru()
-  p.y += 6
-  const d = p.doc
-  d.setFont('helvetica', 'normal')
-  d.setFontSize(7.5)
-  d.setTextColor(...ABU)
-  d.text(`Keterangan: OK / centang = baik · X = ada temuan (catatan & foto) · - = tidak dilakukan · kolom abu-abu = hari Minggu · Status: ${Object.values(STATUS_LABEL).join(', ')}`, M, p.y)
-  d.setTextColor(0, 0, 0)
-  const pengawas = settings.namaPengawasDefault?.trim() || '....................'
-  const kx = PW - M - 180
-  d.setFontSize(9)
-  d.text(`${BULAN[bulan - 1]} ${tahun}`, kx + 90, p.y + 14, { align: 'center' })
-  d.text('Pengawas SPBU', kx + 90, p.y + 26, { align: 'center' })
-  d.text(`( ${pengawas} )`, kx + 90, p.y + 64, { align: 'center' })
-
   p.kaki()
   return p.doc
 }
 
-export function exportOpsPdf(input: OpsPdfInput, filename: string) {
-  buatOpsPdf(input).save(filename)
+export async function exportOpsPdf(input: OpsPdfInput & { lembar: LembarOps[] }, filename: string) {
+  ;(await buatOpsPdf(input)).save(filename)
 }

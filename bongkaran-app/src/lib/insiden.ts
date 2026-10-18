@@ -37,6 +37,10 @@ export interface InsidenLangkah {
   oleh: string
   status: StatusInsiden
   catatan: string
+  /** Foto tindak lanjut (perbaikan, kondisi setelah ditangani). */
+  foto?: Photo[]
+  /** Berita acara / dokumen pendukung (foto dokumen atau PDF). */
+  ba?: Photo[]
 }
 
 /** Pemberhentian penyaluran sementara karena kerusakan (produk yang tidak dapat disalurkan). */
