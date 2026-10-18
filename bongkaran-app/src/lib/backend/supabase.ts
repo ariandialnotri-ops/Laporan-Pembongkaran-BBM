@@ -154,7 +154,8 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         const me = check(await sb.from('bbm_members').select('nama').eq('user_id', user.id).maybeSingle())
         nama = (me as { nama: string | null } | null)?.nama ?? null
       }
-      return { user: { id: user.id, email: user.email ?? '' }, role, nama }
+      const superadmin = role === 'abh' && !!check(await sb.rpc('bbm_saya_superadmin'))
+      return { user: { id: user.id, email: user.email ?? '' }, role, nama, superadmin }
     },
     onAuthChange(cb) {
       const { data } = sb.auth.onAuthStateChange((event, session) => {

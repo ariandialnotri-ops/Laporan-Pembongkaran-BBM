@@ -24,8 +24,11 @@ Deno.serve(async (req) => {
   if (!caller.user) return balas(401, { error: 'Sesi tidak valid, silakan masuk ulang.' })
   const { data: me } = await admin.from('bbm_members').select('role').eq('user_id', caller.user.id).maybeSingle()
   if (me?.role !== 'abh') return balas(403, { error: 'Hanya ABH yang dapat mengelola akun.' })
-  // SPBU yang dikendalikan ABH pemanggil.
-  const { data: tautan } = await admin.from('bbm_abh_spbu').select('spbu_id').eq('user_id', caller.user.id)
+  // SPBU yang dikendalikan ABH pemanggil; Super Admin mengendalikan semua SPBU.
+  const { data: superadmin } = await admin.rpc('bbm_cek_superadmin', { p_user: caller.user.id })
+  const { data: tautan } = superadmin
+    ? await admin.from('bbm_spbu').select('spbu_id:id')
+    : await admin.from('bbm_abh_spbu').select('spbu_id').eq('user_id', caller.user.id)
   const unit = new Set((tautan ?? []).map((t: { spbu_id: string }) => t.spbu_id))
 
   let body: Record<string, unknown>
@@ -41,9 +44,9 @@ Deno.serve(async (req) => {
     const userId = String(body.userId ?? '')
     const { data: anggota } = await admin.from('bbm_members').select('user_id,spbu_id,role').eq('user_id', userId).maybeSingle()
     if (!anggota) return balas(404, { error: 'Anggota tidak ditemukan.' })
-    // Sandi ABH lain tidak boleh diatur: ABH itu bisa mengendalikan SPBU lain yang bukan milik pemanggil.
-    if (anggota.role === 'abh' && userId !== caller.user.id) return balas(403, { error: 'Kata sandi ABH lain hanya dapat diganti oleh ABH itu sendiri.' })
-    const boleh = userId === caller.user.id || (!!anggota.spbu_id && unit.has(anggota.spbu_id))
+    // Sandi ABH lain tidak boleh diatur: ABH itu bisa mengendalikan SPBU lain yang bukan milik pemanggil. Kecuali Super Admin.
+    if (anggota.role === 'abh' && userId !== caller.user.id && !superadmin) return balas(403, { error: 'Kata sandi ABH lain hanya dapat diganti oleh ABH itu sendiri.' })
+    const boleh = userId === caller.user.id || !!superadmin || (!!anggota.spbu_id && unit.has(anggota.spbu_id))
     if (!boleh) return balas(403, { error: 'Anggota ini bukan dari SPBU yang Anda kendalikan.' })
     const { error } = await admin.auth.admin.updateUserById(userId, { password })
     if (error) return balas(400, { error: error.message })

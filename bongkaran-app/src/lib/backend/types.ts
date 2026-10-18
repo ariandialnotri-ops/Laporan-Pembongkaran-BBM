@@ -64,6 +64,8 @@ export interface SessionInfo {
   /** null = login berhasil tetapi belum terdaftar sebagai anggota. */
   role: Role | null
   nama: string | null
+  /** ABH Super Admin: mengendalikan semua SPBU dan boleh mengelola akun ABH lain. */
+  superadmin?: boolean
 }
 
 /**

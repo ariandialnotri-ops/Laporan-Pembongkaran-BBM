@@ -384,6 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       session,
       role,
       isAdmin,
+      superadmin: isAdmin && !!session.superadmin,
       canManage,
       can: (path) => bolehBuka(role, path),
       displayName,

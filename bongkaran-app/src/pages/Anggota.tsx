@@ -115,13 +115,19 @@ export function Anggota() {
                   <span className="truncate text-body-sm text-on-surface-variant">{m.email}</span>
                 </div>
                 {me ? (
-                  <Pill tone="primary">{roleLabel(m.role)} · Anda</Pill>
-                ) : m.role === 'abh' ? (
-                  // ABH lain dapat mengendalikan SPBU lain: peran, sandi, dan keanggotaannya hanya diatur oleh ABH itu sendiri.
+                  <Pill tone="primary">{app.superadmin ? 'Super Admin' : roleLabel(m.role)} · Anda</Pill>
+                ) : m.role === 'abh' && !app.superadmin ? (
+                  // ABH lain dapat mengendalikan SPBU lain: peran, sandi, dan keanggotaannya hanya diatur oleh ABH itu sendiri atau Super Admin.
                   <Pill tone="primary">{roleLabel(m.role)}</Pill>
                 ) : (
                   <div className="flex items-center gap-1">
-                    <PeranSelect label={`Peran ${m.email}`} value={m.role} disabled={busy} onChange={(r) => void run(() => app.backend.setMemberRole(m.user_id, r), 'Peran diperbarui')} />
+                    <PeranSelect
+                      label={`Peran ${m.email}`}
+                      value={m.role}
+                      disabled={busy}
+                      // ABH tidak terikat satu SPBU: saat diturunkan, daftarkan ke SPBU aktif lewat RPC tambah anggota.
+                      onChange={(r) => void run(() => (m.role === 'abh' ? app.backend.addMember(m.email, m.nama ?? '', r) : app.backend.setMemberRole(m.user_id, r)), 'Peran diperbarui')}
+                    />
                     <Button variant="ghost" size="icon" aria-label={`Atur ulang kata sandi ${m.email}`} disabled={busy} onClick={() => navigate(`/anggota/sandi/${encodeURIComponent(m.user_id)}`)}>
                       <KeyRound aria-hidden="true" />
                     </Button>

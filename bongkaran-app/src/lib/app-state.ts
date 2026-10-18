@@ -16,6 +16,8 @@ export interface AppState {
   role: Role
   /** ABH (atau mode lokal): kelola anggota, pengaturan SPBU, dan data utama APAR. */
   isAdmin: boolean
+  /** ABH Super Admin: semua SPBU otomatis terlihat, boleh mengelola akun ABH lain. */
+  superadmin: boolean
   /** ABH atau pengawas: hapus laporan/plan, buka ulang laporan anomali. */
   canManage: boolean
   /** Peran ini boleh membuka halaman tersebut. */
