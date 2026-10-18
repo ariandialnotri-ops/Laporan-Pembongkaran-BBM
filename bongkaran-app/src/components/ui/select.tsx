@@ -6,9 +6,33 @@ import { cn } from '@/lib/utils'
 const Select = SelectPrimitive.Root
 const SelectValue = SelectPrimitive.Value
 
-function SelectTrigger({ className, children, ...props }: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
+/**
+ * Ketukan di luar daftar yang barusan menutup dropdown. Di layar sentuh Radix menutup daftar saat
+ * pointerdown di luar (selama terbuka tombol pemicu tidak menerima pointer), tetapi "click" dari
+ * ketukan yang sama lalu mendarat di tombol pemicu dan membuka daftar lagi, sehingga dropdown tidak
+ * bisa ditutup lewat tombolnya. Click "hantu" itu (tanpa pointerdown di tombol) diabaikan.
+ */
+let tutupLuar = { x: -1, y: -1, waktu: 0 }
+
+function klikHantu(el: HTMLElement) {
+  if (Date.now() - tutupLuar.waktu > 1000) return false
+  const r = el.getBoundingClientRect()
+  return tutupLuar.x >= r.left && tutupLuar.x <= r.right && tutupLuar.y >= r.top && tutupLuar.y <= r.bottom
+}
+
+function SelectTrigger({ className, children, onPointerDown, onClick, ...props }: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
   return (
     <SelectPrimitive.Trigger
+      onPointerDown={(e) => {
+        // Ketukan baru yang sungguh mengenai tombol: bukan click hantu.
+        tutupLuar = { x: -1, y: -1, waktu: 0 }
+        onPointerDown?.(e)
+      }}
+      onClick={(e) => {
+        onClick?.(e)
+        if (klikHantu(e.currentTarget)) e.preventDefault()
+        tutupLuar = { x: -1, y: -1, waktu: 0 }
+      }}
       className={cn(
         'inset-field flex h-12 w-full items-center justify-between gap-2 rounded-md px-3.5 text-left text-body-lg text-on-surface',
         'transition-shadow duration-200 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -31,6 +55,7 @@ function SelectContent({
   className,
   children,
   position = 'popper',
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -39,6 +64,11 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         sideOffset={6}
+        onPointerDownOutside={(e) => {
+          onPointerDownOutside?.(e)
+          const o = e.detail.originalEvent
+          tutupLuar = { x: o.clientX, y: o.clientY, waktu: Date.now() }
+        }}
         className={cn(
           // Latar padat: teks di belakang daftar tidak ikut terlihat (terutama di iOS tanpa blur).
           'z-[70] overflow-hidden rounded-lg border border-outline-variant/50 bg-surface-container-lowest shadow-[0_12px_32px_rgba(15,23,42,0.18)]',

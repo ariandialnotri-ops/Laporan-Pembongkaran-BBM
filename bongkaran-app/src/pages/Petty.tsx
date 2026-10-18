@@ -378,7 +378,7 @@ export function PengajuanPettyForm() {
           <Textarea id="pp-alasan" className="min-h-[88px]" value={alasan} onChange={(e) => set(setAlasan)(e.target.value)} />
         </Field>
         <FotoWajib
-          label="Lampiran (opsional)"
+          label="Lampiran"
           hint="Foto penawaran, contoh barang, atau kerusakan yang akan diperbaiki."
           fotos={lampiran}
           busy={busy === 'foto'}
