@@ -215,6 +215,11 @@ Satu aplikasi untuk banyak SPBU, polanya sama dengan aplikasi Monitoring JBT:
   (cari, saring Semua / Perlu perhatian / Belum siap / Siap, garis Q&Q 7 hari, bongkaran & anomali,
   APAR bulan ini, insiden, jumlah pengawas/akun). Ketuk baris untuk membuka SPBU itu. Tombol
   **Tambah SPBU** membuat unit baru; akun pengawas/kashift/security dibuat di Anggota untuk SPBU aktif.
+- **Super Admin** (admin aplikasi) adalah ABH yang tercatat di `bbm_private.bbm_superadmin`
+  (migrasi `20261018130000_bbm_superadmin.sql`): otomatis mengendalikan **semua SPBU**, termasuk
+  yang dibuat kemudian, dan di Anggota boleh mengubah peran, mengatur ulang sandi, atau menghapus
+  akun ABH lain. ABH biasa tidak dapat mengubah akun ABH lain maupun Super Admin. Daftar Super Admin
+  hanya diubah lewat SQL Editor (lihat komentar di akhir migrasi); tidak bisa lewat aplikasi/API.
 - **Pengawas, kepala shift, security** terikat ke satu SPBU dan hanya melihat data SPBU itu.
 - **SPBU tanpa identitas wajib disiapkan dulu**: selama identitas (nama, kode, jumlah pulau pompa)
   belum ada, pengawas & ABH diarahkan ke **Siapkan Data SPBU** (`/siapkan`): 1) Identitas SPBU,
