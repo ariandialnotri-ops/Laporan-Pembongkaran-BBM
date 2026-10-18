@@ -116,6 +116,9 @@ export function Anggota() {
                 </div>
                 {me ? (
                   <Pill tone="primary">{roleLabel(m.role)} · Anda</Pill>
+                ) : m.role === 'abh' ? (
+                  // ABH lain dapat mengendalikan SPBU lain: peran, sandi, dan keanggotaannya hanya diatur oleh ABH itu sendiri.
+                  <Pill tone="primary">{roleLabel(m.role)}</Pill>
                 ) : (
                   <div className="flex items-center gap-1">
                     <PeranSelect label={`Peran ${m.email}`} value={m.role} disabled={busy} onChange={(r) => void run(() => app.backend.setMemberRole(m.user_id, r), 'Peran diperbarui')} />

@@ -41,11 +41,9 @@ Deno.serve(async (req) => {
     const userId = String(body.userId ?? '')
     const { data: anggota } = await admin.from('bbm_members').select('user_id,spbu_id,role').eq('user_id', userId).maybeSingle()
     if (!anggota) return balas(404, { error: 'Anggota tidak ditemukan.' })
-    let boleh = !!anggota.spbu_id && unit.has(anggota.spbu_id)
-    if (!boleh && anggota.role === 'abh') {
-      const { data: t2 } = await admin.from('bbm_abh_spbu').select('spbu_id').eq('user_id', userId)
-      boleh = (t2 ?? []).some((t: { spbu_id: string }) => unit.has(t.spbu_id))
-    }
+    // Sandi ABH lain tidak boleh diatur: ABH itu bisa mengendalikan SPBU lain yang bukan milik pemanggil.
+    if (anggota.role === 'abh' && userId !== caller.user.id) return balas(403, { error: 'Kata sandi ABH lain hanya dapat diganti oleh ABH itu sendiri.' })
+    const boleh = userId === caller.user.id || (!!anggota.spbu_id && unit.has(anggota.spbu_id))
     if (!boleh) return balas(403, { error: 'Anggota ini bukan dari SPBU yang Anda kendalikan.' })
     const { error } = await admin.auth.admin.updateUserById(userId, { password })
     if (error) return balas(400, { error: error.message })
