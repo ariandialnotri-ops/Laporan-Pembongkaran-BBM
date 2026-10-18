@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate } from 'react-router-dom'
 import { Copy, EyeOff, LoaderCircle, Lock, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -139,6 +140,7 @@ export function ClosingShift() {
 
 function ClosingForm({ tanggal, shift, totalizer }: { tanggal: string; shift: Shift; totalizer: TotalizerRecord | undefined }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const [pecahan, setPecahan] = useState<Record<string, string>>({})
   const [nonTunai, setNonTunai] = useState<Partial<Record<NonTunaiKey, string>>>({})
   const [nonFuel, setNonFuel] = useState<Partial<Record<NonFuelKey, string>>>({})
@@ -204,7 +206,7 @@ function ClosingForm({ tanggal, shift, totalizer }: { tanggal: string; shift: Sh
     if (cash <= 0) return setError('Isi jumlah lembar/keping uang fisik.')
     if (!foto.length) return setError('Foto struk settlement EDC / amplop setoran wajib (minimal 1).')
     if (!petugas.trim()) return setError('Isi nama kepala shift.')
-    if (!window.confirm(`Kirim & kunci closing ${namaShift}? Fisik kas ${rupiah(cash)}. Setelah dikirim hanya ABH yang dapat mengubah.`)) return
+    if (!(await konfirmasi({ jenis: 'kirim', judul: `Kirim closing ${namaShift}?`, pesan: <>Fisik kas <b>{rupiah(cash)}</b>. Setelah dikirim data dikunci; hanya ABH yang dapat mengubah.</>, ya: 'Ya, kirim & kunci' }))) return
     setBusy('kirim')
     try {
       const data: ClosingData = {
@@ -340,13 +342,14 @@ function Baris({ k, v, tebal, merah }: { k: string; v: string; tebal?: boolean; 
 /** Closing yang sudah terkirim (terkunci): rekonsiliasi, rincian, salin teks WhatsApp, hapus (ABH). */
 function ClosingDetail({ rec, onHapus }: { rec: ClosingRecord; onHapus: () => void }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const d = rec.data
   const r = ringkasClosing(d)
   const teks = teksWaClosing(rec, app.settings, zonaWaktu())
   const hapus = async () => {
-    if (!window.confirm('Hapus closing ini? Kepala shift dapat mengisi ulang.')) return
+    if (!(await konfirmasi({ judul: 'Hapus closing?', pesan: <>Closing <b>{formatTanggalIso(rec.tanggal)} {shiftLabel(rec.shift as Shift).split(' (')[0]}</b> dihapus; kepala shift dapat mengisi ulang.</> }))) return
     try {
       await app.backend.deleteCatatan('closing', rec.id)
       toast('Closing dihapus')

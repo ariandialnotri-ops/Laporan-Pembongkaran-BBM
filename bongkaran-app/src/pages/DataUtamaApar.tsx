@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { MapPin, Plus, QrCode, Settings2, Trash2, Wand2 } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
@@ -71,6 +72,7 @@ const COLS: Col<Row>[] = [
  */
 export function DataUtamaApar() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const navigate = useNavigate()
   const baru = useSearchParams()[0].get('baru')
   const toast = useToast()
@@ -189,7 +191,7 @@ export function DataUtamaApar() {
                     aria-label={`Hapus area ${l}`}
                     title={n ? 'Pindahkan dulu unit di area ini' : undefined}
                     disabled={n > 0}
-                    onClick={() => window.confirm(`Hapus area "${l}"?`) && app.updateSettings({ aparArea: areas.filter((x) => x !== l) })}
+                    onClick={async () => (await konfirmasi({ judul: 'Hapus area?', pesan: <>Area <b>{l}</b> akan dihapus dari daftar area APAR.</> })) && app.updateSettings({ aparArea: areas.filter((x) => x !== l) })}
                   >
                     <Trash2 aria-hidden="true" />
                   </Button>

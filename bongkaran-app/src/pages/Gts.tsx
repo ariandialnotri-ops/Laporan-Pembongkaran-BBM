@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Camera, ChevronRight, LoaderCircle, Save, ScanEye, Send, Trash2 } from 'lucide-react'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
@@ -397,6 +398,7 @@ export function GtsForm() {
 /** Report > Riwayat Sampling Penyaluran Subsidi: kepatuhan slot dan isian sampling per tanggal (pengawas/ABH/security); foto dikirim lewat WhatsApp. */
 export function LaporanGts() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const now = slotKini()
@@ -412,7 +414,7 @@ export function LaporanGts() {
   const bolehHapus = app.role === 'abh' || app.role === 'pengawas'
 
   const hapus = async (r: GtsRecord) => {
-    if (!window.confirm(`Hapus sampling ${r.jenis} ${r.data.nopol}?`)) return
+    if (!(await konfirmasi({ judul: 'Hapus sampling?', pesan: <>Sampling <b>{r.jenis} {r.data.nopol}</b> akan dihapus dari riwayat Guard Tour.</> }))) return
     try {
       await app.backend.deleteGts(r.id)
       for (const f of FOTO_GTS) for (const p of r.data.foto?.[f.key] ?? []) void app.backend.deletePhoto(p).catch(() => {})

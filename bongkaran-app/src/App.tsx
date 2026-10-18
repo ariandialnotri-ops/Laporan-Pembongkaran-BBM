@@ -7,6 +7,8 @@ import { AppShell } from '@/components/shell/app-shell'
 import { lepasKunciGulir } from '@/components/shell/viewport'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
+import { KonfirmasiProvider } from '@/components/ui/konfirmasi'
+import { LembarProses } from '@/components/ui/lembar-proses'
 import { ToastProvider } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
@@ -256,9 +258,12 @@ function Gate() {
 function App() {
   return (
     <ToastProvider>
-      <AppProvider>
-        <Gate />
-      </AppProvider>
+      <KonfirmasiProvider>
+        <AppProvider>
+          <Gate />
+        </AppProvider>
+        <LembarProses />
+      </KonfirmasiProvider>
     </ToastProvider>
   )
 }

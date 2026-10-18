@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ClipboardPaste, Cylinder, FileUp, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
@@ -115,6 +116,7 @@ export function TangkiForm() {
 
 function FormTangki({ awal }: { awal: TankDef | null }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -180,7 +182,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
   }
 
   const hapus = async () => {
-    if (!awal || !window.confirm(`Hapus ${tankName(awal.tankNo)} (${awal.produk}) dari database tangki? Laporan lama yang memakai tangki ini tidak lagi menghitung volume dari tabel.`)) return
+    if (!awal || !(await konfirmasi({ judul: 'Hapus tangki?', pesan: <><b>{tankName(awal.tankNo)} ({awal.produk})</b> akan dihapus dari database tangki. Laporan lama yang memakai tangki ini tidak lagi menghitung volume dari tabel.</> }))) return
     try {
       await app.deleteTank(awal.id)
       toast('Tangki dihapus')

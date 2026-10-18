@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Send, TriangleAlert } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -59,6 +60,7 @@ export function StokShift() {
 export function StokShiftForm() {
   const app = useApp()
   const keTerkirim = useKeTerkirim()
+  const konfirmasi = useKonfirmasi()
   const { tanggal, shift, valid } = useKunciShift()
   const id = stokRecordId(tanggal, shift)
   const existing = app.daily.find((d): d is StokRecord => d.kind === 'stok' && d.id === id) ?? null
@@ -83,6 +85,7 @@ export function StokShiftForm() {
     const kosong = TANKS.filter((t) => parseAngka(data.items[t.produk]?.volume ?? '') === null)
     if (kosong.length) return setError(`Isi stok awal: ${kosong.map((t) => t.produk).join(', ')}`)
     if (!data.petugas.trim()) return setError('Isi nama petugas.')
+    if (existing && !(await konfirmasi({ jenis: 'ubah', judul: `Ubah stok ${namaShift}?`, pesan: <>Stok awal <b>{namaShift}</b> tanggal <b>{formatTanggalIso(tanggal)}</b> sudah terkirim. Angka baru akan menggantikan data sebelumnya.</>, ya: 'Ya, ubah data' }))) return
     setSaving(true)
     try {
       const rec: StokRecord = {

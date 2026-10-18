@@ -205,6 +205,20 @@ Sesuai), ringkasan nozzle diperiksa & di bawah toleransi, tanda tangan Petugas U
 Pengawas SPBU, kaki halaman "FLOQ · No. BA", kode verifikasi, nomor halaman. Lampiran: dua hasil per
 halaman, foto dudukan bejana & water pass dan hasil pengukuran (bercap waktu).
 
+## Konfirmasi & notifikasi proses
+
+- **Modal konfirmasi** (`src/components/ui/konfirmasi.tsx`, `useKonfirmasi()`), pengganti `window.confirm`:
+  kartu di tengah layar dengan ikon & tombol aksi yang jelas. `hapus` (merah, "Tidak, simpan" /
+  "Ya, hapus", ditambah "Tindakan ini tidak dapat dibatalkan"), `ubah` (oranye, untuk mengubah data
+  riwayat yang sudah terkirim: totalizer lengkap, stok awal, water content, catatan operasional,
+  buka ulang bongkaran) dan `kirim` (biru, mis. kirim & kunci closing).
+- **Lembar proses** (`src/components/ui/lembar-proses.tsx`, `src/lib/proses.ts`): setiap kirim,
+  unggah foto/video, dan hapus lewat backend dilacak otomatis. Proses >0,4 detik menampilkan
+  "Mengunggah…" / "Memproses…" / "Menghapus…" (tidak bisa ditutup selama berjalan), lalu
+  "Berhasil!" / "Berhasil dihapus" (tutup otomatis). Bila halaman pindah ke Terkirim, halaman itu
+  yang menjadi tanda berhasil. Galat menutup lembar dan pesan galat tetap dari halaman. Penyimpanan
+  latar (autosave draf bongkaran) dibungkus `diam()` sehingga tidak memunculkan lembar.
+
 ## Multi SPBU
 
 Satu aplikasi untuk banyak SPBU, polanya sama dengan aplikasi Monitoring JBT:

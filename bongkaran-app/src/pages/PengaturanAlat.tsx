@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -69,6 +70,7 @@ export function DataDispenser() {
 /** Pengaturan > Data Dispenser > tambah/ubah satu dispenser (halaman tersendiri). */
 export function DispenserEdit() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const navigate = useNavigate()
   const keTerkirim = useKeTerkirim()
   const { id = '' } = useParams()
@@ -107,8 +109,8 @@ export function DispenserEdit() {
             ],
           })
         }}
-        onHapus={() => {
-          if (!ada || !window.confirm(`Hapus ${ada.nama}? Nozzle di unit ini tidak lagi terhubung ke dispenser.`)) return
+        onHapus={async () => {
+          if (!ada || !(await konfirmasi({ judul: 'Hapus dispenser?', pesan: <><b>{ada.nama}</b> akan dihapus. Nozzle di unit ini tidak lagi terhubung ke dispenser.</> }))) return
           simpanList(
             list.filter((x) => x.id !== ada.id),
             s.nozzles.map((n) => (n.dispenserId === ada.id ? { ...n, dispenserId: undefined } : n)),
@@ -253,6 +255,7 @@ export function NozzleTera() {
 /** Pengaturan > Nozzle & Tera Metrologi > tambah/ubah satu nozzle (halaman tersendiri). */
 export function NozzleEdit() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const navigate = useNavigate()
   const keTerkirim = useKeTerkirim()
   const { id = '' } = useParams()
@@ -289,8 +292,8 @@ export function NozzleEdit() {
             ],
           })
         }}
-        onHapus={() => {
-          if (!ada || !window.confirm(`Hapus ${ada.nama}?`)) return
+        onHapus={async () => {
+          if (!ada || !(await konfirmasi({ judul: 'Hapus nozzle?', pesan: <><b>{ada.nama}</b> akan dihapus dari data nozzle.</> }))) return
           app.updateSettings({ nozzles: list.filter((x) => x.id !== ada.id) })
           guard.bypass()
           navigate('/pengaturan/nozzle', { replace: true })

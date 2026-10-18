@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CheckCheck, ClipboardCheck, FileDown, FileSpreadsheet, LoaderCircle, PenLine, Save, Trash2 } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
@@ -232,6 +233,7 @@ function TandaPilih({ value, onChange, tandaOk, label, disabled }: { value?: Tan
 /** Input > Operasional SPBU > satu form pada satu tanggal. */
 export function OpsIsi() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const keTerkirim = useKeTerkirim()
@@ -298,6 +300,7 @@ export function OpsIsi() {
   const simpan = async () => {
     const galat = cekOps(form, d)
     if (galat) return setError(galat)
+    if (lama && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah catatan terkirim?', pesan: <>Catatan <b>{judulForm(form)}</b> tanggal <b>{formatTanggalIso(tanggal)}</b> sudah terkirim. Isian baru akan menggantikan data sebelumnya.</>, ya: 'Ya, ubah data' }))) return
     setBusy('simpan')
     try {
       await app.backend.saveOps({ id, form, tanggal, data: { ...d, petugas: d.petugas.trim() }, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
@@ -323,7 +326,7 @@ export function OpsIsi() {
     }
   }
   const hapus = async () => {
-    if (!lama || !window.confirm(`Hapus catatan ${judulForm(form)} tanggal ${formatTanggalIso(tanggal)}?`)) return
+    if (!lama || !(await konfirmasi({ judul: 'Hapus catatan?', pesan: <>Catatan <b>{judulForm(form)}</b> tanggal <b>{formatTanggalIso(tanggal)}</b> akan dihapus.</> }))) return
     setBusy('hapus')
     try {
       await app.backend.deleteOps(id)

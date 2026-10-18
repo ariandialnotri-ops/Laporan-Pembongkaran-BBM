@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link } from 'react-router-dom'
 import { Gauge, Send, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -88,6 +89,7 @@ export function TotalizerForm() {
   const sebelum = valid ? prevShift({ tanggal, shift }) : { tanggal, shift }
   const { recs } = useCatatan<TotalizerData>('totalizer', sebelum.tanggal, tanggal)
   const lama = recs?.find((r) => r.id === id)
+  const konfirmasi = useKonfirmasi()
   const prev = recs?.find((r) => r.id === idShift(sebelum.tanggal, sebelum.shift))
   const [isian, setIsian] = useState<Record<string, TotalizerNozzle> | null>(null)
   const [petugas, setPetugas] = useState<string | null>(null)
@@ -125,6 +127,8 @@ export function TotalizerForm() {
       if (b !== null && b < a) return setError(`Nozzle ${n.nama}: totalisator akhir lebih kecil dari awal.`)
     }
     if (!namaPetugas.trim()) return setError('Isi nama petugas.')
+    // Totalizer yang sudah lengkap (awal & akhir) adalah riwayat: perubahan perlu dikonfirmasi.
+    if (lama?.data.jamAkhir && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah totalizer terkirim?', pesan: <>Totalizer <b>{formatTanggalIso(tanggal)} {shiftLabel(shift)}</b> sudah lengkap. Angka baru akan menggantikan data sebelumnya dan memengaruhi penjualan closing.</>, ya: 'Ya, ubah data' }))) return
     setBusy(true)
     try {
       const jam = nowHm()
@@ -242,6 +246,7 @@ type BarisTot = { r: TotalizerRecord; jual: { produk: string; liter: number }[];
 /** Report > Riwayat Totalizer: per bulan, penjualan per produk per shift dan per nozzle. */
 export function RiwayatTotalizer() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const [bulan, setBulan] = useState(todayIso().slice(0, 7))
   const [buka, setBuka] = useState<string | null>(null)
@@ -259,7 +264,7 @@ export function RiwayatTotalizer() {
     perNozzle.set(nid, y)
   }
   const hapus = async (r: TotalizerRecord) => {
-    if (!window.confirm(`Hapus totalizer ${formatTanggalIso(r.tanggal)} ${shiftLabel(r.shift as Shift)}?`)) return
+    if (!(await konfirmasi({ judul: 'Hapus totalizer?', pesan: <>Totalizer <b>{formatTanggalIso(r.tanggal)} {shiftLabel(r.shift as Shift)}</b> akan dihapus dari riwayat.</> }))) return
     try {
       await app.backend.deleteCatatan('totalizer', r.id)
       toast('Catatan totalizer dihapus')

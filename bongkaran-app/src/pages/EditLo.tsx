@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Lock, Repeat, Save, Scissors, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -75,6 +76,7 @@ export function EditLo() {
 
 function Form({ plan }: { plan: Plan }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -143,6 +145,7 @@ function Form({ plan }: { plan: Plan }) {
       if (alihBaru(r) && r.asal) return { ...base, status: 'alih', noLOLama: r.noLO.trim(), supplyPointLama: planSupply(plan, r.asal), noLO: r.alihLO.trim(), supplyPoint: r.alihSP }
       return { ...base, noLO: r.noLO.trim(), status: r.status }
     })
+    if (!los.length && !(await konfirmasi({ judul: 'Hapus permintaan?', pesan: <>Semua LO dihapus, sehingga permintaan kirim <b>{formatTanggalIso(plan.tanggal)}</b> ikut terhapus dari Plan & Tracking LO.</> }))) return
     setSaving(true)
     try {
       if (los.length) await app.savePlan({ ...plan, noSO: noSO.trim(), los })

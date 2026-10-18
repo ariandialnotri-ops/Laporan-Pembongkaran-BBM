@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronRight, ClipboardList, FilePlus2, LoaderCircle, PiggyBank, ReceiptText, Send, Trash2, X } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
@@ -460,6 +461,7 @@ const tandaLabel = (t?: Tanda) => (t ? `${t.nama} · ${new Date(t.at).toLocaleSt
 /** Detail pengajuan + persetujuan 1 Admin/Cashier / persetujuan akhir ABH + hapus. */
 export function PengajuanPettyDetail() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const { id = '' } = useParams()
@@ -495,7 +497,7 @@ export function PengajuanPettyDetail() {
     }
   }
   const hapus = async () => {
-    if (!window.confirm(`Hapus pengajuan ${rec.no}?`)) return
+    if (!(await konfirmasi({ judul: 'Hapus pengajuan?', pesan: <>Pengajuan petty cash <b>{rec.no}</b> beserta lampirannya akan dihapus.</> }))) return
     try {
       await app.backend.deletePetty(rec.id)
       for (const p of [...d.lampiran, ...(d.realisasi?.nota ?? [])]) void app.backend.deletePhoto(p).catch(() => {})

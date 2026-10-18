@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { KeyRound, RefreshCw, Trash2, TriangleAlert, UserCheck, UserPlus } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -68,6 +69,7 @@ function KhususAbh() {
 /** Profil > Anggota (khusus ABH): daftar anggota, ubah peran, hapus; form akun di halaman tersendiri. */
 export function Anggota() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const { members, loadError, load, retry } = useAnggota()
@@ -136,7 +138,7 @@ export function Anggota() {
                       size="icon"
                       aria-label={`Hapus ${m.email}`}
                       disabled={busy}
-                      onClick={() => window.confirm(`Hapus ${m.email} dari anggota? Akunnya tidak dapat membuka data SPBU lagi.`) && void run(() => app.backend.removeMember(m.user_id), 'Anggota dihapus')}
+                      onClick={async () => (await konfirmasi({ judul: 'Hapus anggota?', pesan: <><b>{m.nama || m.email}</b> dihapus dari anggota dan tidak dapat membuka data SPBU lagi.</> })) && void run(() => app.backend.removeMember(m.user_id), 'Anggota dihapus')}
                     >
                       <Trash2 aria-hidden="true" />
                     </Button>

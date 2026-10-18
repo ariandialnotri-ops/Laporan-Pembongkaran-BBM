@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Eye, Printer, Save, Trash2 } from 'lucide-react'
 import { CheckRow, Choice, Field } from '@/components/bongkaran/form-bits'
@@ -49,6 +50,7 @@ export function AparUnitForm() {
 
 function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
@@ -98,8 +100,8 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     })
   }
 
-  const hapus = () => {
-    if (!awal || !window.confirm(`Hapus ${awal.u.kode} dari data utama? Label QR unit ini tidak berlaku lagi; riwayat inspeksinya tetap tersimpan.`)) return
+  const hapus = async () => {
+    if (!awal || !(await konfirmasi({ judul: 'Hapus unit?', pesan: <><b>{awal.u.kode}</b> dihapus dari data utama. Label QR unit ini tidak berlaku lagi; riwayat inspeksinya tetap tersimpan.</> }))) return
     app.updateSettings(awal.tipe === 'apar' ? { apar: (s.apar ?? []).filter((x) => x.id !== awal.u.id) } : { apab: (s.apab ?? []).filter((x) => x.id !== awal.u.id) })
     guard.bypass()
     toast(`${awal.u.kode} dihapus`)

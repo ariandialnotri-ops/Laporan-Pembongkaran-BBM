@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Beaker, Camera, CircleCheck, FileDown, FileText, History, LoaderCircle, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
@@ -368,6 +369,7 @@ export function UjiTakaran() {
 /** Pop up satu hasil: data, foto bercap waktu, dan hapus (pengawas/ABH atau pengirim di hari yang sama). */
 function DetailTakar({ r, onClose }: { r: TakarRecord | null; onClose: () => void }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const fotos = r ? [...r.data.foto.dudukan, ...r.data.foto.hasil] : []
   const srcOf = usePhotoSrc(fotos)
@@ -376,7 +378,7 @@ function DetailTakar({ r, onClose }: { r: TakarRecord | null; onClose: () => voi
   const d = r.data
   const bolehHapus = app.canManage || (r.createdBy === app.session.user?.id && r.tanggal === todayIso())
   const hapusHasil = async () => {
-    if (!window.confirm(`Hapus hasil Nozzle ${d.nozzle} ${opsiLabel(d.opsi)} (${formatMl(d.hasilMl)})?`)) return
+    if (!(await konfirmasi({ judul: 'Hapus hasil uji takaran?', pesan: <>Hasil <b>Nozzle {d.nozzle} {opsiLabel(d.opsi)} ({formatMl(d.hasilMl)})</b> akan dihapus dari riwayat.</> }))) return
     setHapus(true)
     try {
       await app.deleteDaily(r)

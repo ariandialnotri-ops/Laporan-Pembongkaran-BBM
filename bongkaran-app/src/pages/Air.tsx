@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link } from 'react-router-dom'
 import { Camera, Droplet, LoaderCircle, Save, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -107,6 +108,7 @@ export function AirForm() {
   const id = airId(tanggal, 1)
   const { recs } = useAir(tanggal, tanggal)
   const lama = recs?.find((r) => r.id === id)
+  const konfirmasi = useKonfirmasi()
   const [isian, setIsian] = useState<Record<string, IsianTangki> | null>(null)
   const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
   const [petugas, setPetugas] = useState<string | null>(null)
@@ -161,6 +163,7 @@ export function AirForm() {
       if (st === 'ada' && !v.tindakan.trim()) return setError(`${namaTangki(t)}: ada air, isi tindakan yang dilakukan.`)
     }
     if (!namaPetugas.trim()) return setError('Isi nama petugas.')
+    if (lama && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah water content terkirim?', pesan: <>Water content <b>{formatTanggalIso(tanggal)}</b> sudah terkirim. Isian baru akan menggantikan data sebelumnya.</>, ya: 'Ya, ubah data' }))) return
     setBusy('kirim')
     try {
       const jam = nowHm()
@@ -305,6 +308,7 @@ export function AirForm() {
 /** Report > Riwayat Water Content: per bulan, temuan air disorot, foto stik pasta air. */
 export function LaporanAir() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const hariIni = todayIso()
   const [bulan, setBulan] = useState(hariIni.slice(0, 7))
@@ -328,7 +332,7 @@ export function LaporanAir() {
   }
   const bolehHapus = app.role === 'abh' || app.role === 'pengawas'
   const hapus = async (r: AirRecord) => {
-    if (!window.confirm(`Hapus water content ${formatTanggalIso(r.tanggal)} ${shiftLabel(r.shift)}?`)) return
+    if (!(await konfirmasi({ judul: 'Hapus water content?', pesan: <>Catatan water content <b>{formatTanggalIso(r.tanggal)} {shiftLabel(r.shift)}</b> akan dihapus dari riwayat.</> }))) return
     try {
       await app.backend.deleteAir(r.id)
       for (const t of Object.values(r.data.tangki)) for (const p of t.foto) void app.backend.deletePhoto(p).catch(() => {})
