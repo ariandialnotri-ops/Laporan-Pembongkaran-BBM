@@ -7,7 +7,7 @@ export type Role = 'abh' | 'pengawas' | 'kashift' | 'security' | 'cs' | 'admin'
 export const ROLES: { key: Role; label: string; desc: string }[] = [
   { key: 'abh', label: 'ABH', desc: 'Area Business Head: beberapa unit bisnis (SPBU), semua modul, anggota, pengaturan SPBU, data utama APAR' },
   { key: 'pengawas', label: 'Pengawas', desc: 'Pengajuan petty cash, laporan stock opname (BA bulanan), totalizer, harga jual, identitas SPBU (pulau pompa), data dispenser, nozzle & tera metrologi, database tangki, inspeksi APAR/APAB, water content tangki, bongkaran & TTD BA, stok awal, uji takaran, plan pengiriman & tracking SO/LO, data utama APAR/APAB & area, uji pasca penerimaan, dashboard monitoring, semua laporan' },
-  { key: 'kashift', label: 'Kepala Shift', desc: 'Closing shift (hitung buta + WhatsApp), totalizer awal/akhir shift, pengajuan petty cash & realisasi, stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
+  { key: 'kashift', label: 'Kepala Shift', desc: 'Dashboard (sama dengan pengawas), closing shift (hitung buta + WhatsApp), totalizer awal/akhir shift, pengajuan petty cash, pengukuran grounding, stok awal, water content tangki, bongkaran, kualitas harian, uji takaran, tracking SO & LO, inspeksi APAR/APAB, kartu perawatan & pantauan lingkungan (Operasional SPBU)' },
   { key: 'security', label: 'Security', desc: 'Dashboard security (pembongkaran, tracking LO, kepatuhan guard tour, laporan kejadian, petty cash security), totalizer awal/akhir shift, sampling penyaluran subsidi JBT/JBKP tiap 2 jam, inspeksi APAR/APAB, sumur pantau & oil catcher, pelaporan insiden / near miss, pengajuan petty cash' },
   { key: 'cs', label: 'Cleaning Service', desc: 'Satu-satunya pengisi checklist housekeeping harian; dashboard CS (progres & kepatuhan housekeeping, petty cash CS, laporan kejadian), pelaporan insiden / near miss, pengajuan petty cash' },
   { key: 'admin', label: 'Admin / Cashier', desc: 'Finance: persetujuan 1 petty cash, realisasi petty cash (pilih akun COA, nota, bayar reimburse, voucher realisasi), pengajuan petty cash, laporan stock opname (BA bulanan)' },
@@ -73,6 +73,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/kalkulator',
   ],
   kashift: [
+    '/',
     '/input',
     '/input/bongkar',
     '/input/',

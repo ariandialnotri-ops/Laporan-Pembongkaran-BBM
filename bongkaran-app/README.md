@@ -323,7 +323,7 @@ membaca/menulis (`bbm_private.bbm_spbu_saya()`); foto disimpan di folder `<spbu_
 |-------|-------|
 | ABH | Beberapa SPBU (unit bisnis) + semua modul, Anggota (buat akun), Pengaturan SPBU, Data utama APAR, Label QR |
 | Pengawas | Identitas SPBU (termasuk jumlah pulau pompa) & Database tangki (wajib diisi untuk SPBU baru), tambah/ubah Data Dispenser (pulau pompa tiap dispenser) dan Nozzle & Tera Metrologi (`20261016120000_bbm_pengawas_dispenser_nozzle.sql`), Dashboard, stok awal, Input Bongkaran & TTD BA, Plan Pengiriman & Tracking SO/LO, Data utama APAR/APAB & area, Label QR, Inspeksi APAR/APAB, Water Content Tangki, Kualitas Harian, Uji Pasca Penerimaan, semua laporan |
-| Kepala Shift | Pengajuan petty cash, pengukuran grounding, stok awal, Water Content Tangki, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
+| Kepala Shift | Dashboard (sama dengan pengawas), pengajuan petty cash, pengukuran grounding, stok awal, Water Content Tangki, Input Bongkaran, Kualitas Harian, Plan & Tracking SO/LO, Inspeksi APAR/APAB, laporan terkait |
 | Security | Dashboard Security (pembongkaran, Tracking LO, kepatuhan guard tour sampling JBT/JBKP, progres kerusakan/insiden/near miss, petty cash pengajuan security), Inspeksi APAR/APAB, sumur pantau & oil catcher, ajukan petty cash, lapor insiden |
 | Cleaning Service (CS) | Dashboard Cleaning Service (progres & kepatuhan housekeeping, jadwal pembersihan berkala, petty cash pengajuan CS, kerusakan/insiden/near miss), satu-satunya pengisi checklist housekeeping, ajukan petty cash, lapor insiden |
 | Admin / Cashier | Finance: persetujuan 1 petty cash (lalu diteruskan ke ABH), pengajuan & realisasi anggaran |
