@@ -22,7 +22,7 @@ import { COA, coaByNo } from '@/lib/coa'
 import { formatBulanTahun, formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { compressImage, genId } from '@/lib/image'
-import { bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, nomorPetty, PERAN_PENGAJU, pettyId, rekapCoa, rupiah, voucherBulan, type JenisPetty, type PettyRecord, type StatusPetty, type Tanda } from '@/lib/petty'
+import { bolehLihatAnggaran, bolehLihatNominal, bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, nomorPetty, PERAN_PENGAJU, pettyId, rekapCoa, rupiah, voucherBulan, type JenisPetty, type PettyRecord, type StatusPetty, type Tanda } from '@/lib/petty'
 import type { Photo } from '@/lib/sop'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
@@ -99,14 +99,17 @@ export function PettyMenu() {
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <span className="text-tag uppercase text-primary">Petty cash · {formatBulanTahun(new Date(`${bulan}-01T00:00:00`))}</span>
-        <Ringkas
-          items={[
-            ['Plafon bulan ini', plafonNilai ? rupiah(plafonNilai) : 'Belum diatur'],
-            ['Anggaran disetujui', rupiah(anggaran), plafonNilai > 0 && anggaran > plafonNilai],
-            ['Realisasi', rupiah(realisasi)],
-            ['Sisa plafon', plafonNilai ? rupiah(plafonNilai - realisasi) : '-', plafonNilai > 0 && realisasi > plafonNilai],
-          ]}
-        />
+        {/* Plafon, anggaran & realisasi hanya untuk Admin/Cashier dan ABH. */}
+        {bolehLihatAnggaran(app.role) && (
+          <Ringkas
+            items={[
+              ['Plafon bulan ini', plafonNilai ? rupiah(plafonNilai) : 'Belum diatur'],
+              ['Anggaran disetujui', rupiah(anggaran), plafonNilai > 0 && anggaran > plafonNilai],
+              ['Realisasi', rupiah(realisasi)],
+              ['Sisa plafon', plafonNilai ? rupiah(plafonNilai - realisasi) : '-', plafonNilai > 0 && realisasi > plafonNilai],
+            ]}
+          />
+        )}
         <span className="text-body-sm text-on-surface-variant">
           Pengajuan pengadaan atau reimburse oleh anggota SPBU, persetujuan 1 Admin/Cashier, persetujuan akhir ABH. Akun COA dipilih Admin/Cashier saat realisasi, lalu voucher realisasi dicetak per tanggal.
         </span>
@@ -125,7 +128,7 @@ export function PettyMenu() {
             badge: tindakan,
           }}
         />
-        {(bolehRealisasi(app.role) || app.role === 'pengawas') && (
+        {bolehRealisasi(app.role) && (
           <MenuCard
             index={1}
             m={{
@@ -134,7 +137,7 @@ export function PettyMenu() {
               title: 'Realisasi Petty Cash',
               desc: 'Pilih akun COA, catat nota, bayar reimburse, voucher realisasi',
               status: recs === null ? 'Memuat…' : belumReal ? `${belumReal} disetujui belum direalisasi` : 'Semua terealisasi',
-              badge: bolehRealisasi(app.role) ? belumReal : 0,
+              badge: belumReal,
             }}
           />
         )}
@@ -165,7 +168,7 @@ export function PettyMenu() {
 
 type Saring = 'semua' | 'tindakan' | 'menunggu' | 'Disetujui' | 'Ditolak'
 
-function KartuPengajuan({ r }: { r: PettyRecord }) {
+function KartuPengajuan({ r, nominal }: { r: PettyRecord; nominal: boolean }) {
   const st = labelStatus(r)
   return (
     <Link to={`/finance/petty/pengajuan/${encodeURIComponent(r.id)}`} className="flex items-center gap-space-sm px-space-md py-space-sm active:bg-surface-container-low">
@@ -179,7 +182,7 @@ function KartuPengajuan({ r }: { r: PettyRecord }) {
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
-        <span className="tabular text-body-sm font-bold text-on-surface">{rupiah(r.total)}</span>
+        {nominal && <span className="tabular text-body-sm font-bold text-on-surface">{rupiah(r.total)}</span>}
         <Pill tone={NADA[st] ?? 'neutral'}>{st}</Pill>
       </span>
       <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
@@ -237,7 +240,7 @@ export function PengajuanPetty() {
       ) : (
         <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 overflow-hidden">
           {tampil.map((r) => (
-            <KartuPengajuan key={r.id} r={r} />
+            <KartuPengajuan key={r.id} r={r} nominal={bolehLihatNominal(r, app.role, uid)} />
           ))}
         </GlassCard>
       )}
@@ -467,6 +470,7 @@ export function PengajuanPettyDetail() {
   const bisaPeriksa = rec.status === 'Menunggu Admin' && (app.role === 'abh' || (app.role === 'admin' && !milikSendiri(rec, uid)))
   const bisaPutus = rec.status === 'Menunggu ABH' && app.role === 'abh'
   const bisaHapus = app.role === 'abh' || (rec.status === 'Menunggu Admin' && rec.createdBy === uid)
+  const lihatNominal = bolehLihatNominal(rec, app.role, uid)
   const tanda = (): Tanda => ({ by: uid, nama: app.displayName, at: new Date().toISOString(), catatan: catatan.trim() })
 
   const putuskan = async (status: StatusPetty) => {
@@ -510,12 +514,12 @@ export function PengajuanPettyDetail() {
           </span>
           <Pill tone={NADA[st] ?? 'neutral'}>{st}</Pill>
         </div>
-        <span className="tabular text-headline-md font-bold text-primary">{rupiah(rec.total)}</span>
+        {lihatNominal && <span className="tabular text-headline-md font-bold text-primary">{rupiah(rec.total)}</span>}
         <div className="divide-y divide-outline-variant/40">
           <Baris k="Jenis" v={jenisPetty(rec) === 'reimburse' ? 'Reimburse (sudah dibayar pengaju)' : 'Pengadaan'} />
           <Baris k="Akun COA" v={coaPetty(rec) ? `${coaPetty(rec)!.accountNo} · ${coaPetty(rec)!.activity}` : 'Dipilih Admin/Cashier saat realisasi'} />
           {coaPetty(rec) && <Baris k="Akun SAP / COA ID" v={`${coaPetty(rec)!.sapAccount} · ${coaPetty(rec)!.coaId}`} />}
-          <Baris k="Jumlah" v={`${d.qty} ${d.satuan} × ${rupiah(d.harga)}`} />
+          <Baris k="Jumlah" v={lihatNominal ? `${d.qty} ${d.satuan} × ${rupiah(d.harga)}` : `${d.qty} ${d.satuan}`} />
           {d.vendor && <Baris k="Vendor" v={d.vendor} />}
           <Baris k="Keperluan" v={d.alasan} />
           <Baris k="Diajukan" v={d.diajukanNama} />
@@ -561,8 +565,8 @@ export function PengajuanPettyDetail() {
               <div className="divide-y divide-outline-variant/40">
                 <Baris k="Tanggal" v={formatTanggalIso(d.realisasi.tanggal)} />
                 {d.realisasi.coa && <Baris k="Akun COA" v={`${d.realisasi.coa.accountNo} · ${d.realisasi.coa.activity}`} />}
-                <Baris k="Nominal" v={rupiah(d.realisasi.nominal)} />
-                <Baris k="Selisih dari pengajuan" v={rupiah(rec.total - d.realisasi.nominal)} />
+                {lihatNominal && <Baris k="Nominal" v={rupiah(d.realisasi.nominal)} />}
+                {lihatNominal && <Baris k="Selisih dari pengajuan" v={rupiah(rec.total - d.realisasi.nominal)} />}
                 <Baris k="Dicatat" v={tandaLabel({ ...d.realisasi, catatan: d.realisasi.catatan })} />
               </div>
               <FotoList fotos={d.realisasi.nota} alt="Nota realisasi" />

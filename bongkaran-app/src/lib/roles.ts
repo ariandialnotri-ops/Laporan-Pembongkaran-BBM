@@ -140,6 +140,8 @@ export function bolehBuka(role: Role, path: string) {
   // Personil & jadwal shift: semua anggota melihat; daftar & jadwal diubah pengawas/ABH.
   if (path === '/personil' || path.startsWith('/personil/')) return true
   if (IKHTISAR.includes(path)) return true
+  // Realisasi petty cash (plafon, anggaran, voucher) hanya Admin/Cashier dan ABH.
+  if (path === '/finance/petty/realisasi' || path.startsWith('/finance/petty/realisasi/')) return role === 'admin'
   return AKSES[role].some((p) => (p.endsWith('/') && p !== '/' ? path.startsWith(p) : path === p))
 }
 

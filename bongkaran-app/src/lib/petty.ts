@@ -31,6 +31,10 @@ export const JENIS_PETTY: { value: JenisPetty; label: string; desc: string }[] =
 export const PERAN_PENGAJU: Role[] = ['kashift', 'pengawas', 'admin', 'security', 'cs']
 /** Realisasi (pilih COA, catat nota, voucher) oleh Admin/Cashier; ABH sebagai cadangan. */
 export const bolehRealisasi = (role: Role | null) => role === 'admin' || role === 'abh'
+/** Plafon, anggaran disetujui, realisasi & nominal pengajuan hanya untuk Admin/Cashier dan ABH. */
+export const bolehLihatAnggaran = bolehRealisasi
+/** Nominal satu pengajuan: Admin/Cashier & ABH, atau pengaju sendiri. */
+export const bolehLihatNominal = (r: Pick<PettyRecord, 'createdBy'>, role: Role | null, uid: string | null) => bolehLihatAnggaran(role) || (!!uid && r.createdBy === uid)
 /** Security & cleaning service hanya melihat pengajuan dari perannya sendiri (sama dengan RLS bbm_petty). */
 export const bolehLihatPetty = (r: PettyRecord, role: Role | null, uid: string | null) =>
   role === 'abh' || role === 'admin' || role === 'pengawas' || role === 'kashift' || r.data.peran === role || (!!uid && r.createdBy === uid)

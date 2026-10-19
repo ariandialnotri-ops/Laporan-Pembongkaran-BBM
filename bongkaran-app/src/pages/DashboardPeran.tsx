@@ -10,7 +10,7 @@ import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { JUMLAH_SLOT, slotKini, statusSlot, type GtsRecord } from '@/lib/gts'
 import { JENIS_INSIDEN, jenisLabel, statusMeta } from '@/lib/insiden'
 import { formKategori, jatuhTempoAktivitas, judulForm, kepatuhanBulan } from '@/lib/ops'
-import { labelStatus, rupiah, type PettyRecord } from '@/lib/petty'
+import { bolehLihatNominal, labelStatus, rupiah, type PettyRecord } from '@/lib/petty'
 import { LO_STATUS, loStatus } from '@/lib/plan'
 import type { Role } from '@/lib/roles'
 import { useOps } from '@/lib/use-ops'
@@ -123,7 +123,7 @@ function KartuPetty({ role }: { role: Role }) {
                 <span className="truncate text-body-sm font-semibold text-on-surface">{r.data.uraian}</span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className="tabular text-body-sm font-bold">{rupiah(r.total)}</span>
+                {bolehLihatNominal(r, app.role, uid) && <span className="tabular text-body-sm font-bold">{rupiah(r.total)}</span>}
                 <Pill tone={labelStatus(r) === 'Ditolak' ? 'error' : labelStatus(r).startsWith('Menunggu') ? 'cyan' : 'success'}>{labelStatus(r)}</Pill>
               </span>
             </Link>

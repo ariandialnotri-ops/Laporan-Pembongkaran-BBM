@@ -322,7 +322,7 @@ export function useMenu(): GrupMenu[] {
           desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan pengadaan & reimburse' : 'Pengajuan pengadaan barang/jasa atau reimburse',
           status: 'Persetujuan Admin/Cashier lalu ABH',
         },
-        ...(['admin', 'abh', 'pengawas'].includes(app.role)
+        ...(['admin', 'abh'].includes(app.role)
           ? [
               {
                 to: '/finance/petty/realisasi',
