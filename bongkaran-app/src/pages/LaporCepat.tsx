@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { useApp } from '@/lib/app-state'
 import { capFoto, capWaktu, compressImage, genId } from '@/lib/image'
-import { JENIS_INSIDEN, type JenisInsiden } from '@/lib/insiden'
+import { JENIS_HENTI, JENIS_INSIDEN, type JenisInsiden } from '@/lib/insiden'
 import { lihatMedia, titipMedia, type MediaLapor } from '@/lib/lapor-media'
 import { cn } from '@/lib/utils'
 
@@ -233,6 +233,20 @@ export function LaporCepat() {
           )}
         </GlassCard>
         <nav aria-label="Jenis laporan" className="animate-entrance-2 flex flex-col gap-space-sm">
+          <button
+            type="button"
+            onClick={() => {
+              titipMedia(media)
+              navigate('/stop-penyaluran/baru?dari=lapor')
+            }}
+            className="flex min-h-16 items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md text-left shadow-sm ring-1 ring-error/30 active:bg-surface-container-low"
+          >
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-body-md font-bold text-error">Lapor {JENIS_HENTI.label.toLowerCase()}</span>
+              <span className="text-body-sm text-on-surface-variant">{JENIS_HENTI.desc}</span>
+            </span>
+            <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+          </button>
           {JENIS_INSIDEN.map((j) => (
             <button key={j.value} type="button" onClick={() => pilih(j.value)} className="flex min-h-16 items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md text-left shadow-sm active:bg-surface-container-low">
               <span className="flex min-w-0 flex-1 flex-col">

@@ -45,6 +45,7 @@ import { qqRecordId, type AparRecord } from '@/lib/daily'
 import { todayIso } from '@/lib/date'
 import { labelSlot, slotKini } from '@/lib/gts'
 import { lewatBatas } from '@/lib/harian'
+import { hentiDari } from '@/lib/insiden'
 import { formTampil } from '@/lib/ops'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
@@ -105,7 +106,8 @@ export function useMenu(): GrupMenu[] {
   const aparBelum = kondisiSemua(s, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), stok.key.tanggal).filter((k) => !k.bulanIni).length
   const takarHariIni = app.daily.filter((d) => d.kind === 'takar' && d.tanggal === hariIni)
   const takarLewatHariIni = takarHariIni.filter((d) => d.kind === 'takar' && takarStatus(d.data.hasilMl) === 'lewat').length
-  const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai').length
+  const insidenTerbuka = app.daily.filter((d) => d.kind === 'insiden' && d.data.jenis !== 'henti' && d.data.status !== 'selesai').length
+  const hentiAktif = hentiDari(app.daily).filter((x) => !x.h.selesai)
   const baBulan = app.reports.filter((r) => r.status !== 'draft' && r.tanggal >= bulan)
   const ttdKurang = baBulan.filter((r) => r.ttdKurang?.length).length
   const aparTerakhir = app.daily.filter((d): d is AparRecord => d.kind === 'apar' && !!d.data.selesaiAt).sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0]
@@ -168,6 +170,15 @@ export function useMenu(): GrupMenu[] {
           title: 'Kaleng Sample',
           desc: 'Sample mobil tangki dari hasil pembongkaran, 3 terakhir per produk',
           status: `${app.reports.filter((r) => r.status === 'selesai').length} bongkaran selesai`,
+        },
+        {
+          to: '/stop-penyaluran',
+          path: '/stop-penyaluran',
+          icon: Ban,
+          title: 'Stop Penyaluran',
+          desc: 'Lapor penghentian penyaluran produk, jam penyaluran kembali, dashboard lama berhenti',
+          status: hentiAktif.length ? `Berhenti: ${[...new Set(hentiAktif.flatMap((x) => x.h.produk))].join(', ')}` : 'Semua produk tersalurkan normal',
+          badge: hentiAktif.length,
         },
         {
           to: '/totalizer',
@@ -401,7 +412,7 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
   { path: '/laporan/pump-test', icon: TestTubes, title: 'Riwayat Pump Test', desc: 'Pump test uji kualitas, uji kuantitas & uji takaran per nozzle dan produk' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
   { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },
-  { path: '/laporan/henti', icon: Ban, title: 'Riwayat Pemberhentian Penyaluran', desc: 'Produk yang dihentikan sementara karena kerusakan, dari–sampai, lama berhenti' },
+  { path: '/laporan/henti', icon: Ban, title: 'Riwayat Stop Penyaluran', desc: 'Produk yang dihentikan sementara, jam berhenti sampai penyaluran kembali, lama berhenti' },
   { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
   { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
   { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },

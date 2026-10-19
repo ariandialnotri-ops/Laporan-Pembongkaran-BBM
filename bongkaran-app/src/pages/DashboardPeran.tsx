@@ -16,6 +16,7 @@ import type { Role } from '@/lib/roles'
 import { useOps } from '@/lib/use-ops'
 import { cn } from '@/lib/utils'
 import { KartuBertugas } from '@/pages/Personil'
+import { KartuStopPenyaluran } from '@/components/insiden/henti'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -58,7 +59,7 @@ function Angka({ items }: { items: [string, string | number, boolean?][] }) {
 /** Laporan insiden, near miss & kerusakan: jumlah per status dan laporan terbaru. */
 function KartuInsiden() {
   const app = useApp()
-  const semua = app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden').sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.updatedAt - a.updatedAt)
+  const semua = app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden' && d.data.jenis !== 'henti').sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.updatedAt - a.updatedAt)
   const n = (s: string) => semua.filter((r) => r.data.status === s).length
   return (
     <Kartu icon={ShieldAlert} judul="Laporan kerusakan, insiden & near miss" sub={JENIS_INSIDEN.map((j) => `${semua.filter((r) => r.data.jenis === j.value).length} ${j.label.toLowerCase()}`).join(' · ')} ke="/laporan/insiden" aksi="Riwayat">
@@ -241,6 +242,7 @@ export function DashboardSecurity() {
   return (
     <div className="flex flex-col gap-space-md">
       <KartuBertugas className="animate-entrance-1" />
+      <KartuStopPenyaluran className="animate-entrance-1" />
       <Kartu icon={ScanEye} judul="Kepatuhan guard tour (sampling JBT/JBKP)" sub="Slot 2 jam lengkap JBT & JBKP, 7 hari terakhir" ke="/gts" aksi="Sampling" className="animate-entrance-1">
         {gts === null ? (
           <span className="text-body-sm text-on-surface-variant">Memuat…</span>

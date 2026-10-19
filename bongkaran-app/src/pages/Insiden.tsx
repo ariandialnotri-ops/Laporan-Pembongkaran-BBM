@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, X } from 'lucide-react'
+import { Ban, ChevronRight, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
+import { HentiInfo } from '@/components/insiden/henti'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -28,6 +29,7 @@ import { compressImage, genId } from '@/lib/image'
 import { ambilMedia } from '@/lib/lapor-media'
 import {
   durasiHenti,
+  JENIS_HENTI,
   JENIS_INSIDEN,
   jenisLabel,
   labelWaktu,
@@ -43,7 +45,7 @@ import {
   type TingkatInsiden,
 } from '@/lib/insiden'
 import { shiftKey } from '@/lib/shift'
-import { PRODUK_OPTIONS, type Photo, type Settings } from '@/lib/sop'
+import type { Photo } from '@/lib/sop'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
@@ -57,54 +59,12 @@ function useInsiden() {
   return useMemo(() => app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden'), [app.daily])
 }
 
+/** Laporan stop penyaluran punya menu & riwayat sendiri; daftar insiden hanya insiden, near miss, kerusakan. */
+const bukanHenti = (r: InsidenRecord) => r.data.jenis !== 'henti'
+
 function StatusPill({ s }: { s: StatusInsiden }) {
   const m = statusMeta(s)
   return <Pill tone={m.tone}>{m.label}</Pill>
-}
-
-/** Produk yang disalurkan SPBU ini (dari database nozzle), bawaan semua produk. */
-const produkSpbu = (s: Settings) => {
-  const ada = [...new Set((s.nozzles ?? []).map((n) => n.produk).filter(Boolean))]
-  return ada.length ? PRODUK_OPTIONS.filter((p) => ada.includes(p)).concat(ada.filter((p) => !PRODUK_OPTIONS.includes(p))) : PRODUK_OPTIONS
-}
-
-/** Pilih beberapa produk (tombol toggle). */
-function PilihProduk({ value, onChange, options }: { value: string[]; onChange: (v: string[]) => void; options: string[] }) {
-  return (
-    <div role="group" aria-label="Produk yang dihentikan" className="flex flex-wrap gap-space-xs">
-      {options.map((p) => {
-        const on = value.includes(p)
-        return (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(on ? value.filter((x) => x !== p) : [...value, p])}
-            className={cn('min-h-10 rounded-full border px-space-sm text-body-sm font-semibold transition-colors', on ? 'border-error bg-error text-on-error' : 'border-outline-variant bg-surface-container-lowest text-on-surface')}
-          >
-            {p}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-/** Ringkasan pemberhentian penyaluran: produk, dari–sampai, lama. */
-function HentiInfo({ h }: { h: HentiPenyaluran }) {
-  return (
-    <div className={cn('flex items-start gap-space-sm rounded-md p-space-sm', h.selesai ? 'bg-surface-container-low' : 'bg-error-container/70')}>
-      <Ban aria-hidden="true" className={cn('mt-0.5 size-5 shrink-0', h.selesai ? 'text-on-surface-variant' : 'text-error')} />
-      <span className="flex flex-col text-body-sm">
-        <b className={h.selesai ? 'text-on-surface' : 'text-on-error-container'}>
-          {h.selesai ? 'Penyaluran sempat dihentikan' : 'Penyaluran dihentikan sementara'}: {h.produk.join(', ')}
-        </b>
-        <span className="tabular text-on-surface-variant">
-          {labelWaktu(h.mulai, formatTanggalIso)} – {h.selesai ? labelWaktu(h.selesai, formatTanggalIso) : 'sekarang'} · {durasiHenti(h)}
-        </span>
-      </span>
-    </div>
-  )
 }
 
 const tingkatTone = (t: TingkatInsiden) => (t === 'tinggi' ? 'text-error' : t === 'sedang' ? 'text-amber-700' : 'text-on-surface-variant')
@@ -124,6 +84,14 @@ export function PilihJenisInsiden() {
           <HentiInfo h={r.data.henti!} />
         </Link>
       ))}
+      <Link to="/stop-penyaluran" className="animate-entrance-1 flex items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md shadow-sm active:bg-surface-container-low">
+        <Ban aria-hidden="true" className="size-5 shrink-0 text-error" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-md font-bold text-on-surface">Stop penyaluran</span>
+          <span className="text-body-sm text-on-surface-variant">Penghentian penyaluran produk dilaporkan di menu tersendiri</span>
+        </span>
+        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+      </Link>
       <div className="animate-entrance-2 flex flex-col gap-space-sm">
         {JENIS_INSIDEN.map((j) => {
           const n = terbuka(j.value)
@@ -169,9 +137,6 @@ export function InsidenBaru() {
     targetSelesai: '',
     riwayat: [],
   }))
-  const [henti, setHenti] = useState<'ya' | 'tidak'>('tidak')
-  const [hentiProduk, setHentiProduk] = useState<string[]>([])
-  const [hentiMulai, setHentiMulai] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
   const srcOf = usePhotoSrc([...d.foto, ...(d.video ?? [])])
@@ -233,18 +198,13 @@ export function InsidenBaru() {
     if (!d.tindakanSegera.trim()) return setError('Isi tindakan yang sudah dilakukan.')
     if (fotoWajib && !d.foto.length && !d.video?.length) return setError('Foto atau video kejadian wajib diunggah.')
     if (!d.pelapor.trim()) return setError('Isi nama pelapor.')
-    const adaHenti = d.jenis === 'kerusakan' && henti === 'ya'
-    const mulai = hentiMulai || `${tanggal}T${d.jam}`
-    if (adaHenti && !hentiProduk.length) return setError('Pilih produk yang penyalurannya dihentikan.')
-    if (adaHenti && mulai > waktuLokal()) return setError('Waktu mulai berhenti tidak boleh di masa depan.')
     setBusy('kirim')
     try {
       const shift = shiftKey(tanggal, d.jam)?.shift ?? 1
       const data: InsidenData = {
         ...d,
         pelapor: d.pelapor.trim(),
-        riwayat: [{ at: isoNow(), oleh: d.pelapor.trim(), status: 'terbuka', catatan: adaHenti ? `Laporan dibuat, penyaluran ${hentiProduk.join(', ')} dihentikan sementara` : 'Laporan dibuat' }],
-        ...(adaHenti ? { henti: { produk: hentiProduk, mulai } } : {}),
+        riwayat: [{ at: isoNow(), oleh: d.pelapor.trim(), status: 'terbuka', catatan: 'Laporan dibuat' }],
       }
       await app.saveDaily({ id, kind: 'insiden', tanggal, shift, data, createdAt: stamp(), updatedAt: stamp(), createdBy: app.session.user?.id ?? null })
       guard.bypass()
@@ -254,7 +214,6 @@ export function InsidenBaru() {
         baris: [
           ['Lokasi', d.lokasi],
           ...(d.aset.trim() ? ([['Peralatan', d.aset.trim()]] as [string, string][]) : []),
-          ...(adaHenti ? ([['Penyaluran dihentikan', `${hentiProduk.join(', ')} sejak ${labelWaktu(mulai, formatTanggalIso)}`]] as [string, string][]) : []),
           ['Tingkat risiko', d.tingkat],
           ['Foto', `${d.foto.length} foto${d.video?.length ? ` + ${d.video.length} video` : ''}`],
           ['Pelapor', d.pelapor.trim()],
@@ -335,28 +294,13 @@ export function InsidenBaru() {
           <Input id="ins-penyebab" autoComplete="off" value={d.penyebab} onChange={(e) => set({ penyebab: e.target.value })} />
         </Field>
         {d.jenis === 'kerusakan' && (
-          <div className="flex flex-col gap-space-sm rounded-md bg-surface-container-low p-space-sm">
-            <Field label="Pemberhentian penyaluran sementara">
-              <Choice
-                label="Pemberhentian penyaluran sementara"
-                value={henti}
-                onChange={(v) => (setError(null), setHenti(v))}
-                options={[
-                  { value: 'tidak', label: 'Tidak, tetap menyalurkan' },
-                  { value: 'ya', label: 'Ya, hentikan' },
-                ]}
-              />
-            </Field>
-            {henti === 'ya' && (
-              <>
-                <span className="text-body-sm text-on-surface-variant">Pilih produk yang tidak dapat disalurkan. Penyaluran dibuka kembali saat tindak lanjut selesai.</span>
-                <PilihProduk value={hentiProduk} onChange={(v) => (setError(null), setHentiProduk(v))} options={produkSpbu(s)} />
-                <Field label="Mulai berhenti" htmlFor="ins-henti-mulai">
-                  <Input id="ins-henti-mulai" type="datetime-local" max={waktuLokal()} value={hentiMulai || `${tanggal}T${d.jam}`} onChange={(e) => setHentiMulai(e.target.value)} />
-                </Field>
-              </>
-            )}
-          </div>
+          <Link to="/stop-penyaluran/baru" className="flex items-center gap-space-sm rounded-md bg-surface-container-low p-space-sm text-body-sm">
+            <Ban aria-hidden="true" className="size-5 shrink-0 text-error" />
+            <span className="min-w-0 flex-1 text-on-surface">
+              Kerusakan membuat penyaluran harus dihentikan? Laporkan juga di <b>Stop Penyaluran</b> agar jam berhenti & penyaluran kembali tercatat.
+            </span>
+            <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+          </Link>
         )}
         <Field label="Tindakan yang sudah dilakukan" htmlFor="ins-tindakan">
           <Textarea id="ins-tindakan" className="min-h-[64px]" placeholder="Mis. area diamankan, tumpahan dibersihkan, nozzle dipasang tanda rusak" value={d.tindakanSegera} onChange={(e) => set({ tindakanSegera: e.target.value })} />
@@ -431,7 +375,7 @@ export function RiwayatInsiden() {
   const semua = useInsiden()
   if (!app.loaded) return <Loading />
 
-  const all = [...semua].sort((a, b) => (b.tanggal + b.data.jam).localeCompare(a.tanggal + a.data.jam))
+  const all = semua.filter(bukanHenti).sort((a, b) => (b.tanggal + b.data.jam).localeCompare(a.tanggal + a.data.jam))
   const inDate = all.filter((r) => inRange(r.tanggal, range) || r.id === baru)
   const n = (f: (r: InsidenRecord) => boolean) => inDate.filter(f).length
   const rows: Row[] = inDate.filter((r) => (jenis === 'semua' || r.data.jenis === jenis) && (status === 'semua' || r.data.status === status)).map((r) => ({ r }))
@@ -500,6 +444,8 @@ export function InsidenDetail() {
   const [target, setTarget] = useState('')
   const [catatan, setCatatan] = useState('')
   const [buka, setBuka] = useState(false)
+  // Jam penyaluran dibuka kembali (wajib saat stop penyaluran ditutup).
+  const [jamKembali, setJamKembali] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   if (!app.loaded) return <Loading />
@@ -519,10 +465,14 @@ export function InsidenDetail() {
   const hentiAktif = !!d.henti && !d.henti.selesai
   // Tindak lanjut selesai otomatis membuka kembali penyaluran.
   const bukaKembali = hentiAktif && (buka || statusBaru === 'selesai')
+  const kembali = jamKembali || waktuLokal()
 
   const simpanTL = async () => {
     if (!catatan.trim()) return setError('Tulis catatan tindak lanjut.')
     if (statusBaru === 'selesai' && d.status !== 'selesai' && catatan.trim().length < 10) return setError('Jelaskan penyelesaiannya (minimal 10 karakter).')
+    if (bukaKembali && !jamKembali) return setError('Isi jam penyaluran kembali.')
+    if (bukaKembali && kembali < d.henti!.mulai) return setError('Jam penyaluran kembali tidak boleh sebelum penyaluran dihentikan.')
+    if (bukaKembali && kembali > waktuLokal()) return setError('Jam penyaluran kembali tidak boleh di masa depan.')
     setBusy(true)
     try {
       const oleh = app.displayName === 'Mode lokal' ? app.settings.namaPengawasDefault || 'Pengawas' : app.displayName
@@ -541,17 +491,18 @@ export function InsidenDetail() {
             at: isoNow(),
             oleh,
             status: statusBaru,
-            catatan: `${catatan.trim()}${bukaKembali ? ` (penyaluran ${d.henti!.produk.join(', ')} dibuka kembali)` : ''}`,
+            catatan: `${catatan.trim()}${bukaKembali ? ` (penyaluran ${d.henti!.produk.join(', ')} kembali ${labelWaktu(kembali, formatTanggalIso)}, berhenti ${durasiHenti({ ...d.henti!, selesai: kembali })})` : ''}`,
             ...(foto.length ? { foto } : {}),
             ...(ba.length ? { ba } : {}),
           },
         ],
-        ...(bukaKembali ? { henti: { ...d.henti!, selesai: waktuLokal() } } : {}),
+        ...(bukaKembali ? { henti: { ...d.henti!, selesai: kembali } } : {}),
       }
       await app.saveDaily({ ...rec, data, updatedAt: stamp() })
       setCatatan('')
       setStatus('')
       setBuka(false)
+      setJamKembali('')
       ;[...tlFoto, ...tlBa].forEach((f) => URL.revokeObjectURL(f.url))
       setTlFoto([])
       setTlBa([])
@@ -569,7 +520,7 @@ export function InsidenDetail() {
       <GlassCard level={2} className={cn('animate-entrance-1 flex flex-col gap-space-sm p-space-md', d.jenis === 'insiden' && 'ring-1 ring-error/40')}>
         <div className="flex items-start gap-space-sm">
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="text-tag uppercase text-primary">{jenisLabel(d.jenis)}</span>
+            <span className={cn('text-tag uppercase', d.jenis === 'henti' ? 'text-error' : 'text-primary')}>{d.jenis === 'henti' ? `${JENIS_HENTI.label} · alasan` : jenisLabel(d.jenis)}</span>
             <span className="text-headline-md font-bold text-on-surface">{d.kategori}</span>
             <span className="tabular text-body-sm text-on-surface-variant">
               {formatTanggalIso(rec.tanggal)} {d.jam}, {d.lokasi}
@@ -729,10 +680,28 @@ export function InsidenDetail() {
             </Button>
           </div>
           {hentiAktif && (
-            <label className="flex items-center gap-space-sm text-body-sm text-on-surface">
-              <input type="checkbox" className="size-5 accent-primary" checked={bukaKembali} disabled={statusBaru === 'selesai'} onChange={(e) => setBuka(e.target.checked)} />
-              Penyaluran {d.henti!.produk.join(', ')} dibuka kembali{statusBaru === 'selesai' ? ' (otomatis saat selesai)' : ''}
-            </label>
+            <div className={cn('flex flex-col gap-space-sm rounded-md p-space-sm', bukaKembali ? 'bg-emerald-50 ring-1 ring-emerald-300' : 'bg-error-container/50')}>
+              <label className="flex items-center gap-space-sm text-body-sm font-semibold text-on-surface">
+                <input type="checkbox" className="size-5 accent-primary" checked={bukaKembali} disabled={statusBaru === 'selesai'} onChange={(e) => (setError(null), setBuka(e.target.checked))} />
+                Penyaluran {d.henti!.produk.join(', ')} dibuka kembali{statusBaru === 'selesai' ? ' (wajib saat selesai)' : ''}
+              </label>
+              {bukaKembali && (
+                <>
+                  <Field label="Jam penyaluran kembali" htmlFor="ins-kembali">
+                    <Input id="ins-kembali" type="datetime-local" min={d.henti!.mulai} max={waktuLokal()} value={jamKembali} onChange={(e) => (setError(null), setJamKembali(e.target.value))} />
+                  </Field>
+                  <span className="tabular text-body-sm text-on-surface-variant">
+                    Berhenti sejak {labelWaktu(d.henti!.mulai, formatTanggalIso)}
+                    {jamKembali && jamKembali >= d.henti!.mulai ? ` · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}` : ''}
+                  </span>
+                  {!jamKembali && (
+                    <Button variant="soft" size="sm" className="self-start" onClick={() => setJamKembali(waktuLokal())}>
+                      Isi dengan waktu sekarang
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           )}
           <ErrorBox text={error} />
           <Button size="lg" disabled={busy} onClick={simpanTL}>
@@ -760,12 +729,12 @@ const COLS_HENTI: Col<RowHenti>[] = [
   { header: 'Mulai berhenti', cell: (x) => <span className="tabular whitespace-nowrap">{labelWaktu(x.h.mulai, formatTanggalIso)}</span>, mobileCell: (x) => `${labelWaktu(x.h.mulai, formatTanggalIso)} – ${x.h.selesai ? labelWaktu(x.h.selesai, formatTanggalIso) : 'sekarang'}`, mobile: 'sub' },
   { header: 'Dibuka kembali', cell: (x) => <span className="tabular whitespace-nowrap">{x.h.selesai ? labelWaktu(x.h.selesai, formatTanggalIso) : <b className="text-error">Masih berhenti</b>}</span>, mobile: 'hide' },
   { header: 'Lama', cell: (x) => <span className="tabular whitespace-nowrap">{durasiHenti(x.h)}</span>, mobile: 'sub' },
-  { header: 'Kerusakan', cell: (x) => `${x.r.data.kategori}${x.r.data.aset ? `, ${x.r.data.aset}` : ''}`, mobile: 'sub' },
+  { header: 'Alasan', cell: (x) => `${x.r.data.kategori}${x.r.data.aset ? `, ${x.r.data.aset}` : ''}`, mobile: 'sub' },
   { header: 'Uraian', cell: (x) => <span className="line-clamp-2">{x.r.data.uraian}</span>, mobile: 'hide' },
   { header: 'Status', cell: (x) => (x.h.selesai ? <Pill tone="success">Normal</Pill> : <Pill tone="error">Berhenti</Pill>), mobile: 'badge' },
 ]
 
-/** Report > Riwayat Pemberhentian Penyaluran: dari laporan kerusakan yang menghentikan penyaluran sementara. */
+/** Report > Riwayat Stop Penyaluran: dari laporan stop penyaluran (dan laporan kerusakan lama yang memuat pemberhentian). */
 export function RiwayatHenti() {
   const app = useApp()
   useSyncOnOpen()
@@ -790,12 +759,21 @@ export function RiwayatHenti() {
         ) : (
           <span className="text-body-md font-semibold text-on-surface">Semua produk tersalurkan normal</span>
         )}
-        <span className="text-body-sm text-on-surface-variant">Pemberhentian dicatat dari laporan kerusakan dan berakhir saat tindak lanjut selesai (penyaluran dibuka kembali).</span>
+        <span className="text-body-sm text-on-surface-variant">Dicatat dari laporan Stop Penyaluran dan berakhir pada jam penyaluran kembali yang diisi saat tindak lanjut / closing.</span>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Link to="/stop-penyaluran/baru" className={buttonVariants({ size: 'sm' })}>
+            <Plus aria-hidden="true" />
+            Laporkan stop
+          </Link>
+          <Link to="/stop-penyaluran" className={buttonVariants({ size: 'sm', variant: 'glass' })}>
+            Dashboard
+          </Link>
+        </div>
         <DateFilter id="henti-range" value={range} onChange={setRange} />
       </GlassCard>
       <div className="animate-entrance-2">
         <RecordTable
-          title="Pemberhentian Penyaluran Sementara"
+          title="Stop Penyaluran"
           rows={rows}
           total={all.length}
           cols={COLS_HENTI}

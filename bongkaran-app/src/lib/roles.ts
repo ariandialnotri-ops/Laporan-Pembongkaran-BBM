@@ -139,6 +139,8 @@ export function bolehBuka(role: Role, path: string) {
   if (path === '/wbs' || path.startsWith('/wbs/')) return true
   // Personil & jadwal shift: semua anggota melihat; daftar & jadwal diubah pengawas/ABH.
   if (path === '/personil' || path.startsWith('/personil/')) return true
+  // Stop penyaluran & riwayatnya: semua anggota dapat melapor, menindaklanjuti, dan menutup.
+  if (path === '/stop-penyaluran' || path.startsWith('/stop-penyaluran/') || path === '/laporan/henti') return true
   if (IKHTISAR.includes(path)) return true
   // Realisasi petty cash (plafon, anggaran, voucher) hanya Admin/Cashier dan ABH.
   if (path === '/finance/petty/realisasi' || path.startsWith('/finance/petty/realisasi/')) return role === 'admin'

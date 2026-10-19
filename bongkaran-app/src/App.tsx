@@ -35,6 +35,8 @@ const InspeksiUnit = lazy(() => import('@/pages/InspeksiUnit').then((m) => ({ de
 const InspeksiApar = lazy(() => import('@/pages/InspeksiApar').then((m) => ({ default: m.InspeksiApar })))
 const InsidenBaru = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.InsidenBaru })))
 const PilihJenisInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.PilihJenisInsiden })))
+const StopPenyaluranMenu = lazy(() => import('@/pages/StopPenyaluran').then((m) => ({ default: m.StopPenyaluranMenu })))
+const StopPenyaluranBaru = lazy(() => import('@/pages/StopPenyaluran').then((m) => ({ default: m.StopPenyaluranBaru })))
 const RiwayatInsiden = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatInsiden })))
 const LaporCepat = lazy(() => import('@/pages/LaporCepat').then((m) => ({ default: m.LaporCepat })))
 const RiwayatHenti = lazy(() => import('@/pages/Insiden').then((m) => ({ default: m.RiwayatHenti })))
@@ -223,6 +225,8 @@ function Gate() {
           <Route path="/ops/:form" element={<OpsIsi />} />
           <Route path="/laporan/ops" element={<LaporanOps />} />
           <Route path="/insiden/baru" element={<PilihJenisInsiden />} />
+          <Route path="/stop-penyaluran" element={<StopPenyaluranMenu />} />
+          <Route path="/stop-penyaluran/baru" element={<StopPenyaluranBaru />} />
           <Route path="/insiden/baru/:jenis" element={<InsidenBaru />} />
           <Route path="/laporan/insiden" element={<RiwayatInsiden />} />
           <Route path="/laporan/henti" element={<RiwayatHenti />} />

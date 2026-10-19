@@ -24,6 +24,7 @@ import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bon
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
 import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
+import { KartuStopPenyaluran } from '@/components/insiden/henti'
 import { KartuUnitBisnis } from '@/components/shell/kartu-unit-bisnis'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
@@ -187,6 +188,7 @@ function DashboardUtama() {
           <span className="tabular whitespace-nowrap text-[11px] font-bold sm:text-tag">{shiftLabel(shift)}</span>
         </span>
       </section>
+      <KartuStopPenyaluran className="animate-entrance-1" />
 
       {/* 2. Kalender pekan */}
       <section aria-labelledby="kalender" className="animate-entrance-1 flex flex-col gap-2 rounded-md bg-surface-container-lowest p-3.5 shadow-sm">
