@@ -8,6 +8,7 @@ import { PlanReminder } from './plan-reminder'
 import { useCatatJejak, useGeserKembali, useKembali } from './kembali'
 import { SidebarLaci, SidebarTetap } from './sidebar'
 import { SidebarContext } from './sidebar-ctx'
+import { VersiBaru } from './versi-baru'
 import { useViewportVars } from './viewport'
 
 const KUNCI_TUTUP = 'floq-sidebar-tutup'
@@ -72,6 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <DockNav />
       <PlanReminder />
+      <VersiBaru />
     </SidebarContext.Provider>
   )
 }
