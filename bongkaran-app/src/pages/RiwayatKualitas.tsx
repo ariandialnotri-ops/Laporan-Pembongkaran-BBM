@@ -87,7 +87,7 @@ export function RiwayatKualitas() {
             density: normalizeDensity(k.densityObs),
             suhu: k.suhu,
             d15,
-            acuan: ref ? `bongkar ${formatTanggalIso(ref.tanggal)}` : 'belum ada bongkaran',
+            acuan: ref ? `pasca penerimaan ${formatTanggalIso(ref.tanggal)}` : 'belum ada uji pasca penerimaan',
             selisih,
             ok: selisih !== null ? Math.abs(selisih) <= tol : null,
             detail: kunciHarian(rec.id, k.id),

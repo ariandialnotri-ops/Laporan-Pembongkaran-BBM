@@ -143,15 +143,19 @@ export function detailTanggal(iso: string, rows: ReportSummary[], daily: DailyRe
 }
 
 
-/** D15 bongkaran terakhir suatu produk (sampai tanggal tertentu) sebagai acuan uji harian. */
+/**
+ * Acuan toleransi uji kualitas harian: D15 uji pasca penerimaan (sampel tangki pendam setelah
+ * bongkar) yang terbaru untuk produk itu sampai tanggal uji. Bukan D15 kaleng sample mobil tangki.
+ */
 export function acuanD15(rows: ReportSummary[], produk: string, sampai?: string) {
-  let best: ReportSummary | null = null
+  let best: { d15: number; tanggal: string; jam: string } | null = null
   for (const r of rows) {
-    if (r.produk !== produk || r.d15 === null || r.status === 'draft') continue
-    if (sampai && r.tanggal > sampai) continue
-    if (!best || r.tanggal + r.jam > best.tanggal + best.jam) best = r
+    const s = r.sample2Jam
+    if (r.produk !== produk || r.status === 'draft' || !s || s.d15 === null) continue
+    if (sampai && s.tanggal > sampai) continue
+    if (!best || s.tanggal + s.jam > best.tanggal + best.jam) best = { d15: s.d15, tanggal: s.tanggal, jam: s.jam }
   }
-  return best ? { d15: best.d15 as number, tanggal: best.tanggal } : null
+  return best
 }
 
 export type KalengStatus = 'sesuai' | 'perhatian' | 'menunggu' | 'belum'

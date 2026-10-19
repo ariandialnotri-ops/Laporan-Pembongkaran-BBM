@@ -74,7 +74,7 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
         suhu: k.suhu,
         d15,
         acuan: ref?.d15 ?? null,
-        acuanLabel: ref ? `D15 bongkar ${formatTanggalIso(ref.tanggal)}` : 'Belum ada bongkaran',
+        acuanLabel: ref ? `D15 pasca penerimaan ${formatTanggalIso(ref.tanggal)}` : 'Belum ada uji pasca penerimaan',
         selisih,
         ok: selisih !== null ? Math.abs(selisih) <= app.rules.densityTolerance + 1e-9 : null,
         catatan: rec.data.catatan,

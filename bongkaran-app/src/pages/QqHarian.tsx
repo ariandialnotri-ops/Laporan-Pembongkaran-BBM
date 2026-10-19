@@ -238,7 +238,7 @@ export function QqHarian() {
     />
   )
 
-  /** Baris laporan per produk (D15, acuan bongkaran terakhir, selisih). */
+  /** Baris laporan per produk (D15, acuan uji pasca penerimaan terbaru, selisih). */
   const barisWa = (): BarisQqWa[] =>
     data.kualitas.map((k) => {
       const { obs, d15 } = qqD15(k)
@@ -404,7 +404,7 @@ export function QqHarian() {
                 rows={[
                   ['Density observasi', formatDensity(obs)],
                   ['Density @15°C', d15 ? formatDensity(d15.value) : '-'],
-                  [`Acuan D15 bongkaran ${ref ? formatTanggalIso(ref.tanggal) : 'terakhir'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
+                  [`Acuan D15 pasca penerimaan ${ref ? formatTanggalIso(ref.tanggal) : 'terbaru'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
                 ]}
                 total={['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-']}
               />

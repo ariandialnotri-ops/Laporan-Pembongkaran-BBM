@@ -175,6 +175,7 @@ Density @15°C : tabel ASTM-IP 53 (interpolasi bilinear), cadangan rumus ASTM D1
 Volume tangki : interpolasi linear tabel kalibrasi per tangki (database tangki SPBU aktif; mode lokal: src/data/tankTables.json)
 Gain / loss   : real stok ATG − (stok awal ATG + volume DO)
 Deepstick     : volume setelah − volume sebelum, dibanding volume DO
+Uji harian    : D15 uji kualitas harian − D15 uji pasca penerimaan terbaru produk itu (bukan kaleng sample MT), ≤ toleransi density
 ```
 
 Toleransi default (density 0,003; tera 10 mm; ATG 10 menit; volume per DO

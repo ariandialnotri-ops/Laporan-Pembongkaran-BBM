@@ -407,7 +407,7 @@ function DashboardUtama() {
         id="kualitas-harian"
         icon={FlaskConical}
         title="Kualitas Harian (D15)"
-        sub="Uji density terakhir tiap produk, dibanding D15 bongkaran terakhir."
+        sub="Uji density terakhir tiap produk, dibanding D15 uji pasca penerimaan terbaru."
         className="animate-entrance-3"
         action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-[11px] font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
       >

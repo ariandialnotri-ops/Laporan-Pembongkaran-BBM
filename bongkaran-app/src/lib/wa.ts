@@ -107,7 +107,7 @@ export function buildWaQq(
     L.push(`*${b.produk}*`, '```')
     L.push(kv('Density', `${formatDensity(b.obs)} / ${b.suhu ? `${formatMaybe(parseAngka(b.suhu), 1)}°C` : '-'}`))
     L.push(kv('D15', formatDensity(b.d15)))
-    L.push(kv('Acuan D15', b.acuan === null ? 'belum ada' : formatDensity(b.acuan)))
+    L.push(kv('Acuan D15 pasca penerimaan', b.acuan === null ? 'belum ada' : formatDensity(b.acuan)))
     L.push(kv('Selisih', b.selisih === null ? '-' : `${formatDensitySigned(b.selisih)} (${b.ok ? 'Sesuai' : 'Melebihi toleransi'})`))
     L.push(kv('Pump test', b.pumpTest ? `${b.pumpTest} L` : '-'))
     L.push('```')
