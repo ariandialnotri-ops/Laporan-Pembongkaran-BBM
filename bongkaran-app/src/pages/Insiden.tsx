@@ -513,7 +513,8 @@ export function InsidenDetail() {
       </GlassCard>
     )
   const d = rec.data
-  const bolehTL = app.role !== 'security' && app.role !== 'cs'
+  // Semua anggota SPBU (termasuk security, cleaning service, Admin/Cashier) dapat menindaklanjuti dan menutup laporan.
+  const bolehTL = !!app.role
   const statusBaru = status || d.status
   const hentiAktif = !!d.henti && !d.henti.selesai
   // Tindak lanjut selesai otomatis membuka kembali penyaluran.

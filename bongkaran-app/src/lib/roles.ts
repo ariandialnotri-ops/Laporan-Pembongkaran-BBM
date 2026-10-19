@@ -124,7 +124,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/kalkulator',
   ],
   security: ['/', '/laporan/bongkaran', '/laporan/lo', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
-  admin: ['/finance', '/finance/', '/laporan/so', '/profil', '/profil/sandi'],
+  admin: ['/finance', '/finance/', '/laporan/so', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
   cs: ['/', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
 }
 
