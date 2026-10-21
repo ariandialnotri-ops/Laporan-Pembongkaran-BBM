@@ -236,6 +236,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
         // Belum diatur = semua fasilitas ada; jangan kirim null yang menimpa.
         ...(d.fasilitas ? { fasilitas: d.fasilitas } : {}),
         ...(d.personil ? { personil: d.personil } : {}),
+        ...(d.absensi ? { absensi: d.absensi } : {}),
       }
       check(await sb.rpc('bbm_save_settings_terbatas', { p_spbu: aktif(), p_patch }))
     },
@@ -443,6 +444,9 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async deleteCatatan(jenis, id) {
       const rows = check(await sb.from(TABEL_CATATAN[jenis]).delete().eq('spbu_id', aktif()).eq('id', id).select('id'))
       if (!rows?.length) throw new Error('Anda tidak berhak menghapus catatan ini.')
+    },
+    async absen(x) {
+      check(await sb.rpc('bbm_absen', { p_spbu: aktif(), p_personil: x.personilId, p_jenis: x.jenis, p_tanggal: x.tanggal, p_lat: x.lat, p_lng: x.lng, p_akurasi: x.akurasi, p_kode: x.kode }))
     },
     async listPetty(from, to) {
       const rows = check(

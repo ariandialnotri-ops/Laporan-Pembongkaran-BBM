@@ -10,6 +10,7 @@ import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
 import type { Role } from '@/lib/roles'
 import type { Catatan } from '@/lib/catatan'
+import { absensiSiap, cekArea, prosesAbsen, type AbsenRecord } from '@/lib/absen'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
@@ -224,6 +225,20 @@ export const localBackend: Backend = {
   },
   async deleteCatatan(jenis, id) {
     await set(`catatan-${jenis}`, ((await get<Catatan<unknown>[]>(`catatan-${jenis}`)) ?? []).filter((r) => r.id !== id))
+  },
+  // Mode lokal: aturan sama dengan RPC bbm_absen (QR, radius GPS, urutan absen); jam dari perangkat.
+  async absen(x) {
+    const st = (await get<Settings>('settings')) ?? ({} as Settings)
+    const a = st.absensi
+    if (!absensiSiap(a)) throw new Error('Titik lokasi & QR absensi SPBU belum diatur. Hubungi pengawas.')
+    if (!x.kode.startsWith('FLOQ-ABSEN|') || !x.kode.endsWith(`|${a.token}`)) throw new Error('QR bukan QR absensi SPBU ini atau sudah diganti. Pindai QR absensi yang terpasang di SPBU.')
+    const p = (st.personil ?? []).find((z) => z.id === x.personilId && z.aktif)
+    if (!p) throw new Error('Personil tidak ditemukan atau tidak aktif')
+    const area = cekArea(a, x)
+    if (!area.ok) throw new Error(`Di luar area SPBU: ${Math.round(area.jarak)} m dari titik absensi (batas ${a.radius} m)`)
+    const recs = (await get<AbsenRecord[]>('catatan-absen')) ?? []
+    const titik = { at: new Date().toISOString(), lat: x.lat, lng: x.lng, akurasi: Math.round(x.akurasi), jarak: Math.round(area.jarak), oleh: null, olehNama: localStorage.getItem('floq-peran') || 'abh' }
+    await set('catatan-absen', upsertById(recs, prosesAbsen(recs, p, x.jenis, titik, x.tanggal)))
   },
   listPetty: (from, to) => get<PettyRecord[]>('petty').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
   // Mode lokal: status awal mengikuti peran uji (sama dengan trigger database).

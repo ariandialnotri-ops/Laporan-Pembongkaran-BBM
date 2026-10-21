@@ -189,22 +189,40 @@ function Kamera({ onHasil }: { onHasil: (text: string) => void }) {
  * Pemindai label QR APAR/APAB. Kamera dibaca langsung di aplikasi (BarcodeDetector bila ada,
  * jsQR untuk iPhone & browser lain). Cadangan: foto label dari kamera HP, atau ketik kode unit.
  */
-export function QrScanner({ open, onClose, onResult, onKode }: { open: boolean; onClose: () => void; onResult: (text: string) => void; onKode: (kode: string) => string | null }) {
+export function QrScanner({
+  open,
+  onClose,
+  onResult,
+  onKode,
+  title = 'Pindai label QR',
+  description = 'Arahkan kamera ke label QR pada tabung APAR/APAB.',
+  error,
+}: {
+  open: boolean
+  onClose: () => void
+  onResult: (text: string) => void
+  /** Cari dengan kode ketikan (label rusak); tanpa ini isian kode disembunyikan (mis. absensi). */
+  onKode?: (kode: string) => string | null
+  title?: string
+  description?: string
+  /** Pesan dari pemanggil (mis. QR salah), ditampilkan di bawah kamera. */
+  error?: string | null
+}) {
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="Pindai label QR" description="Arahkan kamera ke label QR pada tabung APAR/APAB.">
-      {open && <IsiPemindai onResult={onResult} onKode={onKode} />}
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title} description={description}>
+      {open && <IsiPemindai onResult={onResult} onKode={onKode} errorLuar={error} />}
     </Sheet>
   )
 }
 
 /** Isi lembar pindai; dipasang ulang setiap kali dibuka sehingga kamera & isian mulai bersih. */
-function IsiPemindai({ onResult, onKode }: { onResult: (text: string) => void; onKode: (kode: string) => string | null }) {
+function IsiPemindai({ onResult, onKode, errorLuar }: { onResult: (text: string) => void; onKode?: (kode: string) => string | null; errorLuar?: string | null }) {
   const [error, setError] = useState<string | null>(null)
   const [kode, setKode] = useState('')
   const [membaca, setMembaca] = useState(false)
   const fotoRef = useRef<HTMLInputElement>(null)
 
-  const cari = () => setError(onKode(kode))
+  const cari = () => onKode && setError(onKode(kode))
 
   const bacaFoto = async (file: File | undefined) => {
     if (!file) return
@@ -233,9 +251,9 @@ function IsiPemindai({ onResult, onKode }: { onResult: (text: string) => void; o
       <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => void bacaFoto(e.target.files?.[0])} />
       <Button variant="glass" disabled={membaca} onClick={() => fotoRef.current?.click()}>
         {membaca ? <Camera aria-hidden="true" className="animate-pulse" /> : <ImageUp aria-hidden="true" />}
-        {membaca ? 'Membaca foto…' : 'Kamera tidak jalan? Ambil foto label'}
+        {membaca ? 'Membaca foto…' : onKode ? 'Kamera tidak jalan? Ambil foto label' : 'Kamera tidak jalan? Ambil foto QR'}
       </Button>
-      <div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
+      {onKode && (<div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
         <Field label="Label rusak? Ketik kode unit" htmlFor="scan-kode">
           <Input
             id="scan-kode"
@@ -254,10 +272,10 @@ function IsiPemindai({ onResult, onKode }: { onResult: (text: string) => void; o
           <Search aria-hidden="true" />
           Buka
         </Button>
-      </div>
-      {error && (
+      </div>)}
+      {(error || errorLuar) && (
         <span role="alert" className="text-body-sm font-semibold text-error">
-          {error}
+          {error || errorLuar}
         </span>
       )}
     </>

@@ -1,3 +1,4 @@
+import type { JenisAbsen } from '@/lib/absen'
 import type { DailyRecord } from '@/lib/daily'
 import type { OpsRecord } from '@/lib/ops'
 import type { AirRecord } from '@/lib/air'
@@ -49,7 +50,18 @@ export interface RingkasanUnit {
   terakhirAktif: string | null
 }
 
-export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles' | 'hargaProduk' | 'personil'>
+/** Satu absen: QR terpindai, posisi GPS, tanggal perangkat (untuk absen masuk). */
+export interface AbsenInput {
+  personilId: string
+  jenis: JenisAbsen
+  tanggal: string
+  lat: number
+  lng: number
+  akurasi: number
+  kode: string
+}
+
+export type SettingsTerbatas = Pick<Settings, 'namaSpbu' | 'kodeSpbu' | 'alamatSpbu' | 'jumlahPulau' | 'jumlahDispenser' | 'apar' | 'apab' | 'aparArea' | 'soldTo' | 'shipTo' | 'fasilitas' | 'dispensers' | 'nozzles' | 'hargaProduk' | 'personil' | 'absensi'>
 
 export interface FotoArsip {
   path: string
@@ -142,6 +154,8 @@ export interface Backend {
   listCatatan<T>(jenis: JenisCatatan, fromIso: string, toIso: string): Promise<Catatan<T>[]>
   saveCatatan<T>(jenis: JenisCatatan, rec: Catatan<T>): Promise<void>
   deleteCatatan(jenis: JenisCatatan, id: string): Promise<void>
+  /** Absen personil (masuk/istirahat/kembali/keluar) setelah pindai QR & GPS; jam dicatat server. */
+  absen(input: AbsenInput): Promise<void>
   /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
   fotoArsip(): Promise<FotoArsip[]>
   /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */

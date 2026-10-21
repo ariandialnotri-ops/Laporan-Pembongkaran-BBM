@@ -68,6 +68,9 @@ const GroundingMenu = lazy(() => import('@/pages/Grounding').then((m) => ({ defa
 const GroundingForm = lazy(() => import('@/pages/Grounding').then((m) => ({ default: m.GroundingForm })))
 const Inbox = lazy(() => import('@/pages/Inbox').then((m) => ({ default: m.Inbox })))
 const PersonilMenu = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.PersonilMenu })))
+const AbsensiMenu = lazy(() => import('@/pages/Absensi').then((m) => ({ default: m.AbsensiMenu })))
+const AbsensiRekap = lazy(() => import('@/pages/Absensi').then((m) => ({ default: m.AbsensiRekap })))
+const AbsensiPengaturan = lazy(() => import('@/pages/Absensi').then((m) => ({ default: m.AbsensiPengaturan })))
 const JadwalShift = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.JadwalShift })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
@@ -223,6 +226,9 @@ function Gate() {
           <Route path="/grounding" element={<GroundingMenu />} />
           <Route path="/grounding/:tanggal" element={<GroundingForm />} />
           <Route path="/personil" element={<PersonilMenu />} />
+          <Route path="/absen" element={<AbsensiMenu />} />
+          <Route path="/absen/rekap" element={<AbsensiRekap />} />
+          <Route path="/absen/pengaturan" element={<AbsensiPengaturan />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/personil/jadwal" element={<JadwalShift />} />
           <Route path="/ops/:form" element={<OpsIsi />} />

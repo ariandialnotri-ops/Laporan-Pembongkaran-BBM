@@ -2,6 +2,7 @@
  * Alur SOP pembongkaran BBM: tipe data, definisi tahapan, validasi tiap
  * tahap, dan perhitungan kuantitas/kualitas untuk Berita Acara.
  */
+import type { AbsensiSetting } from '@/lib/absen'
 import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { minutesBetween, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
@@ -301,6 +302,8 @@ export interface Settings {
   fasilitas?: string[]
   /** Daftar personil SPBU (termasuk yang tidak punya akun aplikasi): modul Personil & Jadwal Shift. */
   personil?: Personil[]
+  /** Titik lokasi, radius, dan token QR absensi personil. */
+  absensi?: AbsensiSetting
   /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
   fotoSimpanBulan?: number
   /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */

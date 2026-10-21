@@ -140,6 +140,10 @@ export function bolehBuka(role: Role, path: string) {
   if (path === '/wbs' || path.startsWith('/wbs/')) return true
   // Personil & jadwal shift: semua anggota melihat; daftar & jadwal diubah pengawas/ABH.
   if (path === '/personil' || path.startsWith('/personil/')) return true
+  // Absensi: semua anggota absen; rekap untuk pengawas, kepala shift, admin; lokasi & QR oleh pengawas.
+  if (path === '/absen') return true
+  if (path === '/absen/rekap') return ['pengawas', 'kashift', 'admin'].includes(role)
+  if (path === '/absen/pengaturan') return role === 'pengawas'
   // Stop penyaluran & riwayatnya: semua anggota dapat melapor, menindaklanjuti, dan menutup.
   if (path === '/stop-penyaluran' || path.startsWith('/stop-penyaluran/') || path === '/laporan/henti') return true
   if (IKHTISAR.includes(path) || path === '/inbox') return true

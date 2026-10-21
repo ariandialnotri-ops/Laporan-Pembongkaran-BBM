@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarRange, ChevronRight, Copy, Pencil, Plus, Save, UserRound, Users } from 'lucide-react'
+import { CalendarRange, ChevronRight, Copy, Pencil, Plus, Save, ScanLine, UserRound, Users } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
@@ -121,6 +121,13 @@ export function PersonilMenu() {
         <span className="flex items-center gap-space-xs">
           <CalendarRange aria-hidden="true" />
           Jadwal shift bulanan
+        </span>
+        <ChevronRight aria-hidden="true" />
+      </Link>
+      <Link to="/absen" className={cn(buttonVariants({ variant: 'glass', size: 'lg' }), 'justify-between')}>
+        <span className="flex items-center gap-space-xs">
+          <ScanLine aria-hidden="true" />
+          Absensi personil (QR & GPS)
         </span>
         <ChevronRight aria-hidden="true" />
       </Link>
