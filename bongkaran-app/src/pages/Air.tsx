@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link } from 'react-router-dom'
 import { Camera, Droplet, LoaderCircle, Save, Trash2 } from 'lucide-react'
@@ -26,6 +26,7 @@ import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
 import { buatKolaseGrid } from '@/lib/kolase'
 import { shiftLabel } from '@/lib/shift'
 import { TANKS, tankName, type Tank } from '@/lib/tank'
+import { useAir } from '@/lib/use-air'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { cn } from '@/lib/utils'
 
@@ -37,26 +38,6 @@ const keteranganMm = (t: AirTangki | undefined, tank: Tank | undefined) => {
   if (st === 'nihil') return 'Nihil'
   const l = t.liter ?? literAir(tank, t.airMm)
   return `${t.airMm} mm${l ? ` ≈ ${formatLiter(l)}` : ''}`
-}
-
-/** Catatan water content pada rentang tanggal; dimuat ulang saat SPBU/rentang berubah. */
-function useAir(from: string, to: string) {
-  const app = useApp()
-  const kunci = `${app.spbuId}|${from}|${to}`
-  const [hasil, setHasil] = useState<{ kunci: string; recs: AirRecord[]; error: string | null } | null>(null)
-  const muat = useCallback(
-    () =>
-      app.backend.listAir(from, to).then(
-        (recs) => setHasil({ kunci, recs, error: null }),
-        (e) => setHasil({ kunci, recs: [], error: pesan(e) }),
-      ),
-    [app.backend, from, to, kunci],
-  )
-  useEffect(() => {
-    void muat()
-  }, [muat])
-  const kini = hasil?.kunci === kunci ? hasil : null
-  return { recs: kini?.recs ?? null, error: kini?.error ?? null, muat }
 }
 
 /** Operation > Water Content Tangki: sekali sehari di shift 1, paling lambat 10:00. */

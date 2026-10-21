@@ -44,6 +44,11 @@ export interface SoExport {
 }
 
 function kepala(l: Lembar, x: SoExport, judul: string) {
+  // Kolom B sempit (cash opname, pekerja) atau sangat lebar (justifikasi): label & isi dalam satu sel.
+  if ((l.lebar[2] ?? 8.43) < 8 || (l.lebar[2] ?? 0) > 40) {
+    l.set('B2', `SPBU : ${x.settings.namaSpbu || '-'}`, B).set('B3', `Bulan : ${labelBulan(x.bulan)}`, B)
+    return void l.set('B5', judul, JUDUL)
+  }
   l.set('B2', 'SPBU :', B).set('C2', x.settings.namaSpbu || '-')
   l.set('B3', 'Bulan :', B).set('C3', labelBulan(x.bulan))
   l.set('B5', judul, JUDUL)
@@ -174,9 +179,13 @@ function baTotalisator(x: SoExport) {
     return (da < 0 ? 999 : da) - (db < 0 ? 999 : db) || a.nama.localeCompare(b.nama, 'id', { numeric: true })
   })
   let dispSebelum = ''
+  const jml = { manual: 0, digital: 0, selisih: 0 }
   for (const nz of urut) {
     const d = x.data.nozzle[nz.id]
     const h = hitungNozzle(nz, d, x.totalizer)
+    jml.manual += h.manual ?? 0
+    jml.digital += h.digital ?? 0
+    jml.selisih += h.selisih ?? 0
     const disp = x.dispensers.find((z) => z.id === nz.dispenserId)
     l.set(`B${r}`, disp && disp.id !== dispSebelum ? disp.nama.replace(/^dispenser\s*/i, '') : '', TC)
     dispSebelum = disp?.id ?? ''
@@ -187,7 +196,7 @@ function baTotalisator(x: SoExport) {
     r++
   }
   l.merge(`F${r}:G${r}`, 'Total Sales', { ...H })
-  l.set(`H${r}`, { f: `SUM(H${awal}:H${r - 1})` }, { ...N2, b: true }).set(`K${r}`, { f: `SUM(K${awal}:K${r - 1})` }, { ...N2, b: true }).set(`L${r}`, { f: `SUM(L${awal}:L${r - 1})` }, { ...N2, b: true })
+  l.set(`H${r}`, { f: `SUM(H${awal}:H${r - 1})`, v: jml.manual }, { ...N2, b: true }).set(`K${r}`, { f: `SUM(K${awal}:K${r - 1})`, v: jml.digital }, { ...N2, b: true }).set(`L${r}`, { f: `SUM(L${awal}:L${r - 1})`, v: jml.selisih }, { ...N2, b: true })
   r += 2
   l.merge(`B${r}:L${r + 3}`, `Catatan:\n1. Totalisator digital ditarik dari modul Totalizer FLOQ (awal shift 1 tanggal 1, akhir shift terakhir bulan ini) kecuali diubah manual.\n2. Jika totalisator manual maupun digital mengalami kerusakan agar dicantumkan sebagai catatan.\n3. Keterangan R4/R2/R4 Red Carpet/R2 Self Service wajib diisi per nozzle.${x.data.catatanTotalisator ? `\n${x.data.catatanTotalisator}` : ''}`, { wrap: true, valign: 'top' })
   r += 5
@@ -237,7 +246,8 @@ function baPenerimaan(x: SoExport) {
   const semua = penerimaanBulan(x.reports, x.bulan)
   const produk = [...new Set([...produkSo(x), ...semua.map((s) => s.r.produk)])]
   let r = 6
-  const resume: { p: string; tot: number }[] = []
+  const resume: { p: string; tot: number; order: number; real: number }[] = []
+  const persen = (a: number, b: number) => (b ? (a / b) * 100 : '')
   for (const p of produk) {
     const rows = semua.filter((s) => s.r.produk === p)
     l.set(`B${r}`, p, B)
@@ -258,8 +268,10 @@ function baPenerimaan(x: SoExport) {
     }
     l.merge(`B${r}:F${r}`, 'Total', { ...H })
     if (rows.length) {
-      l.set(`G${r}`, { f: `SUM(G${awal}:G${r - 1})` }, { ...N0, b: true }).set(`H${r}`, { f: `SUM(H${awal}:H${r - 1})` }, { ...N2, b: true }).set(`I${r}`, { f: `H${r}-G${r}` }, { ...N2, b: true }).set(`J${r}`, { f: `IF(G${r}<>0,I${r}/G${r}*100,"")` }, { ...N2, b: true, fmt: 'pct' })
-      resume.push({ p, tot: r })
+      const order = rows.reduce((n, z) => n + z.order, 0)
+      const real = rows.reduce((n, z) => n + (z.real ?? 0), 0)
+      l.set(`G${r}`, { f: `SUM(G${awal}:G${r - 1})`, v: order }, { ...N0, b: true }).set(`H${r}`, { f: `SUM(H${awal}:H${r - 1})`, v: real }, { ...N2, b: true }).set(`I${r}`, { f: `H${r}-G${r}`, v: real - order }, { ...N2, b: true }).set(`J${r}`, { f: `IF(G${r}<>0,I${r}/G${r}*100,"")`, v: persen(real - order, order) }, { ...N2, b: true, fmt: 'pct' })
+      resume.push({ p, tot: r, order, real })
     }
     r += 2
   }
@@ -269,10 +281,14 @@ function baPenerimaan(x: SoExport) {
   for (const p of produk) {
     const x0 = resume.find((z) => z.p === p)
     l.set(`B${r}`, '', T).set(`C${r}`, p, T)
-    l.set(`D${r}`, x0 ? { f: `G${x0.tot}` } : 0, N0).set(`E${r}`, x0 ? { f: `H${x0.tot}` } : 0, N2).set(`F${r}`, { f: `E${r}-D${r}` }, N2).set(`G${r}`, { f: `IF(D${r}<>0,F${r}/D${r}*100,"")` }, { ...N2, fmt: 'pct' })
+    const o = x0?.order ?? 0
+    const re = x0?.real ?? 0
+    l.set(`D${r}`, x0 ? { f: `G${x0.tot}`, v: o } : 0, N0).set(`E${r}`, x0 ? { f: `H${x0.tot}`, v: re } : 0, N2).set(`F${r}`, { f: `E${r}-D${r}`, v: re - o }, N2).set(`G${r}`, { f: `IF(D${r}<>0,F${r}/D${r}*100,"")`, v: persen(re - o, o) }, { ...N2, fmt: 'pct' })
     r++
   }
-  l.set(`B${r}`, '', H).set(`C${r}`, 'TOTAL', H).set(`D${r}`, { f: `SUM(D${awalRes}:D${r - 1})` }, { ...N0, b: true }).set(`E${r}`, { f: `SUM(E${awalRes}:E${r - 1})` }, { ...N2, b: true }).set(`F${r}`, { f: `E${r}-D${r}` }, { ...N2, b: true }).set(`G${r}`, { f: `IF(D${r}<>0,F${r}/D${r}*100,"")` }, { ...N2, b: true, fmt: 'pct' })
+  const tO = resume.reduce((n, z) => n + z.order, 0)
+  const tR = resume.reduce((n, z) => n + z.real, 0)
+  l.set(`B${r}`, '', H).set(`C${r}`, 'TOTAL', H).set(`D${r}`, { f: `SUM(D${awalRes}:D${r - 1})`, v: tO }, { ...N0, b: true }).set(`E${r}`, { f: `SUM(E${awalRes}:E${r - 1})`, v: tR }, { ...N2, b: true }).set(`F${r}`, { f: `E${r}-D${r}`, v: tR - tO }, { ...N2, b: true }).set(`G${r}`, { f: `IF(D${r}<>0,F${r}/D${r}*100,"")`, v: persen(tR - tO, tO) }, { ...N2, b: true, fmt: 'pct' })
   r += 2
   penutup(l, r, 'Penerimaan BBM & BBK')
   tandaTangan(l, x, r + 5)
@@ -357,12 +373,14 @@ function baCash(x: SoExport, i: number) {
   l.baris(`C${r}`, ['Keterangan', 'Pecahan', 'Qty', 'Total'], H)
   r++
   const awalP = r
+  let qty = 0
   PECAHAN.forEach(([k, , v, t], j) => {
     const q = angka(c.pecahan[k]) ?? 0
+    qty += q
     l.set(`C${r}`, j === 0 ? 'Uang Kertas' : t === 'l' && PECAHAN[j - 1][3] === 'k' ? 'Uang Logam' : '', T).set(`D${r}`, v, N0).set(`E${r}`, q, N0).set(`F${r}`, { f: `D${r}*E${r}`, v: q * v }, RP)
     r++
   })
-  l.set(`C${r}`, '', T).set(`D${r}`, 'TOTAL', { ...TC, b: true }).set(`E${r}`, { f: `SUM(E${awalP}:E${r - 1})` }, { ...N0, b: true }).set(`F${r}`, { f: `SUM(F${awalP}:F${r - 1})`, v: h.fisik }, { ...RP, b: true })
+  l.set(`C${r}`, '', T).set(`D${r}`, 'TOTAL', { ...TC, b: true }).set(`E${r}`, { f: `SUM(E${awalP}:E${r - 1})`, v: qty }, { ...N0, b: true }).set(`F${r}`, { f: `SUM(F${awalP}:F${r - 1})`, v: h.fisik }, { ...RP, b: true })
   r += 2
   l.set(`C${r}`, `Terbilang : ${terbilang(h.fisik)}`, { italic: true })
   r += 2
@@ -400,16 +418,25 @@ function pekerja(x: SoExport) {
     l.set(`B${r}`, i + 1, TC).set(`C${r}`, j, T).set(`D${r}`, v ?? '-', { ...TC, fmt: 'int' })
     r++
   })
-  l.set(`B${r}`, '', H).set(`C${r}`, 'TOTAL', H).set(`D${r}`, { f: `SUM(D7:D${r - 1})` }, { ...N0, b: true, align: 'center' })
+  const totalPekerja = Object.values(x.data.pekerja).reduce((n, v) => n + (angka(v) ?? 0), 0)
+  l.set(`B${r}`, '', H).set(`C${r}`, 'TOTAL', H).set(`D${r}`, { f: `SUM(D7:D${r - 1})`, v: totalPekerja }, { ...N0, b: true, align: 'center' })
   r += 2
   penutup(l, r, 'Pemeriksaan Update Pekerja')
   tandaTangan(l, x, r + 5)
   return l
 }
 
+/** Semua lembar BA Laporan Bulanan, berurutan seperti dokumen SPBU. */
+export const soLembar = (x: SoExport): Lembar[] => [daftarIsi(x), baSo(x), baTotalisator(x), baArus(x), baPenerimaan(x), baTera(x), ...CASH_SO.map((_, i) => baCash(x, i)), justifikasi(x), pekerja(x)]
+
 export async function soXlsx(x: SoExport): Promise<Blob> {
-  const lembar: Lembar[] = [daftarIsi(x), baSo(x), baTotalisator(x), baArus(x), baPenerimaan(x), baTera(x), ...CASH_SO.map((_, i) => baCash(x, i)), justifikasi(x), pekerja(x)]
-  return tulisXlsx(lembar)
+  return tulisXlsx(soLembar(x))
+}
+
+/** PDF dengan susunan lembar yang sama dengan Excel. */
+export async function soPdf(x: SoExport): Promise<Blob> {
+  const { lembarPdf } = await import('./lembar-pdf')
+  return lembarPdf(soLembar(x), `BA Laporan Bulanan ${x.settings.namaSpbu || 'SPBU'} · ${labelBulan(x.bulan)}`)
 }
 
 /** Nilai sel untuk pratinjau di aplikasi (angka atau "-"). */

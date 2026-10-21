@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronDown, FileSpreadsheet, LoaderCircle, Save } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, FileSpreadsheet, FileText, LoaderCircle, Save, Sparkles, TriangleAlert } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -12,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { PECAHAN } from '@/lib/closing'
+import type { ClosingData } from '@/lib/closing'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
 import { barisPumpTest, rekapTeraNozzle } from '@/lib/pumptest'
@@ -37,15 +39,16 @@ import {
   type SoRecord,
   type SoTangki,
 } from '@/lib/so'
+import { akhirBulan, bulanDepan, cekSo, lengkapiOtomatis, type BagianSo, type ItemCek } from '@/lib/so-cek'
 import { TANKS, volumeTank, type Tank } from '@/lib/tank'
 import type { TotalizerData } from '@/lib/totalizer'
+import { useAir } from '@/lib/use-air'
 import { useCatatan } from '@/lib/use-catatan'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
-const akhirBulan = (bulan: string) => todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)), 0))
+const stamp = () => Date.now()
 const bulanLalu = (bulan: string) => todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)) - 2, 1)).slice(0, 7)
-const bulanDepan = (bulan: string) => todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)), 1))
 const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 const labelBulan = (b: string) => `${BULAN[Number(b.slice(5, 7)) - 1]} ${b.slice(0, 4)}`
 const fmt = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? '-' : formatNumber(v, d))
@@ -59,11 +62,10 @@ const literDariCm = (t: Tank, cm: string) => {
 }
 
 /** Kartu bagian yang dapat dilipat. */
-function Bagian({ no, judul, ringkas, children, buka: bukaAwal = false }: { no: number; judul: string; ringkas?: string; children: ReactNode; buka?: boolean }) {
-  const [buka, setBuka] = useState(bukaAwal)
+function Bagian({ no, judul, ringkas, children, buka, onBuka }: { no: number; judul: string; ringkas?: string; children: ReactNode; buka: boolean; onBuka: (v: boolean) => void }) {
   return (
-    <GlassCard level={2} className="flex flex-col">
-      <button type="button" aria-expanded={buka} onClick={() => setBuka(!buka)} className="flex min-h-14 items-center gap-space-sm px-space-md py-space-sm text-left">
+    <GlassCard level={2} id={`so-bagian-${no}`} className="flex scroll-mt-24 flex-col">
+      <button type="button" aria-expanded={buka} onClick={() => onBuka(!buka)} className="flex min-h-14 items-center gap-space-sm px-space-md py-space-sm text-left">
         <span className="tabular flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-body-sm font-bold text-primary">{no}</span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-body-md font-bold text-on-surface">{judul}</span>
@@ -85,6 +87,215 @@ function Nilai({ k, v, tebal, merah }: { k: string; v: string; tebal?: boolean; 
   )
 }
 
+type CekSo = ReturnType<typeof cekSo>
+
+/** Satu baris daftar periksa: hijau = lengkap, merah = wajib kosong, kuning = disarankan. */
+function BarisCek({ x, wajib, keBagian }: { x: ItemCek; wajib: boolean; keBagian: (no: BagianSo) => void }) {
+  const [semua, setSemua] = useState(false)
+  const Ikon = x.ok ? CircleCheck : wajib ? CircleAlert : TriangleAlert
+  const tampil = semua ? x.kurang : x.kurang.slice(0, 8)
+  const aksi = 'inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-primary px-3 text-body-sm font-semibold text-on-primary'
+  return (
+    <li className="flex items-start gap-space-sm py-space-sm">
+      <Ikon aria-hidden="true" className={cn('mt-0.5 size-5 shrink-0', x.ok ? 'text-tertiary' : wajib ? 'text-error' : 'text-amber-600')} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-body-md font-semibold text-on-surface">{x.judul}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {x.detail} · untuk {x.untuk}
+        </span>
+        {!x.ok && x.kurang.length > 0 && (
+          <span className="flex flex-wrap gap-1 pt-1">
+            {tampil.map((k) => (
+              <span key={k} className={cn('tabular rounded-md px-1.5 py-0.5 text-[11px] font-semibold', wajib ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
+                {k}
+              </span>
+            ))}
+            {x.kurang.length > 8 && (
+              <button type="button" onClick={() => setSemua(!semua)} className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                {semua ? 'Ringkas' : `+${x.kurang.length - 8} lainnya`}
+              </button>
+            )}
+          </span>
+        )}
+      </span>
+      {!x.ok && x.to && (
+        <Link to={x.to} className={aksi}>
+          Isi <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      )}
+      {!x.ok && !x.to && x.bagian && (
+        <button type="button" onClick={() => keBagian(x.bagian!)} className={aksi}>
+          Isi <ChevronRight aria-hidden="true" className="size-4" />
+        </button>
+      )}
+    </li>
+  )
+}
+
+/**
+ * Generate Laporan SO 1 klik: periode tarikan (tgl 1 s.d. akhir bulan), rangkuman angka BA, daftar data
+ * wajib yang masih kosong (menahan generate) dan yang disarankan, lalu unduh PDF / Excel format SO.
+ */
+function PanelGenerate({
+  bulan,
+  setBulan,
+  cek,
+  otomatis,
+  jamSo,
+  busy,
+  bolehDraf,
+  keBagian,
+  generate,
+  error,
+}: {
+  bulan: string
+  setBulan: (b: string) => void
+  cek: CekSo
+  otomatis: string[]
+  jamSo: string
+  busy: string | null
+  bolehDraf: boolean
+  keBagian: (no: BagianSo) => void
+  generate: (jenis: 'excel' | 'pdf', draf?: boolean) => void
+  error: string | null
+}) {
+  const r = cek.rangkuman
+  const siap = cek.kurangWajib === 0
+  const saranKurang = cek.saran.filter((x) => !x.ok).length
+  const tile = (label: string, nilai: string, sub: string, ok: boolean) => (
+    <div className="flex flex-col gap-0.5 rounded-md bg-surface-container-low p-space-sm">
+      <span className="text-tag uppercase text-on-surface-variant">{label}</span>
+      <span className={cn('tabular text-headline-md font-bold', ok ? 'text-on-surface' : 'text-error')}>{nilai}</span>
+      <span className="text-body-sm text-on-surface-variant">{sub}</span>
+    </div>
+  )
+  const persen = (a: number, b: number) => (b ? `${a}/${b}` : '-')
+  return (
+    <>
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <div className="flex items-start gap-space-sm">
+          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary">
+            <Sparkles className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-tag uppercase text-primary">Report · BA Laporan Bulanan</span>
+            <span className="text-headline-md font-bold text-on-surface">Generate Laporan SO</span>
+            <span className="text-body-sm text-on-surface-variant">Data ditarik otomatis dari semua modul FLOQ. Lengkapi data wajib, lalu unduh PDF atau Excel sesuai format SO.</span>
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Periode SO" htmlFor="so-bulan">
+            <Input id="so-bulan" type="month" value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
+          </Field>
+          <div className="flex flex-col justify-end gap-0.5 pb-1 text-body-sm">
+            <span className="text-on-surface-variant">Tarikan data</span>
+            <b className="tabular text-on-surface">
+              {formatTanggalIso(r.dari)} – {formatTanggalIso(r.sampai)}
+            </b>
+            <span className="text-on-surface-variant">
+              SO {formatTanggalIso(r.tanggalSo)} {jamSo}
+            </span>
+          </div>
+        </div>
+        {!r.selesai && (
+          <div className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">Periode ini belum berakhir. Kelengkapan dinilai sampai shift yang sedang berjalan; generate laporan final di awal bulan berikutnya.</div>
+        )}
+        <div className={cn('flex items-center gap-space-sm rounded-md p-space-sm', siap ? 'bg-emerald-50 text-emerald-900' : 'bg-error-container text-on-error-container')}>
+          {siap ? <CircleCheck aria-hidden="true" className="size-5 shrink-0" /> : <CircleAlert aria-hidden="true" className="size-5 shrink-0" />}
+          <span className="text-body-sm font-semibold">
+            {siap ? `Data wajib lengkap. Siap generate${saranKurang ? ` (${saranKurang} data disarankan belum lengkap)` : ''}.` : `${cek.kurangWajib} data wajib belum lengkap. Lengkapi terlebih dahulu sebelum generate.`}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Button size="lg" disabled={!siap || busy !== null} onClick={() => generate('pdf')}>
+            {busy === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
+            PDF
+          </Button>
+          <Button size="lg" disabled={!siap || busy !== null} onClick={() => generate('excel')}>
+            {busy === 'excel' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
+            Excel
+          </Button>
+        </div>
+        {!siap && bolehDraf && (
+          <div className="flex flex-wrap items-center gap-x-space-sm text-body-sm text-on-surface-variant">
+            <span>Periksa dulu hasilnya:</span>
+            <button type="button" disabled={busy !== null} onClick={() => generate('pdf', true)} className="font-semibold text-primary underline-offset-2 hover:underline">
+              Unduh draf PDF
+            </button>
+            <button type="button" disabled={busy !== null} onClick={() => generate('excel', true)} className="font-semibold text-primary underline-offset-2 hover:underline">
+              Unduh draf Excel
+            </button>
+          </div>
+        )}
+        <ErrorBox text={error} />
+      </GlassCard>
+
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="text-tag uppercase text-primary">Rangkuman data tarikan</span>
+        <div className="grid grid-cols-2 gap-space-sm sm:grid-cols-3">
+          {tile('Totalizer lengkap', persen(r.shift.totalizer, r.shift.total), 'shift (awal & akhir)', r.shift.totalizer === r.shift.total)}
+          {tile('Stok awal shift', persen(r.shift.stok, r.shift.total), 'shift', r.shift.stok === r.shift.total)}
+          {tile('Closing shift', persen(r.shift.closing, r.shift.total), 'shift', r.shift.closing === r.shift.total)}
+          {tile('Penerimaan BBM', String(r.penerimaan.jumlah), `order ${formatLiter(r.penerimaan.order)}`, true)}
+          {tile('Pump test / tera', formatLiter(r.pumpTest, 1), 'dikurangkan dari penjualan', true)}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="tabular w-full min-w-[520px] text-body-sm">
+            <thead>
+              <tr className="text-left text-on-surface-variant">
+                <th className="py-1 pr-2 font-semibold">Produk</th>
+                <th className="py-1 pr-2 text-right font-semibold">Stok awal</th>
+                <th className="py-1 pr-2 text-right font-semibold">Penerimaan</th>
+                <th className="py-1 pr-2 text-right font-semibold">Penjualan bersih</th>
+                <th className="py-1 pr-2 text-right font-semibold">Stok akhir real</th>
+                <th className="py-1 text-right font-semibold">Losses</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.arus.map((a) => (
+                <tr key={a.produk} className="border-t border-outline-variant/40">
+                  <td className="py-1.5 pr-2 font-semibold text-on-surface">{a.produk}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.a, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.b, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.d, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.f, 0)}</td>
+                  <td className={cn('py-1.5 text-right font-semibold', (a.g ?? 0) < 0 && 'text-error')}>
+                    {a.g === null ? '-' : `${fmt(a.g, 0)} (${fmt(a.h)}%)`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <span className="text-body-sm text-on-surface-variant">Liter. "-" = data belum lengkap untuk dihitung.</span>
+        {otomatis.length > 0 && (
+          <div className="flex flex-col gap-1 rounded-md bg-primary-fixed/40 p-space-sm text-body-sm text-on-surface">
+            <b>Tarikan otomatis (mengisi kolom yang masih kosong)</b>
+            {otomatis.map((o) => (
+              <span key={o}>• {o}</span>
+            ))}
+          </div>
+        )}
+      </GlassCard>
+
+      <GlassCard level={2} className="flex flex-col p-space-md">
+        <span className="text-tag uppercase text-error">Wajib dipenuhi ({cek.kurangWajib} belum)</span>
+        <ul className="flex flex-col divide-y divide-outline-variant/40">
+          {[...cek.wajib].sort((a, b) => Number(a.ok) - Number(b.ok)).map((x) => (
+            <BarisCek key={x.key} x={x} wajib keBagian={keBagian} />
+          ))}
+        </ul>
+        <span className="mt-space-sm text-tag uppercase text-amber-700">Disarankan ({saranKurang} belum)</span>
+        <ul className="flex flex-col divide-y divide-outline-variant/40">
+          {[...cek.saran].sort((a, b) => Number(a.ok) - Number(b.ok)).map((x) => (
+            <BarisCek key={x.key} x={x} wajib={false} keBagian={keBagian} />
+          ))}
+        </ul>
+      </GlassCard>
+    </>
+  )
+}
+
 /** Report > Laporan Stock Opname: BA Laporan Bulanan SPBU per bulan (isian + tarikan data FLOQ), unduh Excel. */
 export function LaporanStockOpname() {
   const app = useApp()
@@ -98,13 +309,21 @@ export function LaporanStockOpname() {
   const lalu = bulanLalu(bulan)
   const so = useCatatan<SoData>('so', `${lalu}-01`, `${bulan}-01`)
   const tot = useCatatan<TotalizerData>('totalizer', `${bulan}-01`, akhirBulan(bulan))
+  const closing = useCatatan<ClosingData>('closing', `${bulan}-01`, akhirBulan(bulan))
+  const air = useAir(`${bulan}-01`, bulanDepan(bulan))
   const [draft, setDraft] = useState<{ bulan: string; data: SoData } | null>(null)
-  const [busy, setBusy] = useState<'simpan' | 'excel' | null>(null)
+  const [busy, setBusy] = useState<'simpan' | 'excel' | 'pdf' | null>(null)
+  const [buka, setBuka] = useState<Set<number>>(() => new Set())
+  const bg = (no: number) => ({ buka: buka.has(no), onBuka: (v: boolean) => setBuka((b) => { const n = new Set(b); if (v) n.add(no); else n.delete(no); return n }) })
+  const keBagian = (no: BagianSo) => {
+    setBuka((b) => new Set(b).add(no))
+    requestAnimationFrame(() => document.getElementById(`so-bagian-${no}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
   const [error, setError] = useState<string | null>(null)
   const bolehUbah = ['abh', 'pengawas', 'admin'].includes(app.role ?? '')
   const guard = useLeaveGuard({ active: !!draft, title: 'Keluar tanpa menyimpan?', detail: 'Isian stock opname yang belum disimpan akan hilang.' })
 
-  if (!app.loaded || !so.recs || !tot.recs) return <Loading />
+  if (!app.loaded || !so.recs || !tot.recs || !closing.recs || !air.recs) return <Loading />
   const rec = so.recs.find((r) => r.id === bulan)
   const recLalu = so.recs.find((r) => r.id === lalu)?.data ?? null
   const s = app.settings
@@ -112,25 +331,12 @@ export function LaporanStockOpname() {
   const dispensers = s.dispensers ?? []
 
   // Data efektif: isian tersimpan/draf + nilai otomatis dari SO bulan lalu.
-  const dasar: SoData = draft?.bulan === bulan ? draft.data : { ...soKosong(), ...rec?.data, ttd: { ...soKosong().ttd, ...rec?.data.ttd } }
-  const data: SoData = {
-    ...dasar,
-    tanggalSo: dasar.tanggalSo || bulanDepan(bulan),
-    listrikAwal: dasar.listrikAwal || recLalu?.listrikAkhir || '',
-    ttd: {
-      pengawas: dasar.ttd.pengawas || s.namaPengawasDefault || '',
-      admin: dasar.ttd.admin,
-      abh: dasar.ttd.abh || s.namaAbhDefault || '',
-      kasir: dasar.ttd.kasir,
-    },
-    tangki: Object.fromEntries(
-      TANKS.map((t) => {
-        const x = dasar.tangki[t.id] ?? tangkiKosong()
-        const l = recLalu?.tangki[t.id]
-        return [t.id, { ...x, laluDipCm: x.laluDipCm || l?.dipCm || '', laluAtgCm: x.laluAtgCm || l?.atgCm || '', laluTanggal: x.laluTanggal || recLalu?.tanggalSo || '' }]
-      }),
-    ),
-  }
+  const dasar: SoData = draft?.bulan === bulan ? draft.data : { ...soKosong(), ...rec?.data, cash: { ...soKosong().cash, ...rec?.data.cash }, ttd: { ...soKosong().ttd, ...rec?.data.ttd } }
+  // Isian efektif: tersimpan/draf + tarikan otomatis (SO bulan lalu, water content, closing shift, personil).
+  const sumber = { bulan, settings: s, tanks: TANKS, nozzles, lalu: recLalu, totalizer: tot.recs, closing: closing.recs, air: air.recs, daily: app.daily, reports: app.reports }
+  const { data } = lengkapiOtomatis(dasar, sumber)
+  // Sumber tarikan otomatis yang tersedia (dipakai untuk kolom yang belum diisi).
+  const otomatis = lengkapiOtomatis(soKosong(), sumber).otomatis
   const ubah = (patch: Partial<SoData>) => {
     setError(null)
     setDraft({ bulan, data: { ...data, ...patch } })
@@ -145,14 +351,18 @@ export function LaporanStockOpname() {
   const produk = [...new Set([...TANKS.map((t) => t.produk), ...nozzles.map((n) => n.produk)])]
   const arus = produk.map((p) => hitungArus(p, { tanks: TANKS, data, lalu: recLalu, totalizer: tot.recs!, nozzles, penerimaan, pumpTest }))
   const rekapTera = rekapTeraNozzle(pumpTest)
+  const cek = cekSo(data, sumber, pumpTest)
 
+  const tulis = async () => {
+    const r: SoRecord = { id: bulan, tanggal: `${bulan}-01`, shift: 0, data, createdAt: rec?.createdAt ?? stamp(), updatedAt: stamp(), createdBy: rec?.createdBy ?? app.session.user?.id ?? null }
+    await app.backend.saveCatatan('so', r)
+    setDraft(null)
+    await so.muat()
+  }
   const simpan = async () => {
     setBusy('simpan')
     try {
-      const r: SoRecord = { id: bulan, tanggal: `${bulan}-01`, shift: 0, data, createdAt: rec?.createdAt ?? Date.now(), updatedAt: Date.now(), createdBy: rec?.createdBy ?? app.session.user?.id ?? null }
-      await app.backend.saveCatatan('so', r)
-      setDraft(null)
-      await so.muat()
+      await tulis()
       toast(`Stock opname ${labelBulan(bulan)} tersimpan`)
     } catch (e) {
       setError(pesan(e))
@@ -160,14 +370,19 @@ export function LaporanStockOpname() {
       setBusy(null)
     }
   }
-  const unduh = async () => {
-    setBusy('excel')
+  /** Generate 1 klik: simpan isian (termasuk tarikan otomatis) lalu unduh BA Laporan Bulanan. */
+  const generate = async (jenis: 'excel' | 'pdf', drafSaja = false) => {
+    setBusy(jenis)
+    setError(null)
     try {
-      const { soXlsx } = await import('@/lib/report/so-xlsx')
-      const blob = await soXlsx({ bulan, settings: s, data, lalu: recLalu, tanks: TANKS, nozzles, dispensers, totalizer: tot.recs!, reports: app.reports, pumpTest })
-      downloadBlob(blob, `BA Laporan Bulanan ${s.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.xlsx`)
+      if (bolehUbah && !drafSaja) await tulis()
+      const { soXlsx, soPdf } = await import('@/lib/report/so-xlsx')
+      const x = { bulan, settings: s, data, lalu: recLalu, tanks: TANKS, nozzles, dispensers, totalizer: tot.recs!, reports: app.reports, pumpTest }
+      const blob = jenis === 'pdf' ? await soPdf(x) : await soXlsx(x)
+      downloadBlob(blob, `${drafSaja ? 'DRAF ' : ''}BA Laporan Bulanan ${s.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.${jenis === 'pdf' ? 'pdf' : 'xlsx'}`)
+      toast(`Laporan SO ${labelBulan(bulan)} ${jenis === 'pdf' ? 'PDF' : 'Excel'} terunduh`)
     } catch (e) {
-      setError(`Gagal membuat Excel: ${pesan(e)}`)
+      setError(`Gagal membuat laporan: ${pesan(e)}`)
     } finally {
       setBusy(null)
     }
@@ -181,12 +396,25 @@ export function LaporanStockOpname() {
 
   return (
     <div className="flex flex-col gap-space-md">
-      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+      <PanelGenerate
+        bulan={bulan}
+        setBulan={(b) => (setDraft(null), setBulan(b))}
+        cek={cek}
+        otomatis={otomatis}
+        jamSo={data.jamSo}
+        busy={busy}
+        bolehDraf={app.canManage || app.role === 'admin'}
+        keBagian={keBagian}
+        generate={(j, d) => void generate(j, d)}
+        error={error}
+      />
+
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="flex items-center justify-between gap-2">
+          <span className="text-tag uppercase text-primary">Isian hari SO · {labelBulan(bulan)}</span>
+          {rec ? <Pill tone="success">Tersimpan {new Date(rec.updatedAt).toLocaleDateString('id-ID')}</Pill> : <Pill>Belum disimpan</Pill>}
+        </span>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Periode SO" htmlFor="so-bulan">
-            <Input id="so-bulan" type="month" value={bulan} onChange={(e) => e.target.value && (setDraft(null), setBulan(e.target.value))} />
-          </Field>
-          <div className="flex items-end">{rec ? <Pill tone="success">Tersimpan {new Date(rec.updatedAt).toLocaleDateString('id-ID')}</Pill> : <Pill>Belum disimpan</Pill>}</div>
           <Field label="Tanggal SO" htmlFor="so-tgl">
             <Input id="so-tgl" type="date" disabled={!bolehUbah} value={data.tanggalSo} onChange={(e) => ubah({ tanggalSo: e.target.value })} />
           </Field>
@@ -200,7 +428,7 @@ export function LaporanStockOpname() {
         {!bolehUbah && <span className="text-body-sm font-semibold text-on-surface-variant">Hanya dapat dilihat. Isian diisi ABH, pengawas, atau admin.</span>}
       </GlassCard>
 
-      <Bagian no={1} judul="Stock Opname Tangki Pendam & Meter Listrik" ringkas={`${TANKS.length} tangki · konsistensi maks. 2,5 cm`} buka>
+      <Bagian no={1} {...bg(1)} judul="Stock Opname Tangki Pendam & Meter Listrik" ringkas={`${TANKS.length} tangki · konsistensi maks. 2,5 cm`}>
         {TANKS.map((t) => {
           const x = data.tangki[t.id] ?? tangkiKosong()
           const h = hitungTangki(x)
@@ -239,7 +467,7 @@ export function LaporanStockOpname() {
         <Nilai k="Total pemakaian listrik" v={(() => { const a = parseAngka(data.listrikAwal); const b = parseAngka(data.listrikAkhir); return a !== null && b !== null ? `${formatNumber(b - a, 2)} kWh` : '-' })()} tebal />
       </Bagian>
 
-      <Bagian no={2} judul="Totalisator" ringkas={`${nozzles.length} nozzle · digital dari Totalizer (${tot.recs.length} catatan shift)`}>
+      <Bagian no={2} {...bg(2)} judul="Totalisator" ringkas={`${nozzles.length} nozzle · digital dari Totalizer (${tot.recs.length} catatan shift)`}>
         {nozzles.map((nz) => {
           const x = data.nozzle[nz.id] ?? nozzleKosong()
           const h = hitungNozzle(nz, x, tot.recs!)
@@ -273,7 +501,7 @@ export function LaporanStockOpname() {
         </Field>
       </Bagian>
 
-      <Bagian no={3} judul="Arus Minyak" ringkas={arus.map((a) => `${a.produk} ${a.h === null ? '-' : `${formatNumber(a.h, 2)}%`}`).join(' · ')}>
+      <Bagian no={3} {...bg(3)} judul="Arus Minyak" ringkas={arus.map((a) => `${a.produk} ${a.h === null ? '-' : `${formatNumber(a.h, 2)}%`}`).join(' · ')}>
         {arus.map((a) => (
           <div key={a.produk} className="flex flex-col gap-space-xs rounded-md bg-surface-container-low p-space-sm">
             <b className="text-body-md text-on-surface">{a.produk}</b>
@@ -293,7 +521,7 @@ export function LaporanStockOpname() {
         <span className="text-body-sm text-on-surface-variant">Kosongkan isian untuk memakai nilai otomatis (abu-abu).</span>
       </Bagian>
 
-      <Bagian no={4} judul="Penerimaan BBM & BBK" ringkas={`${penerimaan.length} penerimaan dari Input Bongkaran`}>
+      <Bagian no={4} {...bg(4)} judul="Penerimaan BBM & BBK" ringkas={`${penerimaan.length} penerimaan dari Input Bongkaran`}>
         {penerimaan.map(({ r, order, real }) => (
           <span key={r.id} className="tabular flex flex-col border-b border-outline-variant/40 pb-1 text-body-sm">
             <b>
@@ -307,7 +535,7 @@ export function LaporanStockOpname() {
         {!penerimaan.length && <span className="text-body-sm text-on-surface-variant">Belum ada penerimaan bulan ini.</span>}
       </Bagian>
 
-      <Bagian no={5} judul="Rekap Tera Nozzle" ringkas={`${formatLiter(pumpTest.reduce((n, r) => n + r.liter, 0), 1)} pump test bulan ini`}>
+      <Bagian no={5} {...bg(5)} judul="Rekap Tera Nozzle" ringkas={`${formatLiter(pumpTest.reduce((n, r) => n + r.liter, 0), 1)} pump test bulan ini`}>
         {rekapTera.map((x) => (
           <Nilai key={`${x.nozzle}|${x.produk}`} k={`${x.nozzle ? `Nozzle ${x.nozzle}` : 'Nozzle -'} · ${x.produk} · ${x.perHari.size} hari`} v={formatLiter(x.total, 1)} />
         ))}
@@ -318,7 +546,7 @@ export function LaporanStockOpname() {
         const x = data.cash[c.key] ?? kosongCash()
         const h = hitungCashSo(x, c.key)
         return (
-          <Bagian key={c.key} no={6 + i} judul={c.judul.replace('Berita Acara ', '')} ringkas={`Fisik ${rp(h.fisik)} · selisih ${rp(h.selisih)}`}>
+          <Bagian key={c.key} no={6 + i} {...bg(6 + i)} judul={c.judul.replace('Berita Acara ', '')} ringkas={`Fisik ${rp(h.fisik)} · selisih ${rp(h.selisih)}`}>
             <div className="grid grid-cols-2 gap-space-xs">
               <Field label="Tanggal transaksi" htmlFor={`so-ct-${c.key}`}>
                 <Input id={`so-ct-${c.key}`} type="date" disabled={!bolehUbah} value={x.tanggal} onChange={(e) => ubahCash(c.key, { tanggal: e.target.value })} />
@@ -342,7 +570,7 @@ export function LaporanStockOpname() {
         )
       })}
 
-      <Bagian no={10} judul="Justifikasi Sales, Losses & Pertamina Way">
+      <Bagian no={10} {...bg(10)} judul="Justifikasi Sales, Losses & Pertamina Way">
         {(
           [
             ['justifikasiSales', 'a. Justifikasi sales (kenaikan/penurunan)'],
@@ -356,7 +584,7 @@ export function LaporanStockOpname() {
         ))}
       </Bagian>
 
-      <Bagian no={11} judul="Update Pekerja SPBU" ringkas={`${JABATAN_SO.reduce((n, j) => n + (parseAngka(data.pekerja[j] ?? '') ?? 0), 0)} orang`}>
+      <Bagian no={11} {...bg(11)} judul="Update Pekerja SPBU" ringkas={`${JABATAN_SO.reduce((n, j) => n + (parseAngka(data.pekerja[j] ?? '') ?? 0), 0)} orang`}>
         <div className="grid grid-cols-2 gap-space-xs">
           {JABATAN_SO.map((j) => (
             <div key={j}>{angkaInput(`so-pk-${j}`, j, data.pekerja[j] ?? '', (v) => ubah({ pekerja: { ...data.pekerja, [j]: v } }))}</div>
@@ -364,7 +592,7 @@ export function LaporanStockOpname() {
         </div>
       </Bagian>
 
-      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+      <GlassCard level={2} id="so-bagian-12" className="flex scroll-mt-24 flex-col gap-space-sm p-space-md">
         <span className="text-tag uppercase text-primary">Penanda tangan BA</span>
         <div className="grid grid-cols-2 gap-space-xs">
           {(
@@ -387,10 +615,6 @@ export function LaporanStockOpname() {
             Simpan stock opname {labelBulan(bulan)}
           </Button>
         )}
-        <Button variant="glass" size="lg" disabled={busy !== null} onClick={() => void unduh()}>
-          {busy === 'excel' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
-          Unduh Excel BA Laporan Bulanan
-        </Button>
       </GlassCard>
       {guard.dialog}
     </div>
