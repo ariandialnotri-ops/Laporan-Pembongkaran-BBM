@@ -69,7 +69,7 @@ export function KalengDetail({ open, onClose }: { open: { k: Kaleng; slot: numbe
         (k.menunggu ? (
           <Pill tone="cyan" className="self-start">
             <Clock aria-hidden="true" />
-            D15 sample MT belum ada
+            Density std. 15 °C sample MT belum ada
           </Pill>
         ) : (
           <Pill tone={k.ok === false ? 'error' : 'success'} className="self-start">
@@ -134,31 +134,31 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
 
       <Bagian no={2} title="Parameter uji density" aside={`Toleransi ±${formatDensity(tol)}`}>
         {/* Isi kaleng: sample mobil tangki yang diuji saat bongkar. */}
-        {x.densityResults.length === 0 && <UjiDensity title="Sample mobil tangki (isi kaleng)" obs={null} suhu={undefined} hasilLabel="D15 MT" hasil={null} kosong="Belum ada uji density saat bongkar." />}
+        {x.densityResults.length === 0 && <UjiDensity title="Sample mobil tangki (isi kaleng)" obs={null} suhu={undefined} hasilLabel="Density std. 15 °C MT" hasil={null} kosong="Belum ada uji density saat bongkar." />}
         {x.densityResults.map((r) => (
           <UjiDensity
             key={r.id}
             title={`Sample mobil tangki, kompartemen ${r.kompartemenNo} (isi kaleng)`}
             obs={r.obs}
             suhu={r.suhu}
-            hasilLabel="D15 MT"
+            hasilLabel="Density std. 15 °C MT"
             hasil={r.d15?.value ?? null}
             selisih={r.selisih}
             ok={r.ok}
           />
         ))}
         <UjiDensity
-          title="D15 dokumen depot"
+          title="Density std. 15 °C dokumen depot"
           obs={normalizeDensity(d.densityObsDepot)}
           suhu={d.suhuObsDepot}
-          hasilLabel="D15 depot"
+          hasilLabel="Density std. 15 °C depot"
           hasil={x.d15Depot}
         />
         <UjiDensity
           title="Uji kualitas pasca penerimaan (tangki pendam)"
           obs={sample ? normalizeDensity(sample.densityObs) : null}
           suhu={sample?.suhu}
-          hasilLabel="D15 tangki"
+          hasilLabel="Density std. 15 °C tangki"
           hasil={x.sample2Jam?.d15?.value ?? null}
           selisih={x.sample2Jam?.selisih ?? null}
           ok={x.sample2Jam?.ok ?? null}

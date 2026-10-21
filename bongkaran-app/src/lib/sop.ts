@@ -161,7 +161,7 @@ export interface PlanLo {
   /** Nomor segel per produk sesuai dokumen LO. */
   segel: string[]
   /** Shift permintaan untuk produk ini (boleh beda antar produk dalam satu permintaan). */
-  shift?: '' | '1' | '2'
+  shift?: '' | '1' | '2' | '3'
   /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
   supplyPoint?: string
   noLOLama?: string
@@ -178,7 +178,7 @@ export interface Plan {
   ms2Tanggal: string
   ms2Jam: string
   /** Shift permintaan minyak lewat MS2 (hanya shift 1 & 2). */
-  ms2Shift: '' | '1' | '2'
+  ms2Shift: '' | '1' | '2' | '3'
   poSap: string
   shipTo: string
   supplyPoint: string
@@ -445,7 +445,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'density',
     title: 'Kualitas Density',
-    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density 15°C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
+    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density std. 15 °C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
     photos: [{ key: 'density', label: 'Pembacaan hidrometer & termometer', optional: true }],
   },
   {
@@ -817,7 +817,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!d.sampelSesuai) issues.push('Konfirmasi sampel atas & bawah sesuai')
       break
     case 'density':
-      if (x.d15Depot === null) issues.push('Density 15°C depot belum diisi (tahap Dokumen LO)')
+      if (x.d15Depot === null) issues.push('Density std. 15 °C depot belum diisi (tahap Dokumen LO)')
       if (x.densityResults.length === 0) issues.push('Tambahkan minimal satu pengukuran density')
       if (x.densityResults.some((r) => !r.kompartemenId || !r.d15)) issues.push('Lengkapi kompartemen, density, dan suhu pada setiap pengukuran')
       if (x.densityAnomaly) {

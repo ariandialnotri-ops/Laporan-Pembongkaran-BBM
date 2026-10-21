@@ -39,7 +39,7 @@ export function barisPumpTest(daily: DailyRecord[], nozzles: Nozzle[]): BarisPum
         const l = parseAngka(k.pumpTest)
         if (!l) continue
         const d15 = qqD15(k).d15
-        out.push({ key: `${d.id}.${k.id}`, tanggal: d.tanggal, shift: d.shift, jam: d.data.jam, jenis: 'kualitas', nozzle: namaDari(k.nozzleId, k.nozzle), produk: k.produk, liter: l, hasil: d15 ? `D15 ${formatDensity(d15.value)}` : '-', lewat: false, petugas: d.data.petugas })
+        out.push({ key: `${d.id}.${k.id}`, tanggal: d.tanggal, shift: d.shift, jam: d.data.jam, jenis: 'kualitas', nozzle: namaDari(k.nozzleId, k.nozzle), produk: k.produk, liter: l, hasil: d15 ? `Density std. 15 °C ${formatDensity(d15.value)}` : '-', lewat: false, petugas: d.data.petugas })
       }
       for (const k of d.data.kuantitas) {
         const l = parseAngka(k.pumpTest)

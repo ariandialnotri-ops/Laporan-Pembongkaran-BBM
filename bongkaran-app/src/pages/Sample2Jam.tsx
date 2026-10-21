@@ -80,7 +80,7 @@ export function Sample2Jam() {
         sub={`${formatTanggalIso(r.tanggal)}, selesai bongkar ${r.jamSelesai || '-'}`}
         keterangan={
           u
-            ? `Diuji ${formatTanggalIso(u.tanggal)} ${u.jam} · D15 ${formatDensity(u.d15)}${u.selisih !== null ? ` (${formatDensitySigned(u.selisih)})` : ''}${u.ok === false ? ' · tidak sesuai' : ''}`
+            ? `Diuji ${formatTanggalIso(u.tanggal)} ${u.jam} · Density std. 15 °C ${formatDensity(u.d15)}${u.selisih !== null ? ` (${formatDensitySigned(u.selisih)})` : ''}${u.ok === false ? ' · tidak sesuai' : ''}`
             : st === 'terlewat'
               ? 'Terlewat, segera uji'
               : 'Belum diuji'
@@ -164,11 +164,11 @@ export function Sample2JamForm() {
       keTerkirim({
         judul: `Uji ${r.produk} pasca penerimaan terkirim`,
         detail: `${r.nopol || 'MT'}, bongkar ${formatTanggalIso(r.tanggal)}`,
-        peringatan: ok === false ? `Selisih D15 di luar toleransi ${formatDensity(app.rules.densityTolerance)}.` : undefined,
+        peringatan: ok === false ? `Selisih Density std. 15 °C di luar toleransi ${formatDensity(app.rules.densityTolerance)}.` : undefined,
         baris: [
           ['Waktu uji', `${formatTanggalIso(s.tanggal)} ${s.jam}`],
-          ['Density @15°C', formatDensity(d15.value)],
-          ['D15 dokumen depot', r.d15Depot !== null ? formatDensity(r.d15Depot) : '-'],
+          ['Density std. 15 °C', formatDensity(d15.value)],
+          ['Density std. 15 °C dokumen depot', r.d15Depot !== null ? formatDensity(r.d15Depot) : '-'],
           ['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-'],
           ['Petugas', s.petugas.trim()],
         ],
@@ -211,9 +211,9 @@ export function Sample2JamForm() {
         </div>
         <Ladder
           rows={[
-            ['Density @15°C (ASTM 53)', d15 ? formatDensity(d15.value) : '-'],
-            ['D15 dokumen depot', r.d15Depot !== null ? formatDensity(r.d15Depot) : '-'],
-            ['D15 saat bongkar', r.d15 !== null ? formatDensity(r.d15) : '-'],
+            ['Density std. 15 °C (ASTM 53)', d15 ? formatDensity(d15.value) : '-'],
+            ['Density std. 15 °C dokumen depot', r.d15Depot !== null ? formatDensity(r.d15Depot) : '-'],
+            ['Density std. 15 °C saat bongkar', r.d15 !== null ? formatDensity(r.d15) : '-'],
           ]}
           total={[
             'Selisih terhadap depot',

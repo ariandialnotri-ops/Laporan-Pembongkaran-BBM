@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
-import { ChevronDown, Settings, UserRound, X } from 'lucide-react'
+import { ChevronDown, Settings, UserRound, X, Inbox as InboxIcon } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
 import { APP_NAME, TAGLINE } from '@/lib/brand'
 import { cn } from '@/lib/utils'
+import { useInbox } from '@/lib/use-inbox'
 import { useMenu, type GrupMenu, type ItemMenu } from './menu-data'
 
 /** Grup yang memuat halaman ini (untuk dibuka otomatis & disorot). */
@@ -58,6 +59,7 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
   const app = useApp()
   const { pathname, search } = useLocation()
   const grup = useMenu()
+  const inbox = useInbox().length
   const aktifKey = grupAktif(grup, pathname, search)
   // Akordeon: hanya satu grup terbuka. Pilihan pengguna berlaku di halaman ini; pindah halaman
   // membuka grup halaman itu (tanpa efek, diturunkan dari alamat).
@@ -84,6 +86,20 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
         </span>
       </Link>
 
+      <Link
+        to="/inbox"
+        onClick={onNavigate}
+        aria-current={pathname === '/inbox' ? 'page' : undefined}
+        className={cn(
+          'flex min-h-12 items-center gap-space-sm rounded-[14px] px-2 text-body-md',
+          pathname === '/inbox' ? 'bg-surface-container-lowest font-semibold text-on-surface shadow-[0_4px_14px_rgba(15,23,42,0.08)]' : 'text-on-surface hover:bg-surface-container-lowest/60',
+        )}
+      >
+        <InboxIcon aria-hidden="true" className="size-[22px] shrink-0 text-on-surface-variant" strokeWidth={1.6} />
+        <span className="flex-1">Inbox</span>
+        {inbox > 0 && <Badge n={inbox} tone="warn" />}
+      </Link>
+
       <nav aria-label="Menu samping" className="flex flex-col gap-1">
         {grup.map((g) => {
           const Icon = g.icon
@@ -105,7 +121,7 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
                 {g.segera && <span className="rounded-md bg-surface-container-high px-1.5 py-0.5 text-[11px] font-semibold uppercase text-on-surface-variant">Segera</span>}
               </Link>
             )
-          const ikhtisar: ItemMenu = { to: g.href, path: g.href, icon: g.icon, title: 'Ikhtisar', desc: '', status: '' }
+          const ikhtisar: ItemMenu = { to: g.href, path: g.href, icon: g.icon, title: 'Daftar Fitur', desc: '', status: '' }
           const anak = [ikhtisar, ...g.items]
           const aktifTo = pathname === g.href ? g.href : anakAktif(g)
           return (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, ChevronRight, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, X } from 'lucide-react'
+import { Ban, ChevronRight, CircleCheck, Clock, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -67,6 +67,24 @@ function StatusPill({ s }: { s: StatusInsiden }) {
   return <Pill tone={m.tone}>{m.label}</Pill>
 }
 
+const IKON_JENIS: Record<JenisInsiden, typeof Ban> = { insiden: ShieldAlert, nearmiss: TriangleAlert, kerusakan: Wrench, henti: Ban }
+
+/** Keterangan ikon status di ujung kanan kartu. */
+function LegendaIkon() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-space-sm gap-y-1 px-space-xs text-body-sm text-on-surface-variant">
+      <span className="flex items-center gap-1.5">
+        <CircleCheck aria-hidden="true" className="size-4 text-emerald-600" />
+        Semua selesai
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Clock aria-hidden="true" className="size-4 text-orange-500" />
+        Ada laporan terbuka
+      </span>
+    </div>
+  )
+}
+
 const tingkatTone = (t: TingkatInsiden) => (t === 'tinggi' ? 'text-error' : t === 'sedang' ? 'text-amber-700' : 'text-on-surface-variant')
 
 /** Input > Pelaporan Insiden: form satu laporan insiden / near miss / kerusakan. Kirim lalu ke riwayat. */
@@ -84,20 +102,15 @@ export function PilihJenisInsiden() {
           <HentiInfo h={r.data.henti!} />
         </Link>
       ))}
-      <Link to="/stop-penyaluran" className="animate-entrance-1 flex items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md shadow-sm active:bg-surface-container-low">
-        <Ban aria-hidden="true" className="size-5 shrink-0 text-error" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-body-md font-bold text-on-surface">Stop penyaluran</span>
-          <span className="text-body-sm text-on-surface-variant">Penghentian penyaluran produk dilaporkan di menu tersendiri</span>
-        </span>
-        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-      </Link>
+
       <div className="animate-entrance-2 flex flex-col gap-space-sm">
         {JENIS_INSIDEN.map((j) => {
           const n = terbuka(j.value)
           return (
             <KartuPilih
               key={j.value}
+              model="ikon"
+              ikon={IKON_JENIS[j.value]}
               to={`/insiden/baru/${j.value}`}
               status={n ? 'belum' : 'sudah'}
               judul={j.label}
@@ -106,8 +119,17 @@ export function PilihJenisInsiden() {
             />
           )
         })}
+        <KartuPilih
+          model="ikon"
+          ikon={Ban}
+          to="/stop-penyaluran"
+          status={henti.length ? 'belum' : 'sudah'}
+          judul={JENIS_HENTI.label}
+          sub="Dilaporkan di menu tersendiri, dengan jam penyaluran kembali"
+          keterangan={henti.length ? `${henti.length} stop penyaluran masih berjalan` : 'Semua produk tersalurkan normal'}
+        />
       </div>
-      <span className="px-space-xs text-body-sm text-on-surface-variant">Warna menunjukkan tindak lanjut: oranye = masih ada laporan terbuka, hijau = semua selesai.</span>
+      <LegendaIkon />
     </div>
   )
 }
@@ -443,7 +465,6 @@ export function InsidenDetail() {
   const [pic, setPic] = useState('')
   const [target, setTarget] = useState('')
   const [catatan, setCatatan] = useState('')
-  const [buka, setBuka] = useState(false)
   // Jam penyaluran dibuka kembali (wajib saat stop penyaluran ditutup).
   const [jamKembali, setJamKembali] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -463,8 +484,8 @@ export function InsidenDetail() {
   const bolehTL = !!app.role
   const statusBaru = status || d.status
   const hentiAktif = !!d.henti && !d.henti.selesai
-  // Tindak lanjut selesai otomatis membuka kembali penyaluran.
-  const bukaKembali = hentiAktif && (buka || statusBaru === 'selesai')
+  // Penyaluran dibuka kembali bila jam kembali diisi (bisa saat progress), wajib saat selesai.
+  const bukaKembali = hentiAktif && (!!jamKembali || statusBaru === 'selesai')
   const kembali = jamKembali || waktuLokal()
 
   const simpanTL = async () => {
@@ -501,7 +522,6 @@ export function InsidenDetail() {
       await app.saveDaily({ ...rec, data, updatedAt: stamp() })
       setCatatan('')
       setStatus('')
-      setBuka(false)
       setJamKembali('')
       ;[...tlFoto, ...tlBa].forEach((f) => URL.revokeObjectURL(f.url))
       setTlFoto([])
@@ -680,27 +700,33 @@ export function InsidenDetail() {
             </Button>
           </div>
           {hentiAktif && (
-            <div className={cn('flex flex-col gap-space-sm rounded-md p-space-sm', bukaKembali ? 'bg-emerald-50 ring-1 ring-emerald-300' : 'bg-error-container/50')}>
-              <label className="flex items-center gap-space-sm text-body-sm font-semibold text-on-surface">
-                <input type="checkbox" className="size-5 accent-primary" checked={bukaKembali} disabled={statusBaru === 'selesai'} onChange={(e) => (setError(null), setBuka(e.target.checked))} />
-                Penyaluran {d.henti!.produk.join(', ')} dibuka kembali{statusBaru === 'selesai' ? ' (wajib saat selesai)' : ''}
-              </label>
-              {bukaKembali && (
-                <>
-                  <Field label="Jam penyaluran kembali" htmlFor="ins-kembali">
-                    <Input id="ins-kembali" type="datetime-local" min={d.henti!.mulai} max={waktuLokal()} value={jamKembali} onChange={(e) => (setError(null), setJamKembali(e.target.value))} />
-                  </Field>
-                  <span className="tabular text-body-sm text-on-surface-variant">
-                    Berhenti sejak {labelWaktu(d.henti!.mulai, formatTanggalIso)}
-                    {jamKembali && jamKembali >= d.henti!.mulai ? ` · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}` : ''}
-                  </span>
-                  {!jamKembali && (
-                    <Button variant="soft" size="sm" className="self-start" onClick={() => setJamKembali(waktuLokal())}>
-                      Isi dengan waktu sekarang
-                    </Button>
-                  )}
-                </>
-              )}
+            <div className={cn('flex flex-col gap-space-sm rounded-md p-space-sm', jamKembali ? 'bg-emerald-50 ring-1 ring-emerald-300' : 'bg-error-container/50')}>
+              <span className="text-body-sm font-semibold text-on-surface">
+                Penyaluran {d.henti!.produk.join(', ')} masih berhenti sejak {labelWaktu(d.henti!.mulai, formatTanggalIso)}
+              </span>
+              <Field
+                label={statusBaru === 'selesai' ? 'Jam penyaluran kembali (wajib)' : 'Jam penyaluran kembali (isi bila sudah disalurkan lagi)'}
+                htmlFor="ins-kembali"
+              >
+                <Input id="ins-kembali" type="datetime-local" min={d.henti!.mulai} max={waktuLokal()} value={jamKembali} onChange={(e) => (setError(null), setJamKembali(e.target.value))} />
+              </Field>
+              <div className="flex flex-wrap items-center gap-space-xs">
+                <Button variant="soft" size="sm" onClick={() => (setError(null), setJamKembali(waktuLokal()))}>
+                  Isi waktu sekarang
+                </Button>
+                {jamKembali && (
+                  <Button variant="ghost" size="sm" onClick={() => setJamKembali('')}>
+                    Kosongkan
+                  </Button>
+                )}
+              </div>
+              <span className="tabular text-body-sm text-on-surface-variant">
+                {jamKembali && jamKembali >= d.henti!.mulai
+                  ? `Penyaluran kembali ${labelWaktu(jamKembali, formatTanggalIso)} · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}`
+                  : statusBaru === 'selesai'
+                    ? 'Laporan selesai: isi jam penyaluran kembali.'
+                    : 'Biarkan kosong bila penyaluran masih berhenti; laporan tetap dapat ditindaklanjuti.'}
+              </span>
             </div>
           )}
           <ErrorBox text={error} />

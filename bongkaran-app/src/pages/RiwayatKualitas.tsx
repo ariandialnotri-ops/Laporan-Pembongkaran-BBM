@@ -39,12 +39,12 @@ const COLS: Col<Row>[] = [
   { header: 'Produk', cell: (x) => x.produk, mobile: 'title', desktop: false },
   { header: 'Density', cell: (x) => formatDensity(x.density), align: 'right', mobile: 'hide' },
   { header: 'Suhu (°C)', cell: (x) => x.suhu || '-', align: 'right', mobile: 'hide' },
-  { header: 'D15', cell: (x) => <span className="font-semibold">{formatDensity(x.d15)}</span>, align: 'right', mobile: 'hide' },
+  { header: 'Density std. 15 °C', cell: (x) => <span className="font-semibold">{formatDensity(x.d15)}</span>, align: 'right', mobile: 'hide' },
   {
     header: 'Hasil',
     cell: (x) => (
       <span className="tabular">
-        D15 {formatDensity(x.d15)}, {x.acuan} {x.selisih !== null ? formatDensitySigned(x.selisih) : '-'}
+        Density std. 15 °C {formatDensity(x.d15)}, {x.acuan} {x.selisih !== null ? formatDensitySigned(x.selisih) : '-'}
       </span>
     ),
     mobile: 'sub',
@@ -105,7 +105,7 @@ export function RiwayatKualitas() {
         density: null,
         suhu: '',
         d15: r.sample2Jam!.d15,
-        acuan: 'D15 depot',
+        acuan: 'Density std. 15 °C depot',
         selisih: r.sample2Jam!.selisih,
         ok: r.sample2Jam!.ok,
         detail: kunciPasca(r.id),

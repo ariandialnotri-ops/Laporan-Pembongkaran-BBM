@@ -40,7 +40,7 @@ export function StokShift() {
   return (
     <div className="flex flex-col gap-space-md">
       <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Pilih shift untuk mengisi stok awal tiap produk. Pengeluaran dispenser dilengkapi di akhir shift dari shift yang sama.
+        Pilih shift untuk mengisi stok awal tiap produk. Pengeluaran dispenser dihitung otomatis dari totalizer shift itu.
       </p>
       <PilihShift
         status={(k) => statusShift(k, stokLengkap(rec(k.tanggal, k.shift)))}
@@ -48,15 +48,14 @@ export function StokShift() {
         keterangan={(k, st) => {
           const r = rec(k.tanggal, k.shift)
           if (st !== 'sudah' || !r) return undefined
-          const jual = TANKS.every((t) => (r.data.items[t.produk]?.pengeluaran ?? '').trim() !== '')
-          return `Sudah diisi · ${r.data.petugas || '-'}${jual ? '' : ' · pengeluaran belum'}`
+          return `Sudah diisi · ${r.data.petugas || '-'}`
         }}
       />
     </div>
   )
 }
 
-/** Halaman form stok awal satu shift: tinggi & volume per produk, pengeluaran di akhir shift. */
+/** Halaman form stok awal satu shift: tinggi & volume per produk (pengeluaran dari totalizer). */
 export function StokShiftForm() {
   const app = useApp()
   const keTerkirim = useKeTerkirim()
@@ -154,9 +153,6 @@ export function StokShiftForm() {
               </Field>
             </div>
             {tabel?.error !== undefined && <span className="text-body-sm font-semibold text-error">{tabel.error}</span>}
-            <Field label="Pengeluaran dispenser shift ini" htmlFor={`stok-e-${t.id}`} hint="Diisi di akhir shift.">
-              <Input id={`stok-e-${t.id}`} numeric inputMode="decimal" suffix="L" value={item.pengeluaran} onChange={(e) => setItem(t.produk, { pengeluaran: e.target.value })} />
-            </Field>
           </GlassCard>
         )
       })}

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 const STATUS: Record<KalengStatus, { label: string; tone: 'success' | 'error' | 'neutral' | 'cyan'; icon: typeof CircleCheck }> = {
   sesuai: { label: 'Sesuai', tone: 'success', icon: CircleCheck },
   perhatian: { label: 'Ada anomali', tone: 'error', icon: TriangleAlert },
-  menunggu: { label: 'D15 belum ada', tone: 'cyan', icon: Clock },
+  menunggu: { label: 'Density std. 15 °C belum ada', tone: 'cyan', icon: Clock },
   belum: { label: 'Belum ada sampel', tone: 'neutral', icon: CircleDashed },
 }
 
@@ -52,7 +52,7 @@ export function KalengSample() {
               Kaleng Sample
             </h2>
             <span className="text-body-sm text-on-surface-variant">
-              D15 sample mobil tangki (diuji saat bongkar) dari 3 bongkaran terakhir tiap produk, dibanding D15 depot (toleransi ±<span className="tabular">{tol}</span>).
+              Density std. 15 °C sample mobil tangki (diuji saat bongkar) dari 3 bongkaran terakhir tiap produk, dibanding Density std. 15 °C depot (toleransi ±<span className="tabular">{tol}</span>).
             </span>
           </div>
           <button
@@ -105,9 +105,9 @@ export function KalengSample() {
                 {latest ? (
                   <span className="flex gap-space-md">
                     <span className="flex flex-col md:items-end">
-                      <span className="text-tag uppercase text-on-surface-variant">D15 terkini</span>
+                      <span className="text-tag uppercase text-on-surface-variant">Density std. 15 °C terkini</span>
                       {latest.menunggu ? (
-                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">D15 belum ada</span>
+                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">Density std. 15 °C belum ada</span>
                       ) : (
                         <span className="tabular text-body-sm font-bold text-on-surface">
                           {formatDensity(latest.d15Sample)}{' '}
@@ -173,10 +173,10 @@ export function KalengSample() {
 
       <Sheet open={sop} onOpenChange={setSop} title="Ketentuan kaleng sample" description="Pemantauan mutu BBM tiap penerimaan.">
         <ol className="flex list-decimal flex-col gap-space-xs pl-5 text-body-md text-on-surface">
-          <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu D15-nya dibanding D15 dokumen depot. Sampel inilah isi kaleng sample.</li>
+          <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu Density std. 15 °C-nya dibanding Density std. 15 °C dokumen depot. Sampel inilah isi kaleng sample.</li>
           <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (menu Input). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
           <li>
-            Selisih D15 maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
+            Selisih Density std. 15 °C maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
           </li>
           <li>Sampel disimpan dalam kaleng bersegel sampai 3 bongkaran berikutnya untuk produk yang sama; kaleng terlama dibuang saat kaleng baru masuk.</li>
         </ol>
@@ -220,9 +220,9 @@ function NilaiSample({ k, besar }: { k: Kaleng; besar?: boolean }) {
       <span className="flex flex-col">
         <span className="flex items-center gap-1 text-body-sm font-semibold text-on-secondary-fixed-variant">
           <Clock aria-hidden="true" className="size-4" />
-          D15 sample MT belum ada
+          Density std. 15 °C sample MT belum ada
         </span>
-        <span className="tabular text-body-sm text-on-surface-variant">D15 depot {formatDensity(k.d15Depot)}</span>
+        <span className="tabular text-body-sm text-on-surface-variant">Density std. 15 °C depot {formatDensity(k.d15Depot)}</span>
       </span>
     )
   const ok = k.ok !== false

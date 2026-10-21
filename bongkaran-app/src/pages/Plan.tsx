@@ -19,7 +19,7 @@ import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '
 import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
-type Row = { id: string; produk: string; volume: string; shift: '' | '1' | '2' }
+type Row = { id: string; produk: string; volume: string; shift: '' | '1' | '2' | '3' }
 const blankRow = (shift: Row['shift'] = '', produk = PRODUK_OPTIONS[0]): Row => ({ id: genId('lo'), produk, volume: '8000', shift })
 
 type PlanForm = Pick<PlanT, 'tanggal' | 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint' | 'noSO'>

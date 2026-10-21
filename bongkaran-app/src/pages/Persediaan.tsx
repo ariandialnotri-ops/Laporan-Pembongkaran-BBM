@@ -14,6 +14,9 @@ import type { StokRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
 import { persediaanRows, ROWS_PER_PAGE } from '@/lib/report/persediaan'
+import { shiftId, type Shift } from '@/lib/shift'
+import { jualPerProduk, type TotalizerData } from '@/lib/totalizer'
+import { useCatatan } from '@/lib/use-catatan'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { tankForProduk, tankName } from '@/lib/tank'
 import { cn } from '@/lib/utils'
@@ -30,7 +33,10 @@ export function Persediaan() {
   const stok = useMemo(() => app.daily.filter((d): d is StokRecord => d.kind === 'stok'), [app.daily])
   const from = range.from || '0000-01-01'
   const to = range.to || todayIso()
-  const rows = useMemo(() => persediaanRows(produk, from, to, stok, app.reports), [produk, from, to, stok, app.reports])
+  // Pengeluaran dispenser per shift dari totalizer (bukan lagi isian stok awal).
+  const { recs: totalizer } = useCatatan<TotalizerData>('totalizer', from, to)
+  const jual = useMemo(() => new Map((totalizer ?? []).map((t) => [shiftId({ tanggal: t.tanggal, shift: t.shift as Shift }), new Map(jualPerProduk([t]).map((x) => [x.produk, x.liter]))])), [totalizer])
+  const rows = useMemo(() => persediaanRows(produk, from, to, stok, app.reports, jual), [produk, from, to, stok, app.reports, jual])
 
   if (!app.loaded) return <Loading />
 

@@ -33,7 +33,7 @@ export function Kalkulator() {
           </span>
           <div className="flex flex-col">
             <span className="text-tag uppercase text-primary">Tabel ASTM 53</span>
-            <span className="text-headline-md font-bold text-on-surface">Density at 15°C</span>
+            <span className="text-headline-md font-bold text-on-surface">Density std. 15 °C</span>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-space-sm">
@@ -45,7 +45,7 @@ export function Kalkulator() {
           </Field>
         </div>
         <div className="inset-field flex items-end justify-between gap-2 rounded-md p-space-sm">
-          <span className="text-body-sm font-bold text-on-surface">Density @15°C</span>
+          <span className="text-body-sm font-bold text-on-surface">Density std. 15 °C</span>
           <SpringValue className="tabular inline-block text-numeric-lg font-bold text-primary">{d15 ? formatDensity(d15.value) : '-'}</SpringValue>
         </div>
         <StatusBanner

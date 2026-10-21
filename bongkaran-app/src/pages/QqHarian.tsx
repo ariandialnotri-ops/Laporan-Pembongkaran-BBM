@@ -266,7 +266,7 @@ export function QqHarian() {
       const kolase = await buatKolaseGrid([
         ...data.kualitas.map((k, i) => {
           const b = baris[i]
-          return cap(foto[k.id], `${k.produk} · D15 ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
+          return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
         }),
         ...FOTO_UMUM.map((f) => cap(foto[f.key], f.label.replace('Foto ', ''))),
       ])
@@ -403,8 +403,8 @@ export function QqHarian() {
               <Ladder
                 rows={[
                   ['Density observasi', formatDensity(obs)],
-                  ['Density @15°C', d15 ? formatDensity(d15.value) : '-'],
-                  [`Acuan D15 pasca penerimaan ${ref ? formatTanggalIso(ref.tanggal) : 'terbaru'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
+                  ['Density std. 15 °C', d15 ? formatDensity(d15.value) : '-'],
+                  [`Acuan Density std. 15 °C pasca penerimaan ${ref ? formatTanggalIso(ref.tanggal) : 'terbaru'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
                 ]}
                 total={['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-']}
               />
@@ -434,7 +434,7 @@ export function QqHarian() {
             {FOTO_UMUM.map((f) => fotoSlot(f.key, f.label, f.hint))}
             <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
               <Camera aria-hidden="true" className="size-4 shrink-0" />
-              Semua foto digabung otomatis menjadi satu kolase (jam, SPBU, produk, D15) dan dikirim ke WhatsApp; tidak disimpan di aplikasi.
+              Semua foto digabung otomatis menjadi satu kolase (jam, SPBU, produk, Density std. 15 °C) dan dikirim ke WhatsApp; tidak disimpan di aplikasi.
             </span>
           </GlassCard>
         )}

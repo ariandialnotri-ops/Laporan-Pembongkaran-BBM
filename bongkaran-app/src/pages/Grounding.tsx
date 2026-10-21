@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight, Plus, Send, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronRight, Plus, Send, Trash2, Zap } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -17,7 +17,7 @@ import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import type { Catatan } from '@/lib/catatan'
 import { formatTanggalIso, todayIso } from '@/lib/date'
-import { BATAS_OHM, nilaiOhm, ringkasGrounding, SELANG_BULAN, statusTitik, titikGrounding, type GroundingData, type NilaiTitik } from '@/lib/grounding'
+import { areaDipilih, BATAS_OHM, idTambahan, nilaiOhm, ringkasGrounding, SELANG_BULAN, statusTitik, titikGrounding, type GroundingData, type NilaiTitik, type TitikGrounding } from '@/lib/grounding'
 import { compressImage, genId } from '@/lib/image'
 import { tangkiOps } from '@/lib/ops'
 import type { Photo } from '@/lib/sop'
@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils'
 
 type GroundingRecord = Catatan<GroundingData>
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const stamp = () => Date.now()
 /** Pengisi: ABH, pengawas, kepala shift (sama dengan RLS bbm_grounding). */
 const bolehIsi = (role: string) => ['abh', 'pengawas', 'kashift'].includes(role)
 const tambahBulan = (iso: string, n: number) => {
@@ -57,7 +58,7 @@ export function GroundingMenu() {
             <span className="text-tag uppercase text-primary">HSSE · Proteksi listrik statis & petir</span>
             <span className="text-headline-md font-bold text-on-surface">Pengukuran Grounding SPBU</span>
             <span className="text-body-sm text-on-surface-variant">
-              {titik.length} titik ukur dari data SPBU (tangki pendam, dispenser, panel, penangkal petir, fasilitas, area). Batas tahanan ≤ {BATAS_OHM} Ω, ukur ulang tiap {SELANG_BULAN} bulan.
+              Pilih area pengukuran dari {titik.length} titik data SPBU (tangki pendam, dispenser, panel, penangkal petir, fasilitas, area) atau tambah area sendiri. Batas tahanan ≤ {BATAS_OHM} Ω, ukur ulang tiap {SELANG_BULAN} bulan.
             </span>
           </div>
         </div>
@@ -115,9 +116,13 @@ export function GroundingForm() {
   const navigate = useNavigate()
   const keTerkirim = useKeTerkirim()
   const { tanggal = todayIso() } = useParams()
-  const { recs } = useCatatan<GroundingData>('grounding', tanggal, tanggal)
+  // Semua pengukuran sampai tanggal ini: area tambahan sebelumnya ikut menjadi pilihan.
+  const { recs } = useCatatan<GroundingData>('grounding', '2000-01-01', tanggal)
   const lama: GroundingRecord | undefined = recs?.find((r) => r.id === tanggal)
   const titik = useMemo(() => titikGrounding(app.settings, tangkiOps()), [app.settings])
+  const tambahanLalu = useMemo(() => (recs ?? []).filter((r) => r.id !== tanggal).flatMap((r) => r.data.tambahan ?? []), [recs, tanggal])
+  const [areaBaru, setAreaBaru] = useState('')
+  const [kelompokBaru, setKelompokBaru] = useState('Area lain')
   const [edit, setEdit] = useState<GroundingData | null>(null)
   const [foto, setFoto] = useState<FotoLokal[]>([])
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
@@ -129,6 +134,8 @@ export function GroundingForm() {
 
   const awal: GroundingData = lama?.data ?? {
     titik: {},
+    dipilih: [],
+    tambahan: [],
     batasOhm: BATAS_OHM,
     alat: '',
     petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault || '' : app.displayName,
@@ -143,13 +150,28 @@ export function GroundingForm() {
   }
   const ubahTitik = (id: string, area: string, kelompok: string, patch: Partial<NilaiTitik>) =>
     ubah({ titik: { ...d.titik, [id]: { ...{ area, kelompok, ohm: '', ket: '' }, ...d.titik[id], ...patch } } })
-  // Titik dari data SPBU saat ini + titik lama yang sudah tidak ada di data SPBU (tetap ditampilkan).
-  const semua = [...titik, ...Object.entries(d.titik).filter(([id]) => !titik.some((t) => t.id === id)).map(([id, v]) => ({ id, area: v.area, kelompok: v.kelompok }))]
-  const kelompok = [...new Set(semua.map((t) => t.kelompok))]
+  // Pilihan area: data SPBU + area tambahan (sebelumnya & tanggal ini) + titik lama yang sudah tidak ada di data SPBU.
+  const pilihan: TitikGrounding[] = []
+  for (const t of [...titik, ...tambahanLalu, ...(d.tambahan ?? []), ...Object.entries(d.titik).map(([id, v]) => ({ id, area: v.area, kelompok: v.kelompok }))])
+    if (!pilihan.some((x) => x.id === t.id)) pilihan.push(t)
+  const kelompok = [...new Set(pilihan.map((t) => t.kelompok))]
+  const pilih = areaDipilih(d)
+  const semua = pilihan.filter((t) => pilih.includes(t.id))
   const ringkas = ringkasGrounding(d)
+  const togglePilih = (ids: string[], on: boolean) => ubah({ dipilih: on ? [...new Set([...pilih, ...ids])] : pilih.filter((x) => !ids.includes(x)) })
+  const tambahArea = () => {
+    const area = areaBaru.trim()
+    if (!area) return setError('Isi nama area yang akan ditambahkan.')
+    const id = idTambahan(kelompokBaru, area)
+    if (pilihan.some((t) => t.id === id || t.area.toLowerCase() === area.toLowerCase())) return setError(`Area "${area}" sudah ada di pilihan.`)
+    ubah({ tambahan: [...(d.tambahan ?? []), { id, area, kelompok: kelompokBaru }], dipilih: [...pilih, id] })
+    setAreaBaru('')
+  }
 
   const simpan = async () => {
-    if (!ringkas.diukur) return setError('Isi hasil ukur minimal satu titik.')
+    if (!pilih.length) return setError('Pilih minimal satu area pengukuran.')
+    const kosong = semua.filter((t) => statusTitik(d.titik[t.id], d.batasOhm) === 'kosong')
+    if (kosong.length) return setError(`Isi hasil ukur area yang dipilih: ${kosong.map((t) => t.area).join(', ')} (atau batalkan pilihannya).`)
     if (!d.petugas.trim()) return setError('Isi nama petugas.')
     const buruk = Object.entries(d.titik).filter(([, v]) => statusTitik(v, d.batasOhm) === 'buruk' && !v.ket.trim())
     if (buruk.length) return setError(`Titik di atas ${d.batasOhm} Ω wajib diberi keterangan tindak lanjut: ${buruk.map(([, v]) => v.area).join(', ')}.`)
@@ -158,8 +180,11 @@ export function GroundingForm() {
     try {
       const baru: Photo[] = []
       for (const [i, f] of foto.entries()) baru.push(await app.backend.uploadPhoto(`grounding-${tanggal}`, f.blob, `grounding-${i + 1}.jpg`))
-      const data: GroundingData = { ...d, petugas: d.petugas.trim(), foto: [...d.foto, ...baru] }
-      await app.backend.saveCatatan<GroundingData>('grounding', { id: tanggal, tanggal, shift: 0, data, createdAt: lama?.createdAt ?? Date.now(), updatedAt: Date.now(), createdBy: lama?.createdBy ?? app.session.user?.id ?? null })
+      // Hanya area yang dipilih yang disimpan; area tambahan yang dipakai ikut tersimpan untuk pengukuran berikutnya.
+      const titikPilih = Object.fromEntries(Object.entries(d.titik).filter(([id]) => pilih.includes(id)))
+      const tambahan = pilihan.filter((t) => t.id.startsWith('tambah-') && pilih.includes(t.id) && !tambahanLalu.some((x) => x.id === t.id))
+      const data: GroundingData = { ...d, titik: titikPilih, dipilih: pilih, tambahan, petugas: d.petugas.trim(), foto: [...d.foto, ...baru] }
+      await app.backend.saveCatatan<GroundingData>('grounding', { id: tanggal, tanggal, shift: 0, data, createdAt: lama?.createdAt ?? stamp(), updatedAt: stamp(), createdBy: lama?.createdBy ?? app.session.user?.id ?? null })
       guard.bypass()
       foto.forEach((f) => URL.revokeObjectURL(f.url))
       const r = ringkasGrounding(data)
@@ -168,7 +193,7 @@ export function GroundingForm() {
         detail: formatTanggalIso(tanggal),
         peringatan: r.buruk ? `${r.buruk} titik di atas ${data.batasOhm} Ω: perlu perbaikan pentanahan (laporkan sebagai kerusakan).` : undefined,
         baris: [
-          ['Titik diukur', `${r.diukur} dari ${semua.length}`],
+          ['Area diukur', `${r.diukur} area`],
           ['Memenuhi (≤ ' + data.batasOhm + ' Ω)', String(r.baik)],
           ['Di atas batas', String(r.buruk)],
           ['Ukur ulang', formatTanggalIso(tambahBulan(tanggal, SELANG_BULAN))],
@@ -202,7 +227,7 @@ export function GroundingForm() {
         <span className="text-tag uppercase text-primary">Pengukuran grounding · {formatTanggalIso(tanggal)}</span>
         <div className="grid grid-cols-3 gap-space-xs text-center">
           {[
-            ['Diukur', `${ringkas.diukur}/${semua.length}`, false],
+            ['Diukur', `${ringkas.diukur}/${pilih.length}`, false],
             [`≤ ${d.batasOhm} Ω`, String(ringkas.baik), false],
             ['Di atas batas', String(ringkas.buruk), ringkas.buruk > 0],
           ].map(([k, v, buruk]) => (
@@ -231,7 +256,72 @@ export function GroundingForm() {
           </Field>
         </GlassCard>
 
-        {kelompok.map((k) => (
+        <section aria-labelledby="gr-area" className="flex flex-col gap-space-xs">
+          <SectionHeader id="gr-area" title={`Area pengukuran (${pilih.length} dipilih)`} />
+          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+            <span className="text-body-sm text-on-surface-variant">Pilih area yang diukur pada tanggal ini. Area diambil dari data SPBU (tangki, dispenser, panel, penangkal petir, fasilitas, area APAR) dan area tambahan.</span>
+            {kelompok.map((k) => {
+              const ids = pilihan.filter((t) => t.kelompok === k).map((t) => t.id)
+              const semuaPilih = ids.every((id) => pilih.includes(id))
+              return (
+                <div key={k} className="flex flex-col gap-space-xs">
+                  <div className="flex items-center justify-between gap-space-sm">
+                    <span className="text-tag uppercase text-on-surface-variant">{k}</span>
+                    <button type="button" className="text-body-sm font-semibold text-primary" onClick={() => togglePilih(ids, !semuaPilih)}>
+                      {semuaPilih ? 'Batalkan semua' : 'Pilih semua'}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-space-xs">
+                    {pilihan
+                      .filter((t) => t.kelompok === k)
+                      .map((t) => {
+                        const on = pilih.includes(t.id)
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => togglePilih([t.id], !on)}
+                            className={cn('flex min-h-10 items-center gap-1 rounded-full border px-space-sm text-body-sm font-semibold transition-colors', on ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant bg-surface-container-lowest text-on-surface')}
+                          >
+                            {on && <Check aria-hidden="true" className="size-4" />}
+                            {t.area}
+                          </button>
+                        )
+                      })}
+                  </div>
+                </div>
+              )
+            })}
+            <div className="flex flex-col gap-space-xs rounded-md bg-surface-container-low p-space-sm">
+              <span className="text-tag uppercase text-primary">Tambah area</span>
+              <div className="grid grid-cols-2 gap-space-xs">
+                <Field label="Nama area" htmlFor="gr-area-baru" className="col-span-2">
+                  <Input id="gr-area-baru" autoComplete="off" placeholder="Mis. Tiang lampu area parkir" value={areaBaru} onChange={(e) => (setError(null), setAreaBaru(e.target.value))} />
+                </Field>
+                <Field label="Kelompok" htmlFor="gr-kelompok-baru" className="col-span-2">
+                  <Input id="gr-kelompok-baru" list="gr-kelompok-list" autoComplete="off" value={kelompokBaru} onChange={(e) => setKelompokBaru(e.target.value || 'Area lain')} />
+                  <datalist id="gr-kelompok-list">
+                    {[...new Set([...kelompok, 'Area lain'])].map((k) => (
+                      <option key={k} value={k} />
+                    ))}
+                  </datalist>
+                </Field>
+              </div>
+              <Button variant="soft" size="sm" className="self-start" onClick={tambahArea}>
+                <Plus aria-hidden="true" />
+                Tambah & pilih area
+              </Button>
+            </div>
+          </GlassCard>
+        </section>
+
+        {!semua.length && (
+          <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+            Belum ada area dipilih. Pilih area pengukuran di atas untuk mengisi hasil ukur.
+          </GlassCard>
+        )}
+        {kelompok.filter((k) => semua.some((t) => t.kelompok === k)).map((k) => (
           <section key={k} aria-label={k} className="flex flex-col gap-space-xs">
             <SectionHeader id={`gr-${k}`} title={k} />
             <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 px-space-md">

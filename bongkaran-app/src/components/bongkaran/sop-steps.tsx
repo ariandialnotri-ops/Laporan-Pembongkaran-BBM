@@ -443,9 +443,9 @@ function LoStep(props: StepProps) {
 
   const depotBanner = x.depotCalc
     ? x.d15Depot !== null && Math.abs(x.d15Depot - x.depotCalc.value) > 0.0005
-      ? { tone: 'error' as BannerTone, title: 'Density 15°C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
-      : { tone: 'success' as BannerTone, title: `Hitungan D15 depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
-    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek D15' }
+      ? { tone: 'error' as BannerTone, title: 'Density std. 15 °C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
+      : { tone: 'success' as BannerTone, title: `Hitungan Density std. 15 °C depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
+    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek Density std. 15 °C' }
 
   return (
     <>
@@ -559,7 +559,7 @@ function LoStep(props: StepProps) {
             <Num id="suhu-depot" suffix="°C" placeholder="30,0" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
           </Field>
         </div>
-        <Field label="Density at 15°C (dokumen DO)" htmlFor="d15-depot">
+        <Field label="Density std. 15 °C (dokumen DO)" htmlFor="d15-depot">
           <Num id="d15-depot" placeholder="0,7567" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
         </Field>
         <StatusBanner {...depotBanner} />
@@ -610,7 +610,7 @@ function DensityStep(props: StepProps) {
     <>
       <GlassCard level={2} className="flex flex-col gap-space-xs p-space-md">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-tag uppercase text-primary">D15 dokumen DO depot</span>
+          <span className="text-tag uppercase text-primary">Density std. 15 °C dokumen DO depot</span>
           <Pill tone="cyan">Toleransi ±{String(rules.densityTolerance).replace('.', ',')}</Pill>
         </div>
         <span className="tabular text-numeric-lg font-bold text-on-surface">{formatDensity(x.d15Depot)}</span>
@@ -651,8 +651,8 @@ function DensityStep(props: StepProps) {
           </div>
           <Ladder
             rows={[
-              ['Density @15°C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
-              ['D15 dokumen depot', formatDensity(x.d15Depot)],
+              ['Density std. 15 °C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
+              ['Density std. 15 °C dokumen depot', formatDensity(x.d15Depot)],
             ]}
             total={['Selisih', r.selisih !== null ? formatDensitySigned(r.selisih) : '-']}
           />

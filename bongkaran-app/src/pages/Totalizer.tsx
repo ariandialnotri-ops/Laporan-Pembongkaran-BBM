@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
-import { Link } from 'react-router-dom'
-import { Gauge, Send, Trash2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Camera, CircleCheck, Gauge, LoaderCircle, Send, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
+import type { FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
@@ -20,12 +21,18 @@ import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
 import { shiftLabel, type Shift } from '@/lib/shift'
 import { statusShift } from '@/lib/status-isi'
-import { jualNozzle, jualPerProduk, nozzlePerDispenser, prevShift, totalizerAwalSaja, totalizerLengkap, type TotalizerData, type TotalizerNozzle, type TotalizerRecord } from '@/lib/totalizer'
+import { compressImage, genId } from '@/lib/image'
+import type { Photo } from '@/lib/sop'
+import { catatanLama, jualNozzle, jualPerProduk, nozzlePerDispenser, nozzleTerkirim, prevShift, totalizerAwalSaja, totalizerLengkap, type LangkahTotalizer, type TotalizerData, type TotalizerNozzle, type TotalizerRecord } from '@/lib/totalizer'
+import { usePhotoSrc } from '@/lib/use-photo-src'
 import { useCatatan } from '@/lib/use-catatan'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const stamp = () => Date.now()
+/** "Nozzle 3" tanpa dobel bila nama nozzle sudah diawali kata nozzle. */
+const labelNozzle = (nama: string) => (/^nozzle\b/i.test(nama.trim()) ? nama.trim() : `Nozzle ${nama}`)
 const akhirBulan = (bulan: string) => todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)), 0))
 /** Angka totalisator ditampilkan 2 desimal (digital). */
 const angka = (s: string) => {
@@ -57,7 +64,7 @@ export function TotalizerMenu() {
   return (
     <div className="flex flex-col gap-space-md">
       <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Catat totalisator digital setiap nozzle di awal dan akhir shift. Awal shift terisi otomatis dari akhir shift sebelumnya; penjualan nozzle = akhir − awal.
+        Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan = akhir − awal.
       </p>
       <ErrorBox text={error} />
       <PilihShift
@@ -80,128 +87,267 @@ export function TotalizerMenu() {
   )
 }
 
-/** Form totalizer satu shift: awal & akhir per nozzle, dikelompokkan per dispenser / pulau pompa. */
+/**
+ * Form totalizer satu shift dalam 2 langkah: (1) totalizer awal, (2) totalizer akhir. Setiap nozzle
+ * disubmit sendiri (angka + foto totalisator manual opsional), dikelompokkan per dispenser / pulau pompa.
+ */
 export function TotalizerForm() {
   const app = useApp()
   const keTerkirim = useKeTerkirim()
+  const konfirmasi = useKonfirmasi()
+  const toast = useToast()
+  const [params, setParams] = useSearchParams()
   const { tanggal, shift, valid } = useKunciShift()
   const id = idShift(tanggal, shift)
   const sebelum = valid ? prevShift({ tanggal, shift }) : { tanggal, shift }
   const { recs } = useCatatan<TotalizerData>('totalizer', sebelum.tanggal, tanggal)
-  const lama = recs?.find((r) => r.id === id)
-  const konfirmasi = useKonfirmasi()
   const prev = recs?.find((r) => r.id === idShift(sebelum.tanggal, sebelum.shift))
-  const [isian, setIsian] = useState<Record<string, TotalizerNozzle> | null>(null)
+  // Catatan terbaru shift ini (diperbarui setiap submit nozzle).
+  const [rec, setRec] = useState<TotalizerRecord | null>(null)
+  const [isian, setIsian] = useState<Record<string, string>>({})
+  const [foto, setFoto] = useState<Record<string, FotoLokal | undefined>>({})
   const [petugas, setPetugas] = useState<string | null>(null)
   const [catatan, setCatatan] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<{ nid: string; teks: string } | null>(null)
   const namaShift = shiftLabel(shift).split(' (')[0]
-  const guard = useLeaveGuard({ active: true, title: `Keluar dari totalizer ${namaShift}?`, detail: 'Isian yang belum dikirim akan hilang.' })
+  const lama = rec ?? recs?.find((r) => r.id === id)
+  const srcOf = usePhotoSrc(Object.values(lama?.data.nozzle ?? {}).flatMap((n) => [...(n.fotoAwal ?? []), ...(n.fotoAkhir ?? [])]))
+  const adaIsian = Object.keys(isian).length > 0 || Object.values(foto).some(Boolean)
+  const guard = useLeaveGuard({ active: adaIsian, title: `Keluar dari totalizer ${namaShift}?`, detail: 'Angka nozzle yang belum disubmit akan hilang.' })
 
   if (!app.loaded || !recs) return <Loading />
   if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
   const nozzles = app.settings.nozzles ?? []
   if (!nozzles.length) return <NozzleBelumAda />
   const bolehUbah = ['abh', 'pengawas', 'kashift', 'security'].includes(app.role ?? '')
-
-  const awalDari = (nid: string, produk: string, nama: string): TotalizerNozzle =>
-    lama?.data.nozzle[nid] ?? { nama, produk, awal: prev?.data.nozzle[nid]?.akhir ?? '', akhir: '' }
-  const nilai = (nid: string) => {
+  const lamaFormat = catatanLama(lama)
+  const terkirim = (nid: string, l: LangkahTotalizer) => nozzleTerkirim(lama?.data.nozzle[nid], l, lamaFormat)
+  const awalSelesai = nozzles.every((n) => terkirim(n.id, 'awal'))
+  const akhirSelesai = nozzles.every((n) => terkirim(n.id, 'akhir'))
+  const langkah: LangkahTotalizer = params.get('langkah') === 'akhir' || (params.get('langkah') !== 'awal' && awalSelesai) ? 'akhir' : 'awal'
+  const pilihLangkah = (l: LangkahTotalizer) => setParams({ langkah: l }, { replace: true })
+  const kunci = (nid: string) => `${langkah}:${nid}`
+  const tersimpan = (nid: string): TotalizerNozzle => {
     const n = nozzles.find((x) => x.id === nid)!
-    return isian?.[nid] ?? awalDari(nid, n.produk, n.nama)
+    return lama?.data.nozzle[nid] ?? { nama: n.nama, produk: n.produk, awal: prev?.data.nozzle[nid]?.akhir ?? '', akhir: '' }
   }
-  const ubah = (nid: string, patch: Partial<TotalizerNozzle>) => {
-    setError(null)
-    setIsian((x) => ({ ...(x ?? Object.fromEntries(nozzles.map((n) => [n.id, awalDari(n.id, n.produk, n.nama)]))), [nid]: { ...nilai(nid), ...patch } }))
-  }
+  const nilai = (nid: string) => isian[kunci(nid)] ?? tersimpan(nid)[langkah]
   const namaPetugas = petugas ?? lama?.data.petugas ?? (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName)
   const isiCatatan = catatan ?? lama?.data.catatan ?? ''
 
-  const kirim = async () => {
-    for (const n of nozzles) {
-      const v = nilai(n.id)
-      const a = parseAngka(v.awal)
-      const b = parseAngka(v.akhir)
-      if (a === null) return setError(`Nozzle ${n.nama}: isi totalisator awal shift.`)
-      if (b !== null && b < a) return setError(`Nozzle ${n.nama}: totalisator akhir lebih kecil dari awal.`)
+  const submit = async (nid: string) => {
+    const n = nozzles.find((x) => x.id === nid)!
+    const sekarang = tersimpan(nid)
+    const v = nilai(nid).trim()
+    const angkaV = parseAngka(v)
+    const salah = (teks: string) => setError({ nid, teks })
+    if (angkaV === null) return salah(`Isi totalisator ${langkah} ${labelNozzle(n.nama).toLowerCase()}.`)
+    if (langkah === 'akhir') {
+      const a = parseAngka(sekarang.awal)
+      if (a === null || !terkirim(nid, 'awal')) return salah('Submit totalisator awal nozzle ini terlebih dahulu (langkah 1).')
+      if (angkaV < a) return salah('Totalisator akhir lebih kecil dari awal.')
+    } else {
+      const b = parseAngka(sekarang.akhir)
+      if (b !== null && angkaV > b) return salah('Totalisator awal lebih besar dari akhir yang sudah tercatat.')
     }
-    if (!namaPetugas.trim()) return setError('Isi nama petugas.')
-    // Totalizer yang sudah lengkap (awal & akhir) adalah riwayat: perubahan perlu dikonfirmasi.
-    if (lama?.data.jamAkhir && !(await konfirmasi({ jenis: 'ubah', judul: 'Ubah totalizer terkirim?', pesan: <>Totalizer <b>{formatTanggalIso(tanggal)} {shiftLabel(shift)}</b> sudah lengkap. Angka baru akan menggantikan data sebelumnya dan memengaruhi penjualan closing.</>, ya: 'Ya, ubah data' }))) return
-    setBusy(true)
+    if (!namaPetugas.trim()) return salah('Isi nama petugas di atas.')
+    if (terkirim(nid, langkah) && v !== sekarang[langkah].trim() && !(await konfirmasi({ jenis: 'ubah', judul: `Ubah totalisator ${langkah} ${labelNozzle(n.nama).toLowerCase()}?`, pesan: <>Angka yang sudah disubmit akan diganti dan memengaruhi penjualan shift ini.</>, ya: 'Ya, ubah' }))) return
+    setBusy(nid)
+    setError(null)
     try {
+      const f = foto[kunci(nid)]
+      const fotoBaru: Photo[] = f ? [await app.backend.uploadPhoto(`totalizer-${id}`, f.blob, `totalisator-${langkah}-${n.nama}.jpg`)] : []
       const jam = nowHm()
-      const isi: TotalizerData['nozzle'] = {}
-      for (const n of nozzles) {
-        const v = nilai(n.id)
-        isi[n.id] = { nama: n.nama, produk: n.produk, awal: v.awal.trim(), akhir: v.akhir.trim() }
+      const at = new Date().toISOString()
+      const isiNozzle: TotalizerNozzle = {
+        ...sekarang,
+        nama: n.nama,
+        produk: n.produk,
+        [langkah]: v,
+        ...(langkah === 'awal' ? { awalAt: at, ...(fotoBaru.length ? { fotoAwal: fotoBaru } : {}) } : { akhirAt: at, ...(fotoBaru.length ? { fotoAkhir: fotoBaru } : {}) }),
       }
-      const lengkap = nozzles.every((n) => jualNozzle(isi[n.id]) !== null)
-      const rec: TotalizerRecord = {
+      const semua: TotalizerData['nozzle'] = { ...(lama?.data.nozzle ?? {}), [nid]: isiNozzle }
+      const akhirLengkap = nozzles.every((x) => x.id === nid ? langkah === 'akhir' || terkirim(x.id, 'akhir') : nozzleTerkirim(semua[x.id], 'akhir', lamaFormat))
+      const baru: TotalizerRecord = {
         id,
         tanggal,
         shift,
-        data: { nozzle: isi, petugas: namaPetugas.trim(), jamAwal: lama?.data.jamAwal || jam, jamAkhir: lengkap ? lama?.data.jamAkhir || jam : '', catatan: isiCatatan.trim() },
-        createdAt: lama?.createdAt ?? Date.now(),
-        updatedAt: Date.now(),
+        data: { nozzle: semua, petugas: namaPetugas.trim(), jamAwal: lama?.data.jamAwal || jam, jamAkhir: akhirLengkap ? lama?.data.jamAkhir || jam : '', catatan: isiCatatan.trim() },
+        createdAt: lama?.createdAt ?? stamp(),
+        updatedAt: stamp(),
         createdBy: lama?.createdBy ?? app.session.user?.id ?? null,
       }
-      await app.backend.saveCatatan('totalizer', rec)
-      guard.bypass()
-      keTerkirim({
-        judul: `Totalizer ${namaShift} ${lengkap ? 'terkirim' : 'awal shift tersimpan'}`,
-        detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}${lengkap ? '' : '. Lengkapi totalisator akhir di akhir shift.'}`,
-        baris: lengkap ? [...jualPerProduk([rec]).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Petugas', rec.data.petugas]] : [['Nozzle', `${nozzles.length} nozzle`], ['Petugas', rec.data.petugas]],
-        aksi: [
-          { to: '/totalizer', label: 'Pilih shift lain' },
-          ...(app.can('/laporan/totalizer') ? [{ to: '/laporan/totalizer', label: 'Riwayat totalizer' }] : []),
-        ],
-      })
+      await app.backend.saveCatatan('totalizer', baru)
+      if (f) URL.revokeObjectURL(f.url)
+      setRec(baru)
+      setIsian((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== kunci(nid))))
+      setFoto((x) => ({ ...x, [kunci(nid)]: undefined }))
+      const selesai = nozzles.every((x) => nozzleTerkirim(baru.data.nozzle[x.id], langkah, false) || (lamaFormat && terkirim(x.id, langkah)))
+      if (langkah === 'akhir' && selesai) {
+        guard.bypass()
+        keTerkirim({
+          judul: `Totalizer ${namaShift} lengkap`,
+          detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}`,
+          baris: [...jualPerProduk([baru]).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Petugas', baru.data.petugas]],
+          aksi: [{ to: '/totalizer', label: 'Pilih shift lain' }, ...(app.can('/laporan/totalizer') ? [{ to: '/laporan/totalizer', label: 'Riwayat totalizer' }] : [])],
+        })
+      } else toast(`${labelNozzle(n.nama)}: totalisator ${langkah} tersimpan${selesai ? ` · semua nozzle ${langkah} lengkap` : ''}`)
     } catch (e) {
-      setError(pesan(e))
-      setBusy(false)
+      setError({ nid, teks: pesan(e) })
+    } finally {
+      setBusy(null)
     }
   }
 
-  const ringkas = jualPerProduk([{ id, tanggal, shift, data: { nozzle: Object.fromEntries(nozzles.map((n) => [n.id, nilai(n.id)])), petugas: '', jamAwal: '', jamAkhir: '', catatan: '' }, createdAt: 0, updatedAt: 0, createdBy: null }])
+  const jumlah = (l: LangkahTotalizer) => nozzles.filter((n) => terkirim(n.id, l)).length
+  const ringkas = lama ? jualPerProduk([lama]) : []
 
   return (
     <div className="flex flex-col gap-space-md">
-      <GlassCard level={2} className="animate-entrance-1 flex items-start justify-between gap-2 p-space-md">
-        <div className="flex flex-col">
-          <h2 className="text-headline-md font-bold text-on-surface">{shiftLabel(shift)}</h2>
-          <span className="text-body-sm text-on-surface-variant">
-            {formatTanggalIso(tanggal)}
-            {prev ? ` · awal dari akhir ${shiftLabel(sebelum.shift).split(' (')[0]}` : ''}
-          </span>
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-col">
+            <h2 className="text-headline-md font-bold text-on-surface">{shiftLabel(shift)}</h2>
+            <span className="text-body-sm text-on-surface-variant">
+              {formatTanggalIso(tanggal)}
+              {prev ? ` · awal terisi dari akhir ${shiftLabel(sebelum.shift).split(' (')[0]}` : ''}
+            </span>
+          </div>
+          {akhirSelesai ? <Pill tone="success">Lengkap</Pill> : awalSelesai ? <Pill>Akhir belum</Pill> : <Pill tone="error">Awal belum</Pill>}
         </div>
-        {totalizerLengkap(lama, nozzles) ? <Pill tone="success">Lengkap</Pill> : lama ? <Pill>Akhir belum</Pill> : <Pill tone="error">Belum diisi</Pill>}
+        <div role="tablist" aria-label="Langkah pengisian" className="inset-field grid grid-cols-2 gap-1 rounded-md p-1">
+          {(['awal', 'akhir'] as const).map((l, i) => (
+            <button
+              key={l}
+              type="button"
+              role="tab"
+              aria-selected={langkah === l}
+              onClick={() => pilihLangkah(l)}
+              className={cn('flex flex-col items-center rounded py-1.5 text-body-sm font-semibold transition-colors', langkah === l ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-on-surface-variant')}
+            >
+              <span>
+                {i + 1} · Totalizer {l}
+              </span>
+              <span className="tabular text-[11px] font-normal">
+                {jumlah(l)}/{nozzles.length} nozzle
+              </span>
+            </button>
+          ))}
+        </div>
+        <Field label="Petugas" htmlFor="tot-petugas">
+          <Input id="tot-petugas" value={namaPetugas} disabled={!bolehUbah} onChange={(e) => setPetugas(e.target.value)} />
+        </Field>
+        <span className="text-body-sm text-on-surface-variant">
+          {langkah === 'awal'
+            ? 'Langkah 1 di awal shift: periksa angka totalisator digital tiap nozzle (terisi dari akhir shift sebelumnya), foto totalisator manual bila perlu, lalu Submit per nozzle.'
+            : 'Langkah 2 di akhir shift: isi totalisator akhir tiap nozzle, foto totalisator manual bila perlu, lalu Submit per nozzle. Penjualan = akhir − awal.'}
+        </span>
       </GlassCard>
 
       {nozzlePerDispenser(nozzles, app.settings.dispensers ?? []).map((g, gi) => (
         <section key={g.judul} aria-label={g.judul} className={cn('flex flex-col gap-space-xs', gi === 0 ? 'animate-entrance-2' : 'animate-entrance-3')}>
           <SectionHeader id={`tot-${gi}`} title={g.judul} />
           {g.nozzles.map((n) => {
+            const t = tersimpan(n.id)
+            const sudah = terkirim(n.id, langkah)
+            const berubah = isian[kunci(n.id)] !== undefined && isian[kunci(n.id)].trim() !== t[langkah].trim()
             const v = nilai(n.id)
-            const j = jualNozzle(v)
+            const j = langkah === 'akhir' ? jualNozzle({ awal: t.awal, akhir: v }) : null
+            const fotoTersimpan = (langkah === 'awal' ? t.fotoAwal : t.fotoAkhir) ?? []
+            const fl = foto[kunci(n.id)]
+            const at = langkah === 'awal' ? t.awalAt : t.akhirAt
             return (
-              <GlassCard key={n.id} level={2} className="flex flex-col gap-space-sm p-space-md">
+              <GlassCard key={n.id} level={2} className={cn('flex flex-col gap-space-sm p-space-md', sudah && !berubah && 'ring-1 ring-emerald-300')}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-body-md font-bold text-on-surface">Nozzle {n.nama}</span>
-                  <ProdukChip produk={n.produk} />
+                  <span className="flex items-center gap-2">
+                    <span className="text-body-md font-bold text-on-surface">{labelNozzle(n.nama)}</span>
+                    <ProdukChip produk={n.produk} />
+                  </span>
+                  {sudah && !berubah ? (
+                    <span className="flex items-center gap-1 text-body-sm font-semibold text-emerald-700">
+                      <CircleCheck aria-hidden="true" className="size-4" />
+                      {at ? `Terkirim ${new Date(at).toTimeString().slice(0, 5)}` : 'Terkirim'}
+                    </span>
+                  ) : (
+                    <span className="text-body-sm font-semibold text-orange-700">{berubah && sudah ? 'Diubah, belum disubmit' : 'Belum disubmit'}</span>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-space-sm">
-                  <Field label="Awal shift" htmlFor={`tot-a-${n.id}`}>
-                    <Input id={`tot-a-${n.id}`} numeric inputMode="decimal" suffix="L" disabled={!bolehUbah} value={v.awal} onChange={(e) => ubah(n.id, { awal: e.target.value })} />
+                {langkah === 'akhir' && (
+                  <span className="tabular text-body-sm text-on-surface-variant">
+                    Awal {angka(t.awal)}
+                    {terkirim(n.id, 'awal') ? '' : ' · awal belum disubmit'}
+                  </span>
+                )}
+                <div className="flex items-end gap-space-sm">
+                  <Field label={`Totalisator ${langkah} (digital)`} htmlFor={`tot-${langkah}-${n.id}`} className="min-w-0 flex-1">
+                    <Input
+                      id={`tot-${langkah}-${n.id}`}
+                      numeric
+                      inputMode="decimal"
+                      suffix="L"
+                      disabled={!bolehUbah || busy === n.id}
+                      value={v}
+                      onChange={(e) => {
+                        setError(null)
+                        setIsian((x) => ({ ...x, [kunci(n.id)]: e.target.value }))
+                      }}
+                    />
                   </Field>
-                  <Field label="Akhir shift" htmlFor={`tot-b-${n.id}`}>
-                    <Input id={`tot-b-${n.id}`} numeric inputMode="decimal" suffix="L" disabled={!bolehUbah} value={v.akhir} onChange={(e) => ubah(n.id, { akhir: e.target.value })} />
-                  </Field>
+                  <label className={cn(buttonVariants({ variant: 'soft' }), 'h-12 shrink-0 cursor-pointer', (!bolehUbah || busy === n.id) && 'pointer-events-none opacity-50')}>
+                    <Camera aria-hidden="true" />
+                    <span className="sr-only sm:not-sr-only">Foto manual</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="sr-only"
+                      aria-label={`Foto totalisator manual ${labelNozzle(n.nama).toLowerCase()}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        e.target.value = ''
+                        if (!file) return
+                        void compressImage(file).then((blob) => {
+                          if (fl) URL.revokeObjectURL(fl.url)
+                          setFoto((x) => ({ ...x, [kunci(n.id)]: { id: genId('f'), blob, url: URL.createObjectURL(blob) } }))
+                        })
+                      }}
+                    />
+                  </label>
                 </div>
-                <span className={cn('tabular text-body-sm', j !== null && j < 0 ? 'font-semibold text-error' : 'text-on-surface-variant')}>
-                  Penjualan: {j === null ? '-' : formatLiter(j, 2)}
-                </span>
+                {(fl || fotoTersimpan.length > 0) && (
+                  <div className="flex items-center gap-space-xs">
+                    {fl ? (
+                      <>
+                        <img src={fl.url} alt={`Foto totalisator manual ${n.nama} (belum disubmit)`} className="size-16 rounded-md object-cover ring-2 ring-orange-300" />
+                        <Button variant="ghost" size="sm" onClick={() => (URL.revokeObjectURL(fl.url), setFoto((x) => ({ ...x, [kunci(n.id)]: undefined })))}>
+                          Hapus foto
+                        </Button>
+                      </>
+                    ) : (
+                      fotoTersimpan.map((p) =>
+                        srcOf(p) ? (
+                          <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer">
+                            <img src={srcOf(p)} alt={`Foto totalisator manual ${n.nama}`} className="size-16 rounded-md object-cover" />
+                          </a>
+                        ) : (
+                          <span key={p.id} className="size-16 animate-pulse rounded-md bg-surface-container" />
+                        ),
+                      )
+                    )}
+                    <span className="text-body-sm text-on-surface-variant">Foto totalisator manual</span>
+                  </div>
+                )}
+                {j !== null && (
+                  <span className={cn('tabular text-body-sm', j < 0 ? 'font-semibold text-error' : 'text-on-surface-variant')}>Penjualan: {formatLiter(j, 2)}</span>
+                )}
+                {error?.nid === n.id && <ErrorBox text={error.teks} />}
+                {bolehUbah && (
+                  <Button variant={sudah && !berubah && !fl ? 'glass' : 'primary'} disabled={busy !== null} onClick={() => void submit(n.id)}>
+                    {busy === n.id ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+                    {sudah && !berubah && !fl ? `Submit ulang ${labelNozzle(n.nama).toLowerCase()}` : `Submit ${labelNozzle(n.nama).toLowerCase()}`}
+                  </Button>
+                )}
               </GlassCard>
             )
           })}
@@ -209,8 +355,12 @@ export function TotalizerForm() {
       ))}
 
       <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        {langkah === 'awal' && awalSelesai && !akhirSelesai && (
+          <Button onClick={() => pilihLangkah('akhir')}>Lanjut ke langkah 2 · Totalizer akhir</Button>
+        )}
         {ringkas.length > 0 && (
           <div className="flex flex-col gap-1 rounded-md bg-surface-container-low p-space-sm">
+            <span className="text-tag uppercase text-on-surface-variant">Penjualan tercatat</span>
             {ringkas.map((x) => (
               <span key={x.produk} className="tabular flex justify-between text-body-sm">
                 <span className="text-on-surface-variant">{x.produk}</span>
@@ -219,22 +369,10 @@ export function TotalizerForm() {
             ))}
           </div>
         )}
-        <Field label="Petugas" htmlFor="tot-petugas">
-          <Input id="tot-petugas" value={namaPetugas} disabled={!bolehUbah} onChange={(e) => setPetugas(e.target.value)} />
-        </Field>
-        <Field label="Catatan (opsional)" htmlFor="tot-catatan">
+        <Field label="Catatan shift (opsional, ikut tersimpan saat submit nozzle)" htmlFor="tot-catatan">
           <Input id="tot-catatan" autoComplete="off" value={isiCatatan} disabled={!bolehUbah} placeholder="Mis. display nozzle 3 mati" onChange={(e) => setCatatan(e.target.value)} />
         </Field>
-        <ErrorBox text={error} />
-        {bolehUbah ? (
-          <Button size="lg" className="w-full" disabled={busy} onClick={() => void kirim()}>
-            <Send aria-hidden="true" />
-            Kirim totalizer {namaShift}
-          </Button>
-        ) : (
-          <span className="text-body-sm text-on-surface-variant">Totalizer diisi security, kepala shift, pengawas, atau ABH.</span>
-        )}
-        <span className="text-body-sm text-on-surface-variant">Boleh dikirim di awal shift (akhir dikosongkan), lalu dilengkapi di akhir shift.</span>
+        {!bolehUbah && <span className="text-body-sm text-on-surface-variant">Totalizer diisi security, kepala shift, pengawas, atau ABH.</span>}
       </GlassCard>
       {guard.dialog}
     </div>
@@ -251,6 +389,11 @@ export function RiwayatTotalizer() {
   const [bulan, setBulan] = useState(todayIso().slice(0, 7))
   const [buka, setBuka] = useState<string | null>(null)
   const { recs, error, muat } = useCatatan<TotalizerData>('totalizer', `${bulan}-01`, akhirBulan(bulan))
+  const fotoBuka = Object.values(recs?.find((r) => r.id === buka)?.data.nozzle ?? {}).flatMap((n) => [
+    ...(n.fotoAwal ?? []).map((p) => ({ p, label: `${n.nama} awal` })),
+    ...(n.fotoAkhir ?? []).map((p) => ({ p, label: `${n.nama} akhir` })),
+  ])
+  const srcFoto = usePhotoSrc(fotoBuka.map((x) => x.p))
   if (!app.loaded) return <Loading />
   const nozzles = app.settings.nozzles ?? []
   const rows: BarisTot[] = (recs ?? []).slice().reverse().map((r) => ({ r, jual: jualPerProduk([r]), lengkap: totalizerLengkap(r, nozzles) }))
@@ -336,6 +479,23 @@ export function RiwayatTotalizer() {
               </tbody>
             </table>
           </div>
+          {fotoBuka.length > 0 && (
+            <div className="flex flex-col gap-space-xs">
+              <span className="text-tag uppercase text-on-surface-variant">Foto totalisator manual</span>
+              <div className="flex flex-wrap gap-space-xs">
+                {fotoBuka.map(({ p, label }) =>
+                  srcFoto(p) ? (
+                    <a key={p.id} href={srcFoto(p)} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-0.5 text-[11px] text-on-surface-variant">
+                      <img src={srcFoto(p)} alt={`Totalisator manual nozzle ${label}`} className="size-16 rounded-md object-cover" />
+                      {label}
+                    </a>
+                  ) : (
+                    <span key={p.id} className="size-16 animate-pulse rounded-md bg-surface-container" />
+                  ),
+                )}
+              </div>
+            </div>
+          )}
           <span className="text-body-sm text-on-surface-variant">
             Awal {terbuka.r.data.jamAwal || '-'} · akhir {terbuka.r.data.jamAkhir || '-'} · {terbuka.r.data.petugas || '-'}
             {terbuka.r.data.catatan ? ` · ${terbuka.r.data.catatan}` : ''}
@@ -357,7 +517,7 @@ export function RiwayatTotalizer() {
               <span key={x.nama} className="tabular flex items-center justify-between gap-2 text-body-sm">
                 <span className="flex items-center gap-2">
                   <Gauge aria-hidden="true" className="size-4 text-on-surface-variant" />
-                  Nozzle {x.nama} · {x.produk}
+                  {labelNozzle(x.nama)} · {x.produk}
                 </span>
                 <b>{formatLiter(x.liter, 2)}</b>
               </span>

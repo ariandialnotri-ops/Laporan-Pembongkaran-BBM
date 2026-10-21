@@ -114,7 +114,7 @@ export function MenuOperation() {
               {stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}
             </span>
             <span className={cn('text-body-sm', stok.missing ? 'text-on-error-container' : 'text-on-surface-variant')}>
-              {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser diisi di akhir shift.'}
+              {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser dihitung dari totalizer.'}
             </span>
           </span>
           <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />

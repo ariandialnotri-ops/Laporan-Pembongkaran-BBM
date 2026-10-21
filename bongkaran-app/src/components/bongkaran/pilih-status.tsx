@@ -15,7 +15,10 @@ export const GAYA_STATUS: Record<StatusIsi, { kartu: string; ikon: string; label
 
 export const LABEL_STATUS: Record<StatusIsi, string> = { sudah: 'Sudah diisi', belum: 'Belum diisi', terlewat: 'Terlewat', nanti: 'Belum waktunya' }
 
-/** Kartu pilihan berwarna status yang membuka halaman form. */
+/**
+ * Kartu pilihan status yang membuka halaman form. Model `warna` (bawaan): latar kartu berwarna status;
+ * model `ikon`: kartu putih biasa dengan ikon fitur di kiri dan status (hijau/oranye/merah) berupa ikon di ujung kanan.
+ */
 export function KartuPilih({
   to,
   status,
@@ -24,7 +27,12 @@ export function KartuPilih({
   keterangan,
   className,
   statis = false,
+  model = 'warna',
+  ikon: IkonFitur,
 }: {
+  model?: 'warna' | 'ikon'
+  /** Ikon fitur di kiri (model ikon). */
+  ikon?: typeof CircleCheck
   /** Tanpa tautan (mis. unit APAR yang harus dibuka lewat pindai QR di lokasi). */
   statis?: boolean
   to: string
@@ -36,6 +44,33 @@ export function KartuPilih({
   className?: string
 }) {
   const g = GAYA_STATUS[status]
+  if (model === 'ikon') {
+    const isiIkon = (
+      <>
+        {IkonFitur && (
+          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <IkonFitur className="size-5" />
+          </span>
+        )}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-md font-bold text-on-surface">{judul}</span>
+          {sub && <span className="text-body-sm text-on-surface-variant">{sub}</span>}
+          <span className="text-body-sm text-on-surface-variant">{keterangan ?? LABEL_STATUS[status]}</span>
+        </span>
+        <span role="img" aria-label={LABEL_STATUS[status]} title={typeof keterangan === 'string' ? keterangan : LABEL_STATUS[status]} className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', g.ikon)}>
+          <g.Ikon aria-hidden="true" className="size-[18px]" />
+        </span>
+      </>
+    )
+    const kelasIkon = cn('flex min-h-20 items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md text-left shadow-sm', className)
+    return statis ? (
+      <div className={kelasIkon}>{isiIkon}</div>
+    ) : (
+      <Link to={to} className={cn(kelasIkon, 'transition-transform active:scale-[0.99] active:bg-surface-container-low')}>
+        {isiIkon}
+      </Link>
+    )
+  }
   const isi = (
     <>
       <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-full', g.ikon)}>

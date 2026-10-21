@@ -23,7 +23,7 @@ export const KATEGORI_INSIDEN: Record<JenisInsiden, string[]> = {
   insiden: ['Cedera / kecelakaan kerja', 'Kebakaran / api', 'Tumpahan / kebocoran BBM', 'Kecelakaan kendaraan di area SPBU', 'Keamanan / pencurian', 'Lainnya'],
   nearmiss: ['Hampir tertabrak / terpeleset', 'Sumber api / merokok di area', 'Hampir tumpah saat bongkar / pengisian', 'Perilaku tidak aman', 'Kondisi tidak aman', 'Lainnya'],
   kerusakan: ['Dispenser / nozzle', 'Tangki pendam / ATG', 'Listrik / genset / panel', 'Bangunan / kanopi', 'APAR / proteksi kebakaran', 'Lainnya'],
-  henti: ['Kerusakan dispenser / nozzle', 'Kualitas BBM tidak sesuai', 'Stok habis / dry out', 'Pemadaman listrik', 'Perbaikan / tera ulang', 'Instruksi Pertamina / manajemen', 'Lainnya'],
+  henti: ['Kerusakan dispenser / nozzle', 'Kualitas BBM tidak sesuai', 'Stok habis / dry out', 'Kendala pengiriman dari Depot / Fuel Terminal', 'Pemadaman listrik', 'Perbaikan / tera ulang', 'Instruksi Pertamina / manajemen', 'Lainnya'],
 }
 
 export const TINGKAT_INSIDEN: { value: TingkatInsiden; label: string }[] = [
@@ -125,6 +125,9 @@ export function produkSpbu(s: Pick<Settings, 'nozzles'>) {
   const ada = [...new Set((s.nozzles ?? []).map((n) => n.produk).filter(Boolean))]
   return ada.length ? PRODUK_OPTIONS.filter((p) => ada.includes(p)).concat(ada.filter((p) => !PRODUK_OPTIONS.includes(p))) : PRODUK_OPTIONS
 }
+
+/** Lokasi stop penyaluran di luar SPBU: pasokan terlambat / tidak terkirim dari Depot / Fuel Terminal. */
+export const LOKASI_DEPOT = 'Kendala pengiriman dari Depot / Fuel Terminal'
 
 export interface HentiItem {
   id: string

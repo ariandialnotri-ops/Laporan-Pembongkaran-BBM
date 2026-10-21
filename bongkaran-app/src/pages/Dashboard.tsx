@@ -223,7 +223,7 @@ function DashboardUtama() {
         </ol>
         <div className="flex flex-wrap items-center justify-between gap-x-space-md gap-y-1 px-1 pt-1">
           <Legend className="bg-amber-500" label="Plan pengiriman" />
-          <Legend className="bg-error" label="Anomali susut/D15" />
+          <Legend className="bg-error" label="Anomali susut/Density std. 15 °C" />
         </div>
       </section>
 
@@ -408,8 +408,8 @@ function DashboardUtama() {
       <Kartu
         id="kualitas-harian"
         icon={FlaskConical}
-        title="Kualitas Harian (D15)"
-        sub="Uji density terakhir tiap produk, dibanding D15 uji pasca penerimaan terbaru."
+        title="Kualitas Harian (Density std. 15 °C)"
+        sub="Uji density terakhir tiap produk, dibanding Density std. 15 °C uji pasca penerimaan terbaru."
         className="animate-entrance-3"
         action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-[11px] font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
       >
@@ -425,7 +425,7 @@ function DashboardUtama() {
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-md font-bold text-on-surface">{p}</span>
                 <span className="tabular truncate text-body-sm text-outline">
-                  {h ? (ref ? `D15 acuan ${formatDensity(ref.d15)}` : `${formatTanggalIso(h.rec.tanggal)}, shift ${h.rec.shift}`) : 'Belum diuji'}
+                  {h ? (ref ? `Density std. 15 °C acuan ${formatDensity(ref.d15)}` : `${formatTanggalIso(h.rec.tanggal)}, shift ${h.rec.shift}`) : 'Belum diuji'}
                 </span>
               </span>
               {h && (
@@ -824,7 +824,7 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
                     Bongkar {r.produk} {r.nopol}
                   </span>
                   <span className={cn('tabular font-semibold', r.densityOk === false ? 'text-error' : 'text-on-surface')}>
-                    D15 {formatDensity(r.d15)}
+                    Density std. 15 °C {formatDensity(r.d15)}
                     {r.d15Depot !== null ? ` (${formatDensitySigned(Math.round((r.d15! - r.d15Depot) * 10000) / 10000)})` : ''}
                   </span>
                 </div>
@@ -837,7 +837,7 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
                     <span className="text-on-surface">
                       Uji harian shift {q.shift}, {k.produk}
                     </span>
-                    <span className="tabular font-semibold text-on-surface">D15 {v ? formatDensity(v.value) : '-'}</span>
+                    <span className="tabular font-semibold text-on-surface">Density std. 15 °C {v ? formatDensity(v.value) : '-'}</span>
                   </div>
                 )
               }),

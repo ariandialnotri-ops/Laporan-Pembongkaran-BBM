@@ -74,7 +74,7 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
         suhu: k.suhu,
         d15,
         acuan: ref?.d15 ?? null,
-        acuanLabel: ref ? `D15 pasca penerimaan ${formatTanggalIso(ref.tanggal)}` : 'Belum ada uji pasca penerimaan',
+        acuanLabel: ref ? `Density std. 15 °C pasca penerimaan ${formatTanggalIso(ref.tanggal)}` : 'Belum ada uji pasca penerimaan',
         selisih,
         ok: selisih !== null ? Math.abs(selisih) <= app.rules.densityTolerance + 1e-9 : null,
         catatan: rec.data.catatan,
@@ -94,7 +94,7 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
       suhu: s?.suhu ?? '',
       d15: summary.sample2Jam.d15,
       acuan: Number.isFinite(depot) && depot > 0 ? depot : null,
-      acuanLabel: 'D15 dokumen depot',
+      acuanLabel: 'Density std. 15 °C dokumen depot',
       selisih: summary.sample2Jam.selisih,
       ok: summary.sample2Jam.ok,
       catatan: s?.catatan ?? '',
@@ -118,7 +118,7 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
         </div>
         <div className="flex items-end justify-between gap-space-sm">
           <div className="flex flex-col">
-            <span className="text-tag uppercase text-on-surface-variant">D15</span>
+            <span className="text-tag uppercase text-on-surface-variant">Density std. 15 °C</span>
             <span className="tabular text-[2.5rem] font-bold leading-none text-on-surface">{formatDensity(uji.d15)}</span>
             <span className="text-body-sm text-on-surface-variant">g/ml</span>
           </div>

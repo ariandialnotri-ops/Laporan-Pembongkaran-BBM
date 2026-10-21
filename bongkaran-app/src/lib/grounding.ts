@@ -27,6 +27,10 @@ export interface NilaiTitik {
 
 export interface GroundingData {
   titik: Record<string, NilaiTitik>
+  /** Area yang dipilih untuk diukur pada tanggal ini (tidak semua area wajib diukur). */
+  dipilih?: string[]
+  /** Area tambahan yang dibuat petugas (selain data SPBU). */
+  tambahan?: TitikGrounding[]
   batasOhm: number
   alat: string
   petugas: string
@@ -39,7 +43,7 @@ export interface GroundingData {
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 /** Fasilitas bangunan/peralatan yang punya titik pentanahan. */
-const FASILITAS_GROUNDING = ['genset', 'kantor', 'enduro', 'gudang', 'ruangBuh', 'mushola', 'toilet', 'ruangIstirahat']
+export const FASILITAS_GROUNDING = ['genset', 'kantor', 'enduro', 'gudang', 'ruangBuh', 'mushola', 'toilet', 'ruangIstirahat']
 
 /** Titik ukur otomatis dari data SPBU (database tangki, dispenser, fasilitas, area APAR). */
 export function titikGrounding(s: Pick<Settings, 'dispensers' | 'fasilitas' | 'aparArea' | 'jumlahPulau'>, tanks: TangkiOps[]): TitikGrounding[] {
@@ -64,6 +68,11 @@ export function titikGrounding(s: Pick<Settings, 'dispensers' | 'fasilitas' | 'a
   return out
 }
 
+/** Area dipilih: data lama tanpa `dipilih` = titik yang sudah diisi hasil ukur. */
+export const areaDipilih = (d: Pick<GroundingData, 'dipilih' | 'titik'>) => d.dipilih ?? Object.keys(d.titik).filter((id) => d.titik[id].ohm.trim())
+
+export const idTambahan = (kelompok: string, area: string) => `tambah-${slug(kelompok)}-${slug(area)}`
+
 export const nilaiOhm = (v: string) => {
   const n = Number(String(v).replace(',', '.'))
   return v.trim() && Number.isFinite(n) ? n : null
@@ -75,6 +84,7 @@ export const statusTitik = (v: NilaiTitik | undefined, batas: number): StatusTit
 }
 
 export function ringkasGrounding(d: GroundingData) {
-  const st = Object.values(d.titik).map((v) => statusTitik(v, d.batasOhm))
-  return { diukur: st.filter((x) => x !== 'kosong').length, baik: st.filter((x) => x === 'baik').length, buruk: st.filter((x) => x === 'buruk').length }
+  const pilih = areaDipilih(d)
+  const st = pilih.map((id) => statusTitik(d.titik[id], d.batasOhm))
+  return { dipilih: pilih.length, diukur: st.filter((x) => x !== 'kosong').length, baik: st.filter((x) => x === 'baik').length, buruk: st.filter((x) => x === 'buruk').length }
 }

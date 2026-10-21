@@ -28,7 +28,7 @@ type Baris = {
   noLO: string
   produk: string
   volume: string
-  shift: '' | '1' | '2'
+  shift: '' | '1' | '2' | '3'
   status: LoStatus
   /** Alih supply / pindah station: nomor LO baru dan supply point baru. */
   alihLO: string

@@ -24,13 +24,13 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   L.push(`Volume DO: ${formatMaybe(x.volumeDO)} L`)
   L.push('')
   L.push('*QUALITY*')
-  L.push(`Density 15°C depot: ${formatDensity(x.d15Depot)}`)
+  L.push(`Density std. 15 °C depot: ${formatDensity(x.d15Depot)}`)
   for (const r of x.densityResults) {
     L.push(
-      `Komp ${r.kompartemenNo}: obs ${formatDensity(r.obs)} @${formatMaybe(parseAngka(r.suhu), 1)}°C → D15 ${r.d15 ? formatDensity(r.d15.value) : '-'} | selisih ${formatDensitySigned(r.selisih)} ${r.ok === null ? '' : ok(r.ok)}`,
+      `Komp ${r.kompartemenNo}: obs ${formatDensity(r.obs)} @${formatMaybe(parseAngka(r.suhu), 1)}°C → Density std. 15 °C ${r.d15 ? formatDensity(r.d15.value) : '-'} | selisih ${formatDensitySigned(r.selisih)} ${r.ok === null ? '' : ok(r.ok)}`,
     )
   }
-  if (x.densityResults.some((r) => r.d15?.method === 'formula')) L.push(`_*D15 dihitung dengan ${METHOD_LABEL.formula}_`)
+  if (x.densityResults.some((r) => r.d15?.method === 'formula')) L.push(`_*Density std. 15 °C dihitung dengan ${METHOD_LABEL.formula}_`)
   L.push(`Water content: ${d.airNihil === true ? 'Nihil ✅' : d.airNihil === false ? 'Terdapat air, sudah draining ⚠️' : '-'}`)
   L.push(`Sampel atas & bawah sesuai: ${ok(d.sampelSesuai)}`)
   L.push('')
@@ -106,8 +106,8 @@ export function buildWaQq(
   for (const b of baris) {
     L.push(`*${b.produk}*`, '```')
     L.push(kv('Density', `${formatDensity(b.obs)} / ${b.suhu ? `${formatMaybe(parseAngka(b.suhu), 1)}°C` : '-'}`))
-    L.push(kv('D15', formatDensity(b.d15)))
-    L.push(kv('Acuan D15 pasca penerimaan', b.acuan === null ? 'belum ada' : formatDensity(b.acuan)))
+    L.push(kv('Density std. 15 °C', formatDensity(b.d15)))
+    L.push(kv('Acuan Density std. 15 °C pasca penerimaan', b.acuan === null ? 'belum ada' : formatDensity(b.acuan)))
     L.push(kv('Selisih', b.selisih === null ? '-' : `${formatDensitySigned(b.selisih)} (${b.ok ? 'Sesuai' : 'Melebihi toleransi'})`))
     L.push(kv('Pump test', b.pumpTest ? `${b.pumpTest} L` : '-'))
     L.push('```')

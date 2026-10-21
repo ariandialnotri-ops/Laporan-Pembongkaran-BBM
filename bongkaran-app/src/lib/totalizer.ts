@@ -7,14 +7,29 @@ import { parseAngka } from '@/lib/format'
 import type { Catatan } from '@/lib/catatan'
 import { addDays, todayIso } from '@/lib/date'
 import type { Shift } from '@/lib/shift'
-import { PRODUK_OPTIONS, type Dispenser, type Nozzle } from '@/lib/sop'
+import { PRODUK_OPTIONS, type Dispenser, type Nozzle, type Photo } from '@/lib/sop'
 
 export interface TotalizerNozzle {
   nama: string
   produk: string
   awal: string
   akhir: string
+  /** Waktu submit per nozzle (ISO); diisi saat tombol Submit nozzle ditekan. */
+  awalAt?: string
+  akhirAt?: string
+  /** Foto totalisator manual (mekanik) saat awal / akhir shift. */
+  fotoAwal?: Photo[]
+  fotoAkhir?: Photo[]
 }
+
+export type LangkahTotalizer = 'awal' | 'akhir'
+
+/** Catatan lama (sebelum submit per nozzle): angka yang terisi dianggap sudah terkirim. */
+export const catatanLama = (r: TotalizerRecord | undefined) => !!r && !Object.values(r.data.nozzle).some((n) => n.awalAt || n.akhirAt)
+
+/** Nozzle sudah disubmit pada langkah ini. */
+export const nozzleTerkirim = (n: TotalizerNozzle | undefined, langkah: LangkahTotalizer, lama = false) =>
+  !!n && (langkah === 'awal' ? !!n.awalAt || (lama && n.awal.trim() !== '') : !!n.akhirAt || (lama && n.akhir.trim() !== ''))
 
 export interface TotalizerData {
   /** Per id nozzle (data utama nozzle). */

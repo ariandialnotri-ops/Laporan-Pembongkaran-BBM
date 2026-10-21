@@ -44,6 +44,7 @@ const InsidenDetail = lazy(() => import('@/pages/Insiden').then((m) => ({ defaul
 const Kalkulator = lazy(() => import('@/pages/Kalkulator').then((m) => ({ default: m.Kalkulator })))
 const Pengaturan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.Pengaturan })))
 const IdentitasSpbu = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.IdentitasSpbu })))
+const FasilitasSpbu = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.FasilitasSpbu })))
 const AturanPemeriksaan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.AturanPemeriksaan })))
 const DataAcuan = lazy(() => import('@/pages/Pengaturan').then((m) => ({ default: m.DataAcuan })))
 const DataDispenser = lazy(() => import('@/pages/PengaturanAlat').then((m) => ({ default: m.DataDispenser })))
@@ -65,6 +66,7 @@ const LaporanOps = lazy(() => import('@/pages/Operasional').then((m) => ({ defau
 const KalenderOps = lazy(() => import('@/pages/KalenderOps').then((m) => ({ default: m.KalenderOps })))
 const GroundingMenu = lazy(() => import('@/pages/Grounding').then((m) => ({ default: m.GroundingMenu })))
 const GroundingForm = lazy(() => import('@/pages/Grounding').then((m) => ({ default: m.GroundingForm })))
+const Inbox = lazy(() => import('@/pages/Inbox').then((m) => ({ default: m.Inbox })))
 const PersonilMenu = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.PersonilMenu })))
 const JadwalShift = lazy(() => import('@/pages/Personil').then((m) => ({ default: m.JadwalShift })))
 const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ default: m.Persediaan })))
@@ -221,6 +223,7 @@ function Gate() {
           <Route path="/grounding" element={<GroundingMenu />} />
           <Route path="/grounding/:tanggal" element={<GroundingForm />} />
           <Route path="/personil" element={<PersonilMenu />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/personil/jadwal" element={<JadwalShift />} />
           <Route path="/ops/:form" element={<OpsIsi />} />
           <Route path="/laporan/ops" element={<LaporanOps />} />
@@ -244,6 +247,7 @@ function Gate() {
           <Route path="/kalkulator" element={<Kalkulator />} />
           <Route path="/pengaturan" element={<Pengaturan />} />
           <Route path="/pengaturan/identitas" element={<IdentitasSpbu />} />
+          <Route path="/pengaturan/fasilitas" element={<FasilitasSpbu />} />
           <Route path="/pengaturan/dispenser" element={<DataDispenser />} />
           <Route path="/pengaturan/dispenser/:id" element={<DispenserEdit />} />
           <Route path="/pengaturan/nozzle" element={<NozzleTera />} />

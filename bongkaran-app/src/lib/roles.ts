@@ -53,6 +53,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/pengaturan',
     '/pengaturan/sold-ship-to',
     '/pengaturan/identitas',
+    '/pengaturan/fasilitas',
     '/pengaturan/dispenser',
     '/pengaturan/dispenser/',
     '/pengaturan/nozzle',
@@ -141,7 +142,7 @@ export function bolehBuka(role: Role, path: string) {
   if (path === '/personil' || path.startsWith('/personil/')) return true
   // Stop penyaluran & riwayatnya: semua anggota dapat melapor, menindaklanjuti, dan menutup.
   if (path === '/stop-penyaluran' || path.startsWith('/stop-penyaluran/') || path === '/laporan/henti') return true
-  if (IKHTISAR.includes(path)) return true
+  if (IKHTISAR.includes(path) || path === '/inbox') return true
   // Realisasi petty cash (plafon, anggaran, voucher) hanya Admin/Cashier dan ABH.
   if (path === '/finance/petty/realisasi' || path.startsWith('/finance/petty/realisasi/')) return role === 'admin'
   return AKSES[role].some((p) => (p.endsWith('/') && p !== '/' ? path.startsWith(p) : path === p))

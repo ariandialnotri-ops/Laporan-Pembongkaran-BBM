@@ -30,10 +30,11 @@ export function pecahVolume(volume: number): number[] {
 
 export const LO_MANUAL_STATUS: LoStatus[] = ['os', 'planned', 'delivery', 'alih', 'deleted']
 
-/** Pilihan shift permintaan pengiriman (hanya shift 1 dan 2). */
+/** Pilihan shift permintaan pengiriman (MS2). */
 export const SHIFT_PERMINTAAN = [
   { value: '1' as const, label: 'Shift 1' },
   { value: '2' as const, label: 'Shift 2' },
+  { value: '3' as const, label: 'Shift 3' },
 ]
 
 export const loStatusMeta = (k: LoDisplayStatus) => LO_STATUS.find((s) => s.key === k)!

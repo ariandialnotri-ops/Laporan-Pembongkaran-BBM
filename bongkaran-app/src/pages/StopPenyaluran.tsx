@@ -17,7 +17,7 @@ import { DEFAULT_AREAS, lokasiOptions } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatBulanTahun, formatTanggalIso, todayIso } from '@/lib/date'
 import { compressImage, genId } from '@/lib/image'
-import { hentiDari, JENIS_HENTI, KATEGORI_INSIDEN, labelMenit, labelWaktu, produkSpbu, ringkasHenti, TINGKAT_INSIDEN, waktuLokal, type InsidenData } from '@/lib/insiden'
+import { hentiDari, JENIS_HENTI, KATEGORI_INSIDEN, LOKASI_DEPOT, labelMenit, labelWaktu, produkSpbu, ringkasHenti, TINGKAT_INSIDEN, waktuLokal, type InsidenData } from '@/lib/insiden'
 import { ambilMedia } from '@/lib/lapor-media'
 import { shiftKey } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
@@ -182,8 +182,11 @@ export function StopPenyaluranBaru() {
   if (!app.loaded) return <Loading />
 
   const s = app.settings
-  const lokasi = [...lokasiOptions(s.jumlahPulau ?? 0, s.aparArea ?? DEFAULT_AREAS), 'Semua pulau pompa']
-  const aset = [...(s.dispensers ?? []).map((x) => x.nama), ...(s.nozzles ?? []).map((x) => x.nama), 'Tangki pendam', 'ATG']
+  const lokasi = [...lokasiOptions(s.jumlahPulau ?? 0, s.aparArea ?? DEFAULT_AREAS), 'Semua pulau pompa', LOKASI_DEPOT]
+  // Kendala pengiriman: isian peralatan diganti nama Depot / Fuel Terminal (dari supply point plan pengiriman).
+  const depot = d.lokasi === LOKASI_DEPOT
+  const supply = [...new Set(app.plans.flatMap((p) => [p.supplyPoint, ...p.los.map((l) => l.supplyPoint ?? '')]).filter(Boolean))]
+  const aset = depot ? supply : [...(s.dispensers ?? []).map((x) => x.nama), ...(s.nozzles ?? []).map((x) => x.nama), 'Tangki pendam', 'ATG']
   const set = (p: Partial<InsidenData>) => {
     setError(null)
     setD((x) => ({ ...x, ...p }))
@@ -207,6 +210,7 @@ export function StopPenyaluranBaru() {
     if (!mulai) return setError('Isi waktu mulai berhenti.')
     if (mulai > waktuLokal()) return setError('Waktu mulai berhenti tidak boleh di masa depan.')
     if (!d.lokasi) return setError('Pilih lokasi.')
+    if (d.lokasi === LOKASI_DEPOT && !d.aset.trim()) return setError('Isi nama Depot / Fuel Terminal.')
     if (d.uraian.trim().length < 10) return setError('Tulis uraian / penyebab stop penyaluran (minimal 10 karakter).')
     if (!d.tindakanSegera.trim()) return setError('Isi tindakan yang sudah dilakukan.')
     if (!d.pelapor.trim()) return setError('Isi nama pelapor.')
@@ -273,7 +277,7 @@ export function StopPenyaluranBaru() {
             </Select>
           </Field>
           <Field label="Lokasi" htmlFor="sp-lokasi">
-            <Select value={d.lokasi || undefined} onValueChange={(v) => set({ lokasi: v })}>
+            <Select value={d.lokasi || undefined} onValueChange={(v) => set({ lokasi: v, aset: '', ...(v === LOKASI_DEPOT ? { kategori: LOKASI_DEPOT } : {}) })}>
               <SelectTrigger id="sp-lokasi">
                 <SelectValue placeholder="Pilih lokasi" />
               </SelectTrigger>
@@ -286,8 +290,8 @@ export function StopPenyaluranBaru() {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Dispenser / nozzle (opsional)" htmlFor="sp-aset">
-            <Input id="sp-aset" list="sp-aset-list" autoComplete="off" placeholder="Mis. Nozzle 2" value={d.aset} onChange={(e) => set({ aset: e.target.value })} />
+          <Field label={depot ? 'Depot / Fuel Terminal' : 'Dispenser / nozzle (opsional)'} htmlFor="sp-aset">
+            <Input id="sp-aset" list="sp-aset-list" autoComplete="off" placeholder={depot ? 'Mis. FT Kediri' : 'Mis. Nozzle 2'} value={d.aset} onChange={(e) => set({ aset: e.target.value })} />
             <datalist id="sp-aset-list">
               {aset.map((a) => (
                 <option key={a} value={a} />

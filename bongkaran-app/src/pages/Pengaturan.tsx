@@ -1,8 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, X } from 'lucide-react'
-import { CheckRow, Field, JumlahField } from '@/components/bongkaran/form-bits'
+import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, Warehouse, X } from 'lucide-react'
+import { Field, JumlahField } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,10 @@ import { todayIso } from '@/lib/date'
 import { TABLE53_CORRECTIONS, TABLE53_COVERAGE } from '@/lib/density'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { blobToDataUrl, compressImage } from '@/lib/image'
-import { FASILITAS, fotoSimpanBulan, punyaFasilitas } from '@/lib/ops'
+import { FASILITAS, formFasilitas, fotoSimpanBulan, KELOMPOK_FASILITAS, punyaFasilitas } from '@/lib/ops'
+import { FASILITAS_GROUNDING } from '@/lib/grounding'
 import type { Rules } from '@/lib/sop'
+import { cn } from '@/lib/utils'
 import { TANKS } from '@/lib/tank'
 
 /** Profil > Pengaturan SPBU: menu ke tiap bagian data SPBU (halaman terpisah). */
@@ -28,6 +30,7 @@ export function Pengaturan() {
   const teraBermasalah = nz.filter((n) => statusSertifikat(n.teraTanggal, todayIso()) !== 'ok').length
   const items: { to: string; icon: LucideIcon; title: string; desc: string; badge?: ReactNode }[] = [
     { to: '/pengaturan/identitas', icon: Building2, title: 'Identitas SPBU', desc: `${s.namaSpbu || '-'}, ${s.jumlahPulau || 0} pulau pompa, logo & nama default` },
+    { to: '/pengaturan/fasilitas', icon: Warehouse, title: 'Fasilitas SPBU', desc: `${FASILITAS.filter((f) => punyaFasilitas(s, f.key)).length} dari ${FASILITAS.length} fasilitas: bangunan, peralatan, lingkungan` },
     { to: '/pengaturan/tangki', icon: Cylinder, title: 'Database Tangki', desc: `${app.tanks.length} tangki pendam & tabel kalibrasi` },
     { to: '/pengaturan/dispenser', icon: Fuel, title: 'Data Dispenser', desc: `${(s.dispensers ?? []).length} unit: merk & nomor seri` },
     {
@@ -126,26 +129,16 @@ export function IdentitasSpbu() {
             <input ref={logoRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void onLogo(e.target.files?.[0])} />
           </fieldset>
         </GlassCard>
-        <section aria-labelledby="fasilitas-spbu" className="animate-entrance-2 flex flex-col gap-space-sm">
-          <SectionHeader id="fasilitas-spbu" title="Fasilitas SPBU" />
-          <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-            <span className="text-body-sm text-on-surface-variant">Menentukan kartu perawatan dan checklist housekeeping yang tampil di Operasional SPBU.</span>
-            <div className="grid grid-cols-1 gap-space-xs sm:grid-cols-2">
-              {FASILITAS.map((f) => (
-                <CheckRow
-                  key={f.key}
-                  checked={punyaFasilitas(s, f.key)}
-                  onChange={(v) => {
-                    const kini = s.fasilitas ?? FASILITAS.map((x) => x.key)
-                    app.updateSettings({ fasilitas: v ? [...new Set([...kini, f.key])] : kini.filter((k) => k !== f.key) })
-                  }}
-                >
-                  {f.label}
-                </CheckRow>
-              ))}
-            </div>
-          </GlassCard>
-        </section>
+        <Link to="/pengaturan/fasilitas" className="animate-entrance-2 flex items-center gap-space-sm rounded-2xl bg-surface-container-lowest p-space-md shadow-sm">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Warehouse className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-body-md font-bold text-on-surface">Fasilitas SPBU</span>
+            <span className="text-body-sm text-on-surface-variant">{FASILITAS.filter((f) => punyaFasilitas(s, f.key)).length} dari {FASILITAS.length} fasilitas ada · diatur di menu tersendiri</span>
+          </span>
+          <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+        </Link>
       </fieldset>
       <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
         <section aria-labelledby="simpan-foto" className="animate-entrance-2 flex flex-col gap-space-sm">
@@ -271,3 +264,59 @@ function RuleInput({ id, value, suffix, onChange }: { id: string; value: number;
 }
 
 /** Angka bulat 0..max; teks disimpan sendiri agar kolom boleh kosong saat diketik. */
+
+/**
+ * Pengaturan > Fasilitas SPBU (terpisah dari Identitas): fasilitas per kelompok beserta pengaruhnya
+ * ke kartu perawatan, checklist housekeeping, dan titik pengukuran grounding.
+ */
+export function FasilitasSpbu() {
+  const app = useApp()
+  if (!app.loaded) return <Loading />
+  const s = app.settings
+  const readOnly = !app.isAdmin && app.role !== 'pengawas'
+  const ada = FASILITAS.filter((f) => punyaFasilitas(s, f.key))
+  const ubah = (key: string, v: boolean) => {
+    const kini = s.fasilitas ?? FASILITAS.map((x) => x.key)
+    app.updateSettings({ fasilitas: v ? [...new Set([...kini, key])] : kini.filter((k) => k !== key) })
+  }
+  return (
+    <div className="flex flex-col gap-space-md">
+      {readOnly && <HanyaAbh />}
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <span className="text-tag uppercase text-primary">Fasilitas SPBU</span>
+        <span className="tabular text-headline-md font-bold text-on-surface">
+          {ada.length} dari {FASILITAS.length} fasilitas ada
+        </span>
+        <span className="text-body-sm text-on-surface-variant">
+          Fasilitas menentukan kartu perawatan & checklist housekeeping di Operasional SPBU, serta titik ukur di Pengukuran Grounding. Matikan fasilitas yang tidak dimiliki SPBU ini.
+        </span>
+      </GlassCard>
+      <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-space-md">
+        {KELOMPOK_FASILITAS.map((k) => (
+          <section key={k} aria-labelledby={`fas-${k}`} className="animate-entrance-2 flex flex-col gap-space-sm">
+            <SectionHeader id={`fas-${k}`} title={k} />
+            <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 px-space-md">
+              {FASILITAS.filter((f) => f.kelompok === k).map((f) => {
+                const on = punyaFasilitas(s, f.key)
+                const form = formFasilitas(f.key)
+                const grounding = FASILITAS_GROUNDING.includes(f.key)
+                return (
+                  <label key={f.key} className="flex cursor-pointer items-start gap-space-sm py-space-sm">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className={cn('text-body-md font-semibold', on ? 'text-on-surface' : 'text-on-surface-variant line-through')}>{f.label}</span>
+                      <span className="text-body-sm text-on-surface-variant">
+                        {[...form, ...(grounding ? ['Titik grounding'] : [])].join(' · ') || 'Data SPBU'}
+                      </span>
+                    </span>
+                    <span className={cn('shrink-0 text-body-sm font-semibold', on ? 'text-emerald-700' : 'text-on-surface-variant')}>{on ? 'Ada' : 'Tidak ada'}</span>
+                    <input type="checkbox" role="switch" aria-label={`${f.label} ada`} className="mt-0.5 size-5 shrink-0 accent-primary" checked={on} onChange={(e) => ubah(f.key, e.target.checked)} />
+                  </label>
+                )
+              })}
+            </GlassCard>
+          </section>
+        ))}
+      </fieldset>
+    </div>
+  )
+}

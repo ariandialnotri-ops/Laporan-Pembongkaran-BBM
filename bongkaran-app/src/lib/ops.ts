@@ -46,21 +46,28 @@ export const OPS_KEPALA = K.kepala
 export const FORM_SUMUR = 'sumur-pantau'
 export const FORM_OIL = 'oil-catcher'
 
-/** Fasilitas yang menentukan form mana yang tampil (Identitas SPBU). */
-export const FASILITAS: { key: string; label: string }[] = [
-  { key: 'pompaDorong', label: 'Pompa dorong (submersible) & tangkinya' },
-  { key: 'genset', label: 'Genset' },
-  { key: 'kantor', label: 'Kantor' },
-  { key: 'toilet', label: 'Toilet' },
-  { key: 'mushola', label: 'Mushola & tempat wudhu' },
-  { key: 'enduro', label: 'Enduro Express' },
-  { key: 'taman', label: 'Taman' },
-  { key: 'gudang', label: 'Gudang & peralatan' },
-  { key: 'ruangBuh', label: 'Ruang BUH' },
-  { key: 'ruangIstirahat', label: 'Ruang istirahat' },
-  { key: 'sumurPantau', label: 'Sumur pantau' },
-  { key: 'oilCatcher', label: 'Oil catcher' },
+export type KelompokFasilitas = 'Peralatan' | 'Bangunan & ruang' | 'Lingkungan'
+export const KELOMPOK_FASILITAS: KelompokFasilitas[] = ['Peralatan', 'Bangunan & ruang', 'Lingkungan']
+
+/** Fasilitas SPBU (menu Fasilitas SPBU): menentukan form operasional dan titik grounding yang tampil. */
+export const FASILITAS: { key: string; label: string; kelompok: KelompokFasilitas }[] = [
+  { key: 'pompaDorong', label: 'Pompa dorong (submersible) & tangkinya', kelompok: 'Peralatan' },
+  { key: 'genset', label: 'Genset', kelompok: 'Peralatan' },
+  { key: 'kantor', label: 'Kantor', kelompok: 'Bangunan & ruang' },
+  { key: 'toilet', label: 'Toilet', kelompok: 'Bangunan & ruang' },
+  { key: 'mushola', label: 'Mushola & tempat wudhu', kelompok: 'Bangunan & ruang' },
+  { key: 'enduro', label: 'Enduro Express', kelompok: 'Bangunan & ruang' },
+  { key: 'gudang', label: 'Gudang & peralatan', kelompok: 'Bangunan & ruang' },
+  { key: 'ruangBuh', label: 'Ruang BUH', kelompok: 'Bangunan & ruang' },
+  { key: 'ruangIstirahat', label: 'Ruang istirahat', kelompok: 'Bangunan & ruang' },
+  { key: 'taman', label: 'Taman', kelompok: 'Lingkungan' },
+  { key: 'sumurPantau', label: 'Sumur pantau', kelompok: 'Lingkungan' },
+  { key: 'oilCatcher', label: 'Oil catcher', kelompok: 'Lingkungan' },
 ]
+
+/** Form operasional yang tampil karena fasilitas ini. */
+export const formFasilitas = (key: string) =>
+  key === 'sumurPantau' ? ['Pemeriksaan sumur pantau'] : key === 'oilCatcher' ? ['Pemeriksaan oil catcher'] : [...new Set(OPS_FORMS.filter((f) => f.fasilitas === key).map((f) => f.judul))]
 
 /** undefined = belum diatur: semua fasilitas dianggap ada. */
 export const punyaFasilitas = (s: Pick<Settings, 'fasilitas'>, key: string | null) => !key || !s.fasilitas || s.fasilitas.includes(key)
