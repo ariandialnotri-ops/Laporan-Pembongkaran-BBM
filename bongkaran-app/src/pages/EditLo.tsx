@@ -17,7 +17,7 @@ import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { LO_MANUAL_STATUS, LO_MAX_LITER, loStatus, loStatusMeta, pecahVolume, planSupply, SHIFT_PERMINTAAN } from '@/lib/plan'
-import type { LoStatus, Plan, PlanLo } from '@/lib/sop'
+import { evaluateAll, normalizeReport, summarize, type LoStatus, type Plan, type PlanLo } from '@/lib/sop'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +36,8 @@ type Baris = {
   hapus: boolean
 }
 
+/** Waktu simpan (di luar render). */
+const stamp = () => Date.now()
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /**
@@ -145,15 +147,41 @@ function Form({ plan }: { plan: Plan }) {
       if (alihBaru(r) && r.asal) return { ...base, status: 'alih', noLOLama: r.noLO.trim(), supplyPointLama: planSupply(plan, r.asal), noLO: r.alihLO.trim(), supplyPoint: r.alihSP }
       return { ...base, noLO: r.noLO.trim(), status: r.status }
     })
+    // Nomor SO berubah: laporan bongkaran (BA) yang memakai LO permintaan ini ikut diperbarui.
+    const soBaru = noSO.trim()
+    const laporanSo = soBaru !== plan.noSO.trim() ? [...new Map(plan.los.flatMap((lo) => (app.usedLoIds.get(lo.id) ? [[app.usedLoIds.get(lo.id)!.id, app.usedLoIds.get(lo.id)!] as const] : []))).values()] : []
+    if (
+      laporanSo.length &&
+      !(await konfirmasi({
+        jenis: 'ubah',
+        judul: 'Ubah nomor SO?',
+        pesan: (
+          <>
+            Nomor SO pada <b>{laporanSo.length} laporan bongkaran</b> terkait (termasuk BA yang sudah ditandatangani) ikut diubah dari <b>{plan.noSO || '-'}</b> menjadi <b>{soBaru || '-'}</b>.
+          </>
+        ),
+        ya: 'Ya, ubah SO',
+      }))
+    )
+      return
     if (!los.length && !(await konfirmasi({ judul: 'Hapus permintaan?', pesan: <>Semua LO dihapus, sehingga permintaan kirim <b>{formatTanggalIso(plan.tanggal)}</b> ikut terhapus dari Plan & Tracking LO.</> }))) return
     setSaving(true)
     try {
-      if (los.length) await app.savePlan({ ...plan, noSO: noSO.trim(), los })
+      if (los.length) await app.savePlan({ ...plan, noSO: soBaru, los })
       else await app.deletePlan(plan)
+      for (const ring of laporanSo) {
+        const raw = await app.backend.getReport(ring.id)
+        if (!raw) continue
+        const report = normalizeReport(raw)
+        const next = { ...report, updatedAt: stamp(), data: { ...report.data, noSO: soBaru } }
+        const summary = summarize(next, evaluateAll(next, app.rules))
+        await app.backend.saveReport(next, summary)
+        app.upsertSummary(summary)
+      }
       guard.bypass()
       keTerkirim({
         judul: los.length ? 'SO & LO terkirim' : 'Permintaan dihapus',
-        detail: `Kirim ${formatTanggalIso(plan.tanggal)}${noSO.trim() ? `, SO ${noSO.trim()}` : ''}`,
+        detail: `Kirim ${formatTanggalIso(plan.tanggal)}${soBaru ? `, SO ${soBaru}` : ''}${laporanSo.length ? ` · ${laporanSo.length} laporan bongkaran ikut diperbarui` : ''}`,
         baris: los.map((lo): [string, string] => [`${lo.produk} ${formatNumber(lo.volume)} L`, lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit']),
         aksi: [
           { to: `${kembaliKe}?baru=${encodeURIComponent(plan.id)}`, label: kembaliKe === '/plan' ? 'Kembali ke Plan Pengiriman' : 'Kembali ke Tracking LO' },
@@ -182,8 +210,16 @@ function Form({ plan }: { plan: Plan }) {
           <Info label="Permintaan MS2" value={`${formatTanggalIso(plan.ms2Tanggal)} ${plan.ms2Jam}`} />
           <Info label="Total" value={`${plan.los.length} LO, ${formatNumber(plan.los.reduce((n, l) => n + l.volume, 0))} L`} />
         </dl>
-        <Field label="Nomor SO" htmlFor="lo-so-edit" hint={`Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`}>
-          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={semuaTerkunci} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
+        <Field
+          label="Nomor SO"
+          htmlFor="lo-so-edit"
+          hint={
+            plan.los.some(terpakai)
+              ? 'Satu SO untuk semua LO di permintaan ini. LO sudah dipakai laporan bongkaran: perubahan SO ikut memperbarui laporan bongkaran (BA) terkait.'
+              : `Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`
+          }
+        >
+          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
         </Field>
       </GlassCard>
 
@@ -244,7 +280,7 @@ function Form({ plan }: { plan: Plan }) {
         <Button size="lg" variant="glass" onClick={keluar}>
           Batal
         </Button>
-        {!semuaTerkunci && (
+        {(!semuaTerkunci || noSO.trim() !== plan.noSO.trim()) && (
           <Button size="lg" className="flex-1" disabled={saving} onClick={simpan}>
             <Save aria-hidden="true" />
             {saving ? 'Menyimpan…' : 'Simpan & kembali'}
