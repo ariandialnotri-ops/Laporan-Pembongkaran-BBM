@@ -162,7 +162,7 @@ function Isi({ k, slot, report, x }: { k: Kaleng; slot: number; report: Report; 
           hasil={x.sample2Jam?.d15?.value ?? null}
           selisih={x.sample2Jam?.selisih ?? null}
           ok={x.sample2Jam?.ok ?? null}
-          kosong={!sample ? 'Belum diuji (wajib, menu Input > Uji Kualitas Pasca Penerimaan).' : undefined}
+          kosong={!sample ? 'Belum diuji (wajib, Operation > Kualitas Pasca Penerimaan).' : undefined}
           waktu={sample ? `${formatTanggalIso(sample.tanggal)}, ${sample.jam}` : undefined}
         />
         <div className="flex flex-col gap-1 rounded-md bg-surface-container-low/70 p-space-sm text-body-sm">

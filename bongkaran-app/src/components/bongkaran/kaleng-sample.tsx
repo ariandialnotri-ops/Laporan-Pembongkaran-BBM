@@ -174,7 +174,7 @@ export function KalengSample() {
       <Sheet open={sop} onOpenChange={setSop} title="Ketentuan kaleng sample" description="Pemantauan mutu BBM tiap penerimaan.">
         <ol className="flex list-decimal flex-col gap-space-xs pl-5 text-body-md text-on-surface">
           <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu Density std. 15 °C-nya dibanding Density std. 15 °C dokumen depot. Sampel inilah isi kaleng sample.</li>
-          <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (menu Input). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
+          <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (Operation › Kualitas Pasca Penerimaan). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
           <li>
             Selisih Density std. 15 °C maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
           </li>
