@@ -167,8 +167,7 @@ function Form({ plan }: { plan: Plan }) {
     if (!los.length && !(await konfirmasi({ judul: 'Hapus permintaan?', pesan: <>Semua LO dihapus, sehingga permintaan kirim <b>{formatTanggalIso(plan.tanggal)}</b> ikut terhapus dari Plan & Tracking LO.</> }))) return
     setSaving(true)
     try {
-      if (los.length) await app.savePlan({ ...plan, noSO: soBaru, los })
-      else await app.deletePlan(plan)
+      // Laporan bongkaran dulu, baru permintaan: bila gagal di tengah, simpan ulang tetap memperbarui laporan.
       for (const ring of laporanSo) {
         const raw = await app.backend.getReport(ring.id)
         if (!raw) continue
@@ -178,6 +177,8 @@ function Form({ plan }: { plan: Plan }) {
         await app.backend.saveReport(next, summary)
         app.upsertSummary(summary)
       }
+      if (los.length) await app.savePlan({ ...plan, noSO: soBaru, los })
+      else await app.deletePlan(plan)
       guard.bypass()
       keTerkirim({
         judul: los.length ? 'SO & LO terkirim' : 'Permintaan dihapus',
