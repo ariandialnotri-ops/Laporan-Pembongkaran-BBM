@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react'
 import { useMenu } from '@/components/shell/menu-data'
 import { statusKedaluwarsa } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { berlakuSertifikat, statusSertifikat, statusTanggal } from '@/lib/berlaku'
 import { addDays, todayIso } from '@/lib/date'
 import { bolehParaf, formById, formKategori, formTampil, jatuhTempoAktivitas, judulForm, opsId, statusOps, tanggalSimpan, type OpsRecord } from '@/lib/ops'
+import { jenisPetty, perluSettlement, type PettyRecord } from '@/lib/petty'
+import type { SignerKey } from '@/lib/sop'
 import { useOps } from '@/lib/use-ops'
 
 export type JenisInbox = 'tugas' | 'berlaku'
@@ -34,6 +37,17 @@ export function useInbox(): ItemInbox[] {
   const hariIni = todayIso()
   const out: ItemInbox[] = []
   const { recs: ops } = useOps(todayIso(addDays(new Date(`${hariIni}T00:00:00`), -62)), hariIni)
+  // Pengajuan petty cash 3 bulan terakhir: persetujuan, settlement, realisasi yang menunggu PIC.
+  const [petty, setPetty] = useState<{ kunci: string; recs: PettyRecord[] } | null>(null)
+  const kunciPetty = `${app.spbuId}|${app.role}|${hariIni}`
+  useEffect(() => {
+    if (!app.loaded || !app.role || !app.can('/finance/petty')) return
+    app.backend.listPetty(todayIso(addDays(new Date(`${hariIni}T00:00:00`), -92)), hariIni).then(
+      (recs) => setPetty({ kunci: kunciPetty, recs }),
+      () => setPetty({ kunci: kunciPetty, recs: [] }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dimuat ulang per SPBU/peran/hari
+  }, [app.loaded, app.role, app.backend, app.spbuId, hariIni, kunciPetty])
 
   for (const g of grup) {
     if (g.key === 'report') continue
@@ -63,6 +77,58 @@ export function useInbox(): ItemInbox[] {
       out.push({ id: `instansi:${u.id}`, jenis: 'berlaku', judul: `Pemeriksaan instansi ${u.kode}`, detail: `${u.instansi || 'Instansi berwenang'} · berlaku s.d. ${berlakuSertifikat(u.periksaInstansi)}`, to: app.can('/apar/data') ? '/apar/data' : '/apar', grup: 'HSSE & Guard Patrol System', tingkat: ins })
   }
   if (ops && app.role) out.push(...inboxOps(app.role, app.settings, ops, hariIni))
+  out.push(...inboxPersetujuan(app, petty?.kunci === kunciPetty ? petty.recs : []))
+  return out
+}
+
+/** Grup Inbox untuk semua yang menunggu persetujuan, paraf, atau tanda tangan PIC. */
+export const GRUP_PERSETUJUAN = 'Persetujuan & Paraf'
+/** Penanda tangan Berita Acara bongkaran per peran. */
+const TTD_PERAN: Partial<Record<string, SignerKey>> = { kashift: 'penerima', security: 'security', pengawas: 'pengawas', abh: 'abh' }
+
+/**
+ * Persetujuan & paraf yang menunggu pengguna ini (PIC): persetujuan 1 Admin/Cashier & persetujuan akhir ABH
+ * petty cash, Create Settlement oleh pengaju, realisasi Admin/Cashier, tanda tangan Berita Acara bongkaran
+ * sesuai peran, dan insiden yang PIC-nya pengguna ini.
+ */
+function inboxPersetujuan(app: ReturnType<typeof useApp>, petty: PettyRecord[]): ItemInbox[] {
+  const out: ItemInbox[] = []
+  const role = app.role
+  const uid = app.session.user?.id ?? null
+  const milik = (r: PettyRecord) => (!!uid && r.createdBy === uid) || (uid === null && r.createdBy === null)
+  const tambah = (id: string, judul: string, recs: PettyRecord[], to: string, detail: (r: PettyRecord) => string) => {
+    if (!recs.length) return
+    out.push({ id, jenis: 'tugas', judul: `${judul} (${recs.length})`, detail: recs.slice(0, 2).map(detail).join('; ') + (recs.length > 2 ? ` +${recs.length - 2} lainnya` : ''), to, grup: GRUP_PERSETUJUAN, tingkat: 'tugas' })
+  }
+  const ringkas = (r: PettyRecord) => `${r.no} ${r.data.uraian} · ${r.data.diajukanNama}`
+  if (role === 'admin' || role === 'abh')
+    tambah('acc-admin', 'Persetujuan 1 petty cash', petty.filter((r) => r.status === 'Menunggu Admin' && !(role === 'admin' && milik(r))), '/finance/petty/pengajuan', ringkas)
+  if (role === 'abh') tambah('acc-abh', 'Persetujuan akhir ABH', petty.filter((r) => r.status === 'Menunggu ABH'), '/finance/petty/pengajuan', ringkas)
+  const settle = petty.filter((r) => perluSettlement(r) && milik(r))
+  if (settle.length === 1) tambah('settlement', 'Buat settlement pengajuan', settle, `/finance/petty/settlement/${encodeURIComponent(settle[0].id)}`, (r) => `${r.no} ${r.data.uraian} disetujui, lampirkan struk & foto barang`)
+  else tambah('settlement', 'Buat settlement pengajuan', settle, '/finance/petty/pengajuan', (r) => `${r.no} ${r.data.uraian}`)
+  if (role === 'admin' || role === 'abh')
+    tambah('realisasi', 'Realisasi petty cash', petty.filter((r) => r.status === 'Disetujui' && !r.data.realisasi && !perluSettlement(r)), '/finance/petty/realisasi', (r) => `${r.no} ${r.data.uraian}${jenisPetty(r) === 'reimburse' ? ' (reimburse)' : ''}`)
+  // Tanda tangan Berita Acara bongkaran yang menunggu peran ini.
+  const ttd = role ? TTD_PERAN[role] : undefined
+  if (ttd) {
+    const ba = app.reports.filter((r) => r.status !== 'draft' && r.ttdKurang?.includes(ttd))
+    if (ba.length)
+      out.push({
+        id: 'ttd-ba',
+        jenis: 'tugas',
+        judul: `Tanda tangan Berita Acara (${ba.length})`,
+        detail: ba.slice(0, 2).map((r) => `${r.produk} ${r.nopol || ''} ${r.tanggal}`).join('; ') + (ba.length > 2 ? ` +${ba.length - 2} lainnya` : ''),
+        to: ba.length === 1 ? `/input/${encodeURIComponent(ba[0].id)}` : '/laporan/ba',
+        grup: GRUP_PERSETUJUAN,
+        tingkat: 'tugas',
+      })
+  }
+  // Insiden terbuka dengan PIC = pengguna ini.
+  const nama = app.displayName.trim().toLowerCase()
+  const pic = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai' && !!nama && d.data.pic?.trim().toLowerCase() === nama)
+  if (pic.length)
+    out.push({ id: 'pic-insiden', jenis: 'tugas', judul: `Tindak lanjut insiden sebagai PIC (${pic.length})`, detail: 'Laporan menunggu tindak lanjut Anda', to: '/laporan/insiden', grup: GRUP_PERSETUJUAN, tingkat: 'tugas' })
   return out
 }
 
@@ -124,7 +190,7 @@ function inboxOps(role: Parameters<typeof formKategori>[0], settings: Parameters
         judul: 'Paraf kartu perawatan & housekeeping',
         detail: `${tunggu.length} form 7 hari terakhir belum diparaf${tunggu.some((r) => statusOps(r.form, r) === 'temuan') ? ', ada temuan' : ''}`,
         to: '/ops/kalender',
-        grup: 'Paraf pengawas',
+        grup: GRUP_PERSETUJUAN,
         tingkat: 'tugas',
       })
   }

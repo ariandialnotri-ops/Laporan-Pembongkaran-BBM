@@ -482,10 +482,13 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 - Chip pilihan di atas Dashboard: **ABH**: Operation, Sales/Finance, HSSE & Guard Patrol; **pengawas & kepala shift**: Operation, HSSE & Guard Patrol; **Admin/Cashier**: Sales/Finance; **Security**: Security, HSSE; **Cleaning Service**: Housekeeping. Pilihan terakhir diingat per perangkat.
 - **Sales/Finance**: penjualan BBM (totalizer × harga), closing shift (setoran & selisih), petty cash. **HSSE**: stop penyaluran, proteksi kebakaran (APAR), guard tour, insiden, grounding. Proteksi kebakaran pindah dari Dashboard Operation ke HSSE.
 
-### 9.14e Highlight KPI di dashboard
-- Kartu **KPI** paling atas di setiap dashboard (Operation setelah kartu operasional; Sales/Finance dan HSSE paling atas): judul, "n dari m KPI capai target", ikon ⓘ model KPI, lalu grid kartu KPI (HP 2 kolom, tablet 3, laptop 4).
-- Kartu KPI: label huruf besar, nilai besar berwarna status, "Target …", garis kiri berwarna (hijau capai, amber mendekati, merah di bawah, abu-abu belum ada data). Ketuk → pop up definisi, rumus, target, sumber data, tombol **Tindak lanjuti**.
-- Daftar KPI, rumus, dan target: [`docs/KPI.md`](docs/KPI.md); perhitungan di `src/lib/kpi.ts`.
+### 9.14e Dashboard: pemilih, periode, KPI, grafik
+- **Pemilih dashboard**: kartu ikon (Operation = pompa BBM, Sales & Finance = grafik naik, HSSE & Patrol = perisai, Security = pindai, Housekeeping = sapu) dengan subjudul; aktif berwarna gradasi penuh, terangkat & berbayang, digeser horizontal di HP (otomatis ke tengah saat dipilih), 3 kolom di laptop.
+- **Periode**: judul dashboard + pil "📅 Bulan ini ⌄" di kanan; ketuk → bottom sheet preset (7 hari, 30 hari, bulan ini, bulan lalu, 3 bulan) dengan rentang tanggal tiap preset, dan rentang sendiri (dua tanggal + Terapkan). Periode berlaku untuk KPI & grafik.
+- **KPI** (gaya kartu referensi): kartu panel berisi ringkasan "n dari m KPI capai target" + cincin persentase, lalu **dropdown per modul** (titik status tiap KPI, n/m capai; modul pertama yang ada KPI merah terbuka). Kartu KPI putih 2 kolom: titik status + judul + chevron, angka besar, pil perubahan ↗/↙ terhadap periode sebelumnya (hijau membaik, merah memburuk), rincian kecil. Ketuk → pop up definisi, rumus, target, sumber, periode sebelumnya, tombol Tindak lanjuti. Daftar KPI: [`docs/KPI.md`](docs/KPI.md).
+- **Grafik** (`components/dashboard/charts.tsx`, SVG tanpa pustaka): batang satu seri (≤ 24 px, ujung membulat 4 px, grid putus-putus samar, ketuk/hover menampilkan nilai; per hari ≤ 31 hari, per minggu bila lebih panjang; kosong → "Belum ada data") dan donat (celah 2 px antar-irisan, angka di tengah, legenda dengan persen; ketuk irisan/legenda menyorot). Palet kategori tervalidasi CVD; warna produk tetap per produk; kondisi APAR memakai warna status.
+  - Operation: volume diterima per hari, penerimaan per produk. Sales & Finance: penjualan BBM per hari, penjualan per produk, metode pembayaran (closing). HSSE: kondisi APAR & APAB, laporan insiden per hari.
+- **Inbox**: grup **Persetujuan & Paraf** (ikon stempel) selalu paling atas: persetujuan 1 & akhir petty cash, Create Settlement (pengaju), realisasi (Admin/Cashier), tanda tangan Berita Acara sesuai peran, paraf kartu perawatan & housekeeping, dan insiden dengan PIC pengguna.
 
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.

@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Beaker,
+  BrushCleaning,
   CalendarClock,
   CalendarDays,
   ChevronDown,
@@ -12,13 +13,18 @@ import {
   Ellipsis,
   FireExtinguisher,
   FlaskConical,
+  Fuel,
   Gauge,
   Minus,
   Network,
+  ScanEye,
+  ShieldCheck,
   SlidersHorizontal,
   Timer,
+  TrendingUp,
   TriangleAlert,
   Truck,
+  type LucideIcon,
 } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bongkaran/date-filter'
@@ -31,8 +37,9 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
-import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { KpiOperation } from '@/components/dashboard/kpi-highlight'
+import { BarChart, DonutChart, KATEGORI, warnaProduk } from '@/components/dashboard/charts'
+import { kelompokPeriode, periodeDari, PilihPeriode, type PeriodeDashboard } from '@/components/dashboard/periode'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
@@ -78,6 +85,8 @@ export function Dashboard() {
       return pilihan[0].value
     }
   })
+  // Periode tarikan dashboard (grafik & KPI); bawaan bulan berjalan.
+  const [periode, setPeriode] = useState<PeriodeDashboard>(() => periodeDari('bulan'))
   const aktif = pilihan.some((p) => p.value === pilih) ? pilih : pilihan[0].value
   const ganti = (v: JenisDashboard) => {
     setPilih(v)
@@ -87,30 +96,78 @@ export function Dashboard() {
       // abaikan: pilihan hanya kenyamanan per perangkat
     }
   }
+  const pakaiPeriode = aktif === 'operation' || aktif === 'sales' || aktif === 'hsse'
   return (
     <div className="flex flex-col gap-space-md">
-      {pilihan.length > 1 && <ChipFilter label="Pilih dashboard" value={aktif} onChange={ganti} options={pilihan} />}
+      {pilihan.length > 1 && <PilihDashboard pilihan={pilihan} value={aktif} onChange={ganti} />}
+      {pakaiPeriode && (
+        <div className="animate-entrance-1 flex items-center justify-between gap-space-sm px-space-xs">
+          <span className="flex min-w-0 flex-col">
+            <span className="text-headline-md font-bold text-on-surface">{pilihan.find((p) => p.value === aktif)?.label}</span>
+            <span className="truncate text-body-sm text-on-surface-variant">{pilihan.find((p) => p.value === aktif)?.sub}</span>
+          </span>
+          <PilihPeriode value={periode} onChange={setPeriode} className="shrink-0" />
+        </div>
+      )}
       <Suspense fallback={<Loading />}>
-        {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse /> : aktif === 'sales' ? <DashboardSales /> : <DashboardUtama />}
+        {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse periode={periode} /> : aktif === 'sales' ? <DashboardSales periode={periode} /> : <DashboardUtama periode={periode} />}
       </Suspense>
     </div>
   )
 }
 
 type JenisDashboard = 'operation' | 'sales' | 'hsse' | 'cs' | 'security'
+type PilihanDashboard = { value: JenisDashboard; label: string; sub: string; icon: LucideIcon; nada: string }
 /**
  * Dashboard yang dapat dipilih per peran: ABH semua (Operation, Sales/Finance, HSSE & Guard Patrol); pengawas &
  * kepala shift tanpa Sales/Finance; Admin/Cashier Sales/Finance; Security & Cleaning Service sesuai tugasnya.
  */
-function pilihanDashboard(role: string | null): { value: JenisDashboard; label: string }[] {
-  const op = { value: 'operation' as const, label: 'Dashboard Operation' }
-  const sales = { value: 'sales' as const, label: 'Dashboard Sales/Finance' }
-  const hsse = { value: 'hsse' as const, label: 'Dashboard HSSE & Guard Patrol' }
+function pilihanDashboard(role: string | null): PilihanDashboard[] {
+  const op: PilihanDashboard = { value: 'operation', label: 'Operation', sub: 'Bongkaran, kualitas, stok & perawatan', icon: Fuel, nada: 'from-[#0050cb] to-[#2a78d6]' }
+  const sales: PilihanDashboard = { value: 'sales', label: 'Sales & Finance', sub: 'Penjualan, closing & petty cash', icon: TrendingUp, nada: 'from-[#00694a] to-[#1baf7a]' }
+  const hsse: PilihanDashboard = { value: 'hsse', label: 'HSSE & Patrol', sub: 'APAR, insiden, guard tour & stop penyaluran', icon: ShieldCheck, nada: 'from-[#9a3412] to-[#eb6834]' }
   if (role === 'abh') return [op, sales, hsse]
   if (role === 'admin') return [sales]
-  if (role === 'security') return [{ value: 'security', label: 'Dashboard Security' }, hsse]
-  if (role === 'cs') return [{ value: 'cs', label: 'Dashboard Housekeeping' }]
+  if (role === 'security') return [{ value: 'security', label: 'Security', sub: 'Guard tour, bongkaran & LO', icon: ScanEye, nada: 'from-[#3b2a9e] to-[#6250d6]' }, hsse]
+  if (role === 'cs') return [{ value: 'cs', label: 'Housekeeping', sub: 'Progres & kepatuhan kebersihan', icon: BrushCleaning, nada: 'from-[#00694a] to-[#1baf7a]' }]
   return [op, hsse]
+}
+
+/** Pemilih dashboard: kartu ikon interaktif (geser di HP); yang aktif berwarna penuh & terangkat. */
+function PilihDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
+  return (
+    <div role="tablist" aria-label="Pilih dashboard" className="-mx-space-md flex snap-x scroll-px-space-md gap-space-sm overflow-x-auto px-space-md pb-1 pt-0.5 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
+      {pilihan.map((p) => {
+        const on = p.value === value
+        const Ikon = p.icon
+        return (
+          <button
+            key={p.value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={(e) => {
+              onChange(p.value)
+              e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+            }}
+            className={cn(
+              'relative flex min-h-20 w-44 shrink-0 snap-start items-center gap-space-sm overflow-hidden rounded-xl p-space-sm text-left transition-all duration-300 active:scale-[0.97] lg:w-auto',
+              on ? `bg-gradient-to-br ${p.nada} text-white shadow-[0_10px_24px_-8px_rgba(0,80,203,0.45)]` : 'border border-outline-variant/50 bg-surface-container-lowest text-on-surface shadow-sm hover:-translate-y-0.5',
+            )}
+          >
+            {on && <span aria-hidden="true" className="absolute -right-6 -top-6 size-20 rounded-full bg-white/15" />}
+            <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors', on ? 'bg-white/20 text-white' : 'bg-primary-fixed text-primary')}>
+              <Ikon className="size-6" />
+            </span>
+            <span className="relative flex min-w-0 flex-col">
+              <span className="text-body-md font-bold leading-tight">{p.label}</span>
+              <span className={cn('line-clamp-2 text-xs leading-snug', on ? 'text-white/85' : 'text-on-surface-variant')}>{p.sub}</span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 const DashboardHsse = lazy(() => import('@/pages/DashboardModul').then((m) => ({ default: m.DashboardHsse })))
@@ -119,7 +176,7 @@ const DashboardSales = lazy(() => import('@/pages/DashboardModul').then((m) => (
 const DashboardCs = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardCs })))
 const DashboardSecurity = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardSecurity })))
 
-function DashboardUtama() {
+function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard }) {
   const app = useApp()
   const now = new Date()
   const [weekAnchor, setWeekAnchor] = useState(() => new Date())
@@ -230,7 +287,8 @@ function DashboardUtama() {
         </span>
       </section>
       {/* Highlight KPI bulan berjalan (lib/kpi.ts, docs/KPI.md). */}
-      <KpiOperation className="animate-entrance-1" />
+      <KpiOperation periode={periodeDash} className="animate-entrance-1" />
+      <GrafikOperation periode={periodeDash} />
       <PengingatPlan />
       <KartuStopPenyaluran className="animate-entrance-1" />
 
@@ -622,6 +680,29 @@ export function KartuProteksi({ className }: { className?: string }) {
           </Link>
         </div>
       </Kartu>
+  )
+}
+
+/** Grafik Dashboard Operation: volume diterima per hari/minggu dan komposisi penerimaan per produk. */
+function GrafikOperation({ periode }: { periode: PeriodeDashboard }) {
+  const app = useApp()
+  const rows = app.reports.filter((r) => r.status !== 'draft' && r.tanggal >= periode.dari && r.tanggal <= periode.sampai)
+  const vol = (r: (typeof rows)[number]) => r.terimaAktual ?? r.volumeDO ?? 0
+  const batang = kelompokPeriode(periode, rows.map((r) => ({ tanggal: r.tanggal, value: vol(r) })))
+  const perProduk = new Map<string, number>()
+  for (const r of rows) perProduk.set(r.produk, (perProduk.get(r.produk) ?? 0) + vol(r))
+  const produk = [...perProduk.entries()].sort((a, b) => b[1] - a[1])
+  const total = produk.reduce((a, [, v]) => a + v, 0)
+  const anomali = rows.filter((r) => r.status === 'anomali').length
+  return (
+    <div className="animate-entrance-2 grid grid-cols-1 gap-space-md lg:grid-cols-2">
+      <Kartu id="grafik-penerimaan" icon={Truck} title="Volume diterima" sub={`${formatNumber(total)} L · ${rows.length} bongkaran${anomali ? ` · ${anomali} anomali` : ''}`}>
+        <BarChart data={batang} warna={KATEGORI[0]} satuan=" L" label="Volume diterima" />
+      </Kartu>
+      <Kartu id="grafik-produk" icon={Fuel} title="Penerimaan per produk" sub="Komposisi volume diterima pada periode">
+        <DonutChart data={produk.map(([p, v], i) => ({ label: p, value: v, warna: warnaProduk(p, i) }))} subTengah="volume" label="Penerimaan per produk" satuan=" L" />
+      </Kartu>
+    </div>
   )
 }
 

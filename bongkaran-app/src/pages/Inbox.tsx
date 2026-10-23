@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BrushCleaning, CalendarClock, ChevronDown, ChevronRight, CircleAlert, Clock, Inbox as InboxIcon, PenLine, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { BrushCleaning, CalendarClock, ChevronDown, ChevronRight, CircleAlert, Clock, Inbox as InboxIcon, Stamp, Wrench, Zap, type LucideIcon } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { useMenu } from '@/components/shell/menu-data'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -10,7 +10,7 @@ import { formatTanggalIso, todayIso } from '@/lib/date'
 import { SELANG_BULAN, type GroundingData } from '@/lib/grounding'
 import { tambahBulan } from '@/lib/berlaku'
 import { useCatatan } from '@/lib/use-catatan'
-import { useInbox, type ItemInbox } from '@/lib/use-inbox'
+import { GRUP_PERSETUJUAN, useInbox, type ItemInbox } from '@/lib/use-inbox'
 import { cn } from '@/lib/utils'
 
 const NADA: Record<ItemInbox['tingkat'], { kelas: string; Ikon: typeof Clock }> = {
@@ -19,7 +19,7 @@ const NADA: Record<ItemInbox['tingkat'], { kelas: string; Ikon: typeof Clock }> 
   segera: { kelas: 'bg-amber-400 text-amber-950', Ikon: CalendarClock },
 }
 
-const IKON_GRUP: Record<string, LucideIcon> = { Perawatan: Wrench, Housekeeping: BrushCleaning, 'Paraf pengawas': PenLine }
+const IKON_GRUP: Record<string, LucideIcon> = { Perawatan: Wrench, Housekeeping: BrushCleaning, [GRUP_PERSETUJUAN]: Stamp }
 const URUT: Record<ItemInbox['tingkat'], number> = { lewat: 0, tugas: 1, segera: 2 }
 
 function Baris({ x }: { x: ItemInbox }) {
@@ -65,7 +65,8 @@ export function Inbox() {
       : null
   const semua = [...items, ...(groundingItem ? [{ ...groundingItem, grup: 'HSSE & Guard Patrol System' }] : [])]
   // Satu dropdown per modul utama (urutan menu), lalu Perawatan, Housekeeping, Paraf pengawas.
-  const urutan = [...menu.filter((g) => g.key !== 'dashboard' && g.key !== 'report').map((g) => g.label), 'Perawatan', 'Housekeeping', 'Paraf pengawas']
+  // Persetujuan & paraf (menunggu PIC) selalu paling atas.
+  const urutan = [GRUP_PERSETUJUAN, ...menu.filter((g) => g.key !== 'dashboard' && g.key !== 'report').map((g) => g.label), 'Perawatan', 'Housekeeping']
   const grup = [...new Set([...urutan, ...semua.map((x) => x.grup)])]
     .map((g) => ({ label: g, Ikon: IKON_GRUP[g] ?? menu.find((m) => m.label === g)?.icon ?? InboxIcon, isi: semua.filter((x) => x.grup === g).sort((a, b) => URUT[a.tingkat] - URUT[b.tingkat]) }))
     .filter((g) => g.isi.length)
