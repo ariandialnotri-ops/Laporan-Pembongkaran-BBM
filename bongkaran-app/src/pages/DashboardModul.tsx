@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Banknote, ChevronRight, Fuel, HandCoins, Zap, type LucideIcon } from 'lucide-react'
+import { KpiFinance, KpiHsse } from '@/components/dashboard/kpi-highlight'
 import { KartuStopPenyaluran } from '@/components/insiden/henti'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -87,6 +88,7 @@ export function DashboardHsse() {
   if (!app.loaded) return <Loading />
   return (
     <div className="grid grid-cols-1 gap-space-md lg:grid-cols-2 lg:items-start">
+      <KpiHsse className="animate-entrance-1 lg:col-span-2" />
       <KartuStopPenyaluran className="animate-entrance-1 lg:col-span-2" />
       <KartuProteksi className="animate-entrance-2" />
       {/* Data sampling guard tour hanya terbaca ABH, pengawas, dan security (RLS bbm_gts). */}
@@ -131,6 +133,7 @@ export function DashboardSales() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      <KpiFinance className="animate-entrance-1" />
       <GlassCard level={2} className="animate-entrance-1 p-space-md">
         <Field label="Bulan" htmlFor="ds-bulan">
           <Input id="ds-bulan" type="month" max={todayIso().slice(0, 7)} value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />

@@ -57,3 +57,4 @@ Production dan Preview. `bongkaran-app/vercel.json` mengatur rewrite SPA dan hea
 
 - [`bongkaran-app/README.md`](bongkaran-app/README.md): fitur per layar, alur SOP bongkaran, perhitungan, laporan, multi SPBU, backend
 - [`bongkaran-app/DESIGN.md`](bongkaran-app/DESIGN.md): sistem desain dan aturan tampilan
+- [`bongkaran-app/docs/KPI.md`](bongkaran-app/docs/KPI.md): model KPI per modul (highlight dashboard)

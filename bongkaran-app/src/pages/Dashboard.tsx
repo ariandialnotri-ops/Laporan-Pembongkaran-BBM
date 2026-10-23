@@ -32,6 +32,7 @@ import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
+import { KpiOperation } from '@/components/dashboard/kpi-highlight'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
@@ -228,6 +229,8 @@ function DashboardUtama() {
           <span className="tabular whitespace-nowrap text-xs font-bold sm:text-tag">{shiftLabel(shift)}</span>
         </span>
       </section>
+      {/* Highlight KPI bulan berjalan (lib/kpi.ts, docs/KPI.md). */}
+      <KpiOperation className="animate-entrance-1" />
       <PengingatPlan />
       <KartuStopPenyaluran className="animate-entrance-1" />
 

@@ -13,6 +13,8 @@ gradasi dingin, dock navigasi melayang, font Inter (angka memakai `tabular-nums`
 mengikuti referensi stitch "Sistem Serba Bisa". Brief lengkapnya ada di
 [`design-system/aeroshift/DESIGN.md`](design-system/aeroshift/DESIGN.md).
 
+Model KPI per modul (definisi, rumus, target) yang tampil sebagai highlight di setiap dashboard ada di [`docs/KPI.md`](docs/KPI.md).
+
 Spesifikasi tampilan FLOQ yang lengkap (token, komponen, setiap layar, cara mengganti desain, dan prompt untuk tool desain AI) ada di [`DESIGN.md`](DESIGN.md).
 
 ## Stack

@@ -482,6 +482,11 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 - Chip pilihan di atas Dashboard: **ABH**: Operation, Sales/Finance, HSSE & Guard Patrol; **pengawas & kepala shift**: Operation, HSSE & Guard Patrol; **Admin/Cashier**: Sales/Finance; **Security**: Security, HSSE; **Cleaning Service**: Housekeeping. Pilihan terakhir diingat per perangkat.
 - **Sales/Finance**: penjualan BBM (totalizer × harga), closing shift (setoran & selisih), petty cash. **HSSE**: stop penyaluran, proteksi kebakaran (APAR), guard tour, insiden, grounding. Proteksi kebakaran pindah dari Dashboard Operation ke HSSE.
 
+### 9.14e Highlight KPI di dashboard
+- Kartu **KPI** paling atas di setiap dashboard (Operation setelah kartu operasional; Sales/Finance dan HSSE paling atas): judul, "n dari m KPI capai target", ikon ⓘ model KPI, lalu grid kartu KPI (HP 2 kolom, tablet 3, laptop 4).
+- Kartu KPI: label huruf besar, nilai besar berwarna status, "Target …", garis kiri berwarna (hijau capai, amber mendekati, merah di bawah, abu-abu belum ada data). Ketuk → pop up definisi, rumus, target, sumber data, tombol **Tindak lanjuti**.
+- Daftar KPI, rumus, dan target: [`docs/KPI.md`](docs/KPI.md); perhitungan di `src/lib/kpi.ts`.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.
