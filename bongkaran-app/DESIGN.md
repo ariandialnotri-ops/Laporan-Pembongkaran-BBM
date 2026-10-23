@@ -245,6 +245,8 @@ Peta halaman:
 | Profil | Profil, Kalkulator, Pengaturan SPBU, Anggota | `/profil`, `/kalkulator`, `/pengaturan`, `/anggota` |
 | (tanpa dock) | Login | saat belum masuk |
 
+**Tarik untuk segarkan** (`shell/use-pull-segarkan.ts`, `shell/pull-segarkan.tsx`): di puncak halaman (HP, sentuh), tarik ke bawah ≥ 64 px lalu lepas. Indikator bulat putih dengan ikon `RefreshCw` muncul di bawah header, berputar mengikuti tarikan (abu-abu → biru primer saat siap), lalu berputar terus selama memuat. Data bersama dimuat ulang dari server dan isi halaman dipasang ulang agar setiap halaman mengambil datanya lagi. Bila isian di halaman sudah diubah, halaman **tidak** dipasang ulang (ketikan tidak hilang). Tidak aktif saat halaman sudah tergulir, keyboard terbuka, sheet/dialog terbuka, atau sentuhan dimulai di kanvas tanda tangan, slider, atau elemen `data-tanpa-tarik`.
+
 ---
 
 ## 8. Komponen

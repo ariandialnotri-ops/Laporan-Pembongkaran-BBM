@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useApp } from '@/lib/app-state'
 import { cn } from '@/lib/utils'
 import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
 import { PlanReminder } from './plan-reminder'
+import { IndikatorSegarkan } from './pull-segarkan'
+import { usePullSegarkan } from './use-pull-segarkan'
 import { useCatatJejak, useGeserKembali, useKembali } from './kembali'
 import { SidebarLaci, SidebarTetap } from './sidebar'
 import { SidebarContext } from './sidebar-ctx'
@@ -29,6 +32,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const setLaci = useCallback((o: boolean) => setLaciDi(o ? window.location.pathname : null), [])
   const [tertutup, setTertutup] = useState(bacaTutup)
   useCatatJejak()
+  const { refresh, status } = useApp()
+  const segar = usePullSegarkan(() => (status === 'ready' ? refresh() : Promise.resolve()))
   useGeserKembali(useKembali())
 
   const toggle = useCallback(() => {
@@ -60,6 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SidebarTetap tertutup={tertutup} />
       <SidebarLaci open={laci} onOpenChange={setLaci} />
       <AppHeader />
+      <IndikatorSegarkan tarik={segar.tarik} sibuk={segar.sibuk} />
 
       {/* Ruang untuk header tetap (+ notch), bar bawah (+ garis home iPhone), dan sidebar di layar lebar. */}
       <div className={cn('transition-[padding] duration-300 motion-reduce:transition-none print:p-0', !tertutup && 'lg:pl-72')}>
@@ -67,7 +73,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           id="konten"
           className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-margin pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-[calc(5rem+env(safe-area-inset-top,0px))] lg:pb-12 print:max-w-none print:p-0"
         >
-          {children}
+          {/* Kunci berganti setelah tarik-segarkan: isi halaman dipasang ulang dan memuat ulang datanya. */}
+          <div key={segar.kunci} className="flex flex-1 flex-col">
+            {children}
+          </div>
         </main>
       </div>
 
