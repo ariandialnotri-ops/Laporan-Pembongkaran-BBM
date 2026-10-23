@@ -232,7 +232,7 @@ export function useMenu(): GrupMenu[] {
           icon: ScanLine,
           title: 'Absensi Personil',
           desc: 'Absen masuk, istirahat & keluar dengan pindai QR SPBU dan GPS; rekap bulanan',
-          status: s.absensi?.token && s.absensi.lat !== null ? `Radius ${s.absensi.radius} m dari titik SPBU` : 'Lokasi & QR absensi belum diatur',
+          status: typeof s.absensi?.lat === 'number' ? `Radius ${s.absensi.radius} m dari titik SPBU` : 'Lokasi & QR absensi belum diatur',
         },
       ],
     },

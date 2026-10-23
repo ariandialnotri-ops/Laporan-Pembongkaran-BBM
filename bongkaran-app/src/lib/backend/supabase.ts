@@ -448,6 +448,9 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
     async absen(x) {
       check(await sb.rpc('bbm_absen', { p_spbu: aktif(), p_personil: x.personilId, p_jenis: x.jenis, p_tanggal: x.tanggal, p_lat: x.lat, p_lng: x.lng, p_akurasi: x.akurasi, p_kode: x.kode }))
     },
+    async absenQr(baru) {
+      return check(await sb.rpc('bbm_absen_qr', { p_spbu: aktif(), p_baru: !!baru })) as string
+    },
     async listPetty(from, to) {
       const rows = check(
         await sb.from('bbm_petty').select('id,no,tanggal,status,total,data,created_at,created_by').eq('spbu_id', aktif()).gte('tanggal', from).lte('tanggal', to).order('tanggal', { ascending: false }).limit(5000),

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarRange, ChevronRight, Copy, Pencil, Plus, Save, ScanLine, UserRound, Users } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
+import type { Member } from '@/lib/backend'
+import { roleLabel } from '@/lib/roles'
 import { formatBulanTahun, todayIso } from '@/lib/date'
 import { bertugas, JABATAN, KODE_JADWAL, kodeInfo, personilAktif, personilId, shiftSekarang, type JadwalData, type KodeJadwal } from '@/lib/personil'
 import { SHIFTS, type Shift } from '@/lib/shift'
@@ -75,12 +77,31 @@ export function PersonilMenu() {
   const hariIni = shiftSekarang()
   const { jadwal } = useJadwal(hariIni.bulan)
   const [ubah, setUbah] = useState<Personil | null>(null)
+  // Akun anggota SPBU untuk ditautkan ke personil (absensi hanya untuk diri sendiri).
+  const [akun, setAkun] = useState<Member[]>([])
+  const atur = bolehAtur(app.role)
+  const bukaUbah = !!ubah
+  useEffect(() => {
+    if (!atur || !bukaUbah || app.backend.mode !== 'supabase') return
+    let hidup = true
+    app.backend.listMembers().then(
+      (m) => hidup && setAkun(m),
+      () => undefined,
+    )
+    return () => {
+      hidup = false
+    }
+  }, [atur, bukaUbah, app.backend])
   if (!app.loaded) return <Loading />
   const semua = app.settings.personil ?? []
-  const atur = bolehAtur(app.role)
+  const namaAkun = (id?: string) => {
+    const m = akun.find((x) => x.user_id === id)
+    return m ? m.nama || m.email : id ? 'akun tertaut' : ''
+  }
 
   const simpan = (p: Personil) => {
     if (!p.nama.trim()) return toast('Isi nama personil.')
+    if (p.akunId && semua.some((x) => x.id !== p.id && x.akunId === p.akunId)) return toast('Akun ini sudah ditautkan ke personil lain.')
     const ada = semua.some((x) => x.id === p.id)
     app.updateSettings({ personil: ada ? semua.map((x) => (x.id === p.id ? { ...p, nama: p.nama.trim() } : x)) : [...semua, { ...p, nama: p.nama.trim() }] })
     setUbah(null)
@@ -158,6 +179,7 @@ export function PersonilMenu() {
                     <span className="truncate text-body-sm text-on-surface-variant">
                       {p.jabatan}
                       {p.hp ? ` · ${p.hp}` : ''}
+                      {p.akunId ? ` · ${namaAkun(p.akunId)}` : ''}
                       {!p.aktif ? ' · tidak aktif' : ''}
                     </span>
                   </span>
@@ -195,6 +217,23 @@ export function PersonilMenu() {
             <Field label="No. HP (opsional)" htmlFor="ps-hp">
               <Input id="ps-hp" inputMode="tel" autoComplete="off" value={ubah.hp} onChange={(e) => setUbah({ ...ubah, hp: e.target.value })} />
             </Field>
+            {app.backend.mode === 'supabase' && (
+              <Field label="Akun FLOQ (untuk absensi)" htmlFor="ps-akun" hint="Personil hanya dapat absen dari akunnya sendiri. Tanpa akun, absen dilakukan pengawas.">
+                <Select value={ubah.akunId ?? 'tanpa'} onValueChange={(v) => setUbah({ ...ubah, akunId: v === 'tanpa' ? undefined : v })}>
+                  <SelectTrigger id="ps-akun">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tanpa">Tanpa akun</SelectItem>
+                    {akun.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        {m.nama || m.email} · {roleLabel(m.role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <label className="flex items-center gap-space-sm text-body-md text-on-surface">
               <input type="checkbox" className="size-5 accent-primary" checked={ubah.aktif} onChange={(e) => setUbah({ ...ubah, aktif: e.target.checked })} />
               Masih bertugas di SPBU ini

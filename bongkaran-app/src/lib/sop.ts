@@ -333,6 +333,8 @@ export interface Personil {
   jabatan: string
   hp: string
   aktif: boolean
+  /** Akun FLOQ milik personil ini (absensi hanya untuk diri sendiri). */
+  akunId?: string
 }
 
 export interface Dispenser {

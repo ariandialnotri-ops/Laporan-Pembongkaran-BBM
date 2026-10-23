@@ -150,6 +150,7 @@ function Form({ plan }: { plan: Plan }) {
     // Nomor SO berubah: laporan bongkaran (BA) yang memakai LO permintaan ini ikut diperbarui.
     const soBaru = noSO.trim()
     const laporanSo = soBaru !== plan.noSO.trim() ? [...new Map(plan.los.flatMap((lo) => (app.usedLoIds.get(lo.id) ? [[app.usedLoIds.get(lo.id)!.id, app.usedLoIds.get(lo.id)!] as const] : []))).values()] : []
+    if (laporanSo.length && !app.canManage) return setError('Nomor SO pada laporan bongkaran yang sudah ditutup hanya dapat diubah pengawas atau ABH.')
     if (
       laporanSo.length &&
       !(await konfirmasi({
@@ -216,11 +217,13 @@ function Form({ plan }: { plan: Plan }) {
           htmlFor="lo-so-edit"
           hint={
             plan.los.some(terpakai)
-              ? 'Satu SO untuk semua LO di permintaan ini. LO sudah dipakai laporan bongkaran: perubahan SO ikut memperbarui laporan bongkaran (BA) terkait.'
+              ? app.canManage
+                ? 'Satu SO untuk semua LO di permintaan ini. LO sudah dipakai laporan bongkaran: perubahan SO ikut memperbarui laporan bongkaran (BA) terkait.'
+                : 'LO sudah dipakai laporan bongkaran: nomor SO hanya dapat dikoreksi pengawas atau ABH.'
               : `Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`
           }
         >
-          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
+          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={plan.los.some(terpakai) && !app.canManage} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
         </Field>
       </GlassCard>
 

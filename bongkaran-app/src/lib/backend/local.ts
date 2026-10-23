@@ -10,7 +10,7 @@ import type { AirRecord } from '@/lib/air'
 import type { PettyRecord } from '@/lib/petty'
 import type { Role } from '@/lib/roles'
 import type { Catatan } from '@/lib/catatan'
-import { absensiSiap, cekArea, prosesAbsen, type AbsenRecord } from '@/lib/absen'
+import { absensiSiap, cekArea, prosesAbsen, teksQr, tokenBaru, type AbsenRecord } from '@/lib/absen'
 import type { GtsRecord } from '@/lib/gts'
 import type { WbsRecord } from '@/lib/wbs'
 import { normalizePlan } from '@/lib/plan'
@@ -231,7 +231,8 @@ export const localBackend: Backend = {
     const st = (await get<Settings>('settings')) ?? ({} as Settings)
     const a = st.absensi
     if (!absensiSiap(a)) throw new Error('Titik lokasi & QR absensi SPBU belum diatur. Hubungi pengawas.')
-    if (!x.kode.startsWith('FLOQ-ABSEN|') || !x.kode.endsWith(`|${a.token}`)) throw new Error('QR bukan QR absensi SPBU ini atau sudah diganti. Pindai QR absensi yang terpasang di SPBU.')
+    const token = await get<string>('absen-token')
+    if (!token || x.kode !== teksQr(SPBU_LOKAL.id, token)) throw new Error('QR bukan QR absensi SPBU ini atau sudah diganti. Pindai QR absensi yang terpasang di SPBU.')
     const p = (st.personil ?? []).find((z) => z.id === x.personilId && z.aktif)
     if (!p) throw new Error('Personil tidak ditemukan atau tidak aktif')
     const area = cekArea(a, x)
@@ -239,6 +240,11 @@ export const localBackend: Backend = {
     const recs = (await get<AbsenRecord[]>('catatan-absen')) ?? []
     const titik = { at: new Date().toISOString(), lat: x.lat, lng: x.lng, akurasi: Math.round(x.akurasi), jarak: Math.round(area.jarak), oleh: null, olehNama: localStorage.getItem('floq-peran') || 'abh' }
     await set('catatan-absen', upsertById(recs, prosesAbsen(recs, p, x.jenis, titik, x.tanggal)))
+  },
+  async absenQr(baru) {
+    let token = await get<string>('absen-token')
+    if (!token || baru) await set('absen-token', (token = tokenBaru()))
+    return teksQr(SPBU_LOKAL.id, token)
   },
   listPetty: (from, to) => get<PettyRecord[]>('petty').then((d) => (d ?? []).filter((r) => r.tanggal >= from && r.tanggal <= to).sort((a, b) => b.tanggal.localeCompare(a.tanggal))),
   // Mode lokal: status awal mengikuti peran uji (sama dengan trigger database).

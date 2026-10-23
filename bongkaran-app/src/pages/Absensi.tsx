@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarRange, Coffee, Crosshair, Download, FileSpreadsheet, LoaderCircle, LogIn, LogOut, MapPin, QrCode, RefreshCw, Save, ScanLine, Settings2, Trash2, Undo2, UserRound } from 'lucide-react'
 import { QrImg, QrScanner } from '@/components/apar/qr'
@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast'
 import {
   AKSI,
   absensiSiap,
+  bolehAbsenkanLain,
   catatanTerbuka,
   cekArea,
   jamDari,
@@ -27,8 +28,6 @@ import {
   RADIUS_BAWAAN,
   statusAbsen,
   tanggalAbsen,
-  teksQr,
-  tokenBaru,
   type AbsenData,
   type AbsenRecord,
   type AbsensiSetting,
@@ -118,8 +117,11 @@ export function AbsensiMenu() {
   const [hasil, setHasil] = useState<{ jenis: JenisAbsen; nama: string; jam: string } | null>(null)
   if (!app.loaded || !recs) return <Loading />
 
-  const aktif = personilAktif(app.settings)
-  const p = aktif.find((x) => x.id === pilih) ?? null
+  const semuaAktif = personilAktif(app.settings)
+  // Selain ABH/pengawas hanya dapat absen untuk personil yang tertaut ke akunnya (mode lokal: semua).
+  const uid = app.session.user?.id
+  const aktif = bolehAbsenkanLain(app.role) || !uid ? semuaAktif : semuaAktif.filter((x) => x.akunId === uid)
+  const p = aktif.find((x) => x.id === pilih) ?? (aktif.length === 1 ? aktif[0] : null)
   const a = app.settings.absensi
   const siap = absensiSiap(a)
   const buka = p ? catatanTerbuka(recs, p.id) : undefined
@@ -175,7 +177,7 @@ export function AbsensiMenu() {
     }
   }
 
-  const hariIniSemua = aktif.map((x) => {
+  const hariIniSemua = semuaAktif.map((x) => {
     const r = catatanTerbuka(recs, x.id) ?? recs.find((z) => z.data.personilId === x.id && z.tanggal === hariIni)
     return { p: x, r, st: r ? statusAbsen(r.data) : ('belum' as StatusAbsen) }
   })
@@ -207,7 +209,9 @@ export function AbsensiMenu() {
           </div>
         )}
         {!aktif.length ? (
-          <span className="text-body-sm text-on-surface-variant">Daftar personil belum diisi. Tambahkan di menu Personil & Jadwal Shift.</span>
+          <span className="text-body-sm text-on-surface-variant">
+            {semuaAktif.length ? 'Akun Anda belum ditautkan ke data personil. Minta pengawas menautkan akun Anda di menu Personil & Jadwal Shift.' : 'Daftar personil belum diisi. Tambahkan di menu Personil & Jadwal Shift.'}
+          </span>
         ) : (
           <Field label="Nama personil" htmlFor="absen-personil">
             <Select value={p?.id ?? ''} onValueChange={pilihPersonil}>
@@ -258,7 +262,7 @@ export function AbsensiMenu() {
       </GlassCard>
 
       <section aria-labelledby="absen-hari" className="animate-entrance-2 flex flex-col gap-space-sm">
-        <SectionHeader id="absen-hari" title={`Hari ini · ${hadir} dari ${aktif.length} hadir`} />
+        <SectionHeader id="absen-hari" title={`Hari ini · ${hadir} dari ${semuaAktif.length} hadir`} />
         <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 overflow-hidden">
           {hariIniSemua.map(({ p: x, r, st: s }) => (
             <button key={x.id} type="button" onClick={() => pilihPersonil(x.id)} className="flex items-center gap-space-sm px-space-md py-space-sm text-left active:bg-surface-container-low">
@@ -273,7 +277,7 @@ export function AbsensiMenu() {
               <Pill tone={STATUS[s].tone}>{STATUS[s].label}</Pill>
             </button>
           ))}
-          {!aktif.length && <span className="p-space-md text-body-sm text-on-surface-variant">Belum ada personil aktif.</span>}
+          {!semuaAktif.length && <span className="p-space-md text-body-sm text-on-surface-variant">Belum ada personil aktif.</span>}
         </GlassCard>
       </section>
 
@@ -503,24 +507,38 @@ export function AbsensiPengaturan() {
   const konfirmasi = useKonfirmasi()
   const tersimpan = app.settings.absensi
   const [draf, setDraf] = useState<{ lat: string; lng: string; radius: string } | null>(null)
-  const [busy, setBusy] = useState<'gps' | 'pdf' | null>(null)
+  const [busy, setBusy] = useState<'gps' | 'pdf' | 'qr' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Teks QR diambil dari server (token tidak tersimpan di pengaturan yang terbaca semua anggota).
+  const [qr, setQr] = useState<{ spbu: string | null; teks: string } | null>(null)
+  const siapQr = absensiSiap(tersimpan) && bolehAtur(app.role)
+  useEffect(() => {
+    if (!siapQr) return
+    let hidup = true
+    app.backend.absenQr().then(
+      (teks) => hidup && setQr({ spbu: app.spbuId, teks }),
+      (e) => hidup && setError(pesan(e)),
+    )
+    return () => {
+      hidup = false
+    }
+  }, [siapQr, app.backend, app.spbuId])
   if (!app.loaded) return <Loading />
   if (!bolehAtur(app.role)) return <ErrorBox text="Hanya ABH atau pengawas yang dapat mengatur lokasi & QR absensi." />
   const isi = draf ?? { lat: tersimpan?.lat?.toString() ?? '', lng: tersimpan?.lng?.toString() ?? '', radius: String(tersimpan?.radius ?? RADIUS_BAWAAN) }
-  const spbuId = app.spbuId ?? 'lokal'
+  const teksQr = qr?.spbu === app.spbuId ? qr.teks : null
   const angka = (s: string) => {
     const v = Number(s.replace(',', '.'))
     return s.trim() && Number.isFinite(v) ? v : null
   }
 
-  const simpan = (token = tersimpan?.token || tokenBaru()) => {
+  const simpan = () => {
     const lat = angka(isi.lat)
     const lng = angka(isi.lng)
     const radius = angka(isi.radius)
     if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return setError('Isi koordinat lintang & bujur yang benar (mis. -7.8166 dan 112.0115).')
     if (radius === null || radius < 20 || radius > 1000) return setError('Radius 20 – 1.000 meter.')
-    const a: AbsensiSetting = { lat, lng, radius: Math.round(radius), token }
+    const a: AbsensiSetting = { lat, lng, radius: Math.round(radius) }
     app.updateSettings({ absensi: a })
     setDraf(null)
     setError(null)
@@ -541,14 +559,22 @@ export function AbsensiPengaturan() {
   }
   const gantiQr = async () => {
     if (!(await konfirmasi({ jenis: 'ubah', judul: 'Buat QR absensi baru?', pesan: 'QR lama tidak berlaku lagi. Cetak dan pasang QR baru di SPBU.', ya: 'Ya, buat baru' }))) return
-    simpan(tokenBaru())
+    setBusy('qr')
+    try {
+      setQr({ spbu: app.spbuId, teks: await app.backend.absenQr(true) })
+      toast('QR absensi baru dibuat. Cetak & pasang poster yang baru.')
+    } catch (e) {
+      setError(pesan(e))
+    } finally {
+      setBusy(null)
+    }
   }
   const unduhPoster = async () => {
-    if (!absensiSiap(tersimpan)) return
+    if (!teksQr) return
     setBusy('pdf')
     try {
       const { posterAbsenPdf } = await import('@/lib/report/absen-xlsx')
-      downloadBlob(await posterAbsenPdf(teksQr(spbuId, tersimpan.token), app.settings.namaSpbu || app.spbu?.nama || 'SPBU', app.settings.kodeSpbu || ''), `QR Absensi ${app.settings.namaSpbu || 'SPBU'}.pdf`)
+      downloadBlob(await posterAbsenPdf(teksQr, app.settings.namaSpbu || app.spbu?.nama || 'SPBU', app.settings.kodeSpbu || ''), `QR Absensi ${app.settings.namaSpbu || 'SPBU'}.pdf`)
     } catch (e) {
       setError(pesan(e))
     } finally {
@@ -592,17 +618,17 @@ export function AbsensiPengaturan() {
 
       <GlassCard level={2} className="flex flex-col items-center gap-space-sm p-space-md">
         <span className="self-start text-tag uppercase text-primary">QR absensi SPBU</span>
-        {absensiSiap(tersimpan) ? (
+        {absensiSiap(tersimpan) && teksQr ? (
           <>
-            <QrImg text={teksQr(spbuId, tersimpan.token)} size={200} alt="QR absensi SPBU" className="rounded-md" />
+            <QrImg text={teksQr} size={200} alt="QR absensi SPBU" className="rounded-md" />
             <span className="text-center text-body-sm text-on-surface-variant">Cetak dan tempel di lokasi SPBU (mis. dekat kantor). Hanya berlaku untuk {app.settings.namaSpbu || 'SPBU ini'}.</span>
             <div className="grid w-full grid-cols-2 gap-space-sm">
               <Button variant="glass" disabled={busy !== null} onClick={() => void unduhPoster()}>
                 {busy === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
                 Poster PDF
               </Button>
-              <Button variant="glass" onClick={() => void gantiQr()}>
-                <RefreshCw aria-hidden="true" />
+              <Button variant="glass" disabled={busy !== null} onClick={() => void gantiQr()}>
+                {busy === 'qr' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
                 Buat QR baru
               </Button>
             </div>
@@ -610,7 +636,7 @@ export function AbsensiPengaturan() {
         ) : (
           <span className="flex items-center gap-2 text-body-sm text-on-surface-variant">
             <QrCode aria-hidden="true" className="size-5" />
-            QR dibuat otomatis setelah lokasi absensi disimpan.
+            {absensiSiap(tersimpan) ? 'Memuat QR absensi…' : 'QR dibuat otomatis setelah lokasi absensi disimpan.'}
           </span>
         )}
       </GlassCard>

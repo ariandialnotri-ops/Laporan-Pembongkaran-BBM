@@ -156,6 +156,8 @@ export interface Backend {
   deleteCatatan(jenis: JenisCatatan, id: string): Promise<void>
   /** Absen personil (masuk/istirahat/kembali/keluar) setelah pindai QR & GPS; jam dicatat server. */
   absen(input: AbsenInput): Promise<void>
+  /** Teks QR absensi SPBU aktif (ABH/pengawas); `baru` mengganti token sehingga QR lama tidak berlaku. */
+  absenQr(baru?: boolean): Promise<string>
   /** Foto yang akan terhapus pada cut-off tanggal 5 berikutnya (mode Supabase; lokal: kosong). */
   fotoArsip(): Promise<FotoArsip[]>
   /** Unduh isi foto berdasarkan path penyimpanan (arsip ZIP). */

@@ -3,7 +3,9 @@
  * absen wajib memindai QR absensi SPBU (dipasang di lokasi, isi "FLOQ-ABSEN|<id SPBU>|<token>") dan
  * lokasi GPS di dalam radius titik absensi SPBU. Satu catatan per personil per tanggal masuk
  * (tabel bbm_absen, id "<tanggal>_<id personil>"); shift 3 keluar keesokan pagi tetap di catatan masuk.
- * Di Supabase jam dicatat server dan QR/jarak diperiksa ulang oleh RPC bbm_absen.
+ * Di Supabase jam dicatat server dan QR/jarak diperiksa ulang oleh RPC bbm_absen. Token QR disimpan di tabel
+ * privat (tidak terbaca anggota); teks QR hanya diberikan ke ABH/pengawas lewat RPC bbm_absen_qr. Personil
+ * hanya dapat absen untuk dirinya sendiri (Personil.akunId = akun pemanggil), kecuali ABH/pengawas.
  */
 import type { Catatan } from '@/lib/catatan'
 import { todayIso } from '@/lib/date'
@@ -43,8 +45,6 @@ export interface AbsensiSetting {
   lng: number | null
   /** Radius area absensi (m). */
   radius: number
-  /** Token QR; diganti bila QR lama perlu dinonaktifkan. */
-  token: string
 }
 export const RADIUS_BAWAAN = 100
 /** Toleransi akurasi GPS yang diperhitungkan (m). */
@@ -63,7 +63,9 @@ export function jarakMeter(lat1: number, lng1: number, lat2: number, lng2: numbe
   return 2 * 6371000 * Math.asin(Math.sqrt(a))
 }
 
-export const absensiSiap = (a: AbsensiSetting | undefined): a is AbsensiSetting & { lat: number; lng: number } => !!a?.token && a.lat !== null && a.lng !== null
+export const absensiSiap = (a: AbsensiSetting | undefined): a is AbsensiSetting & { lat: number; lng: number } => typeof a?.lat === 'number' && typeof a?.lng === 'number'
+/** ABH/pengawas: mengatur lokasi & QR, dan boleh mengabsenkan personil lain. */
+export const bolehAbsenkanLain = (role: string | null | undefined) => role === 'abh' || role === 'pengawas'
 
 /** Posisi GPS terhadap area absensi: di dalam bila jarak − akurasi (maks. 50 m) ≤ radius. */
 export function cekArea(a: AbsensiSetting & { lat: number; lng: number }, pos: { lat: number; lng: number; akurasi: number }) {
