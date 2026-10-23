@@ -5,9 +5,8 @@
  * tabel bbm_air sebagai shift 1. Foto tidak disimpan: digabung menjadi kolase dan dikirim ke WhatsApp.
  */
 import { formatLiter, parseAngka } from '@/lib/format'
-import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
 import type { Shift } from '@/lib/shift'
-import type { Photo, Settings } from '@/lib/sop'
+import type { Photo } from '@/lib/sop'
 import { tankName, volumeTank, type Tank } from '@/lib/tank'
 
 export interface AirTangki {
@@ -66,13 +65,16 @@ export const airLengkap = (r: AirRecord | undefined, tanks: Tank[]) => !!r && ta
 /** Tangki yang ada airnya pada catatan ini. */
 export const tangkiBerair = (r: AirRecord | undefined, tanks: Tank[]) => (r ? tanks.filter((t) => statusAir(r.data.tangki[t.id]) === 'ada') : [])
 
-/** Teks laporan WhatsApp water content (isian dalam blok monospace supaya titik dua sejajar). */
-export function teksWaAir(rec: AirRecord, tanks: Tank[], s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>, zona = '') {
+// Ringkas supaya muat satu baris di layar HP: "T1 Pertalite", nama khusus tetap (mis. "PERTADEX 3 KL").
+const namaWa = (t: Tank) => (/^\d+$/.test(t.tankNo) ? `T${t.tankNo} ${t.produk}` : t.tankNo)
+
+/**
+ * Baris laporan WhatsApp water content: hasil per tangki (blok monospace, titik dua sejajar dengan
+ * label `kiri` lain), hasil, dan tindakan. Bagian dari laporan Kontrol Kualitas Harian.
+ */
+export function barisWaAir(rec: AirRecord, tanks: Tank[], kiri: string[] = []) {
   const d = rec.data
-  // Ringkas supaya muat satu baris di layar HP: "T1 Pertalite", nama khusus tetap (mis. "PERTADEX 3 KL").
-  const nama = (t: Tank) => (/^\d+$/.test(t.tankNo) ? `T${t.tankNo} ${t.produk}` : t.tankNo)
-  const kiri = ['Shift', 'Petugas', 'Status', ...tanks.map(nama)]
-  const lebar = Math.max(...kiri.map((k) => k.length))
+  const lebar = Math.max(...[...kiri, ...tanks.map(namaWa)].map((k) => k.length))
   const kv = (k: string, v: string) => `${k.padEnd(lebar)} : ${v}`
   const isi = (t: Tank) => {
     const x = d.tangki[t.id]
@@ -81,20 +83,12 @@ export function teksWaAir(rec: AirRecord, tanks: Tank[], s: Pick<Settings, 'nama
     return `${x.airMm} mm${l ? ` (± ${formatLiter(l)})` : ''}`
   }
   const berair = tangkiBerair(rec, tanks)
-  return [
-    '*Laporan Water Content Tangki Pendam*',
-    namaSpbuWa(s),
-    `Tanggal ${tanggalPanjang(rec.tanggal)}, ${d.jam}${zona ? ` ${zona}` : ''}`,
-    '',
-    '```',
-    kv('Shift', String(rec.shift)),
-    kv('Petugas', d.petugas || '-'),
-    kv('Status', d.terlambat ? 'Terlambat (lewat 10:00)' : 'Tepat waktu'),
-    '',
-    ...tanks.map((t) => kv(nama(t), isi(t))),
-    '```',
-    berair.length ? `Hasil: *ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}*` : 'Hasil: semua tangki *nihil air*',
-    ...berair.map((t) => `Tindakan ${tankName(t.tankNo)}: ${d.tangki[t.id]?.tindakan || '-'}`),
-    ...(d.catatan ? [`Catatan: ${d.catatan}`] : []),
-  ].join('\n')
+  return {
+    kv,
+    tangki: tanks.map((t) => kv(namaWa(t), isi(t))),
+    hasil: [
+      berair.length ? `Hasil: *ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}*` : 'Hasil: semua tangki *nihil air*',
+      ...berair.map((t) => `Tindakan ${tankName(t.tankNo)}: ${d.tangki[t.id]?.tindakan || '-'}`),
+    ],
+  }
 }

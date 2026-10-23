@@ -128,7 +128,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Operation',
       href: '/operation',
       icon: Fuel,
-      desc: 'Stok, totalizer, water content, bongkaran, kualitas BBM, uji takaran, perawatan & housekeeping',
+      desc: 'Stok, totalizer, kontrol kualitas harian (density & water content), bongkaran, uji takaran, perawatan & housekeeping',
       items: [
         {
           to: '/stok',
@@ -152,9 +152,9 @@ export function useMenu(): GrupMenu[] {
           to: '/kualitas',
           path: '/kualitas',
           icon: FlaskConical,
-          title: 'Kualitas Harian',
-          desc: 'Density & suhu per produk, sekali sehari (shift 1, maks. 10:00)',
-          status: diuji ? 'Hari ini sudah diuji' : lewat10 ? 'Terlewat (batas 10:00)' : 'Belum diuji (batas 10:00)',
+          title: 'Kontrol Kualitas Harian',
+          desc: 'Density per produk & water content tangki pendam, sekali sehari (shift 1, maks. 10:00), satu laporan WhatsApp',
+          status: diuji ? 'Hari ini sudah dikontrol' : lewat10 ? 'Terlewat (batas 10:00)' : 'Belum dikontrol (batas 10:00)',
           badge: diuji ? 0 : 1,
           nada: diuji ? 'ok' : lewat10 ? 'anomali' : 'pengingat',
         },
@@ -193,15 +193,6 @@ export function useMenu(): GrupMenu[] {
           desc: 'Totalisator digital awal & akhir shift per nozzle dan produk',
           status: (s.nozzles ?? []).length ? `${(s.nozzles ?? []).length} nozzle · awal & akhir shift` : 'Database nozzle belum diisi',
           nada: (s.nozzles ?? []).length ? 'ok' : 'pengingat',
-        },
-        {
-          to: '/air',
-          path: '/air',
-          icon: Droplet,
-          title: 'Water Content Tangki',
-          desc: 'Pasta air di setiap tangki pendam, sekali sehari (shift 1, maks. 10:00)',
-          status: stok.tanpaTangki ? 'Database tangki belum diisi' : 'Kolase foto + laporan WhatsApp',
-          nada: stok.tanpaTangki ? 'pengingat' : 'ok',
         },
         {
           to: '/takaran',

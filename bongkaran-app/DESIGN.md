@@ -385,7 +385,10 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib** (HP, satu
   - LO lama di atas 8.000 L dipecah otomatis menjadi beberapa baris (latar kuning + catatan).
   - Tombol **Batal** dan **Simpan & kembali**; simpan otomatis kembali ke Tracking LO asal (`/plan` atau `?dari=/laporan/lo`). Keluar dengan perubahan belum disimpan memunculkan konfirmasi.
 
-### 9.7 Kualitas Harian
+### 9.7 Kontrol Kualitas Harian (density + water content)
+- Satu menu **Kontrol Kualitas Harian** menggantikan menu Kualitas Harian dan Water Content Tangki (rute lama `/air` dialihkan ke `/kualitas`). Sekali sehari di shift 1, paling lambat 10:00.
+- Urutan form: kartu kepala → **Uji kualitas (density)** per produk → **Water content tangki pendam** per tangki (tinggi air mm + tombol Nihil, foto stik pasta air, tindakan wajib bila ada air, kartu bergaris merah bila ada air) → **Langkah terakhir** (foto struk pump test, foto pengembalian minyak, catatan) → Selesaikan.
+- Selesai = simpan uji kualitas (bbm_daily kind qq) **dan** water content (bbm_air), lalu **satu kolase** semua foto (hydrometer, stik pasta air per tangki, struk, pengembalian; tiap foto bercap jam, SPBU, hasil) dan **satu laporan WhatsApp** "Laporan Kontrol Kualitas Harian BBM" berisi density per produk dan blok water content per tangki.
 - **Stok awal wajib**, sama dengan Input Bongkaran: selama stok awal shift berjalan belum diisi, kartu amber "Isi stok awal" tampil di atas, seluruh form dikunci (`fieldset disabled`, pudar 60%), dan tombol akhir menjadi abu-abu bergembok "Isi stok awal dulu".
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
 - **Uji kualitas (density)**: kartu per produk: Produk, Density, Suhu, Pump test, tangga (density observasi, D15, acuan D15 bongkaran, selisih), baris status + **tombol Simpan per baris** ("Tersimpan jam" / "Belum disimpan"). Uji produk lain.

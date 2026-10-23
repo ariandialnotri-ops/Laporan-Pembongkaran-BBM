@@ -1,8 +1,10 @@
+import { barisWaAir, tangkiBerair, type AirRecord } from '@/lib/air'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatMaybe, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
 import type { Derived, Report, Settings } from '@/lib/sop'
+import type { Tank } from '@/lib/tank'
 
 const ok = (b: boolean) => (b ? '✅' : '❌')
 
@@ -90,10 +92,12 @@ export function buildWaQq(
   spbu: string,
   tanggalPanjang: string,
   zona = '',
+  /** Kontrol Kualitas Harian: hasil water content tangki pendam ikut dalam satu laporan. */
+  air?: { rec: AirRecord; tanks: Tank[] },
 ) {
   const kv = (k: string, v: string) => `${k.padEnd(10)}: ${v}`
   const L: string[] = [
-    '*Laporan Uji Kualitas Harian BBM*',
+    air ? '*Laporan Kontrol Kualitas Harian BBM*' : '*Laporan Uji Kualitas Harian BBM*',
     spbu,
     `Tanggal ${tanggalPanjang}, ${q.jam}${zona ? ` ${zona}` : ''}`,
     '',
@@ -115,6 +119,10 @@ export function buildWaQq(
   const lewat = baris.filter((b) => b.ok === false).map((b) => b.produk)
   L.push(`Total pump test: ${formatMaybe(q.totalPumpTest, 1)} L`)
   L.push(lewat.length ? `Hasil: *${lewat.join(', ')} melebihi toleransi* ❗` : 'Hasil: *semua produk sesuai toleransi* ✅')
+  if (air) {
+    const w = barisWaAir(air.rec, air.tanks)
+    L.push('', '*Water content tangki pendam*', '```', ...w.tangki, '```', ...w.hasil.map((h) => (h.startsWith('Hasil:') ? `${h}${tangkiBerair(air.rec, air.tanks).length ? ' ❗' : ' ✅'}` : h)))
+  }
   if (q.catatan) L.push(`Catatan: ${q.catatan}`)
   return L.join('\n')
 }

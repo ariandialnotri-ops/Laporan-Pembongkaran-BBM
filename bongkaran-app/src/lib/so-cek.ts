@@ -344,7 +344,7 @@ export function cekSo(data: SoData, s: SumberSo, pumpTest: BarisPumpTest[], now 
     ),
   )
   saran.push(perHari('qq', 'Kualitas harian (pump test)', (t) => qq.has(t), '/kualitas', 'BA Rekap Tera Nozzle & penjualan bersih'))
-  saran.push(perHari('air', 'Water content tangki', (t) => air.has(t), '/air', 'Tinggi air BA SO BBM'))
+  saran.push(perHari('air', 'Water content tangki', (t) => air.has(t), '/kualitas', 'Tinggi air BA SO BBM'))
   saran.push(
     daftar(
       'ket',

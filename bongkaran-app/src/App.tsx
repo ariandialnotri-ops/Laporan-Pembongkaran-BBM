@@ -113,8 +113,6 @@ const ClosingShift = lazy(() => import('@/pages/Closing').then((m) => ({ default
 const TotalizerMenu = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.TotalizerMenu })))
 const TotalizerForm = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.TotalizerForm })))
 const RiwayatTotalizer = lazy(() => import('@/pages/Totalizer').then((m) => ({ default: m.RiwayatTotalizer })))
-const AirMenu = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirMenu })))
-const AirForm = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirForm })))
 const LaporanAir = lazy(() => import('@/pages/Air').then((m) => ({ default: m.LaporanAir })))
 const PettyMenu = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PettyMenu })))
 const PengajuanPetty = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PengajuanPetty })))
@@ -194,8 +192,9 @@ function Gate() {
           <Route path="/laporan/totalizer" element={<RiwayatTotalizer />} />
           <Route path="/laporan/pump-test" element={<RiwayatPumpTest />} />
           <Route path="/laporan/so" element={<LaporanStockOpname />} />
-          <Route path="/air" element={<AirMenu />} />
-          <Route path="/air/isi" element={<AirForm />} />
+          {/* Water content kini bagian Kontrol Kualitas Harian. */}
+          <Route path="/air" element={<Navigate to="/kualitas" replace />} />
+          <Route path="/air/isi" element={<Navigate to="/kualitas" replace />} />
           <Route path="/laporan/air" element={<LaporanAir />} />
           <Route path="/terkirim" element={<Terkirim />} />
           <Route path="/takaran" element={<MenuTakaran />} />
