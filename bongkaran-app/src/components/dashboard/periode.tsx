@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarDays, Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Funnel } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet } from '@/components/ui/sheet'
@@ -35,7 +35,15 @@ export function periodeDari(preset: Exclude<PresetPeriode, 'custom'>, now = new 
 
 export const labelPeriode = (p: PeriodeDashboard) => (p.preset === 'custom' ? `${formatTanggalIso(p.dari)} – ${formatTanggalIso(p.sampai)}` : (PRESET.find((x) => x.key === p.preset)?.label ?? ''))
 
-/** Tombol pil periode tarikan dashboard (gaya "Last 30 Days ⌄") + bottom sheet pilihan & rentang bebas. */
+/** Rentang ringkas: "1 – 23 Okt 2026" bila sebulan, tahun ditulis sekali bila sama. */
+const rentangRingkas = (p: Periode) => {
+  const a = formatTanggalIso(p.dari).split(' ')
+  const b = formatTanggalIso(p.sampai).split(' ')
+  if (a[2] !== b[2]) return `${a.join(' ')} – ${b.join(' ')}`
+  return a[1] === b[1] ? `${a[0]} – ${b.join(' ')}` : `${a[0]} ${a[1]} – ${b.join(' ')}`
+}
+
+/** Tombol "Filter Tanggal" (ikon corong) periode tarikan dashboard + bottom sheet pilihan & rentang bebas. */
 export function PilihPeriode({ value, onChange, className }: { value: PeriodeDashboard; onChange: (p: PeriodeDashboard) => void; className?: string }) {
   const [buka, setBuka] = useState(false)
   const [dari, setDari] = useState(value.dari)
@@ -50,14 +58,28 @@ export function PilihPeriode({ value, onChange, className }: { value: PeriodeDas
           setSampai(value.sampai)
           setBuka(true)
         }}
-        aria-label={`Periode dashboard: ${labelPeriode(value)}. Ubah periode`}
-        className={cn('flex min-h-11 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3.5 text-body-sm font-semibold text-on-surface shadow-sm active:scale-95', className)}
+        aria-label={`Filter tanggal: ${labelPeriode(value)}, ${rentangRingkas(value)}. Ubah periode`}
+        aria-expanded={buka}
+        className={cn(
+          'group flex min-h-12 items-center gap-space-sm rounded-xl bg-surface-container-low py-1.5 pl-1.5 pr-space-sm text-left ring-1 ring-inset ring-outline-variant/50 transition-colors hover:bg-primary/5 active:scale-[0.98]',
+          className,
+        )}
       >
-        <CalendarDays aria-hidden="true" className="size-4 text-primary" />
-        <span className="max-w-44 truncate">{labelPeriode(value)}</span>
-        <ChevronDown aria-hidden="true" className="size-4 text-on-surface-variant" />
+        <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary shadow-sm transition-transform duration-200 group-hover:scale-105 group-active:scale-90">
+          <Funnel className="size-4" />
+          {/* Titik: periode bukan bawaan (bulan ini). */}
+          {value.preset !== 'bulan' && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-surface-container-low" />}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-xs font-semibold text-on-surface-variant">Filter Tanggal</span>
+          <span className="truncate text-body-sm font-bold text-on-surface">
+            {labelPeriode(value)}
+            {value.preset !== 'custom' && <span className="tabular font-medium text-on-surface-variant"> · {rentangRingkas(value)}</span>}
+          </span>
+        </span>
+        <ChevronDown aria-hidden="true" className={cn('size-5 shrink-0 text-on-surface-variant transition-transform duration-200', buka && 'rotate-180')} />
       </button>
-      <Sheet open={buka} onOpenChange={setBuka} title="Periode dashboard" description="Data grafik & KPI ditarik untuk periode ini">
+      <Sheet open={buka} onOpenChange={setBuka} title="Filter Tanggal" description="Data grafik & KPI ditarik untuk periode ini">
         <div className="flex flex-col gap-space-sm pb-space-md">
           <div className="flex flex-col divide-y divide-outline-variant/40 rounded-lg bg-surface-container-low">
             {PRESET.map((p) => {

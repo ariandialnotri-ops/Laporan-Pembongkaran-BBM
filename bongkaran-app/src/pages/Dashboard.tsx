@@ -4,7 +4,6 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Beaker,
-  Building2,
   BrushCleaning,
   CalendarClock,
   ChevronDown,
@@ -101,16 +100,11 @@ export function Dashboard() {
   const pakaiPeriode = aktif === 'operation' || aktif === 'sales' || aktif === 'hsse'
   return (
     <div className="flex flex-col gap-space-md">
-      <HeroDashboard>{pilihan.length > 1 && <PilihDashboard pilihan={pilihan} value={aktif} onChange={ganti} />}</HeroDashboard>
-      {pakaiPeriode && (
-        <div className="animate-entrance-1 flex items-center justify-between gap-space-sm px-space-xs">
-          <span className="flex min-w-0 flex-col">
-            <span className="text-headline-md font-bold text-on-surface">{pilihan.find((p) => p.value === aktif)?.label}</span>
-            <span className="truncate text-body-sm text-on-surface-variant">{pilihan.find((p) => p.value === aktif)?.sub}</span>
-          </span>
-          <PilihPeriode value={periode} onChange={setPeriode} className="shrink-0" />
-        </div>
-      )}
+      <HeroDashboard>
+        <PanelDashboard pilihan={pilihan} value={aktif} onChange={ganti}>
+          {pakaiPeriode && <PilihPeriode value={periode} onChange={setPeriode} className="w-full" />}
+        </PanelDashboard>
+      </HeroDashboard>
       <Suspense fallback={<Loading />}>
         {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse periode={periode} /> : aktif === 'sales' ? <DashboardSales periode={periode} /> : <DashboardUtama periode={periode} />}
       </Suspense>
@@ -119,28 +113,27 @@ export function Dashboard() {
 }
 
 type JenisDashboard = 'operation' | 'sales' | 'hsse' | 'cs' | 'security'
-type PilihanDashboard = { value: JenisDashboard; label: string; sub: string; icon: LucideIcon; nada: string }
+type PilihanDashboard = { value: JenisDashboard; label: string; pendek: string; sub: string; icon: LucideIcon; nada: string }
 /**
  * Dashboard yang dapat dipilih per peran: ABH semua (Operation, Sales/Finance, HSSE & Guard Patrol); pengawas &
  * kepala shift tanpa Sales/Finance; Admin/Cashier Sales/Finance; Security & Cleaning Service sesuai tugasnya.
  */
 function pilihanDashboard(role: string | null): PilihanDashboard[] {
-  const op: PilihanDashboard = { value: 'operation', label: 'Operation', sub: 'Bongkaran, kualitas, stok & perawatan', icon: Fuel, nada: 'from-[#0050cb] to-[#2a78d6]' }
-  const sales: PilihanDashboard = { value: 'sales', label: 'Sales & Finance', sub: 'Penjualan, closing & petty cash', icon: TrendingUp, nada: 'from-[#00694a] to-[#1baf7a]' }
-  const hsse: PilihanDashboard = { value: 'hsse', label: 'HSSE & Patrol', sub: 'APAR, insiden, guard tour & stop penyaluran', icon: ShieldCheck, nada: 'from-[#9a3412] to-[#eb6834]' }
+  const op: PilihanDashboard = { value: 'operation', label: 'Operation', pendek: 'Operation', sub: 'Bongkaran, kualitas, stok & perawatan', icon: Fuel, nada: 'from-[#0050cb] to-[#2a78d6]' }
+  const sales: PilihanDashboard = { value: 'sales', label: 'Sales & Finance', pendek: 'Sales', sub: 'Penjualan, closing & petty cash', icon: TrendingUp, nada: 'from-[#00694a] to-[#1baf7a]' }
+  const hsse: PilihanDashboard = { value: 'hsse', label: 'HSSE & Patrol', pendek: 'HSSE', sub: 'APAR, insiden, guard tour & stop penyaluran', icon: ShieldCheck, nada: 'from-[#9a3412] to-[#eb6834]' }
   if (role === 'abh') return [op, sales, hsse]
   if (role === 'admin') return [sales]
-  if (role === 'security') return [{ value: 'security', label: 'Security', sub: 'Guard tour, bongkaran & LO', icon: ScanEye, nada: 'from-[#3b2a9e] to-[#6250d6]' }, hsse]
-  if (role === 'cs') return [{ value: 'cs', label: 'Housekeeping', sub: 'Progres & kepatuhan kebersihan', icon: BrushCleaning, nada: 'from-[#00694a] to-[#1baf7a]' }]
+  if (role === 'security') return [{ value: 'security', label: 'Security', pendek: 'Security', sub: 'Guard tour, bongkaran & LO', icon: ScanEye, nada: 'from-[#3b2a9e] to-[#6250d6]' }, hsse]
+  if (role === 'cs') return [{ value: 'cs', label: 'Housekeeping', pendek: 'Housekeeping', sub: 'Progres & kepatuhan kebersihan', icon: BrushCleaning, nada: 'from-[#00694a] to-[#1baf7a]' }]
   return [op, hsse]
 }
 
 /**
- * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): tanggal & shift, unit bisnis (ABH), lalu pemilih
+ * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): tanggal & shift, lalu panel pemilih
  * dashboard di atas latar biru. Di HP menempel ke header dan selebar layar; di laptop menjadi panel membulat.
  */
 function HeroDashboard({ children }: { children: ReactNode }) {
-  const app = useApp()
   const now = new Date()
   const shift = currentShift(now)
   return (
@@ -161,58 +154,88 @@ function HeroDashboard({ children }: { children: ReactNode }) {
             {shiftLabel(shift.shift)}
           </span>
         </div>
-        {/* ABH: unit bisnis (progres semua SPBU, tambah & ganti SPBU aktif). */}
-        {app.isAdmin && (
-          <Link to="/unit" className="flex min-h-12 items-center gap-space-sm rounded-2xl bg-white/10 px-space-sm py-2 ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/15 active:scale-[0.99]">
-            <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
-              <Building2 className="size-[18px]" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-body-sm font-bold leading-tight">Unit bisnis · {app.spbuList.length} SPBU</span>
-              <span className="truncate text-xs text-white/75">Progres semua SPBU, tambah & ganti SPBU aktif</span>
-            </span>
-            <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-white/80" />
-          </Link>
-        )}
         {children}
       </div>
     </div>
   )
 }
 
-/** Pemilih dashboard di atas latar biru: kartu kaca; yang aktif menjadi kartu putih dengan ikon bergradasi. */
-function PilihDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
+/** Lengkung cekung (r 12 px) yang menyambungkan tab aktif ke panel putih, seperti tab kartu aplikasi Telkomsel. */
+const LENGKUNG_KIRI = { background: 'radial-gradient(circle at 0 0, transparent 11.5px, #fff 12px)' }
+const LENGKUNG_KANAN = { background: 'radial-gradient(circle at 100% 0, transparent 11.5px, #fff 12px)' }
+
+/**
+ * Pemilih dashboard bergaya tab kartu (seperti SIMPATI | Halo | IndiHome di aplikasi Telkomsel): tab sama lebar
+ * di atas latar biru; tab aktif berwarna putih dan menyatu ke panel di bawahnya lewat lengkung cekung. Panel
+ * berisi ikon, nama & cakupan dashboard aktif, lalu Filter Tanggal. Satu pilihan saja → tanpa baris tab.
+ */
+function PanelDashboard({ pilihan, value, onChange, children }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void; children?: ReactNode }) {
+  const i = Math.max(0, pilihan.findIndex((p) => p.value === value))
+  const p = pilihan[i]
+  const Ikon = p.icon
+  const tab = pilihan.length > 1
+  const pindah = (n: number) => {
+    const q = pilihan[(n + pilihan.length) % pilihan.length]
+    onChange(q.value)
+    document.getElementById(`tab-dash-${q.value}`)?.focus()
+  }
   return (
-    <div role="tablist" aria-label="Pilih dashboard" className="-mx-margin flex snap-x scroll-px-margin gap-space-sm overflow-x-auto px-margin py-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
-      {pilihan.map((p) => {
-        const on = p.value === value
-        const Ikon = p.icon
-        return (
-          <button
-            key={p.value}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            onClick={(e) => {
-              onChange(p.value)
-              e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
-            }}
-            className={cn(
-              'relative flex min-h-[4.5rem] w-[11.5rem] shrink-0 snap-start items-center gap-space-sm rounded-2xl p-space-sm text-left transition-all duration-300 active:scale-[0.97] lg:w-auto',
-              on ? 'bg-white text-on-surface shadow-[0_10px_24px_-10px_rgba(0,20,60,0.55)]' : 'bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/15',
-            )}
-          >
-            <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors', on ? `bg-gradient-to-br ${p.nada} text-white shadow-md` : 'bg-white/15 text-white')}>
-              <Ikon className="size-[22px]" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-body-md font-bold leading-tight">{p.label}</span>
-              <span className={cn('line-clamp-2 text-xs leading-snug', on ? 'text-on-surface-variant' : 'text-white/75')}>{p.sub}</span>
-            </span>
-            {on && <span aria-hidden="true" className="absolute right-2.5 top-2.5 size-2 rounded-full bg-primary" />}
-          </button>
-        )
-      })}
+    <div className="flex flex-col">
+      {tab && (
+        <div
+          role="tablist"
+          aria-label="Pilih dashboard"
+          className="grid"
+          style={{ gridTemplateColumns: `repeat(${pilihan.length}, minmax(0, 1fr))` }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') pindah(i + 1)
+            else if (e.key === 'ArrowLeft') pindah(i - 1)
+          }}
+        >
+          {pilihan.map((q, j) => {
+            const on = j === i
+            const IkonTab = q.icon
+            return (
+              <button
+                key={q.value}
+                id={`tab-dash-${q.value}`}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                aria-controls="panel-dashboard"
+                tabIndex={on ? 0 : -1}
+                onClick={() => onChange(q.value)}
+                className={cn(
+                  'relative flex min-h-12 items-center justify-center gap-1.5 rounded-t-2xl px-1 text-body-sm transition-colors duration-200',
+                  on ? 'bg-white font-bold text-primary' : 'font-semibold text-white/80 hover:text-white',
+                )}
+              >
+                {on && j > 0 && <span aria-hidden="true" className="absolute -left-3 bottom-0 size-3" style={LENGKUNG_KIRI} />}
+                {on && j < pilihan.length - 1 && <span aria-hidden="true" className="absolute -right-3 bottom-0 size-3" style={LENGKUNG_KANAN} />}
+                <IkonTab aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">{q.pendek}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <div
+        id="panel-dashboard"
+        role={tab ? 'tabpanel' : undefined}
+        aria-labelledby={tab ? `tab-dash-${p.value}` : undefined}
+        className={cn('flex flex-col gap-space-sm rounded-2xl bg-white p-space-sm text-on-surface shadow-[0_10px_24px_-12px_rgba(0,20,60,0.5)]', tab && i === 0 && 'rounded-tl-none', tab && i === pilihan.length - 1 && 'rounded-tr-none')}
+      >
+        <div key={p.value} className="animate-entrance-1 flex items-center gap-space-sm">
+          <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md', p.nada)}>
+            <Ikon className="size-[22px]" />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-body-lg font-bold leading-tight">{p.label}</span>
+            <span className="text-body-sm leading-snug text-on-surface-variant">{p.sub}</span>
+          </span>
+        </div>
+        {children}
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, Receipt, SlidersHorizontal, Warehouse, X } from 'lucide-react'
+import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, LayoutGrid, Receipt, SlidersHorizontal, Warehouse, X } from 'lucide-react'
 import { Field, JumlahField } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -29,6 +29,8 @@ export function Pengaturan() {
   const nz = s.nozzles ?? []
   const teraBermasalah = nz.filter((n) => statusSertifikat(n.teraTanggal, todayIso()) !== 'ok').length
   const items: { to: string; icon: LucideIcon; title: string; desc: string; badge?: ReactNode }[] = [
+    // ABH: dashboard unit bisnis (progres semua SPBU, tambah SPBU, ganti SPBU aktif).
+    ...(app.isAdmin ? [{ to: '/unit', icon: LayoutGrid, title: 'Unit Bisnis', desc: `${app.spbuList.length} SPBU: progres semua SPBU, tambah & ganti SPBU aktif` }] : []),
     { to: '/pengaturan/identitas', icon: Building2, title: 'Identitas SPBU', desc: `${s.namaSpbu || '-'}, ${s.jumlahPulau || 0} pulau pompa, logo & nama default` },
     { to: '/pengaturan/fasilitas', icon: Warehouse, title: 'Fasilitas SPBU', desc: `${FASILITAS.filter((f) => punyaFasilitas(s, f.key)).length} dari ${FASILITAS.length} fasilitas: bangunan, peralatan, lingkungan` },
     { to: '/pengaturan/tangki', icon: Cylinder, title: 'Database Tangki', desc: `${app.tanks.length} tangki pendam & tabel kalibrasi` },
