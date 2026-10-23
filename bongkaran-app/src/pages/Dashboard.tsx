@@ -4,9 +4,9 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Beaker,
+  Building2,
   BrushCleaning,
   CalendarClock,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -34,8 +34,6 @@ import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
 import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
 import { KartuStopPenyaluran } from '@/components/insiden/henti'
-import { KartuUnitBisnis } from '@/components/shell/kartu-unit-bisnis'
-import { PemilihSpbu } from '@/components/shell/pemilih-spbu'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
@@ -138,34 +136,48 @@ function pilihanDashboard(role: string | null): PilihanDashboard[] {
 }
 
 /**
- * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): SPBU aktif & tanggal, lalu pemilih
+ * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): tanggal & shift, unit bisnis (ABH), lalu pemilih
  * dashboard di atas latar biru. Di HP menempel ke header dan selebar layar; di laptop menjadi panel membulat.
  */
 function HeroDashboard({ children }: { children: ReactNode }) {
   const app = useApp()
   const now = new Date()
+  const shift = currentShift(now)
   return (
     <div className="relative -mx-margin -mt-space-md overflow-hidden rounded-b-[28px] bg-gradient-to-b from-[#0047b8] to-[#1f6ad8] px-margin pb-space-md pt-space-sm text-white shadow-[0_12px_28px_-14px_rgba(0,71,184,0.6)] lg:mx-0 lg:mt-0 lg:rounded-3xl lg:pt-space-md">
       <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-white/[0.07]" />
       <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-10 size-48 rounded-full bg-white/[0.05]" />
       <div className="relative flex flex-col gap-space-sm">
-        <div className="flex min-h-9 items-center justify-between gap-space-sm">
-          {/* ABH: pil pemilih SPBU (nama SPBU sudah ada di header); peran lain: salam. */}
-          {app.isAdmin ? <PemilihSpbu varian="hero" /> : <span className="truncate text-body-md font-semibold">{salam(now)} 👋</span>}
-          <span className="tabular flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/20">
-            <CalendarDays aria-hidden="true" className="size-3.5" />
-            {formatTanggalSingkat(now)} · Shift {currentShift(now).shift}
+        {/* Tanggal operasional & shift berjalan (nama SPBU sudah di header). */}
+        <div className="flex items-center justify-between gap-space-sm">
+          <span className="flex min-w-0 flex-col">
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/70">Operasional SPBU</span>
+            <span className="truncate text-body-lg font-bold leading-tight" title={formatTanggalPanjang(now)}>
+              {formatTanggalPanjang(now).split(', ')[0]}, {formatTanggalSingkat(now)}
+            </span>
+          </span>
+          <span className="tabular flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold ring-1 ring-inset ring-white/20">
+            <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-emerald-400 motion-reduce:animate-none" />
+            {shiftLabel(shift.shift)}
           </span>
         </div>
+        {/* ABH: unit bisnis (progres semua SPBU, tambah & ganti SPBU aktif). */}
+        {app.isAdmin && (
+          <Link to="/unit" className="flex min-h-12 items-center gap-space-sm rounded-2xl bg-white/10 px-space-sm py-2 ring-1 ring-inset ring-white/20 transition-colors hover:bg-white/15 active:scale-[0.99]">
+            <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
+              <Building2 className="size-[18px]" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-body-sm font-bold leading-tight">Unit bisnis · {app.spbuList.length} SPBU</span>
+              <span className="truncate text-xs text-white/75">Progres semua SPBU, tambah & ganti SPBU aktif</span>
+            </span>
+            <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-white/80" />
+          </Link>
+        )}
         {children}
       </div>
     </div>
   )
-}
-
-const salam = (d: Date) => {
-  const j = d.getHours()
-  return j < 11 ? 'Selamat pagi' : j < 15 ? 'Selamat siang' : j < 18 ? 'Selamat sore' : 'Selamat malam'
 }
 
 /** Pemilih dashboard di atas latar biru: kartu kaca; yang aktif menjadi kartu putih dengan ikon bergradasi. */
@@ -254,7 +266,6 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
   const planDates = new Set(app.plans.filter((p) => p.los.some((lo) => lo.status !== 'deleted')).map((p) => p.tanggal))
   const senin = startOfWeek(weekAnchor)
   const thisWeek = todayIso(senin) === todayIso(startOfWeek(now))
-  const shift = currentShift(now).shift
 
   const periode = app.reports.filter((r) => r.status === 'selesai' && inRange(r.tanggal, range))
   const sum = (rs: ReportSummary[], f: (r: ReportSummary) => number | null | undefined) => rs.reduce((n, r) => n + (f(r) ?? 0), 0)
@@ -300,27 +311,7 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
   return (
     <div className="flex flex-col gap-space-md">
       <ArsipFotoBanner />
-      {/* 1. Operasional & shift */}
-      <KartuUnitBisnis />
       <TangkiBelumAda className="animate-entrance-1" />
-      {/* HP: tanggal & shift dua baris agar tanggal tidak terpotong; layar lebar satu baris. */}
-      <section aria-label="Operasional SPBU" className="animate-entrance-1 flex flex-col items-start gap-2 rounded-md bg-surface-container-lowest/85 p-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
-            <CalendarDays className="size-[18px]" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Operasional SPBU</span>
-            <span className="text-body-md font-bold text-on-surface" title={formatTanggalPanjang(now)}>
-              {formatTanggalPanjang(now).split(', ')[0]}, {formatTanggalSingkat(now)}
-            </span>
-          </span>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-container-high/90 px-3 py-1.5 text-primary shadow-sm">
-          <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-emerald-500 motion-reduce:animate-none" />
-          <span className="tabular whitespace-nowrap text-xs font-bold sm:text-tag">{shiftLabel(shift)}</span>
-        </span>
-      </section>
       {/* Highlight KPI bulan berjalan (lib/kpi.ts, docs/KPI.md). */}
       <KpiOperation periode={periodeDash} className="animate-entrance-1" />
       <GrafikOperation periode={periodeDash} />

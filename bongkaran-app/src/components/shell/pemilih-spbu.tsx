@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, Check, ChevronDown, LayoutGrid, MapPin, Search } from 'lucide-react'
+import { Building2, Check, ChevronDown, LayoutGrid, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp } from '@/lib/app-state'
@@ -10,23 +10,12 @@ import { cn } from '@/lib/utils'
  * Nama SPBU aktif di header. Untuk ABH dengan beberapa unit bisnis, ketuk untuk berpindah SPBU
  * (seperti pemilih SPBU di aplikasi Monitoring JBT).
  */
-export function PemilihSpbu({ varian = 'header' }: { varian?: 'header' | 'hero' }) {
+export function PemilihSpbu() {
   const app = useApp()
   const [buka, setBuka] = useState(false)
   const [cari, setCari] = useState('')
   const nama = app.settings.namaSpbu || app.spbu?.nama || 'SPBU'
-  const hero = varian === 'hero'
-  // Di header biru Dashboard: pil kaca dengan ikon lokasi.
-  const gayaHero = 'flex min-h-9 min-w-0 items-center gap-1.5 rounded-full bg-white/15 py-1 pl-2 pr-3 text-left text-xs font-bold uppercase tracking-wide text-white ring-1 ring-inset ring-white/20'
-  if (!app.isAdmin)
-    return hero ? (
-      <span className={gayaHero}>
-        <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-        <span className="truncate">{nama}</span>
-      </span>
-    ) : (
-      <span className="truncate text-tag uppercase text-primary">{nama}</span>
-    )
+  if (!app.isAdmin) return <span className="truncate text-tag uppercase text-primary">{nama}</span>
 
   const q = cari.trim().toLowerCase()
   const daftar = app.spbuList.filter((s) => !q || s.nama.toLowerCase().includes(q) || (s.kode ?? '').toLowerCase().includes(q))
@@ -36,9 +25,8 @@ export function PemilihSpbu({ varian = 'header' }: { varian?: 'header' | 'hero' 
         type="button"
         onClick={() => (setCari(''), setBuka(true))}
         aria-label={`SPBU aktif: ${nama}. Ganti SPBU`}
-        className={hero ? gayaHero : 'flex min-w-0 items-center gap-0.5 text-left text-tag uppercase text-primary'}
+        className="flex min-w-0 items-center gap-0.5 text-left text-tag uppercase text-primary"
       >
-        {hero && <MapPin aria-hidden="true" className="size-3.5 shrink-0" />}
         <span className="truncate">{nama}</span>
         <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
       </button>
