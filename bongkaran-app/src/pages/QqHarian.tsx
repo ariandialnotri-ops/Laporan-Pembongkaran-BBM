@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Beaker, Camera, ChevronRight, CircleCheck, CircleDot, Droplet, Flag, LoaderCircle, Lock, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
+import { Beaker, Camera, ChevronRight, CircleCheck, Flag, Lock, Plus, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
@@ -9,6 +9,7 @@ import { PilihHarian } from '@/components/bongkaran/pilih-harian'
 import { useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
+import { SimpanBaris } from '@/components/bongkaran/simpan-baris'
 import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -16,7 +17,6 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
-import { airId, literAir, statusAir, tangkiBerair, type AirData, type AirRecord } from '@/lib/air'
 import { useApp } from '@/lib/app-state'
 import {
   newQqKualitas,
@@ -28,15 +28,14 @@ import {
   type QqRecord,
 } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
-import { formatDensity, formatDensitySigned, formatLiter, formatNumber } from '@/lib/format'
+import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
 import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
 import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
+import { simpanFotoHarian } from '@/lib/foto-harian'
 import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
 import { buatKolaseGrid } from '@/lib/kolase'
 import { acuanD15 } from '@/lib/ringkasan'
 import { PRODUK_OPTIONS } from '@/lib/sop'
-import { TANKS, tankName, type Tank } from '@/lib/tank'
-import { useAir } from '@/lib/use-air'
 import { cn } from '@/lib/utils'
 import { buildWaQq, type BarisQqWa } from '@/lib/wa'
 
@@ -47,57 +46,37 @@ const jamDari = (iso?: string) => (iso ? new Date(iso).toTimeString().slice(0, 5
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const kualitasValid = (k: QqKualitas) => (!qqD15(k).d15 ? 'Lengkapi density dan suhu.' : null)
-const namaTangki = (t: Tank) => `${tankName(t.tankNo)} · ${t.produk}`
-/** Status water content dari isian form (belum disimpan). */
-const stAir = (airMm: string) => statusAir({ airMm, liter: null, foto: [], tindakan: '' })
 
 function upsert<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
 }
 
-/** Operation > Kualitas Harian: sekali sehari di shift 1, paling lambat 10:00 (hijau selesai, oranye belum, merah terlewat). */
+/** Operation > Kualitas Harian > Density Harian: sekali sehari di shift 1, paling lambat 10:00 (hijau selesai, oranye belum, merah terlewat). */
 export function QqHarianMenu() {
   const app = useApp()
-  const hariIni = todayIso()
-  const { recs: airRecs } = useAir(`${hariIni.slice(0, 7)}-01`, hariIni)
   if (!app.loaded) return <Loading />
-  const air = (tanggal: string) => airRecs?.find((r) => r.id === airId(tanggal, 1))
-  const ringkasAir = (tanggal: string) => {
-    const a = air(tanggal)
-    if (!a || !TANKS.length) return ''
-    const berair = tangkiBerair(a, TANKS)
-    return ` · ${berair.length ? `ada air: ${berair.map((t) => tankName(t.tankNo)).join(', ')}` : 'air nihil'}`
-  }
   // Catatan lama per shift tetap dihitung untuk tanggalnya.
   const rec = (tanggal: string) =>
     app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(tanggal, 1)) ??
     app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.tanggal === tanggal && !!d.data.selesaiAt)
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Sekali sehari di shift 1, paling lambat pukul {BATAS_HARIAN}: uji density & suhu per produk dan water content setiap tangki pendam. Foto hydrometer, stik pasta air, struk pump test, dan pengembalian minyak digabung menjadi satu kolase dan dikirim ke WhatsApp dalam satu laporan; foto tidak disimpan di aplikasi.
-      </p>
       <PilihHarian
-        judul="Kontrol kualitas harian"
+        judul="Density harian"
         status={(t) => statusHarian(t, !!rec(t)?.data.selesaiAt)}
         keHalaman={(t) => `/kualitas/${t}/1`}
         keterangan={(t, st) => {
           const r = rec(t)
-          if (r?.data.selesaiAt) return `Selesai ${r.data.jam}${r.data.terlambat ? ' (terlambat)' : ''} · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}${ringkasAir(t)}`
+          if (r?.data.selesaiAt) return `Selesai ${r.data.jam}${r.data.terlambat ? ' (terlambat)' : ''} · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}`
           if (r) return `${st === 'terlewat' ? 'Terlewat' : 'Belum selesai'} · sebagian tersimpan`
           return st === 'belum' ? `Belum diuji · batas ${BATAS_HARIAN}` : undefined
         }}
       />
-      {app.can('/laporan/air') && TANKS.length > 0 && (
-        <Link to="/laporan/air" className={buttonVariants({ variant: 'glass' })}>
-          Riwayat water content
-        </Link>
-      )}
     </div>
   )
 }
 
-type SelesaiQq = { teks: string; files: File[]; urls: string[]; air: AirRecord | null }
+type SelesaiQq = { teks: string; files: File[]; urls: string[] }
 type FotoUmum = 'struk' | 'kembali'
 const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
   { key: 'struk', label: 'Foto struk pump test', hint: 'Struk pump test uji kualitas terbaca. Disimpan di riwayat aplikasi, tidak ikut kolase WhatsApp grup SPBU.' },
@@ -107,10 +86,9 @@ const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
 const FOTO_KOLASE = FOTO_UMUM.filter((f) => f.key !== 'struk')
 
 /**
- * Halaman form Kontrol Kualitas Harian (hari ini, shift 1, paling lambat 10:00): density per produk
- * (disimpan per baris) dan water content setiap tangki pendam, foto hydrometer, stik pasta air, struk
- * + pengembalian, lalu satu kolase foto & satu laporan WhatsApp. Uji kualitas tersimpan di bbm_daily
- * (kind qq) dan water content di bbm_air seperti sebelumnya. Foto tidak disimpan di aplikasi.
+ * Halaman form Density Harian (hari ini, shift 1, paling lambat 10:00): density per produk (disimpan
+ * per baris), foto hydrometer tiap produk + pengembalian (kolase WhatsApp) dan struk pump test (disimpan
+ * di riwayat aplikasi). Foto kolase juga disimpan sementara di HP untuk laporan gabungan Kualitas Harian.
  */
 export function QqHarian() {
   const app = useApp()
@@ -126,12 +104,6 @@ export function QqHarian() {
   const [rowError, setRowError] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const { recs: airRecs } = useAir(tanggal, tanggal)
-  const lamaAir = airRecs?.find((r) => r.id === airId(tanggal, 1))
-  const [isianAir, setIsianAir] = useState<Record<string, { airMm: string; tindakan: string }>>({})
-  // Catatan water content yang sudah tersimpan di sesi ini (simpan per tangki), menggantikan lamaAir.
-  const [airSimpan, setAirSimpan] = useState<AirRecord | null>(null)
-  const [airJam, setAirJam] = useState<Record<string, string>>({})
 
   const fresh = (): QqData => ({
     petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName,
@@ -146,10 +118,10 @@ export function QqHarian() {
   const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
   const [selesaiWa, setSelesaiWa] = useState<SelesaiQq | null>(null)
   const [dibagikan, setDibagikan] = useState(false)
-  const belumSimpan = (draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0) + Object.keys(isianAir).filter((k) => !airJam[k]).length
+  const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
   const guard = useLeaveGuard({
     active: bolehIsi && (!selesaiWa || !dibagikan),
-    title: selesaiWa ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari kontrol kualitas harian?',
+    title: selesaiWa ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari density harian?',
     detail: selesaiWa
       ? 'Hasil uji sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.'
       : belumSimpan
@@ -157,7 +129,7 @@ export function QqHarian() {
         : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim. Foto yang sudah diambil akan hilang.',
   })
 
-  if (!app.loaded || (TANKS.length > 0 && bolehIsi && airRecs === null)) return <Loading />
+  if (!app.loaded) return <Loading />
   if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
   if (!bolehIsi)
     return (
@@ -175,64 +147,6 @@ export function QqHarian() {
   const setData = (patch: Partial<QqData>) => {
     setError(null)
     setDraft({ id, data: { ...data, ...patch } })
-  }
-  const airDasar = airSimpan ?? lamaAir ?? null
-  const nilaiAir = (t: Tank) => isianAir[t.id] ?? { airMm: airDasar?.data.tangki[t.id]?.airMm ?? '', tindakan: airDasar?.data.tangki[t.id]?.tindakan ?? '' }
-  /** Tangki tersimpan: disimpan di sesi ini, atau sudah ada di catatan dan belum diubah. */
-  const airTersimpan = (t: Tank) => airJam[t.id] ?? (!isianAir[t.id] && airDasar?.data.tangki[t.id] ? airDasar.data.jam : undefined)
-  const ubahAir = (t: Tank, patch: Partial<{ airMm: string; tindakan: string }>) => {
-    setError(null)
-    setRowError((r) => ({ ...r, [`air-${t.id}`]: '' }))
-    setIsianAir((x) => ({ ...x, [t.id]: { ...nilaiAir(t), ...patch } }))
-    setAirJam((x) => {
-      const y = { ...x }
-      delete y[t.id]
-      return y
-    })
-  }
-  const isiTangki = (t: Tank) => {
-    const v = nilaiAir(t)
-    return { airMm: v.airMm.trim(), liter: literAir(t, v.airMm), foto: [], tindakan: stAir(v.airMm) === 'nihil' ? '' : v.tindakan.trim() }
-  }
-  const validAir = (t: Tank) => {
-    const v = nilaiAir(t)
-    const st = stAir(v.airMm)
-    if (st === 'kosong') return 'Isi tinggi air (0 bila nihil).'
-    if (st === 'ada' && !v.tindakan.trim()) return 'Ada air: isi tindakan yang dilakukan.'
-    return null
-  }
-  /** Simpan water content satu tangki ke bbm_air (tangki lain yang sudah tersimpan tetap). */
-  const simpanAir = async (t: Tank) => {
-    const err = validAir(t)
-    if (err) return setRowError((r) => ({ ...r, [`air-${t.id}`]: err }))
-    setBusy(`air-${t.id}`)
-    try {
-      const jam = nowHm()
-      const rec: AirRecord = {
-        id: airId(tanggal, 1),
-        tanggal,
-        shift: 1,
-        data: { tangki: { ...(airDasar?.data.tangki ?? {}), [t.id]: isiTangki(t) }, petugas: data.petugas.trim(), jam, catatan: airDasar?.data.catatan ?? '', terlambat: lewatBatas(jam) },
-        createdAt: airDasar?.createdAt ?? stamp(),
-        updatedAt: stamp(),
-        createdBy: airDasar?.createdBy ?? app.session.user?.id ?? null,
-      }
-      await app.backend.saveAir(rec)
-      setAirSimpan(rec)
-      setAirJam((x) => ({ ...x, [t.id]: jam }))
-      toast(`Water content ${tankName(t.tankNo)} tersimpan`)
-    } catch (e) {
-      setRowError((r) => ({ ...r, [`air-${t.id}`]: pesan(e) }))
-    } finally {
-      setBusy(null)
-    }
-  }
-  const keteranganAir = (t: Tank) => {
-    const v = nilaiAir(t)
-    const st = stAir(v.airMm)
-    if (st === 'nihil') return 'Air nihil'
-    const l = literAir(t, v.airMm)
-    return `Air ${v.airMm} mm${l ? ` ≈ ${formatLiter(l)}` : ''}`
   }
   // Mengubah baris membatalkan tanda "tersimpan" sampai disimpan lagi.
   const setK = (i: number, patch: Partial<QqKualitas>) => setData({ kualitas: data.kualitas.map((k, j) => (j === i ? { ...k, ...patch, savedAt: undefined } : k)) })
@@ -340,12 +254,6 @@ export function QqHarian() {
     if (data.kualitas.some((k) => !k.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk).')
     const tanpaFoto = data.kualitas.filter((k) => !foto[k.id]).map((k) => k.produk)
     if (tanpaFoto.length) return setError(`Foto hydrometer belum ada: ${tanpaFoto.join(', ')}.`)
-    for (const t of TANKS) {
-      const err = validAir(t)
-      if (err) return setError(`Water content ${namaTangki(t)}: ${err}`)
-      if (!airTersimpan(t)) return setError(`Water content ${namaTangki(t)}: simpan dulu (tombol Simpan di kartu tangki).`)
-      if (!foto[`air-${t.id}`]) return setError(`Water content ${namaTangki(t)}: foto stik pasta air wajib.`)
-    }
     const kurang = FOTO_UMUM.filter((f) => !foto[f.key]).map((f) => f.label)
     if (kurang.length) return setError(`Foto wajib belum ada: ${kurang.join(', ')}.`)
     if (!data.petugas.trim()) return setError('Isi nama petugas.')
@@ -356,33 +264,19 @@ export function QqHarian() {
       // Struk pump test disimpan di aplikasi (riwayat kualitas), bukan dikirim ke grup WhatsApp.
       const struk = await app.backend.uploadPhoto(`daily-${id}`, foto.struk.blob, `qq-struk-${key.tanggal}.jpg`)
       await persist(() => ({ ...data, jam, foto: { kualitasStruk: [struk] }, selesaiAt: isoNow(), terlambat }))
-      // Water content tangki pendam: satu catatan per hari (shift 1) di bbm_air.
-      let airRec: AirRecord | null = null
-      if (TANKS.length) {
-        const tangki: AirData['tangki'] = {}
-        for (const t of TANKS) tangki[t.id] = isiTangki(t)
-        airRec = {
-          id: airId(tanggal, 1),
-          tanggal,
-          shift: 1,
-          data: { tangki, petugas: data.petugas.trim(), jam, catatan: data.catatan?.trim() ?? '', terlambat },
-          createdAt: airDasar?.createdAt ?? stamp(),
-          updatedAt: stamp(),
-          createdBy: airDasar?.createdBy ?? app.session.user?.id ?? null,
-        }
-        await app.backend.saveAir(airRec)
-      }
       const spbu = namaSpbuWa(app.settings)
       const baris = barisWa()
       const cap = (f: FotoLokal, ket: string) => ({ blob: f.blob, cap: [waktuFoto[f.id] ?? capWaktu(), spbu, ket] })
-      const kolase = await buatKolaseGrid([
+      const bagian = [
         ...data.kualitas.map((k, i) => {
           const b = baris[i]
           return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
         }),
-        ...TANKS.map((t) => cap(foto[`air-${t.id}`], `${namaTangki(t)} · ${keteranganAir(t)}`)),
         ...FOTO_KOLASE.map((f) => cap(foto[f.key], f.label.replace('Foto ', ''))),
-      ])
+      ]
+      const kolase = await buatKolaseGrid(bagian)
+      // Disimpan sementara di HP untuk menu Kirim ke grup WA (gabungan density & water content).
+      void simpanFotoHarian(app.spbuId, key.tanggal, 'density', bagian)
       const files = [new File([kolase], `Kontrol_Kualitas_Harian_${key.tanggal}.jpg`, { type: 'image/jpeg' })]
       const teks = buildWaQq(
         { tanggal: key.tanggal, jam, petugas: data.petugas.trim(), terlambat, totalPumpTest: totalPumpTest(data).kualitas, catatan: data.catatan?.trim() ?? '' },
@@ -390,9 +284,8 @@ export function QqHarian() {
         spbu,
         tanggalPanjang(key.tanggal),
         zonaWaktu(),
-        airRec ? { rec: airRec, tanks: TANKS } : undefined,
       )
-      setSelesaiWa({ teks, files, urls: [URL.createObjectURL(kolase)], air: airRec })
+      setSelesaiWa({ teks, files, urls: [URL.createObjectURL(kolase)] })
       setBusy(null)
       window.scrollTo({ top: 0 })
     } catch (e) {
@@ -403,20 +296,11 @@ export function QqHarian() {
 
   if (selesaiWa) {
     const lewat = barisWa().filter((b) => b.ok === false).map((b) => b.produk)
-    const berair = tangkiBerair(selesaiWa.air ?? undefined, TANKS)
-    const masalah = [
-      ...(lewat.length ? [`${lewat.join(', ')} melebihi toleransi density`] : []),
-      ...(berair.length ? [`ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')} (lakukan penyedotan dan laporkan ke pengawas)`] : []),
-    ]
     return (
       <>
         <LayarKirimWa
-          judul="Kontrol kualitas harian tersimpan"
-          keterangan={
-            masalah.length
-              ? `${masalah.join('; ')}. Kirim laporan ke WhatsApp sekarang.`
-              : `Semua produk sesuai toleransi${selesaiWa.air ? ' dan semua tangki nihil air' : ''}. Foto tidak disimpan di aplikasi: kirim sekarang ke grup WhatsApp.`
-          }
+          judul="Density harian tersimpan"
+          keterangan={lewat.length ? `${lewat.join(', ')} melebihi toleransi density. Kirim laporan ke WhatsApp sekarang.` : 'Semua produk sesuai toleransi. Kirim sekarang ke grup WhatsApp, atau kirim gabungan dengan water content dari menu Kualitas Harian.'}
           teks={selesaiWa.teks}
           files={selesaiWa.files}
           urls={selesaiWa.urls}
@@ -427,7 +311,7 @@ export function QqHarian() {
             Lihat riwayat kualitas
           </Link>
           <Link to="/kualitas" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
-            Kembali ke Kontrol Kualitas Harian
+            Kembali ke Kualitas Harian
           </Link>
         </LayarKirimWa>
         {guard.dialog}
@@ -450,7 +334,7 @@ export function QqHarian() {
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
-            <h2 className="text-headline-md font-bold text-on-surface">Kontrol kualitas harian</h2>
+            <h2 className="text-headline-md font-bold text-on-surface">Density harian</h2>
             <span className="text-body-sm text-on-surface-variant">
               {formatTanggalIso(key.tanggal)} · Shift 1 · batas {BATAS_HARIAN}
             </span>
@@ -554,56 +438,6 @@ export function QqHarian() {
         </Button>
       </section>
 
-      {TANKS.length > 0 && (
-        <section aria-labelledby="uji-air" className="flex flex-col gap-space-sm">
-          <SectionHeader id="uji-air" title="Water content tangki pendam" />
-          <p className="px-space-xs text-body-sm text-on-surface-variant">
-            Oleskan pasta air di ujung stik ukur, celupkan sampai dasar tangki, tunggu perubahan warna, lalu baca tinggi air. Tidak berubah warna = nihil (0 mm).
-            {lamaAir ? ` Sudah diperiksa pukul ${lamaAir.data.jam}.` : ''}
-          </p>
-          {TANKS.map((t) => {
-            const v = nilaiAir(t)
-            const st = stAir(v.airMm)
-            const liter = literAir(t, v.airMm)
-            return (
-              <GlassCard key={t.id} level={2} className={cn('flex flex-col gap-space-sm p-space-md', st === 'ada' && 'border border-error/40', st !== 'ada' && !airTersimpan(t) && 'border border-amber-300')}>
-                <div className="flex items-center justify-between gap-space-sm">
-                  <span className="flex min-w-0 items-center gap-space-xs">
-                    <span aria-hidden="true" className={cn('flex size-9 shrink-0 items-center justify-center rounded-full', st === 'ada' ? 'bg-error text-on-error' : st === 'nihil' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface-variant')}>
-                      <Droplet className="size-5" />
-                    </span>
-                    <span className="text-body-md font-bold text-on-surface">{namaTangki(t)}</span>
-                  </span>
-                  {st !== 'kosong' && <Pill tone={st === 'ada' ? 'error' : 'success'}>{st === 'ada' ? `Ada air${liter ? ` ≈ ${formatLiter(liter)}` : ''}` : 'Nihil'}</Pill>}
-                </div>
-                <div className="flex items-end gap-space-xs">
-                  <Field label="Tinggi air" htmlFor={`air-${t.id}`} className="flex-1">
-                    <Input id={`air-${t.id}`} numeric inputMode="decimal" suffix="mm" value={v.airMm} onChange={(e) => ubahAir(t, { airMm: e.target.value })} />
-                  </Field>
-                  <Button variant={st === 'nihil' ? 'primary' : 'glass'} className="h-12" onClick={() => ubahAir(t, { airMm: '0' })}>
-                    Nihil
-                  </Button>
-                </div>
-                {fotoSlot(`air-${t.id}`, 'Foto stik pasta air', 'Ujung stik dengan pasta air setelah dicelupkan, angka tinggi air terbaca.')}
-                {st === 'ada' && (
-                  <Field label="Tindakan (wajib)" htmlFor={`air-tl-${t.id}`}>
-                    <Input id={`air-tl-${t.id}`} autoComplete="off" placeholder="Mis. penyedotan air, lapor pengawas" value={v.tindakan} onChange={(e) => ubahAir(t, { tindakan: e.target.value })} />
-                  </Field>
-                )}
-                <SimpanBaris
-                  ok={st === 'kosong' ? null : st === 'nihil'}
-                  okText={st === 'nihil' ? 'Air nihil' : 'Ada air'}
-                  savedAt={airTersimpan(t)}
-                  busy={busy === `air-${t.id}`}
-                  error={rowError[`air-${t.id}`]}
-                  onSave={() => void simpanAir(t)}
-                  label={`Simpan water content ${tankName(t.tankNo)}`}
-                />
-              </GlassCard>
-            )
-          })}
-        </section>
-      )}
 
       {data.kualitas.length > 0 && (
         <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
@@ -617,7 +451,7 @@ export function QqHarian() {
           </Field>
           <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
             <Camera aria-hidden="true" className="size-4 shrink-0" />
-            Foto hydrometer, stik pasta air, dan pengembalian minyak digabung otomatis menjadi satu kolase bercap jam, SPBU, dan hasil, lalu dikirim ke WhatsApp grup SPBU. Foto struk pump test tidak ikut kolase: disimpan di riwayat kualitas aplikasi.
+            Foto hydrometer dan pengembalian minyak digabung otomatis menjadi satu kolase bercap jam, SPBU, dan hasil untuk WhatsApp grup SPBU. Foto struk pump test tidak ikut kolase: disimpan di riwayat kualitas aplikasi.
           </span>
         </GlassCard>
       )}
@@ -665,55 +499,6 @@ export function QqHarian() {
       </fieldset>
 
       {guard.dialog}
-    </div>
-  )
-}
-
-/**
- * Kotak simpan di setiap kartu input: amber + tombol Simpan biru penuh selama belum disimpan, hijau
- * "Tersimpan jam" setelahnya. `savedAt` berupa ISO atau jam "HH:MM".
- */
-function SimpanBaris({
-  ok,
-  okText,
-  savedAt,
-  busy,
-  error,
-  onSave,
-  label,
-}: {
-  ok: boolean | null
-  okText: string
-  savedAt?: string
-  busy: boolean
-  error?: string
-  onSave: () => void
-  label: string
-}) {
-  const jam = savedAt && savedAt.length > 5 ? jamDari(savedAt) : savedAt
-  return (
-    <div className={cn('flex flex-col gap-space-xs rounded-md border-2 p-space-sm', savedAt ? 'border-emerald-300 bg-emerald-50' : 'border-amber-400 bg-amber-50')}>
-      <div className="flex flex-wrap items-center justify-between gap-space-xs">
-        <span className="flex flex-wrap items-center gap-space-xs">
-          {ok !== null && <Pill tone={ok ? 'success' : 'error'}>{okText}</Pill>}
-          {savedAt ? (
-            <span className="flex items-center gap-1 text-body-sm font-semibold text-emerald-800">
-              <CircleCheck aria-hidden="true" className="size-4" />
-              Tersimpan {jam}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-body-sm font-semibold text-amber-900">
-              <CircleDot aria-hidden="true" className="size-4" />
-              Belum disimpan
-            </span>
-          )}
-        </span>
-        <Button variant={savedAt ? 'glass' : 'primary'} className="min-w-28" disabled={busy} onClick={onSave} aria-label={label}>
-          {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
-          {savedAt ? 'Simpan ulang' : 'Simpan'}
-        </Button>
-      </div>
-      {error && <span className="text-body-sm font-semibold text-error">{error}</span>}
     </div>
   )
 }

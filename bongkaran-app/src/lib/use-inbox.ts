@@ -14,7 +14,7 @@ export interface ItemInbox {
   judul: string
   detail: string
   to: string
-  /** Grup menu / kategori. */
+  /** Modul (label grup menu), atau Perawatan / Housekeeping / Paraf pengawas. */
   grup: string
   /** 'lewat' & tugas = merah/oranye, 'segera' = kuning. */
   tingkat: 'lewat' | 'segera' | 'tugas'
@@ -50,17 +50,17 @@ export function useInbox(): ItemInbox[] {
       judul: `Tera metrologi nozzle ${n.nama}`,
       detail: st === 'belum' ? 'Tanggal tera belum dicatat' : `${st === 'lewat' ? 'Habis sejak' : 'Berakhir'} ${berlakuSertifikat(n.teraTanggal)}`,
       to: app.can('/pengaturan/nozzle') ? '/pengaturan/nozzle' : '/inbox',
-      grup: 'Masa berlaku',
+      grup: 'Operation',
       tingkat: st === 'segera' ? 'segera' : 'lewat',
     })
   }
   for (const u of [...(s.apar ?? []), ...(s.apab ?? [])]) {
     const isi = statusKedaluwarsa(u.kedaluwarsa, hariIni)
     if (isi === 'lewat' || isi === 'segera')
-      out.push({ id: `apar:${u.id}`, jenis: 'berlaku', judul: `Isi ulang ${u.kode}`, detail: `${u.lokasi || '-'} · ${isi === 'lewat' ? 'kedaluwarsa sejak' : 'kedaluwarsa'} ${u.kedaluwarsa}`, to: app.can('/apar/data') ? '/apar/data' : '/apar', grup: 'Masa berlaku', tingkat: isi })
+      out.push({ id: `apar:${u.id}`, jenis: 'berlaku', judul: `Isi ulang ${u.kode}`, detail: `${u.lokasi || '-'} · ${isi === 'lewat' ? 'kedaluwarsa sejak' : 'kedaluwarsa'} ${u.kedaluwarsa}`, to: app.can('/apar/data') ? '/apar/data' : '/apar', grup: 'HSSE & Guard Patrol System', tingkat: isi })
     const ins = u.periksaInstansi ? statusTanggal(berlakuSertifikat(u.periksaInstansi), hariIni) : null
     if (ins === 'lewat' || ins === 'segera')
-      out.push({ id: `instansi:${u.id}`, jenis: 'berlaku', judul: `Pemeriksaan instansi ${u.kode}`, detail: `${u.instansi || 'Instansi berwenang'} · berlaku s.d. ${berlakuSertifikat(u.periksaInstansi)}`, to: app.can('/apar/data') ? '/apar/data' : '/apar', grup: 'Masa berlaku', tingkat: ins })
+      out.push({ id: `instansi:${u.id}`, jenis: 'berlaku', judul: `Pemeriksaan instansi ${u.kode}`, detail: `${u.instansi || 'Instansi berwenang'} · berlaku s.d. ${berlakuSertifikat(u.periksaInstansi)}`, to: app.can('/apar/data') ? '/apar/data' : '/apar', grup: 'HSSE & Guard Patrol System', tingkat: ins })
   }
   if (ops && app.role) out.push(...inboxOps(app.role, app.settings, ops, hariIni))
   return out
@@ -92,7 +92,7 @@ function inboxOps(role: Parameters<typeof formKategori>[0], settings: Parameters
         jenis: 'tugas',
         judul: kat === 'hk' ? 'Checklist housekeeping hari ini' : 'Kartu perawatan hari ini',
         detail: `${harian.length} dari ${nHarian} ${kat === 'hk' ? 'area' : 'kartu'} belum lengkap: ${ringkas(harian)}`,
-        to: `/ops?grup=operasional&tanggal=${hariIni}`,
+        to: kat === 'hk' ? '/ops/kalender?kategori=hk' : `/ops?grup=operasional&kategori=rawat&tanggal=${hariIni}`,
         grup,
         tingkat: 'tugas',
       })

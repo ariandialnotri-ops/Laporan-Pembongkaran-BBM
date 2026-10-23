@@ -11,6 +11,7 @@ import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
+import { InfoPop } from '@/components/ui/info-pop'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
@@ -94,7 +95,12 @@ export function OpsMenu() {
 
   // ?grup=operasional (Operation: perawatan & housekeeping) atau ?grup=lingkungan (HSSE).
   const filter = params.get('grup')
-  const grup = formTampil(app.role, app.settings).filter((g) => (filter === 'lingkungan' ? g.judul === 'Pantauan lingkungan' : filter === 'operasional' ? g.judul !== 'Pantauan lingkungan' : true))
+  // ?kategori=rawat|hk: menu Perawatan / Housekeeping terpisah.
+  const kategori = params.get('kategori')
+  const grup = formTampil(app.role, app.settings)
+    .filter((g) => (filter === 'lingkungan' ? g.judul === 'Pantauan lingkungan' : filter === 'operasional' ? g.judul !== 'Pantauan lingkungan' : true))
+    .map((g) => (kategori ? { ...g, forms: g.forms.filter((id) => formById(id)?.kategori === kategori) } : g))
+    .filter((g) => g.forms.length)
   const recOf = (id: string) => {
     const f = formById(id)
     return recs?.find((r) => r.id === opsId(id, f ? tanggalSimpan(f, tanggal) : tanggal))
@@ -127,21 +133,23 @@ export function OpsMenu() {
           <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary shadow-sm">
             <ClipboardCheck className="size-5" />
           </span>
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-tag uppercase text-primary">Format laporan operasional SPBU</span>
-            <span className="text-headline-md font-bold text-on-surface">Operasional SPBU</span>
-            <span className="text-body-sm text-on-surface-variant">Tandai tiap aktivitas. X (ada kerusakan) wajib catatan dan foto; foto hanya saat ada temuan.</span>
+            <span className="text-headline-md font-bold text-on-surface">{kategori === 'rawat' ? 'Perawatan' : kategori === 'hk' ? 'Housekeeping' : 'Operasional SPBU'}</span>
           </div>
+          <InfoPop judul="Operasional SPBU">
+            <p>Tandai tiap aktivitas. X (ada kerusakan) wajib catatan dan foto; foto hanya saat ada temuan.</p>
+          </InfoPop>
         </div>
         <div className="flex flex-wrap items-end gap-space-sm">
           <Field label="Tanggal" htmlFor="ops-tgl" className="min-w-40 flex-1">
-            <Input id="ops-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => e.target.value && setParams({ ...(filter ? { grup: filter } : {}), tanggal: e.target.value }, { replace: true })} />
+            <Input id="ops-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => e.target.value && setParams({ ...(filter ? { grup: filter } : {}), ...(kategori ? { kategori } : {}), tanggal: e.target.value }, { replace: true })} />
           </Field>
           <span className="tabular pb-3 text-body-sm text-on-surface-variant">
             {recs ? `${terisi}/${semua.length} form terisi` : 'Memuat…'}
           </span>
         </div>
-        <Link to={`/ops/kalender${filter ? `?grup=${filter}` : ''}`} className={cn(buttonVariants({ variant: 'glass', size: 'pill' }), 'self-start')}>
+        <Link to={`/ops/kalender${kategori ? `?kategori=${kategori}` : filter ? `?grup=${filter}` : ''}`} className={cn(buttonVariants({ variant: 'glass', size: 'pill' }), 'self-start')}>
           <CalendarDays aria-hidden="true" />
           Kalender progres & jadwal
         </Link>
@@ -220,15 +228,17 @@ function TandaPilih({ value, onChange, tandaOk, label, disabled }: { value?: Tan
 }
 
 /** Input > Operasional SPBU > satu form pada satu tanggal. */
-export function OpsIsi() {
+export function OpsIsi({ sematan }: { sematan?: { form: string; tanggal: string; onSelesai: () => void } } = {}) {
   const app = useApp()
   const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
   const keTerkirim = useKeTerkirim()
-  const { form = '' } = useParams()
+  const { form: formRute = '' } = useParams()
   const [params] = useSearchParams()
-  const tanggalPilih = params.get('tanggal') || todayIso()
+  // Sematan: form dibuka sebagai pop up (mis. dari kalender progres housekeeping), bukan halaman.
+  const form = sematan?.form ?? formRute
+  const tanggalPilih = sematan?.tanggal ?? (params.get('tanggal') || todayIso())
   const f = formById(form)
   const valid = !!f || form === FORM_SUMUR || form === FORM_OIL
   const tanggal = f ? tanggalSimpan(f, tanggalPilih) : tanggalPilih
@@ -242,7 +252,7 @@ export function OpsIsi() {
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form?', detail: dirty ? 'Isian form ini belum dikirim dan akan hilang.' : 'Form ini belum dikirim.' })
+  const guard = useLeaveGuard({ active: !sematan, title: 'Keluar dari form?', detail: dirty ? 'Isian form ini belum dikirim dan akan hilang.' : 'Form ini belum dikirim.' })
 
   // Isian awal: catatan tersimpan atau form kosong; salinan baru dibuat saat pertama diubah.
   const [jamBuka] = useState(nowHm)
@@ -301,6 +311,10 @@ export function OpsIsi() {
       const data = hanyaParaf && lama ? { ...lama.data, paraf: d.paraf } : { ...d, petugas: d.petugas.trim() }
       await app.backend.saveOps({ id, form, tanggal, data, updatedAt: Date.now(), updatedBy: app.session.user?.id ?? null })
       guard.bypass()
+      if (sematan) {
+        toast(`${judulForm(form)} tersimpan`)
+        return sematan.onSelesai()
+      }
       const kembali = `/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`
       const x = Object.values(d.jenis === 'checklist' ? d.hasil : {}).filter((v) => v === 'X').length
       keTerkirim({
@@ -329,6 +343,7 @@ export function OpsIsi() {
       for (const p of fotoOps(lama.data)) hapusFoto(p)
       guard.bypass()
       toast('Catatan dihapus')
+      if (sematan) return sematan.onSelesai()
       navigate(`/ops?${params.get('grup') ? `grup=${params.get('grup')}&` : ''}tanggal=${tanggalPilih}`, { replace: true })
     } catch (e) {
       setError(pesan(e))

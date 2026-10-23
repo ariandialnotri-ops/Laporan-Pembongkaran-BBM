@@ -9,6 +9,7 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { density15, normalizeDensity } from '@/lib/density'
@@ -90,9 +91,9 @@ export function Sample2Jam() {
   }
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        <b className="text-on-surface">Wajib</b> untuk setiap penerimaan BBM: setelah bongkar selesai, ambil sampel dari tangki pendam dan ukur density. Jam uji diatur petugas.
-      </p>
+      <InfoHalaman judul="Kualitas Pasca Penerimaan">
+        <p><b className="text-on-surface">Wajib</b> untuk setiap penerimaan BBM: setelah bongkar selesai, ambil sampel dari tangki pendam dan ukur density. Jam uji diatur petugas.</p>
+      </InfoHalaman>
       <section aria-labelledby="sample-belum" className="animate-entrance-2 flex flex-col gap-space-xs">
         <SectionHeader id="sample-belum" title="Belum diuji" action={<span className="tabular text-body-sm text-on-surface-variant">{belum.length}</span>} />
         {belum.length === 0 ? (
@@ -143,6 +144,9 @@ export function Sample2JamForm() {
   const d15 = density15(s.densityObs, s.suhu)
   const selisih = d15 && r.d15Depot !== null ? Math.round((d15.value - r.d15Depot) * 10000) / 10000 : null
   const ok = selisih !== null ? Math.abs(selisih) <= app.rules.densityTolerance + 1e-9 : null
+  // Selisih terhadap Density std. 15 °C hasil bongkaran (sample MT saat bongkar), tampil langsung saat input.
+  const selisihBongkar = d15 && r.d15 !== null ? Math.round((d15.value - r.d15) * 10000) / 10000 : null
+  const okBongkar = selisihBongkar !== null ? Math.abs(selisihBongkar) <= app.rules.densityTolerance + 1e-9 : null
 
   const kirim = async () => {
     if (!s.tanggal || !s.jam) return setError('Isi tanggal dan jam uji.')
@@ -169,7 +173,8 @@ export function Sample2JamForm() {
           ['Waktu uji', `${formatTanggalIso(s.tanggal)} ${s.jam}`],
           ['Density std. 15 °C', formatDensity(d15.value)],
           ['Density std. 15 °C dokumen depot', r.d15Depot !== null ? formatDensity(r.d15Depot) : '-'],
-          ['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-'],
+          ['Selisih vs depot', selisih !== null ? formatDensitySigned(selisih) : '-'],
+          ['Selisih vs bongkaran', selisihBongkar !== null ? formatDensitySigned(selisihBongkar) : '-'],
           ['Petugas', s.petugas.trim()],
         ],
         aksi: [
@@ -208,6 +213,20 @@ export function Sample2JamForm() {
           <Field label="Suhu" htmlFor="smp-s">
             <Input id="smp-s" numeric inputMode="decimal" suffix="°C" value={s.suhu} onChange={(e) => set({ suhu: e.target.value })} />
           </Field>
+        </div>
+        <div aria-live="polite" className="grid grid-cols-2 gap-space-sm">
+          {(
+            [
+              ['Selisih vs bongkaran', selisihBongkar, okBongkar, r.d15],
+              ['Selisih vs depot', selisih, ok, r.d15Depot],
+            ] as const
+          ).map(([label, x, baik, acuan]) => (
+            <div key={label} className={cn('flex flex-col rounded-md border-2 p-space-sm', baik === null ? 'border-outline-variant/60 bg-surface-container-low' : baik ? 'border-emerald-300 bg-emerald-50' : 'border-error/50 bg-error-container/60')}>
+              <span className="text-xs font-bold uppercase text-on-surface-variant">{label}</span>
+              <span className={cn('tabular text-headline-md font-bold', baik === false ? 'text-error' : baik ? 'text-emerald-800' : 'text-on-surface-variant')}>{x !== null ? formatDensitySigned(x) : '-'}</span>
+              <span className="text-body-sm text-on-surface-variant">{acuan === null ? 'acuan belum ada' : x === null ? `acuan ${formatDensity(acuan)}, isi density & suhu` : baik ? 'Sesuai toleransi' : `Melebihi ±${formatDensity(app.rules.densityTolerance)}`}</span>
+            </div>
+          ))}
         </div>
         <Ladder
           rows={[

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarClock, CalendarDays, ChevronRight, ClipboardCheck, PiggyBank, Route, ScanEye, ShieldAlert, Sparkles, Truck } from 'lucide-react'
+import { CalendarClock, CalendarDays, ChevronRight, ClipboardCheck, HandCoins, Route, ScanEye, ShieldAlert, Sparkles, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -57,7 +57,7 @@ function Angka({ items }: { items: [string, string | number, boolean?][] }) {
 }
 
 /** Laporan insiden, near miss & kerusakan: jumlah per status dan laporan terbaru. */
-function KartuInsiden() {
+export function KartuInsiden() {
   const app = useApp()
   const semua = app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden' && d.data.jenis !== 'henti').sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.updatedAt - a.updatedAt)
   const n = (s: string) => semua.filter((r) => r.data.status === s).length
@@ -101,7 +101,7 @@ function KartuPetty({ role }: { role: Role }) {
   const data = recs ?? []
   const n = (f: (r: PettyRecord) => boolean) => data.filter(f).length
   return (
-    <Kartu icon={PiggyBank} judul={`Pengajuan petty cash ${role === 'cs' ? 'Cleaning Service' : 'Security'}`} sub="3 bulan terakhir, hanya pengajuan dari peran Anda" ke="/finance/petty/pengajuan" aksi="Ajukan / lihat">
+    <Kartu icon={HandCoins} judul={`Pengajuan anggaran ${role === 'cs' ? 'Cleaning Service' : 'Security'}`} sub="3 bulan terakhir, hanya pengajuan dari peran Anda" ke="/finance/petty/pengajuan" aksi="Ajukan / lihat">
       {error ? (
         <span className="text-body-sm text-error">{error}</span>
       ) : recs === null ? (
@@ -133,6 +133,49 @@ function KartuPetty({ role }: { role: Role }) {
         </>
       )}
     </Kartu>
+  )
+}
+
+/** Kepatuhan guard tour (sampling JBT/JBKP tiap slot 2 jam), 7 hari terakhir. */
+export function KartuGuardTour({ className }: { className?: string }) {
+  const app = useApp()
+  const hariIni = todayIso()
+  const [gts, setGts] = useState<GtsRecord[] | null>(null)
+  const kini = slotKini()
+  useEffect(() => {
+    app.backend.listGts(todayIso(addDays(new Date(), -7)), hariIni).then(setGts, () => setGts([]))
+  }, [app.backend, app.spbuId, hariIni])
+  // Kepatuhan guard tour: slot 2 jam yang sudah lewat dengan sampling JBT & JBKP lengkap.
+  const hari7 = Array.from({ length: 7 }, (_, i) => todayIso(addDays(new Date(`${kini.tanggal}T00:00:00`), -6 + i)))
+  const patuh = hari7.map((t) => {
+    const st = Array.from({ length: JUMLAH_SLOT }, (_, s) => statusSlot(t, s, gts ?? [], kini))
+    const dinilai = st.filter((x) => x !== 'nanti')
+    return { t, sudah: st.filter((x) => x === 'sudah').length, dinilai: dinilai.length, st }
+  })
+  const tot = patuh.reduce((a, h) => a + h.dinilai, 0)
+  const ok = patuh.reduce((a, h) => a + h.sudah, 0)
+  const hari = patuh[patuh.length - 1]
+  return (
+      <Kartu icon={ScanEye} judul="Kepatuhan guard tour (sampling JBT/JBKP)" sub="Slot 2 jam lengkap JBT & JBKP, 7 hari terakhir" ke="/gts" aksi="Sampling" className={className}>
+        {gts === null ? (
+          <span className="text-body-sm text-on-surface-variant">Memuat…</span>
+        ) : (
+          <>
+            <Angka
+              items={[
+                ['Kepatuhan 7 hari', `${tot ? Math.round((ok / tot) * 100) : 0}%`, tot > 0 && ok / tot < 0.9],
+                ['Hari ini', `${hari.sudah}/${hari.dinilai}`, hari.sudah < hari.dinilai],
+                ['Slot terlewat', hari.st.filter((x) => x === 'terlewat').length, hari.st.includes('terlewat')],
+              ]}
+            />
+            <div className="grid grid-cols-12 gap-1" role="img" aria-label="Status 12 slot hari ini">
+              {hari.st.map((x, i) => (
+                <span key={i} title={`Slot ${i + 1}`} className={cn('h-3 rounded-sm', x === 'sudah' ? 'bg-emerald-500' : x === 'terlewat' ? 'bg-red-400' : x === 'belum' ? 'bg-amber-400' : 'bg-surface-container-high')} />
+              ))}
+            </div>
+          </>
+        )}
+      </Kartu>
   )
 }
 
@@ -218,51 +261,17 @@ export function DashboardSecurity() {
   const app = useApp()
   useSyncOnOpen()
   const hariIni = todayIso()
-  const [gts, setGts] = useState<GtsRecord[] | null>(null)
-  const kini = slotKini()
-  useEffect(() => {
-    app.backend.listGts(todayIso(addDays(new Date(), -7)), hariIni).then(setGts, () => setGts([]))
-  }, [app.backend, app.spbuId, hariIni])
   if (!app.loaded) return <Loading />
 
   const bulan = hariIni.slice(0, 8)
   const bongkar = [...app.reports].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.updatedAt - a.updatedAt)
   const bulanIni = bongkar.filter((r) => r.tanggal >= `${bulan}01`)
   const los = app.plans.flatMap((p) => p.los.map((lo) => ({ lo, p, st: loStatus(lo, app.usedLoIds) })))
-  // Kepatuhan guard tour: slot 2 jam yang sudah lewat dengan sampling JBT & JBKP lengkap.
-  const hari7 = Array.from({ length: 7 }, (_, i) => todayIso(addDays(new Date(`${kini.tanggal}T00:00:00`), -6 + i)))
-  const patuh = hari7.map((t) => {
-    const st = Array.from({ length: JUMLAH_SLOT }, (_, s) => statusSlot(t, s, gts ?? [], kini))
-    const dinilai = st.filter((x) => x !== 'nanti')
-    return { t, sudah: st.filter((x) => x === 'sudah').length, dinilai: dinilai.length, st }
-  })
-  const tot = patuh.reduce((a, h) => a + h.dinilai, 0)
-  const ok = patuh.reduce((a, h) => a + h.sudah, 0)
-  const hari = patuh[patuh.length - 1]
   return (
     <div className="flex flex-col gap-space-md">
       <KartuBertugas className="animate-entrance-1" />
       <KartuStopPenyaluran className="animate-entrance-1" />
-      <Kartu icon={ScanEye} judul="Kepatuhan guard tour (sampling JBT/JBKP)" sub="Slot 2 jam lengkap JBT & JBKP, 7 hari terakhir" ke="/gts" aksi="Sampling" className="animate-entrance-1">
-        {gts === null ? (
-          <span className="text-body-sm text-on-surface-variant">Memuat…</span>
-        ) : (
-          <>
-            <Angka
-              items={[
-                ['Kepatuhan 7 hari', `${tot ? Math.round((ok / tot) * 100) : 0}%`, tot > 0 && ok / tot < 0.9],
-                ['Hari ini', `${hari.sudah}/${hari.dinilai}`, hari.sudah < hari.dinilai],
-                ['Slot terlewat', hari.st.filter((x) => x === 'terlewat').length, hari.st.includes('terlewat')],
-              ]}
-            />
-            <div className="grid grid-cols-12 gap-1" role="img" aria-label="Status 12 slot hari ini">
-              {hari.st.map((x, i) => (
-                <span key={i} title={`Slot ${i + 1}`} className={cn('h-3 rounded-sm', x === 'sudah' ? 'bg-emerald-500' : x === 'terlewat' ? 'bg-red-400' : x === 'belum' ? 'bg-amber-400' : 'bg-surface-container-high')} />
-              ))}
-            </div>
-          </>
-        )}
-      </Kartu>
+      <KartuGuardTour className="animate-entrance-1" />
       <Kartu icon={Truck} judul="Laporan pembongkaran" sub={`${bulanIni.length} bongkaran bulan ini · ${bongkar.filter((r) => r.status === 'draft').length} sedang berjalan`} ke="/laporan/bongkaran" aksi="Riwayat">
         {bongkar.slice(0, 4).map((r) => (
           <div key={r.id} className="flex items-center gap-space-sm rounded-md bg-surface-container-low px-space-sm py-space-xs">

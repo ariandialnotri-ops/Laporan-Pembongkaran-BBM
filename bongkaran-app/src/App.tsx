@@ -80,6 +80,10 @@ const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Pro
 const GantiSandi = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.GantiSandi })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
 const QqHarianMenu = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarianMenu })))
+const KualitasHarianMenu = lazy(() => import('@/pages/KualitasHarian').then((m) => ({ default: m.KualitasHarianMenu })))
+const KirimGabungan = lazy(() => import('@/pages/KualitasHarian').then((m) => ({ default: m.KirimGabungan })))
+const AirMenu = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirMenu })))
+const AirForm = lazy(() => import('@/pages/Air').then((m) => ({ default: m.AirForm })))
 const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ default: m.RiwayatApar })))
 const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
 const KualitasDetail = lazy(() => import('@/pages/KualitasDetail').then((m) => ({ default: m.KualitasDetail })))
@@ -120,6 +124,7 @@ const PengajuanPettyForm = lazy(() => import('@/pages/Petty').then((m) => ({ def
 const PengajuanPettyDetail = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.PengajuanPettyDetail })))
 const RealisasiPetty = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.RealisasiPetty })))
 const RealisasiPettyForm = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.RealisasiPettyForm })))
+const SettlementPetty = lazy(() => import('@/pages/Petty').then((m) => ({ default: m.SettlementPetty })))
 const Terkirim = lazy(() => import('@/pages/Terkirim').then((m) => ({ default: m.Terkirim })))
 
 function Gate() {
@@ -127,10 +132,10 @@ function Gate() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    document.title = `${titleFor(pathname)} · FLOQ`
+    document.title = `${titleFor(pathname, app.role)} · FLOQ`
     window.scrollTo(0, 0)
     lepasKunciGulir()
-  }, [pathname])
+  }, [pathname, app.role])
 
   if (app.status === 'login') return <Login />
   if (app.status === 'nomember') return <NotMember />
@@ -174,6 +179,7 @@ function Gate() {
           <Route path="/finance/petty/pengajuan/:id" element={<PengajuanPettyDetail />} />
           <Route path="/finance/petty/realisasi" element={<RealisasiPetty />} />
           <Route path="/finance/petty/realisasi/:id" element={<RealisasiPettyForm />} />
+          <Route path="/finance/petty/settlement/:id" element={<SettlementPetty />} />
           <Route path="/kaleng" element={<HalamanKaleng />} />
           <Route path="/input/bongkar" element={<FormInput />} />
           <Route path="/input/:id" element={<FormBongkar />} />
@@ -181,7 +187,9 @@ function Gate() {
           <Route path="/plan" element={<Plan />} />
           <Route path="/plan/baru" element={<PlanBaru />} />
           <Route path="/plan/so/:id" element={<EditLo />} />
-          <Route path="/kualitas" element={<QqHarianMenu />} />
+          <Route path="/kualitas" element={<KualitasHarianMenu />} />
+          <Route path="/kualitas/density" element={<QqHarianMenu />} />
+          <Route path="/kualitas/kirim" element={<KirimGabungan />} />
           <Route path="/kualitas/:tanggal/:shift" element={<QqHarian />} />
           <Route path="/sample" element={<Sample2Jam />} />
           <Route path="/sample/:id" element={<Sample2JamForm />} />
@@ -192,9 +200,8 @@ function Gate() {
           <Route path="/laporan/totalizer" element={<RiwayatTotalizer />} />
           <Route path="/laporan/pump-test" element={<RiwayatPumpTest />} />
           <Route path="/laporan/so" element={<LaporanStockOpname />} />
-          {/* Water content kini bagian Kontrol Kualitas Harian. */}
-          <Route path="/air" element={<Navigate to="/kualitas" replace />} />
-          <Route path="/air/isi" element={<Navigate to="/kualitas" replace />} />
+          <Route path="/air" element={<AirMenu />} />
+          <Route path="/air/isi" element={<AirForm />} />
           <Route path="/laporan/air" element={<LaporanAir />} />
           <Route path="/terkirim" element={<Terkirim />} />
           <Route path="/takaran" element={<MenuTakaran />} />

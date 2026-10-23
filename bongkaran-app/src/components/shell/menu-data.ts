@@ -9,7 +9,7 @@ import {
   Beaker,
   BookOpenCheck,
   ChartNoAxesCombined,
-  ClipboardCheck,
+  BrushCleaning,
   ClipboardList,
   Cylinder,
   Droplet,
@@ -21,9 +21,9 @@ import {
   FlaskConical,
   Fuel,
   Gauge,
+  HandCoins,
   History,
   Megaphone,
-  PiggyBank,
   ReceiptText,
   Route,
   ScanEye,
@@ -33,6 +33,7 @@ import {
   TestTubes,
   Truck,
   Users,
+  Wrench,
   ScanLine,
   Wallet,
   Waves,
@@ -47,7 +48,8 @@ import { todayIso } from '@/lib/date'
 import { labelSlot, slotKini } from '@/lib/gts'
 import { lewatBatas } from '@/lib/harian'
 import { hentiDari } from '@/lib/insiden'
-import { formTampil } from '@/lib/ops'
+import { formKategori, formTampil } from '@/lib/ops'
+import { namaModulPetty } from '@/lib/petty'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
 import { shiftLabel } from '@/lib/shift'
@@ -92,6 +94,7 @@ export function useMenu(): GrupMenu[] {
   const stok = useStokShift()
   const s = app.settings
   const hariIni = todayIso()
+  const terbuka = useRiwayatTerbuka()
   const bulan = `${hariIni.slice(0, 8)}01`
 
   const shiftNama = shiftLabel(stok.key.shift).split(' (')[0]
@@ -121,6 +124,8 @@ export function useMenu(): GrupMenu[] {
   const adaOpsOperasional = opsGrup.some((g) => g.judul !== 'Pantauan lingkungan')
   const adaOpsLingkungan = opsGrup.some((g) => g.judul === 'Pantauan lingkungan')
 
+  const nTerbuka = Object.keys(terbuka).filter((p) => app.can(p)).length
+
   const grup: GrupMenu[] = [
     { key: 'dashboard', label: 'Dashboard', href: '/', icon: ChartNoAxesCombined, desc: 'Ringkasan operasional SPBU', items: [] },
     {
@@ -128,7 +133,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Operation',
       href: '/operation',
       icon: Fuel,
-      desc: 'Stok, totalizer, kontrol kualitas harian (density & water content), bongkaran, uji takaran, perawatan & housekeeping',
+      desc: 'Stok, totalizer, kualitas harian (density & water content), bongkaran, uji takaran, perawatan & housekeeping',
       items: [
         {
           to: '/stok',
@@ -152,9 +157,9 @@ export function useMenu(): GrupMenu[] {
           to: '/kualitas',
           path: '/kualitas',
           icon: FlaskConical,
-          title: 'Kontrol Kualitas Harian',
-          desc: 'Density per produk & water content tangki pendam, sekali sehari (shift 1, maks. 10:00), satu laporan WhatsApp',
-          status: diuji ? 'Hari ini sudah dikontrol' : lewat10 ? 'Terlewat (batas 10:00)' : 'Belum dikontrol (batas 10:00)',
+          title: 'Kualitas Harian',
+          desc: 'Density harian & water content harian (shift 1, maks. 10:00), kirim gabungan ke grup WA',
+          status: diuji ? 'Density hari ini sudah diuji' : lewat10 ? 'Density terlewat (batas 10:00)' : 'Density belum diuji (batas 10:00)',
           badge: diuji ? 0 : 1,
           nada: diuji ? 'ok' : lewat10 ? 'anomali' : 'pengingat',
         },
@@ -204,15 +209,27 @@ export function useMenu(): GrupMenu[] {
           badge: takarLewatHariIni,
           nada: takarLewatHariIni ? 'anomali' : 'ok',
         },
-        ...(adaOpsOperasional
+        ...(adaOpsOperasional && formKategori(app.role, s, 'rawat').length
           ? [
               {
-                to: '/ops?grup=operasional',
+                to: '/ops?grup=operasional&kategori=rawat',
                 path: '/ops',
-                icon: ClipboardCheck,
-                title: app.role === 'cs' ? 'Checklist Housekeeping' : 'Perawatan & Housekeeping',
-                desc: app.role === 'cs' ? 'Checklist kebersihan harian per area, jadwal pembersihan & kalender progres' : 'Kartu perawatan per tangki & peralatan, checklist housekeeping (diisi CS), jadwal & kalender progres',
+                icon: Wrench,
+                title: 'Perawatan',
+                desc: 'Kartu perawatan per tangki & peralatan, jadwal & kalender progres',
                 status: 'Format laporan operasional SPBU',
+              },
+            ]
+          : []),
+        ...(adaOpsOperasional && formKategori(app.role, s, 'hk').length
+          ? [
+              {
+                to: '/ops/kalender?kategori=hk',
+                path: '/ops/kalender',
+                icon: BrushCleaning,
+                title: 'Housekeeping',
+                desc: 'Kalender progres bulanan; ketuk tanggal untuk mengisi checklist kebersihan per area',
+                status: app.role === 'cs' ? 'Diisi Cleaning Service' : 'Diisi Cleaning Service, diparaf pengawas',
               },
             ]
           : []),
@@ -326,7 +343,7 @@ export function useMenu(): GrupMenu[] {
       label: 'Finance',
       href: '/finance',
       icon: Wallet,
-      desc: 'Closing shift (setoran tepat), petty cash: pengajuan pengadaan & reimburse, realisasi dengan akun COA dan voucher',
+      desc: 'Closing shift (setoran tepat), petty cash / pengajuan anggaran: pengajuan, settlement, realisasi dengan akun COA dan voucher',
       items: [
         {
           to: '/finance/closing',
@@ -339,9 +356,9 @@ export function useMenu(): GrupMenu[] {
         {
           to: '/finance/petty',
           path: '/finance/petty',
-          icon: PiggyBank,
-          title: 'Petty Cash',
-          desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan pengadaan & reimburse' : 'Pengajuan pengadaan barang/jasa atau reimburse',
+          icon: HandCoins,
+          title: namaModulPetty(app.role),
+          desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan pengadaan & reimburse' : 'Pengajuan pengadaan barang/jasa atau reimburse, lalu Create Settlement (struk & foto barang)',
           status: 'Persetujuan Admin/Cashier lalu ABH',
         },
         ...(['admin', 'abh'].includes(app.role)
@@ -365,7 +382,7 @@ export function useMenu(): GrupMenu[] {
       icon: FileText,
       desc: 'Riwayat, stock opname, export file, dan berita acara',
       items: [
-        { to: '/laporan/riwayat', path: '/laporan/riwayat', icon: History, title: 'Riwayat', desc: 'Bongkaran, kualitas, APAR, uji takaran, insiden', status: insidenTerbuka + temuanApar ? `${insidenTerbuka + temuanApar} perlu ditindaklanjuti` : 'Semua sudah ditindaklanjuti', badge: insidenTerbuka + temuanApar },
+        { to: '/laporan/riwayat', path: '/laporan/riwayat', icon: History, title: 'Riwayat', desc: 'Bongkaran, kualitas, APAR, uji takaran, insiden', status: nTerbuka ? `${nTerbuka} riwayat belum closing` : temuanApar ? `${temuanApar} temuan APAR perlu ditindaklanjuti` : 'Semua sudah closing', badge: nTerbuka + temuanApar },
         { to: '/laporan/so', path: '/laporan/so', icon: ClipboardList, title: 'Laporan Stock Opname', desc: 'BA Laporan Bulanan: SO tangki, totalisator, arus minyak, penerimaan, tera, cash opname', status: 'Excel BA per bulan' },
         { to: '/laporan/export', path: '/laporan/export', icon: FileDown, title: 'Export File', desc: 'Catatan persediaan BBM & laporan operasional (Excel)', status: 'Excel & PDF' },
         {
@@ -407,6 +424,30 @@ export function patrolItems(can: (p: string) => boolean): ItemMenu[] {
     },
   ]
   return items.filter((i) => can(i.path))
+}
+
+/**
+ * Data yang belum closing per halaman riwayat (notifikasi di daftar Riwayat): bongkaran draft, uji pasca
+ * penerimaan yang belum dilakukan, uji density harian yang belum selesai, insiden terbuka, penyaluran yang
+ * masih berhenti, dan LO yang belum closed.
+ */
+export function useRiwayatTerbuka(): Record<string, string> {
+  const app = useApp()
+  const hariIni = todayIso()
+  const out: Record<string, string> = {}
+  const drafts = app.reports.filter((r) => r.status === 'draft').length
+  if (drafts) out['/laporan/bongkaran'] = `${drafts} bongkaran belum selesai`
+  const sample = sampleMenunggu(app.reports).length
+  const qqSebagian = app.daily.filter((d) => d.kind === 'qq' && !d.data.selesaiAt && d.tanggal < hariIni).length
+  const kual = [sample && `${sample} penerimaan belum diuji`, qqSebagian && `${qqSebagian} uji harian tidak diselesaikan`].filter(Boolean)
+  if (kual.length) out['/laporan/kualitas'] = kual.join(' · ')
+  const insiden = app.daily.filter((d) => d.kind === 'insiden' && d.data.jenis !== 'henti' && d.data.status !== 'selesai').length
+  if (insiden) out['/laporan/insiden'] = `${insiden} laporan belum ditutup`
+  const henti = hentiDari(app.daily).filter((x) => !x.h.selesai).length
+  if (henti) out['/laporan/henti'] = `${henti} penyaluran masih berhenti`
+  const lo = app.plans.flatMap((p) => p.los).filter((x) => !['closed', 'deleted'].includes(loStatus(x, app.usedLoIds))).length
+  if (lo) out['/laporan/lo'] = `${lo} LO belum closed`
+  return out
 }
 
 /** Halaman riwayat (Report > Riwayat). */

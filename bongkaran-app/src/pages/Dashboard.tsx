@@ -31,6 +31,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
+import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
@@ -67,14 +68,52 @@ const BULAN_SINGKAT = (d: Date) => d.toLocaleDateString('id-ID', { month: 'short
  */
 export function Dashboard() {
   const app = useApp()
-  if (app.role === 'cs' || app.role === 'security')
-    return (
+  const pilihan = pilihanDashboard(app.role)
+  const [pilih, setPilih] = useState<JenisDashboard>(() => {
+    try {
+      const x = localStorage.getItem('floq:dashboard') as JenisDashboard | null
+      return x && pilihan.some((p) => p.value === x) ? x : pilihan[0].value
+    } catch {
+      return pilihan[0].value
+    }
+  })
+  const aktif = pilihan.some((p) => p.value === pilih) ? pilih : pilihan[0].value
+  const ganti = (v: JenisDashboard) => {
+    setPilih(v)
+    try {
+      localStorage.setItem('floq:dashboard', v)
+    } catch {
+      // abaikan: pilihan hanya kenyamanan per perangkat
+    }
+  }
+  return (
+    <div className="flex flex-col gap-space-md">
+      {pilihan.length > 1 && <ChipFilter label="Pilih dashboard" value={aktif} onChange={ganti} options={pilihan} />}
       <Suspense fallback={<Loading />}>
-        {app.role === 'cs' ? <DashboardCs /> : <DashboardSecurity />}
+        {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse /> : aktif === 'sales' ? <DashboardSales /> : <DashboardUtama />}
       </Suspense>
-    )
-  return <DashboardUtama />
+    </div>
+  )
 }
+
+type JenisDashboard = 'operation' | 'sales' | 'hsse' | 'cs' | 'security'
+/**
+ * Dashboard yang dapat dipilih per peran: ABH semua (Operation, Sales/Finance, HSSE & Guard Patrol); pengawas &
+ * kepala shift tanpa Sales/Finance; Admin/Cashier Sales/Finance; Security & Cleaning Service sesuai tugasnya.
+ */
+function pilihanDashboard(role: string | null): { value: JenisDashboard; label: string }[] {
+  const op = { value: 'operation' as const, label: 'Dashboard Operation' }
+  const sales = { value: 'sales' as const, label: 'Dashboard Sales/Finance' }
+  const hsse = { value: 'hsse' as const, label: 'Dashboard HSSE & Guard Patrol' }
+  if (role === 'abh') return [op, sales, hsse]
+  if (role === 'admin') return [sales]
+  if (role === 'security') return [{ value: 'security', label: 'Dashboard Security' }, hsse]
+  if (role === 'cs') return [{ value: 'cs', label: 'Dashboard Housekeeping' }]
+  return [op, hsse]
+}
+
+const DashboardHsse = lazy(() => import('@/pages/DashboardModul').then((m) => ({ default: m.DashboardHsse })))
+const DashboardSales = lazy(() => import('@/pages/DashboardModul').then((m) => ({ default: m.DashboardSales })))
 
 const DashboardCs = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardCs })))
 const DashboardSecurity = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardSecurity })))
@@ -164,10 +203,6 @@ function DashboardUtama() {
   const tol = app.rules.densityTolerance + 1e-9
   const loTotal = LO_DASH.reduce((n, x) => n + (loCounts.get(x.key) ?? 0), 0)
   const isToday = range.preset === 'today'
-  const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
-  const aparTemuan = apar.filter((k) => k.status === 'temuan').length
-  // Masa berlaku lewat: isi ulang atau pemeriksaan instansi berwenang (maks. 12 bulan).
-  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat' || k.instansi === 'lewat').length
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -524,57 +559,66 @@ function DashboardUtama() {
         </div>
       </Kartu>
 
-      {/* 8. Proteksi kebakaran (APAR & APAB) */}
-      {apar.length > 0 && (
-        <Kartu
-          id="proteksi"
-          icon={FireExtinguisher}
-          title="Proteksi Kebakaran"
-          sub="Kondisi APAR & APAB dari inspeksi terakhir"
-          className="animate-entrance-5 lg:order-7"
-          action={
-            <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
-              {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
-            </Link>
-          }
-        >
-          <div className="mb-2 grid grid-cols-3 divide-x divide-outline-variant/50 rounded-md bg-primary-fixed/50">
-            {[
-              { label: 'APAR terpasang', value: apar.filter((k) => k.tipe === 'apar' && !k.unit.cadangan).length },
-              { label: 'APAR cadangan', value: apar.filter((k) => k.unit.cadangan).length },
-              { label: 'APAB', value: apar.filter((k) => k.tipe === 'apab').length },
-            ].map((x) => (
-              <Link key={x.label} to="/apar" className="flex min-w-0 flex-col items-center px-1 py-2 text-center active:scale-[0.98]">
-                <span className="tabular text-numeric-lg font-bold text-on-surface">{x.value}</span>
-                <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
-              </Link>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
-              <span className="text-xs font-bold uppercase text-emerald-700">Baik</span>
-              <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
-            </Link>
-            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-xs font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
-              <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
-            </Link>
-            <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
-              <span className="text-xs font-bold uppercase text-amber-700">Belum bulan ini</span>
-              <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
-            </Link>
-            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-xs font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
-              <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
-            </Link>
-          </div>
-        </Kartu>
-      )}
 
       </div>
 
       <DetailHari iso={hari} onClose={() => setHari(null)} />
     </div>
+  )
+}
+
+/** Proteksi kebakaran (APAR & APAB): kondisi dari inspeksi terakhir. Dipakai di Dashboard HSSE & Guard Patrol. */
+export function KartuProteksi({ className }: { className?: string }) {
+  const app = useApp()
+  const hariIni = todayIso()
+  const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
+  const aparTemuan = apar.filter((k) => k.status === 'temuan').length
+  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat' || k.instansi === 'lewat').length
+  if (!apar.length) return null
+  return (
+      <Kartu
+        id="proteksi"
+        icon={FireExtinguisher}
+        title="Proteksi Kebakaran"
+        sub="Kondisi APAR & APAB dari inspeksi terakhir"
+        className={className}
+        action={
+          <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
+            {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
+          </Link>
+        }
+      >
+        <div className="mb-2 grid grid-cols-3 divide-x divide-outline-variant/50 rounded-md bg-primary-fixed/50">
+          {[
+            { label: 'APAR terpasang', value: apar.filter((k) => k.tipe === 'apar' && !k.unit.cadangan).length },
+            { label: 'APAR cadangan', value: apar.filter((k) => k.unit.cadangan).length },
+            { label: 'APAB', value: apar.filter((k) => k.tipe === 'apab').length },
+          ].map((x) => (
+            <Link key={x.label} to="/apar" className="flex min-w-0 flex-col items-center px-1 py-2 text-center active:scale-[0.98]">
+              <span className="tabular text-numeric-lg font-bold text-on-surface">{x.value}</span>
+              <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
+            <span className="text-xs font-bold uppercase text-emerald-700">Baik</span>
+            <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
+          </Link>
+          <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+            <span className={cn('text-xs font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
+            <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
+          </Link>
+          <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
+            <span className="text-xs font-bold uppercase text-amber-700">Belum bulan ini</span>
+            <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
+          </Link>
+          <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+            <span className={cn('text-xs font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
+            <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
+          </Link>
+        </div>
+      </Kartu>
   )
 }
 

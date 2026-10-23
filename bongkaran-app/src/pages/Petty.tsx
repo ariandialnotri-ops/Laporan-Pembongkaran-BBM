@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronRight, ClipboardList, FilePlus2, FileSpreadsheet, LoaderCircle, PiggyBank, ReceiptText, Send, Trash2, X } from 'lucide-react'
+import { Check, ChevronRight, ClipboardList, FilePlus2, FileSpreadsheet, FileText, HandCoins, LoaderCircle, PackageCheck, ReceiptText, Send, Trash2, X } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
@@ -12,6 +12,7 @@ import { MenuCard } from '@/components/bongkaran/menu-card'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
+import { InfoPop } from '@/components/ui/info-pop'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -22,7 +23,7 @@ import { COA, coaByNo } from '@/lib/coa'
 import { formatBulanTahun, formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { compressImage, genId } from '@/lib/image'
-import { bolehLihatAnggaran, bolehLihatNominal, bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, nomorPetty, PERAN_PENGAJU, pettyId, rekapCoa, rupiah, voucherBulan, type JenisPetty, type PettyRecord, type StatusPetty, type Tanda } from '@/lib/petty'
+import { bolehLihatAnggaran, bolehLihatNominal, bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, namaModulPetty, nomorPetty, PERAN_PENGAJU, perluSettlement, pettyId, rekapCoa, rupiah, voucherBulan, voucherRentang, type JenisPetty, type PettyRecord, type Settlement, type StatusPetty, type Tanda } from '@/lib/petty'
 import type { Photo } from '@/lib/sop'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
@@ -34,6 +35,8 @@ const NADA: Record<string, 'neutral' | 'primary' | 'success' | 'error' | 'cyan' 
   'Menunggu Admin': 'cyan',
   'Menunggu ABH': 'primary',
   Disetujui: 'success',
+  'Menunggu Settlement': 'info',
+  Settlement: 'primary',
   Terealisasi: 'success',
   Dibayar: 'success',
   Ditolak: 'error',
@@ -59,8 +62,8 @@ function usePetty(from: string, to: string) {
   return { recs: kini?.recs ?? null, error: kini?.error ?? null, muat }
 }
 
-/** Pengajuan dibuat pengguna ini (admin tidak menyetujui pengajuannya sendiri). */
-const milikSendiri = (r: PettyRecord, uid: string | null) => !!uid && r.createdBy === uid
+/** Pengajuan dibuat pengguna ini (admin tidak menyetujui pengajuannya sendiri). Mode lokal: satu pengguna tanpa akun. */
+const milikSendiri = (r: PettyRecord, uid: string | null) => (!!uid && r.createdBy === uid) || (uid === null && r.createdBy === null)
 /** Pengajuan yang menunggu tindakan peran ini. */
 const perluTindakan = (r: PettyRecord, role: string | null, uid: string | null) =>
   (r.status === 'Menunggu Admin' && (role === 'abh' || (role === 'admin' && !milikSendiri(r, uid)))) || (r.status === 'Menunggu ABH' && role === 'abh')
@@ -92,13 +95,22 @@ export function PettyMenu() {
   const anggaran = disetujui.reduce((n, r) => n + r.total, 0)
   const realisasi = disetujui.reduce((n, r) => n + (r.data.realisasi?.nominal ?? 0), 0)
   const tindakan = data.filter((r) => perluTindakan(r, app.role, app.session.user?.id ?? null)).length
-  const belumReal = disetujui.filter((r) => !r.data.realisasi).length
+  const belumReal = disetujui.filter((r) => !r.data.realisasi && !perluSettlement(r)).length
+  const settlementSaya = data.filter((r) => perluSettlement(r) && milikSendiri(r, app.session.user?.id ?? null)).length
   const plafonNilai = s.pettyPlafon ?? 0
 
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
-        <span className="text-tag uppercase text-primary">Petty cash · {formatBulanTahun(new Date(`${bulan}-01T00:00:00`))}</span>
+        <div className="flex items-start justify-between gap-space-sm">
+          <span className="text-tag uppercase text-primary">
+            {namaModulPetty(app.role)} · {formatBulanTahun(new Date(`${bulan}-01T00:00:00`))}
+          </span>
+          <InfoPop judul={namaModulPetty(app.role)}>
+            <p>Pengajuan pengadaan atau reimburse oleh seluruh personil SPBU (kecuali ABH), persetujuan 1 Admin/Cashier, persetujuan akhir ABH.</p>
+            <p>Setelah disetujui, pengaju membuat Settlement: foto struk pembelian dan foto barang yang dibeli. Admin/Cashier lalu merealisasi dengan akun COA dan mencetak voucher petty cash beserta lampirannya.</p>
+          </InfoPop>
+        </div>
         {/* Plafon, anggaran & realisasi hanya untuk Admin/Cashier dan ABH. */}
         {bolehLihatAnggaran(app.role) && (
           <Ringkas
@@ -110,9 +122,6 @@ export function PettyMenu() {
             ]}
           />
         )}
-        <span className="text-body-sm text-on-surface-variant">
-          Pengajuan pengadaan atau reimburse oleh anggota SPBU, persetujuan 1 Admin/Cashier, persetujuan akhir ABH. Akun COA dipilih Admin/Cashier saat realisasi, lalu voucher realisasi dicetak per tanggal.
-        </span>
         <ErrorBox text={error} />
       </GlassCard>
 
@@ -122,10 +131,10 @@ export function PettyMenu() {
           m={{
             to: '/finance/petty/pengajuan',
             icon: FilePlus2,
-            title: app.role === 'abh' ? 'Persetujuan Pengajuan' : 'Pengajuan Pengadaan & Reimburse',
-            desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan dari anggota SPBU' : 'Pengadaan barang/jasa atau reimburse, disetujui Admin/Cashier lalu ABH',
-            status: recs === null ? 'Memuat…' : tindakan ? `${tindakan} perlu persetujuan Anda` : `${data.length} pengajuan bulan ini`,
-            badge: tindakan,
+            title: app.role === 'abh' ? 'Persetujuan Pengajuan' : app.role === 'admin' ? 'Pengajuan Pengadaan & Reimburse' : 'Pengajuan Anggaran',
+            desc: app.role === 'abh' ? 'Persetujuan akhir pengajuan dari personil SPBU' : 'Pengadaan barang/jasa atau reimburse, disetujui Admin/Cashier lalu ABH; setelah disetujui buat Settlement (struk & foto barang)',
+            status: recs === null ? 'Memuat…' : tindakan ? `${tindakan} perlu persetujuan Anda` : settlementSaya ? `${settlementSaya} perlu Create Settlement` : `${data.length} pengajuan bulan ini`,
+            badge: tindakan + settlementSaya,
           }}
         />
         {bolehRealisasi(app.role) && (
@@ -134,8 +143,8 @@ export function PettyMenu() {
             m={{
               to: '/finance/petty/realisasi',
               icon: ReceiptText,
-              title: 'Realisasi Petty Cash',
-              desc: 'Pilih akun COA, catat nota, bayar reimburse, voucher realisasi',
+              title: 'Realisasi & Voucher',
+              desc: 'Pilih akun COA, realisasi settlement, bayar reimburse, cetak voucher petty cash dengan lampiran struk & barang',
               status: recs === null ? 'Memuat…' : belumReal ? `${belumReal} disetujui belum direalisasi` : 'Semua terealisasi',
               badge: belumReal,
             }}
@@ -209,10 +218,10 @@ export function PengajuanPetty() {
         {PERAN_PENGAJU.includes(app.role) ? (
           <Link to="/finance/petty/pengajuan/baru" className={buttonVariants({ size: 'lg' })}>
             <FilePlus2 aria-hidden="true" />
-            Ajukan pengadaan / reimburse
+            {app.role === 'admin' ? 'Ajukan pengadaan / reimburse' : 'Ajukan anggaran'}
           </Link>
         ) : (
-          <span className="text-body-sm text-on-surface-variant">ABH memberi persetujuan akhir; pengajuan dibuat oleh anggota SPBU (kepala shift, pengawas, Admin/Cashier, security, cleaning service).</span>
+          <span className="text-body-sm text-on-surface-variant">ABH memberi persetujuan akhir; pengajuan dibuat oleh seluruh personil SPBU.</span>
         )}
         <Field label="Bulan" htmlFor="pp-bulan">
           <Input id="pp-bulan" type="month" max={todayIso().slice(0, 7)} value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
@@ -264,7 +273,7 @@ export function PengajuanPettyForm() {
   const [error, setError] = useState<string | null>(null)
   const guard = useLeaveGuard({ active: true, title: 'Keluar dari pengajuan?', detail: 'Pengajuan yang belum dikirim akan hilang.' })
   if (!app.loaded) return <Loading />
-  if (!PERAN_PENGAJU.includes(app.role)) return <GlassCard className="p-space-md">Pengajuan petty cash dibuat oleh anggota SPBU (kepala shift, pengawas, Admin/Cashier, security, cleaning service). ABH memberi persetujuan akhir.</GlassCard>
+  if (!PERAN_PENGAJU.includes(app.role)) return <GlassCard className="p-space-md">Pengajuan anggaran dibuat oleh seluruh personil SPBU. ABH memberi persetujuan akhir.</GlassCard>
   const reimburse = jenis === 'reimburse'
   const nQty = parseAngka(qty) ?? 0
   const nHarga = parseAngka(harga) ?? 0
@@ -494,7 +503,7 @@ export function PengajuanPettyDetail() {
     if (!(await konfirmasi({ judul: 'Hapus pengajuan?', pesan: <>Pengajuan petty cash <b>{rec.no}</b> beserta lampirannya akan dihapus.</> }))) return
     try {
       await app.backend.deletePetty(rec.id)
-      for (const p of [...d.lampiran, ...(d.realisasi?.nota ?? [])]) void app.backend.deletePhoto(p).catch(() => {})
+      for (const p of [...d.lampiran, ...(d.realisasi?.nota ?? []), ...(d.settlement?.struk ?? []), ...(d.settlement?.barang ?? [])]) void app.backend.deletePhoto(p).catch(() => {})
       toast('Pengajuan dihapus')
       navigate('/finance/petty/pengajuan', { replace: true })
     } catch (e) {
@@ -557,6 +566,33 @@ export function PengajuanPettyDetail() {
         </GlassCard>
       )}
 
+      {rec.status === 'Disetujui' && jenisPetty(rec) === 'pengadaan' && (
+        <GlassCard level={2} className={cn('flex flex-col gap-space-sm p-space-md', perluSettlement(rec) && 'border-2 border-amber-400')}>
+          <SectionHeader id="pp-settle" title="Settlement" />
+          {d.settlement ? (
+            <>
+              <div className="divide-y divide-outline-variant/40">
+                <Baris k="Tanggal belanja" v={formatTanggalIso(d.settlement.tanggal)} />
+                {lihatNominal && <Baris k="Nominal dibelanjakan" v={rupiah(d.settlement.nominal)} />}
+                {lihatNominal && <Baris k="Sisa dari pengajuan" v={rupiah(rec.total - d.settlement.nominal)} />}
+                <Baris k="Dibuat" v={tandaLabel({ ...d.settlement, catatan: d.settlement.catatan })} />
+              </div>
+              <span className="text-body-sm font-semibold text-on-surface">Struk pembelian</span>
+              <FotoList fotos={d.settlement.struk} alt="Struk pembelian" />
+              <span className="text-body-sm font-semibold text-on-surface">Barang yang dibeli</span>
+              <FotoList fotos={d.settlement.barang} alt="Barang yang dibeli" />
+            </>
+          ) : milikSendiri(rec, uid) || bolehRealisasi(app.role) ? (
+            <Link to={`/finance/petty/settlement/${encodeURIComponent(rec.id)}`} className={buttonVariants({ size: 'lg' })}>
+              <PackageCheck aria-hidden="true" />
+              Create Settlement
+            </Link>
+          ) : (
+            <span className="text-body-sm text-on-surface-variant">Menunggu pengaju membuat Settlement (foto struk & barang).</span>
+          )}
+        </GlassCard>
+      )}
+
       {rec.status === 'Disetujui' && (
         <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
           <SectionHeader id="pp-real" title={jenisPetty(rec) === 'reimburse' ? 'Pembayaran reimburse' : 'Realisasi'} />
@@ -571,6 +607,8 @@ export function PengajuanPettyDetail() {
               </div>
               <FotoList fotos={d.realisasi.nota} alt="Nota realisasi" />
             </>
+          ) : perluSettlement(rec) ? (
+            <span className="text-body-sm text-on-surface-variant">Realisasi Admin/Cashier dilakukan setelah Settlement dibuat.</span>
           ) : bolehRealisasi(app.role) ? (
             <Link to={`/finance/petty/realisasi/${encodeURIComponent(rec.id)}`} className={buttonVariants({ size: 'lg' })}>
               <ReceiptText aria-hidden="true" />
@@ -604,7 +642,46 @@ export function RealisasiPetty() {
   const rekap = useMemo(() => rekapCoa((semua ?? []).filter((r) => r.data.realisasi?.tanggal.startsWith(bulan))), [semua, bulan])
   const vouchers = useMemo(() => voucherBulan(semua ?? [], bulan), [semua, bulan])
   const [busy, setBusy] = useState(false)
+  // Cetak voucher petty cash: rentang tanggal pengajuan (mis. 1 s.d. 7), hanya yang sudah direalisasi dengan COA.
+  const [vDari, setVDari] = useState(`${todayIso().slice(0, 7)}-01`)
+  const [vSampai, setVSampai] = useState(todayIso())
+  const [cetak, setCetak] = useState(false)
+  const { recs: rentang } = usePetty(vDari, vSampai)
+  const barisCetak = useMemo(() => voucherRentang(rentang ?? [], vDari, vSampai), [rentang, vDari, vSampai])
+  const belumCoa = (rentang ?? []).filter((r) => r.status === 'Disetujui' && !r.data.realisasi).length
   if (!app.loaded) return <Loading />
+  const cetakVoucher = async () => {
+    setCetak(true)
+    try {
+      const fotos = barisCetak.flatMap((b) => [...b.struk, ...b.barang])
+      const fotoData: Record<string, string> = {}
+      await Promise.all(fotos.map(async (p) => (fotoData[p.id] = await app.backend.photoDataUrl(p).catch(() => ''))))
+      const { voucherPdf } = await import('@/lib/report/voucher-pdf')
+      const hari = todayIso()
+      const blob = voucherPdf({
+        nomor: `${Number(hari.slice(8))}/COCO/${hari.slice(5, 7)}/${hari.slice(0, 4)}`,
+        tanggal: hari,
+        dari: vDari,
+        sampai: vSampai,
+        baris: barisCetak,
+        settings: app.settings,
+        ttd: { buh: app.settings.namaPengawasDefault ?? '', admin: app.role === 'admin' ? app.displayName : '', kasir: '' },
+        fotoData,
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Voucher_Petty_Cash_${(app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')}_${vDari}_sd_${vSampai}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+    } catch (e) {
+      toast(`Gagal mencetak voucher: ${pesan(e)}`)
+    } finally {
+      setCetak(false)
+    }
+  }
   const unduhVoucher = async () => {
     setBusy(true)
     try {
@@ -624,7 +701,8 @@ export function RealisasiPetty() {
   const realisasi = (semua ?? []).filter((r) => r.data.realisasi?.tanggal.startsWith(bulan)).reduce((n, r) => n + (r.data.realisasi?.nominal ?? 0), 0)
   const plafon = app.settings.pettyPlafon ?? 0
   // Menunggu realisasi: semua pengajuan disetujui yang belum direalisasi (termasuk dari bulan sebelumnya).
-  const menunggu = (semua ?? []).filter((r) => r.status === 'Disetujui' && !r.data.realisasi)
+  const menunggu = (semua ?? []).filter((r) => r.status === 'Disetujui' && !r.data.realisasi && !perluSettlement(r))
+  const tungguSettlement = (semua ?? []).filter((r) => perluSettlement(r)).length
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
@@ -651,7 +729,7 @@ export function RealisasiPetty() {
       </GlassCard>
 
       <section aria-labelledby="rp-tunggu" className="flex flex-col gap-space-sm">
-        <SectionHeader id="rp-tunggu" title={`Menunggu realisasi (${menunggu.length})`} />
+        <SectionHeader id="rp-tunggu" title={`Menunggu realisasi (${menunggu.length})`} action={tungguSettlement ? <span className="text-body-sm font-semibold text-amber-800">{tungguSettlement} menunggu settlement pengaju</span> : undefined} />
         {!menunggu.length ? (
           <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
             Semua pengajuan yang disetujui sudah direalisasi.
@@ -678,8 +756,50 @@ export function RealisasiPetty() {
         )}
       </section>
 
+      <section aria-labelledby="rp-cetak" className="flex flex-col gap-space-sm">
+        <SectionHeader id="rp-cetak" title="Cetak voucher petty cash" />
+        <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+          <div className="grid grid-cols-2 gap-space-sm">
+            <Field label="Pengajuan dari" htmlFor="vc-dari">
+              <Input id="vc-dari" type="date" max={vSampai} value={vDari} onChange={(e) => e.target.value && setVDari(e.target.value)} />
+            </Field>
+            <Field label="Sampai" htmlFor="vc-sampai">
+              <Input id="vc-sampai" type="date" min={vDari} max={todayIso()} value={vSampai} onChange={(e) => e.target.value && setVSampai(e.target.value)} />
+            </Field>
+          </div>
+          {rentang === null ? (
+            <Loading />
+          ) : !barisCetak.length ? (
+            <span className="text-body-sm text-on-surface-variant">Belum ada pengajuan pada rentang ini yang sudah direalisasi dengan akun COA.</span>
+          ) : (
+            <div className="flex flex-col divide-y divide-outline-variant/40 rounded-md bg-surface-container-low">
+              {barisCetak.map((b) => (
+                <div key={b.no} className="flex items-center justify-between gap-space-sm px-space-sm py-space-xs">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-body-sm font-semibold text-on-surface">{b.uraian}</span>
+                    <span className="truncate text-xs text-on-surface-variant">
+                      {b.no} · {b.coa} · {b.struk.length} struk · {b.barang.length} foto barang
+                    </span>
+                  </span>
+                  <span className="tabular shrink-0 text-body-sm font-bold text-on-surface">{rupiah(b.jumlah)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between px-space-sm py-space-xs text-body-sm font-bold text-on-surface">
+                <span>Total</span>
+                <span className="tabular">{rupiah(barisCetak.reduce((a, b) => a + b.jumlah, 0))}</span>
+              </div>
+            </div>
+          )}
+          {belumCoa > 0 && <span className="text-body-sm font-semibold text-amber-800">{belumCoa} pengajuan disetujui pada rentang ini belum direalisasi (belum ada COA) dan tidak ikut voucher.</span>}
+          <Button disabled={cetak || !barisCetak.length} onClick={() => void cetakVoucher()}>
+            {cetak ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
+            Cetak voucher PDF + lampiran struk & barang
+          </Button>
+        </GlassCard>
+      </section>
+
       <section aria-labelledby="rp-voucher" className="flex flex-col gap-space-sm">
-        <SectionHeader id="rp-voucher" title={`Voucher realisasi (${vouchers.length})`} />
+        <SectionHeader id="rp-voucher" title={`Voucher per tanggal realisasi (${vouchers.length})`} />
         <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
           <span className="text-body-sm text-on-surface-variant">
             Satu voucher per tanggal realisasi (nomor tanggal/COCO/bulan/tahun), berisi akun COA, keterangan, jumlah, total & terbilang, serta tanda tangan BUH SPBU, Admin, Kasir.
@@ -766,7 +886,18 @@ export function RealisasiPettyForm() {
   if (!rec) return <GlassCard className="p-space-md">{error ?? 'Pengajuan tidak ditemukan.'}</GlassCard>
   if (rec.status !== 'Disetujui') return <GlassCard className="p-space-md">Realisasi hanya untuk pengajuan yang sudah disetujui.</GlassCard>
   if (rec.data.realisasi) return <GlassCard className="p-space-md">Pengajuan {rec.no} sudah direalisasi.</GlassCard>
-  const nilai = nominal ?? String(rec.total)
+  if (perluSettlement(rec))
+    return (
+      <GlassCard className="flex flex-col gap-space-sm p-space-md">
+        <span className="text-body-md font-semibold text-on-surface">Menunggu Settlement {rec.no}</span>
+        <span className="text-body-sm text-on-surface-variant">Pengaju belum melampirkan foto struk pembelian dan foto barang. Realisasi dicatat setelah Settlement dibuat.</span>
+        <Link to={`/finance/petty/settlement/${encodeURIComponent(rec.id)}`} className={buttonVariants({ variant: 'glass' })}>
+          Buat Settlement atas nama pengaju
+        </Link>
+      </GlassCard>
+    )
+  const st = rec.data.settlement
+  const nilai = nominal ?? String(st?.nominal ?? rec.total)
   const n = parseAngka(nilai) ?? 0
   const reimburse = jenisPetty(rec) === 'reimburse'
   // Pengajuan lama sudah punya COA; pengajuan baru: COA dipilih di sini.
@@ -777,7 +908,7 @@ export function RealisasiPettyForm() {
     if (!akun) return setErr('Pilih akun COA.')
     if (n <= 0) return setErr(reimburse ? 'Isi nominal yang dibayarkan.' : 'Isi nominal realisasi.')
     // Reimburse: nota sudah dilampirkan pengaju; bukti bayar opsional.
-    if (!reimburse && !nota.length) return setErr('Foto nota/kuitansi wajib.')
+    if (!reimburse && !st && !nota.length) return setErr('Foto nota/kuitansi wajib (pengaju belum membuat Settlement).')
     setBusy('kirim')
     try {
       const foto: Photo[] = []
@@ -821,6 +952,15 @@ export function RealisasiPettyForm() {
         <span className="text-headline-md font-bold text-on-surface">{rec.data.uraian}</span>
         <span className="text-body-sm text-on-surface-variant">Disetujui {rupiah(rec.total)}</span>
         {reimburse && <FotoList fotos={rec.data.lampiran} alt="Nota reimburse" />}
+        {st && (
+          <div className="mt-space-xs flex flex-col gap-space-xs rounded-md border-2 border-emerald-300 bg-emerald-50 p-space-sm">
+            <span className="text-body-sm font-bold text-emerald-900">
+              Settlement {formatTanggalIso(st.tanggal)} · {rupiah(st.nominal)} · {st.nama}
+            </span>
+            <FotoList fotos={st.struk} alt="Struk pembelian" />
+            <FotoList fotos={st.barang} alt="Barang yang dibeli" />
+          </div>
+        )}
       </GlassCard>
       <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
         <Field label="Akun COA (wajib)" htmlFor="rl-coa">
@@ -854,9 +994,9 @@ export function RealisasiPettyForm() {
         </div>
         {n > rec.total && <span className="text-body-sm font-semibold text-error">Melebihi pengajuan sebesar {rupiah(n - rec.total)}.</span>}
         <FotoWajib
-          label={reimburse ? 'Bukti pembayaran ke pengaju' : 'Foto nota / kuitansi'}
-          hint={reimburse ? 'Bukti transfer / tanda terima uang reimburse (opsional).' : 'Nota pembelian atau kuitansi jasa terbaca (nominal & tanggal).'}
-          wajib={!reimburse}
+          label={reimburse ? 'Bukti pembayaran ke pengaju' : st ? 'Nota tambahan (opsional)' : 'Foto nota / kuitansi'}
+          hint={reimburse ? 'Bukti transfer / tanda terima uang reimburse (opsional).' : st ? 'Struk & foto barang sudah dilampirkan pengaju lewat Settlement.' : 'Nota pembelian atau kuitansi jasa terbaca (nominal & tanggal).'}
+          wajib={!reimburse && !st}
           fotos={nota}
           busy={busy === 'foto'}
           disabled={busy === 'kirim'}
@@ -892,8 +1032,138 @@ export function RealisasiPettyForm() {
         </Field>
         <ErrorBox text={err} />
         <Button size="lg" disabled={busy !== null} onClick={() => void simpan()}>
-          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <PiggyBank aria-hidden="true" />}
+          {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <HandCoins aria-hidden="true" />}
           {busy === 'kirim' ? 'Menyimpan…' : 'Simpan realisasi'}
+        </Button>
+      </GlassCard>
+      {guard.dialog}
+    </div>
+  )
+}
+
+/** Unggah foto (maks. 3) untuk form settlement. */
+function useFotoList() {
+  const [fotos, setFotos] = useState<FotoLokal[]>([])
+  const [busy, setBusy] = useState(false)
+  const tambah = async (files: File[]) => {
+    setBusy(true)
+    try {
+      const baru: FotoLokal[] = []
+      for (const f of files.slice(0, 3 - fotos.length)) {
+        const blob = await compressImage(f)
+        baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
+      }
+      setFotos((x) => [...x, ...baru].slice(0, 3))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const hapus = (fid: string) =>
+    setFotos((x) => {
+      const t = x.find((f) => f.id === fid)
+      if (t) URL.revokeObjectURL(t.url)
+      return x.filter((f) => f.id !== fid)
+    })
+  return { fotos, busy, tambah, hapus }
+}
+
+/**
+ * Create Settlement: pertanggungjawaban pengaju setelah pengajuan pengadaan disetujui. Foto struk pembelian
+ * dan foto barang yang dibeli (keduanya wajib), tanggal & nominal belanja. Setelah itu Admin/Cashier merealisasi
+ * dengan akun COA dan mencetak voucher petty cash beserta lampiran ini.
+ */
+export function SettlementPetty() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const { id = '' } = useParams()
+  const { rec, loading, error } = useSatuPetty(id)
+  const [tanggal, setTanggal] = useState(todayIso())
+  const [nominal, setNominal] = useState<string | null>(null)
+  const [catatan, setCatatan] = useState('')
+  const struk = useFotoList()
+  const barang = useFotoList()
+  const [kirim, setKirim] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari settlement?', detail: 'Foto struk dan barang yang belum dikirim akan hilang.' })
+  if (loading) return <Loading />
+  if (!rec) return <GlassCard className="p-space-md">{error ?? 'Pengajuan tidak ditemukan.'}</GlassCard>
+  const uid = app.session.user?.id ?? null
+  if (!(milikSendiri(rec, uid) || bolehRealisasi(app.role))) return <GlassCard className="p-space-md">Settlement dibuat oleh pengaju.</GlassCard>
+  if (rec.status !== 'Disetujui') return <GlassCard className="p-space-md">Settlement hanya untuk pengajuan yang sudah disetujui.</GlassCard>
+  if (rec.data.realisasi) return <GlassCard className="p-space-md">Pengajuan {rec.no} sudah direalisasi.</GlassCard>
+  const nilai = nominal ?? String(rec.total)
+  const n = parseAngka(nilai) ?? 0
+
+  const simpan = async () => {
+    if (n <= 0) return setErr('Isi nominal yang dibelanjakan.')
+    if (!struk.fotos.length) return setErr('Foto struk / nota pembelian wajib.')
+    if (!barang.fotos.length) return setErr('Foto barang yang dibeli wajib.')
+    setKirim(true)
+    try {
+      const up = async (fotos: FotoLokal[], nama: string) => {
+        const out: Photo[] = []
+        for (const [i, f] of fotos.entries()) out.push(await app.backend.uploadPhoto(`petty-${rec.id}`, f.blob, `${nama}-${i + 1}.jpg`))
+        return out
+      }
+      const settlement: Settlement = {
+        tanggal,
+        nominal: n,
+        struk: await up(struk.fotos, 'settlement-struk'),
+        barang: await up(barang.fotos, 'settlement-barang'),
+        catatan: catatan.trim(),
+        by: uid,
+        nama: app.displayName,
+        at: new Date().toISOString(),
+      }
+      await app.backend.savePetty({ ...rec, data: { ...rec.data, settlement } }, false)
+      guard.bypass()
+      keTerkirim({
+        judul: `Settlement ${rec.no} terkirim`,
+        detail: `${rec.data.uraian} · menunggu realisasi Admin/Cashier`,
+        peringatan: n > rec.total ? `Belanja melebihi pengajuan sebesar ${rupiah(n - rec.total)}.` : undefined,
+        baris: [
+          ['Pengajuan', rupiah(rec.total)],
+          ['Dibelanjakan', rupiah(n)],
+          ['Sisa dikembalikan', rupiah(Math.max(0, rec.total - n))],
+        ],
+        aksi: [{ to: `/finance/petty/pengajuan/${encodeURIComponent(rec.id)}`, label: 'Lihat pengajuan' }],
+      })
+    } catch (e) {
+      setErr(pesan(e))
+      setKirim(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-xs p-space-md">
+        <span className="tabular text-tag uppercase text-on-surface-variant">
+          {rec.no} · Create Settlement
+        </span>
+        <span className="text-headline-md font-bold text-on-surface">{rec.data.uraian}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          Disetujui {rupiah(rec.total)} · {rec.data.qty} {rec.data.satuan}
+        </span>
+      </GlassCard>
+      <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Tanggal belanja" htmlFor="st-tgl">
+            <Input id="st-tgl" type="date" max={todayIso()} value={tanggal} onChange={(e) => e.target.value && setTanggal(e.target.value)} />
+          </Field>
+          <Field label="Nominal dibelanjakan (Rp)" htmlFor="st-nom">
+            <Input id="st-nom" numeric inputMode="numeric" value={nilai} onChange={(e) => (setErr(null), setNominal(e.target.value))} />
+          </Field>
+        </div>
+        {n > rec.total && <span className="text-body-sm font-semibold text-error">Melebihi pengajuan sebesar {rupiah(n - rec.total)}.</span>}
+        <FotoWajib label="Foto struk / nota pembelian" hint="Struk atau nota terbaca: toko, tanggal, barang, dan nominal." fotos={struk.fotos} busy={struk.busy} disabled={kirim} onAdd={(f) => void struk.tambah(f)} onRemove={struk.hapus} />
+        <FotoWajib label="Foto barang yang dibeli" hint="Barang/jasa yang dibeli, terlihat jelas." fotos={barang.fotos} busy={barang.busy} disabled={kirim} onAdd={(f) => void barang.tambah(f)} onRemove={barang.hapus} />
+        <Field label="Catatan (opsional)" htmlFor="st-cat">
+          <Input id="st-cat" autoComplete="off" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+        </Field>
+        <ErrorBox text={err} />
+        <Button size="lg" disabled={kirim || struk.busy || barang.busy} onClick={() => void simpan()}>
+          {kirim ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+          {kirim ? 'Mengirim…' : 'Kirim settlement'}
         </Button>
       </GlassCard>
       {guard.dialog}

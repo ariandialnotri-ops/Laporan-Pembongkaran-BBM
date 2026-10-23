@@ -92,12 +92,12 @@ export function buildWaQq(
   spbu: string,
   tanggalPanjang: string,
   zona = '',
-  /** Kontrol Kualitas Harian: hasil water content tangki pendam ikut dalam satu laporan. */
+  /** Laporan gabungan Kualitas Harian: hasil water content tangki pendam ikut dalam satu laporan. */
   air?: { rec: AirRecord; tanks: Tank[] },
 ) {
   const kv = (k: string, v: string) => `${k.padEnd(10)}: ${v}`
   const L: string[] = [
-    air ? '*Laporan Kontrol Kualitas Harian BBM*' : '*Laporan Uji Kualitas Harian BBM*',
+    air ? '*Laporan Kualitas Harian BBM (Density & Water Content)*' : '*Laporan Uji Kualitas Harian BBM*',
     spbu,
     `Tanggal ${tanggalPanjang}, ${q.jam}${zona ? ` ${zona}` : ''}`,
     '',

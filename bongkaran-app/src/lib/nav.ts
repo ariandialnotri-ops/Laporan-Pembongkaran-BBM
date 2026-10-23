@@ -29,8 +29,12 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/plan', title: 'Plan Pengiriman', parent: '/delivery' },
   { href: '/plan/baru', title: 'Permintaan Baru (MS2)', parent: '/plan' },
   { href: '/plan/so/', title: 'Edit SO & LO', parent: '/plan' },
-  { href: '/kualitas', title: 'Kontrol Kualitas Harian', parent: '/operation' },
-  { href: '/kualitas/', title: 'Form Kontrol Kualitas Harian', parent: '/kualitas' },
+  { href: '/kualitas', title: 'Kualitas Harian', parent: '/operation' },
+  { href: '/kualitas/density', title: 'Density Harian', parent: '/kualitas' },
+  { href: '/kualitas/kirim', title: 'Kirim ke Grup WA', parent: '/kualitas' },
+  { href: '/kualitas/', title: 'Form Density Harian', parent: '/kualitas/density' },
+  { href: '/air', title: 'Water Content Harian', parent: '/kualitas' },
+  { href: '/air/', title: 'Form Water Content', parent: '/air' },
   { href: '/sample', title: 'Kualitas Pasca Penerimaan', parent: '/operation' },
   { href: '/sample/', title: 'Uji Pasca Penerimaan', parent: '/sample' },
   { href: '/kaleng', title: 'Kaleng Sample', parent: '/operation' },
@@ -89,6 +93,7 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/finance/petty/pengajuan/', title: 'Detail Pengajuan', parent: '/finance/petty/pengajuan' },
   { href: '/finance/petty/pengajuan', title: 'Pengajuan Pengadaan & Reimburse', parent: '/finance/petty' },
   { href: '/finance/petty/realisasi/', title: 'Form Realisasi', parent: '/finance/petty/realisasi' },
+  { href: '/finance/petty/settlement/', title: 'Create Settlement', parent: '/finance/petty/pengajuan' },
   { href: '/finance/petty/realisasi', title: 'Realisasi Petty Cash', parent: '/finance' },
   { href: '/wbs', title: 'Whistleblowing System', parent: '/patrol' },
   { href: '/wbs/', title: 'Form Laporan WBS', parent: '/wbs' },
@@ -147,6 +152,9 @@ export function parentOf(pathname: string) {
   return pageFor(pathname)?.parent || null
 }
 
-export function titleFor(pathname: string) {
-  return GRUP.find((g) => g.href === pathname)?.title ?? pageFor(pathname)?.title ?? 'FLOQ'
+export function titleFor(pathname: string, role?: string | null) {
+  const t = GRUP.find((g) => g.href === pathname)?.title ?? pageFor(pathname)?.title ?? 'FLOQ'
+  // Petty cash disebut "Pengajuan Anggaran" untuk peran selain ABH & Admin/Cashier.
+  if (role && role !== 'abh' && role !== 'admin' && pathname.startsWith('/finance/petty')) return t.replace(/Pengajuan Pengadaan & Reimburse|Pengajuan Petty Cash|Petty Cash/, 'Pengajuan Anggaran')
+  return t
 }

@@ -385,12 +385,12 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib** (HP, satu
   - LO lama di atas 8.000 L dipecah otomatis menjadi beberapa baris (latar kuning + catatan).
   - Tombol **Batal** dan **Simpan & kembali**; simpan otomatis kembali ke Tracking LO asal (`/plan` atau `?dari=/laporan/lo`). Keluar dengan perubahan belum disimpan memunculkan konfirmasi.
 
-### 9.7 Kontrol Kualitas Harian (density + water content)
-- Satu menu **Kontrol Kualitas Harian** menggantikan menu Kualitas Harian dan Water Content Tangki (rute lama `/air` dialihkan ke `/kualitas`). Sekali sehari di shift 1, paling lambat 10:00.
-- Urutan form: kartu kepala → **Uji kualitas (density)** per produk → **Water content tangki pendam** per tangki (tinggi air mm + tombol Nihil, foto stik pasta air, tindakan wajib bila ada air, kartu bergaris merah bila ada air) → **Langkah terakhir** (foto struk pump test, foto pengembalian minyak, catatan) → Selesaikan.
-- **Setiap kartu input (produk & tangki) punya kotak Simpan sendiri**: amber bergaris tebal + tombol biru "Simpan" selama belum disimpan, hijau "Tersimpan jam" + "Simpan ulang" setelahnya; kartu yang belum disimpan bergaris amber. Selesai ditolak bila ada kartu belum disimpan.
-- Selesai = simpan uji kualitas (bbm_daily kind qq) **dan** water content (bbm_air), **foto struk pump test diunggah ke riwayat kualitas aplikasi (tidak ikut kolase WhatsApp grup SPBU)**, lalu **satu kolase** foto hydrometer, stik pasta air per tangki, dan pengembalian minyak (tiap foto bercap jam, SPBU, hasil) dan **satu laporan WhatsApp** "Laporan Kontrol Kualitas Harian BBM" berisi density per produk dan blok water content per tangki.
-- **Stok awal wajib**, sama dengan Input Bongkaran: selama stok awal shift berjalan belum diisi, kartu amber "Isi stok awal" tampil di atas, seluruh form dikunci (`fieldset disabled`, pudar 60%), dan tombol akhir menjadi abu-abu bergembok "Isi stok awal dulu".
+### 9.7 Kualitas Harian (Density Harian, Water Content Harian, Kirim ke grup WA)
+- Menu **Kualitas Harian** (`/kualitas`) berisi dua submenu terpisah, masing-masing dengan form & laporan WhatsApp sendiri, sekali sehari di shift 1 paling lambat 10:00:
+  - **Density Harian** (`/kualitas/density` → form `/kualitas/:tanggal/1`): density, suhu, pump test per produk, foto hydrometer, foto struk pump test (disimpan di riwayat aplikasi, **tidak ikut kolase grup WA**), foto pengembalian minyak. Dikunci sampai stok awal shift diisi.
+  - **Water Content Harian** (`/air` → `/air/isi`): per tangki tinggi air (tombol Nihil), foto stik pasta air, tindakan wajib bila ada air.
+- **Kirim ke grup WA** (`/kualitas/kirim`): tombol hijau aktif setelah keduanya selesai hari ini (abu-abu bergembok + alasan bila belum). Satu kolase berisi foto density & water content (foto disimpan sementara 3 hari di HP pengisi) + satu laporan gabungan "Laporan Kualitas Harian BBM (Density & Water Content)".
+- **Setiap kartu input (produk & tangki) punya kotak Simpan sendiri**: amber bergaris tebal + tombol biru "Simpan" selama belum disimpan, hijau "Tersimpan jam" + "Simpan ulang" setelahnya (`components/bongkaran/simpan-baris.tsx`). Selesai ditolak bila ada kartu belum disimpan.
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
 - **Uji kualitas (density)**: kartu per produk: Produk, Density, Suhu, Pump test, tangga (density observasi, D15, acuan D15 bongkaran, selisih), baris status + **tombol Simpan per baris** ("Tersimpan jam" / "Belum disimpan"). Uji produk lain.
   - **Langkah terakhir**: PhotoSlot wajib *Foto struk pump test* & *Foto pengembalian minyak ke tangki*.
@@ -471,6 +471,21 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 - Tombol aksi sesuai status: **Absen masuk**, **Mulai istirahat**, **Selesai istirahat**, **Absen keluar**. Tiap aksi meminta izin lokasi (GPS) lalu membuka pemindai **QR absensi SPBU**; ditolak bila di luar radius atau QR bukan milik SPBU ini.
 - Personil hanya melihat dirinya sendiri (akun ditautkan di Daftar Personil); ABH/pengawas melihat semua dan boleh mengabsenkan.
 - **Rekap** bulanan per personil (hadir, terlambat, jam kerja, istirahat) + unduh Excel. **Pengaturan** (ABH/pengawas): titik lokasi, radius, unduh/ganti poster QR A4.
+
+### 9.14b Inbox & Housekeeping
+- **Inbox**: satu kartu dropdown per modul (ikon modul: Operation, Delivery, HSSE & Guard Patrol, Finance, plus **Perawatan** (kunci pas) dan **Housekeeping** (sapu)), lencana jumlah (merah bila ada yang lewat), ketuk untuk membuka rincian.
+- **Housekeeping** (`/ops/kalender?kategori=hk`): kalender progres sebulan (persen form lengkap, warna status, titik merah = temuan). Ketuk tanggal → pop up daftar area → ketuk area → **form checklist dalam pop up**; simpan menutup pop up dan memperbarui kalender. Menu Perawatan & Housekeeping terpisah.
+- **Riwayat**: baris riwayat yang punya data belum closing menampilkan lonceng amber + teks (mis. "2 bongkaran belum selesai", "3 LO belum closed"); menu Riwayat berlencana jumlahnya.
+- **Penjelasan fitur** tidak ditulis di halaman/kartu, tetapi lewat ikon **Information** (ⓘ, `components/ui/info-pop.tsx`) yang membuka pop up.
+
+### 9.14c Dashboard pilihan per peran
+- Chip pilihan di atas Dashboard: **ABH**: Operation, Sales/Finance, HSSE & Guard Patrol; **pengawas & kepala shift**: Operation, HSSE & Guard Patrol; **Admin/Cashier**: Sales/Finance; **Security**: Security, HSSE; **Cleaning Service**: Housekeeping. Pilihan terakhir diingat per perangkat.
+- **Sales/Finance**: penjualan BBM (totalizer × harga), closing shift (setoran & selisih), petty cash. **HSSE**: stop penyaluran, proteksi kebakaran (APAR), guard tour, insiden, grounding. Proteksi kebakaran pindah dari Dashboard Operation ke HSSE.
+
+### 9.14d Pengajuan Anggaran (petty cash)
+- Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
+- Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.
+- **Stop penyaluran**: setelah memilih produk, centang **nozzle yang berhenti** per produk (otomatis tercentang semua, bisa dilepas); nozzle tampil di ringkasan & riwayat.
 
 ### 9.15 Laporan SO Bulanan (Report > Stock Opname)
 - Pilih periode (tanggal 1 s.d. akhir bulan) lalu **Generate 1 klik**: PDF atau Excel sesuai format SO.

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { TakarRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
@@ -69,9 +70,9 @@ export function MenuTakaran() {
   const nama = (key: string) => (app.settings.nozzles ?? []).find((n) => n.nama.trim().toUpperCase() === key)?.nama.trim() ?? hariIni.find((r) => r.data.nozzle.toUpperCase() === key)?.data.nozzle ?? key
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Pilih nozzle, lalu uji dengan bejana ukur 20 L untuk opsi Preset dan Manual. Toleransi: selisih tidak boleh kurang dari {TOLERANSI_TAKAR_ML} ml.
-      </p>
+      <InfoHalaman judul="Uji Takaran">
+        <p>Pilih nozzle, lalu uji dengan bejana ukur 20 L untuk opsi Preset dan Manual. Toleransi: selisih tidak boleh kurang dari {TOLERANSI_TAKAR_ML} ml.</p>
+      </InfoHalaman>
       <section aria-labelledby="takar-nozzle" className="animate-entrance-2 flex flex-col gap-space-xs">
         <SectionHeader id="takar-nozzle" title="Nozzle" action={<span className="tabular text-body-sm text-on-surface-variant">{daftar.size}</span>} />
         {[...daftar].map(([key, prod]) => {

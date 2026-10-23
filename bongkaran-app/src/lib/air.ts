@@ -5,8 +5,9 @@
  * tabel bbm_air sebagai shift 1. Foto tidak disimpan: digabung menjadi kolase dan dikirim ke WhatsApp.
  */
 import { formatLiter, parseAngka } from '@/lib/format'
+import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
 import type { Shift } from '@/lib/shift'
-import type { Photo } from '@/lib/sop'
+import type { Photo, Settings } from '@/lib/sop'
 import { tankName, volumeTank, type Tank } from '@/lib/tank'
 
 export interface AirTangki {
@@ -70,7 +71,7 @@ const namaWa = (t: Tank) => (/^\d+$/.test(t.tankNo) ? `T${t.tankNo} ${t.produk}`
 
 /**
  * Baris laporan WhatsApp water content: hasil per tangki (blok monospace, titik dua sejajar dengan
- * label `kiri` lain), hasil, dan tindakan. Bagian dari laporan Kontrol Kualitas Harian.
+ * label `kiri` lain), hasil, dan tindakan. Dipakai laporan water content dan laporan gabungan Kualitas Harian.
  */
 export function barisWaAir(rec: AirRecord, tanks: Tank[], kiri: string[] = []) {
   const d = rec.data
@@ -91,4 +92,25 @@ export function barisWaAir(rec: AirRecord, tanks: Tank[], kiri: string[] = []) {
       ...berair.map((t) => `Tindakan ${tankName(t.tankNo)}: ${d.tangki[t.id]?.tindakan || '-'}`),
     ],
   }
+}
+
+/** Teks laporan WhatsApp water content (isian dalam blok monospace supaya titik dua sejajar). */
+export function teksWaAir(rec: AirRecord, tanks: Tank[], s: Pick<Settings, 'namaSpbu' | 'kodeSpbu'>, zona = '') {
+  const d = rec.data
+  const { kv, tangki, hasil } = barisWaAir(rec, tanks, ['Shift', 'Petugas', 'Status'])
+  return [
+    '*Laporan Water Content Tangki Pendam*',
+    namaSpbuWa(s),
+    `Tanggal ${tanggalPanjang(rec.tanggal)}, ${d.jam}${zona ? ` ${zona}` : ''}`,
+    '',
+    '```',
+    kv('Shift', String(rec.shift)),
+    kv('Petugas', d.petugas || '-'),
+    kv('Status', d.terlambat ? 'Terlambat (lewat 10:00)' : 'Tepat waktu'),
+    '',
+    ...tangki,
+    '```',
+    ...hasil,
+    ...(d.catatan ? [`Catatan: ${d.catatan}`] : []),
+  ].join('\n')
 }

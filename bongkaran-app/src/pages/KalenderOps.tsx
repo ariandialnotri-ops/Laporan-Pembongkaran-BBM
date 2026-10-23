@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CalendarClock, CalendarDays, ChevronRight } from 'lucide-react'
+import { BrushCleaning, CalendarClock, ChevronRight, Wrench } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { GlassCard } from '@/components/ui/glass-card'
+import { InfoPop } from '@/components/ui/info-pop'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
@@ -15,6 +16,7 @@ import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { formKategori, jatuhTempoAktivitas, judulForm, kepatuhanBulan, opsId, statusOps, STATUS_LABEL, type KepatuhanHari, type OpsStatus } from '@/lib/ops'
 import { useOps } from '@/lib/use-ops'
 import { cn } from '@/lib/utils'
+import { OpsIsi } from '@/pages/Operasional'
 
 type Kategori = 'hk' | 'rawat'
 const HARI = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
@@ -41,11 +43,13 @@ export function KalenderOps() {
   const hariIni = todayIso()
   const [bulan, setBulan] = useState(hariIni.slice(0, 7))
   const [buka, setBuka] = useState<string | null>(null)
+  // Form yang dibuka sebagai pop up dari tanggal terpilih.
+  const [isi, setIsi] = useState<string | null>(null)
   const pilihan = (['hk', 'rawat'] as Kategori[]).filter((k) => formKategori(app.role, app.settings, k).length)
   const kat = (params.get('kategori') as Kategori | null) ?? (app.role === 'cs' ? 'hk' : (pilihan[0] ?? 'rawat'))
   // Riwayat 2 bulan sebelumnya: untuk jadwal aktivitas berkala (mingguan) yang jatuh tempo.
   const dari = todayIso(addDays(new Date(`${bulan}-01T00:00:00`), -62))
-  const { recs, error } = useOps(dari, akhirBulan(bulan))
+  const { recs, error, muat } = useOps(dari, akhirBulan(bulan))
   const forms = useMemo(() => formKategori(app.role, app.settings, kat), [app.role, app.settings, kat])
   const k = useMemo(() => (recs ? kepatuhanBulan(forms, recs, bulan, hariIni) : null), [forms, recs, bulan, hariIni])
   const tempo = useMemo(() => (recs && bulan === hariIni.slice(0, 7) ? jatuhTempoAktivitas(forms, recs, hariIni) : []), [forms, recs, bulan, hariIni])
@@ -60,13 +64,16 @@ export function KalenderOps() {
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start gap-space-sm">
           <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary shadow-sm">
-            <CalendarDays className="size-5" />
+            {kat === 'hk' ? <BrushCleaning className="size-5" /> : <Wrench className="size-5" />}
           </span>
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-tag uppercase text-primary">Kalender progres</span>
             <span className="text-headline-md font-bold text-on-surface">{kat === 'hk' ? 'Housekeeping' : 'Perawatan peralatan'}</span>
-            <span className="text-body-sm text-on-surface-variant">Persentase form harian yang terisi lengkap setiap tanggal. Ketuk tanggal untuk rinciannya.</span>
           </div>
+          <InfoPop judul={`Kalender progres ${kat === 'hk' ? 'housekeeping' : 'perawatan'}`}>
+            <p>Setiap tanggal menampilkan persentase form harian yang terisi lengkap dan statusnya (hijau semua lengkap, amber ≥ 50%, oranye sebagian, merah belum diisi; titik merah = ada temuan).</p>
+            <p>Ketuk tanggal untuk melihat daftar {kat === 'hk' ? 'area' : 'kartu'}, lalu ketuk salah satunya untuk mengisi form langsung di pop up.</p>
+          </InfoPop>
         </div>
         {pilihan.length > 1 && (
           <ChipFilter
@@ -131,6 +138,7 @@ export function KalenderOps() {
                   >
                     <span>{Number(h.tanggal.slice(8))}</span>
                     {!h.nanti && <span className="tabular text-xs font-semibold opacity-90">{pct}%</span>}
+                    {h.temuan > 0 && <span aria-hidden="true" className="mt-0.5 size-1.5 rounded-full bg-error" />}
                   </button>
                 )
               })}
@@ -176,15 +184,34 @@ export function KalenderOps() {
         </>
       )}
 
-      <Sheet open={!!buka} onOpenChange={(o) => !o && setBuka(null)} title={buka ? formatTanggalIso(buka) : ''} description={`${kat === 'hk' ? 'Checklist housekeeping' : 'Kartu perawatan'} harian`}>
+      <Sheet open={!!buka && !isi} onOpenChange={(o) => !o && setBuka(null)} title={buka ? formatTanggalIso(buka) : ''} description={`${kat === 'hk' ? 'Checklist housekeeping' : 'Kartu perawatan'} harian · ${detail.filter((x) => x.st !== 'kosong' && x.st !== 'sebagian').length}/${detail.length} lengkap · ketuk untuk mengisi`}>
         <div className="flex flex-col divide-y divide-outline-variant/40">
           {detail.map((x) => (
-            <Link key={x.id} to={`/ops/${x.id}?tanggal=${buka}`} className="flex items-center justify-between gap-space-sm py-space-sm">
+            <button key={x.id} type="button" onClick={() => setIsi(x.id)} className="flex min-h-12 items-center justify-between gap-space-sm py-space-sm text-left">
               <span className="text-body-md text-on-surface">{judulForm(x.id)}</span>
-              <Pill tone={NADA[x.st]}>{STATUS_LABEL[x.st]}</Pill>
-            </Link>
+              <span className="flex items-center gap-1">
+                <Pill tone={NADA[x.st]}>{STATUS_LABEL[x.st]}</Pill>
+                <ChevronRight aria-hidden="true" className="size-5 text-on-surface-variant" />
+              </span>
+            </button>
           ))}
         </div>
+      </Sheet>
+
+      <Sheet open={!!buka && !!isi} onOpenChange={(o) => !o && setIsi(null)} title={isi ? judulForm(isi) : ''} description={buka ? formatTanggalIso(buka) : ''} className="h-[92dvh]">
+        {buka && isi && (
+          <OpsIsi
+            key={`${isi}-${buka}`}
+            sematan={{
+              form: isi,
+              tanggal: buka,
+              onSelesai: () => {
+                setIsi(null)
+                void muat()
+              },
+            }}
+          />
+        )}
       </Sheet>
     </div>
   )

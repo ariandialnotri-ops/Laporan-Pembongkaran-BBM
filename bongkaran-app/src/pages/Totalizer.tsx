@@ -15,6 +15,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { idShift } from '@/lib/catatan'
 import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
@@ -63,9 +64,9 @@ export function TotalizerMenu() {
   const rec = (tanggal: string, shift: Shift) => recs.find((r) => r.id === idShift(tanggal, shift))
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan = akhir − awal.
-      </p>
+      <InfoHalaman judul="Totalizer">
+        <p>Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan = akhir − awal.</p>
+      </InfoHalaman>
       <ErrorBox text={error} />
       <PilihShift
         status={(k) => statusShift(k, totalizerLengkap(rec(k.tanggal, k.shift), nozzles))}

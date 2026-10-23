@@ -1,8 +1,9 @@
 /**
- * Finance > Petty Cash: pengajuan pengadaan barang/jasa atau reimburse oleh anggota di bawah ABH (kepala
- * shift, pengawas, Admin/Cashier, security, cleaning service), persetujuan 1 Admin/Cashier, persetujuan
- * akhir ABH, lalu realisasi oleh Admin/Cashier dengan akun COA (One Touch Solution) dan voucher realisasi.
- * Aturan alur juga dijaga trigger database bbm_petty.
+ * Finance > Petty Cash (disebut "Pengajuan Anggaran" untuk peran selain ABH & Admin/Cashier): pengajuan
+ * pengadaan barang/jasa atau reimburse oleh seluruh personil kecuali ABH, persetujuan 1 Admin/Cashier,
+ * persetujuan akhir ABH, Create Settlement oleh pengaju (foto struk pembelian & foto barang), lalu realisasi
+ * oleh Admin/Cashier dengan akun COA (One Touch Solution) dan voucher petty cash. Aturan alur juga dijaga
+ * trigger database bbm_petty.
  */
 import type { Coa } from '@/lib/coa'
 import type { Role } from '@/lib/roles'
@@ -27,7 +28,10 @@ export const JENIS_PETTY: { value: JenisPetty; label: string; desc: string }[] =
   { value: 'reimburse', label: 'Reimburse', desc: 'Sudah dibayar sendiri, nota dilampirkan, kas mengganti setelah disetujui' },
 ]
 
-/** Peran yang boleh mengajukan: anggota di bawah ABH (ABH adalah pemberi persetujuan akhir). */
+/** Nama modul: "Petty Cash" untuk ABH & Admin/Cashier, "Pengajuan Anggaran" untuk personil lain. */
+export const namaModulPetty = (role: Role | null) => (role === 'abh' || role === 'admin' ? 'Petty Cash' : 'Pengajuan Anggaran')
+
+/** Peran yang boleh mengajukan: seluruh personil kecuali ABH (ABH adalah pemberi persetujuan akhir). */
 export const PERAN_PENGAJU: Role[] = ['kashift', 'pengawas', 'admin', 'security', 'cs']
 /** Realisasi (pilih COA, catat nota, voucher) oleh Admin/Cashier; ABH sebagai cadangan. */
 export const bolehRealisasi = (role: Role | null) => role === 'admin' || role === 'abh'
@@ -47,6 +51,21 @@ export interface Realisasi {
   catatan: string
   /** Foto nota/kuitansi (wajib). */
   nota: Photo[]
+  by: string | null
+  nama: string
+  at: string
+}
+
+/** Create Settlement: pertanggungjawaban pengaju setelah pengajuan disetujui (sebelum realisasi). */
+export interface Settlement {
+  tanggal: string
+  /** Nominal yang benar-benar dibelanjakan. */
+  nominal: number
+  /** Foto struk / nota pembelian (wajib). */
+  struk: Photo[]
+  /** Foto barang yang dibeli (wajib). */
+  barang: Photo[]
+  catatan: string
   by: string | null
   nama: string
   at: string
@@ -73,6 +92,7 @@ export interface PettyData {
   diajukanNama: string
   review?: Tanda
   keputusan?: Tanda
+  settlement?: Settlement
   realisasi?: Realisasi
 }
 
@@ -98,7 +118,11 @@ export const jenisPetty = (r: PettyRecord): JenisPetty => r.data.jenis ?? 'penga
 export const coaPetty = (r: PettyRecord) => r.data.realisasi?.coa ?? r.data.coa ?? null
 
 /** Status tampilan: pengajuan yang disetujui dan sudah direalisasi / dibayar (reimburse). */
-export const labelStatus = (r: PettyRecord) => (r.status === 'Disetujui' && r.data.realisasi ? (jenisPetty(r) === 'reimburse' ? 'Dibayar' : 'Terealisasi') : r.status)
+export const labelStatus = (r: PettyRecord) =>
+  r.status === 'Disetujui' && r.data.realisasi ? (jenisPetty(r) === 'reimburse' ? 'Dibayar' : 'Terealisasi') : r.status === 'Disetujui' && perluSettlement(r) ? 'Menunggu Settlement' : r.status === 'Disetujui' && r.data.settlement ? 'Settlement' : r.status
+
+/** Pengadaan yang disetujui wajib Create Settlement (struk & foto barang) sebelum direalisasi. */
+export const perluSettlement = (r: PettyRecord) => r.status === 'Disetujui' && jenisPetty(r) === 'pengadaan' && !r.data.settlement && !r.data.realisasi
 
 /** Rekap per COA: pengajuan disetujui yang sudah direalisasi (COA dipilih saat realisasi). */
 export function rekapCoa(recs: PettyRecord[]) {
@@ -142,4 +166,42 @@ export function voucherBulan(recs: PettyRecord[], bulan: string): Voucher[] {
   return [...per.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([tanggal, baris]) => ({ nomor: `${Number(tanggal.slice(8))}/COCO/${tanggal.slice(5, 7)}/${tanggal.slice(0, 4)}`, tanggal, baris, total: baris.reduce((a, b) => a + b.jumlah, 0) }))
+}
+
+/** Satu baris voucher petty cash cetak (rentang tanggal pengajuan) beserta lampiran fotonya. */
+export interface BarisVoucherCetak extends BarisVoucher {
+  uraian: string
+  tanggalPengajuan: string
+  tanggalRealisasi: string
+  pengaju: string
+  /** Foto struk/nota (settlement, nota realisasi, atau nota reimburse). */
+  struk: Photo[]
+  /** Foto barang yang dibeli (settlement). */
+  barang: Photo[]
+}
+
+/**
+ * Voucher petty cash untuk rentang tanggal pengajuan (mis. 1 s.d. 7 Oktober): pengajuan disetujui yang
+ * sudah direalisasi dengan akun COA, urut tanggal pengajuan, lengkap dengan foto struk & barang.
+ */
+export function voucherRentang(recs: PettyRecord[], dari: string, sampai: string): BarisVoucherCetak[] {
+  return recs
+    .filter((r) => r.status === 'Disetujui' && r.data.realisasi && coaPetty(r) && r.tanggal >= dari && r.tanggal <= sampai)
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.no.localeCompare(b.no))
+    .map((r) => {
+      const x = r.data.realisasi!
+      const st = r.data.settlement
+      return {
+        coa: coaPetty(r)!.activity,
+        keterangan: `${jenisPetty(r) === 'reimburse' ? 'Reimburse ' : ''}${r.data.uraian}`,
+        jumlah: x.nominal,
+        no: r.no,
+        uraian: r.data.uraian,
+        tanggalPengajuan: r.tanggal,
+        tanggalRealisasi: x.tanggal,
+        pengaju: r.data.diajukanNama,
+        struk: [...(st?.struk ?? []), ...x.nota, ...(jenisPetty(r) === 'reimburse' ? r.data.lampiran : [])],
+        barang: st?.barang ?? [],
+      }
+    })
 }

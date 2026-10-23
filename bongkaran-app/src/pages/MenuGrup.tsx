@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, CircleCheck, Fuel, Wallet } from 'lucide-react'
+import { BellDot, ChevronRight, CircleCheck, Fuel, Wallet } from 'lucide-react'
 import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
 import { Loading } from '@/components/bongkaran/load-state'
 import { MenuCard, type MenuItem } from '@/components/bongkaran/menu-card'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
-import { EXPORT, patrolItems, riwayatItems, useMenu, type GrupKey, type ItemMenu } from '@/components/shell/menu-data'
+import { EXPORT, patrolItems, riwayatItems, useMenu, useRiwayatTerbuka, type GrupKey, type ItemMenu } from '@/components/shell/menu-data'
 import { GlassCard } from '@/components/ui/glass-card'
+import { InfoPop } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { todayIso } from '@/lib/date'
 import { formTampil, statusOps, type OpsRecord } from '@/lib/ops'
@@ -34,7 +35,10 @@ function Judul({ grup }: { grup: GrupKey }) {
       <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-surface-container-lowest text-on-surface shadow-sm">
         <Icon className="size-5" strokeWidth={1.7} />
       </span>
-      <span className="text-body-md text-on-surface-variant">{g.desc}</span>
+      <span className="flex-1 text-body-md font-bold text-on-surface">{g.label}</span>
+      <InfoPop judul={g.label}>
+        <p>{g.desc}</p>
+      </InfoPop>
     </div>
   )
 }
@@ -54,7 +58,11 @@ export function MenuGrup({ grup }: { grup: Exclude<GrupKey, 'operation' | 'dashb
 }
 
 function Kosong() {
-  return <GlassCard level={1} className="p-space-md text-body-md text-on-surface-variant">Tidak ada fitur di grup ini untuk peran Anda.</GlassCard>
+  return (
+    <GlassCard level={1} className="p-space-md text-body-md text-on-surface-variant">
+      Tidak ada fitur di grup ini untuk peran Anda.
+    </GlassCard>
+  )
 }
 
 /**
@@ -84,14 +92,21 @@ export function MenuOperation() {
     .filter((g) => g.judul !== 'Pantauan lingkungan')
     .flatMap((g) => g.forms)
     .filter((id) => !['pompa-tangki-rutin', 'outlet-ritel'].includes(id))
-  const opsBelum = ops ? opsHarian.filter((id) => statusOps(id, ops.find((r) => r.form === id)) === 'kosong').length : 0
+  const opsBelum = ops
+    ? opsHarian.filter(
+        (id) =>
+          statusOps(
+            id,
+            ops.find((r) => r.form === id),
+          ) === 'kosong',
+      ).length
+    : 0
   const items = (menu.find((g) => g.key === 'operation')?.items ?? [])
     // Stok awal tampil sebagai kartu kewajiban di atas, bukan kartu menu.
     .filter((i) => i.path !== '/stok')
-    .map((i): ItemMenu =>
-      i.path === '/ops'
-        ? { ...i, status: !ops ? 'Memuat…' : opsBelum ? `${opsBelum} dari ${opsHarian.length} form belum hari ini` : 'Semua form hari ini terisi', badge: opsBelum }
-        : i,
+    .map(
+      (i): ItemMenu =>
+        i.path === '/ops' ? { ...i, status: !ops ? 'Memuat…' : opsBelum ? `${opsBelum} dari ${opsHarian.length} form belum hari ini` : 'Semua form hari ini terisi', badge: opsBelum } : i,
     )
 
   return (
@@ -110,9 +125,7 @@ export function MenuOperation() {
             {stok.missing ? <Fuel className="size-5" /> : <CircleCheck className="size-5" />}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className={cn('text-body-md font-bold', stok.missing ? 'text-amber-950' : 'text-on-surface')}>
-              {stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}
-            </span>
+            <span className={cn('text-body-md font-bold', stok.missing ? 'text-amber-950' : 'text-on-surface')}>{stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}</span>
             <span className={cn('text-body-sm', stok.missing ? 'text-amber-900' : 'text-on-surface-variant')}>
               {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser dihitung dari totalizer.'}
             </span>
@@ -166,6 +179,7 @@ export function MenuFinance() {
 export function MenuReport() {
   const app = useApp()
   const menu = useMenu()
+  const terbuka = useRiwayatTerbuka()
   if (!app.loaded) return <Loading />
   const items = menu.find((g) => g.key === 'report')?.items ?? []
   const riwayat = riwayatItems(app.can)
@@ -177,7 +191,7 @@ export function MenuReport() {
       {riwayat.length > 0 && (
         <section aria-labelledby="rp-riwayat" className="flex flex-col gap-space-sm">
           <SectionHeader id="rp-riwayat" title="Riwayat" />
-          <Daftar items={riwayat} />
+          <Daftar items={riwayat} terbuka={terbuka} />
         </section>
       )}
       {exp.length > 0 && (
@@ -190,22 +204,33 @@ export function MenuReport() {
   )
 }
 
-function Daftar({ items }: { items: { path: string; icon: ItemMenu['icon']; title: string; desc: string }[] }) {
+function Daftar({ items, terbuka = {} }: { items: { path: string; icon: ItemMenu['icon']; title: string; desc: string }[]; terbuka?: Record<string, string> }) {
   return (
     <GlassCard level={2} className="flex flex-col divide-y divide-outline-variant/40 overflow-hidden">
       {items.map((r) => {
         const Icon = r.icon
         return (
-          <Link key={r.path} to={r.path} className="flex min-h-16 items-center gap-space-sm px-space-md py-space-sm active:bg-surface-container-low">
-            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface-container-low text-on-surface-variant">
-              <Icon className="size-5" strokeWidth={1.7} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-body-md font-semibold text-on-surface">{r.title}</span>
-              <span className="text-body-sm text-on-surface-variant">{r.desc}</span>
-            </span>
-            <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
-          </Link>
+          <div key={r.path} className="flex items-center pr-space-md">
+            <Link to={r.path} className="flex min-h-16 min-w-0 flex-1 items-center gap-space-sm py-space-sm pl-space-md pr-space-sm active:bg-surface-container-low">
+              <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-surface-container-low text-on-surface-variant">
+                <Icon className="size-5" strokeWidth={1.7} />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-body-md font-semibold text-on-surface">{r.title}</span>
+                {terbuka[r.path] ? (
+                  <span className="flex items-center gap-1 text-body-sm font-semibold text-amber-800">
+                    <BellDot aria-hidden="true" className="size-4 shrink-0" />
+                    {terbuka[r.path]}
+                  </span>
+                ) : null}
+              </span>
+              {terbuka[r.path] && <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full bg-amber-500" />}
+              <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+            </Link>
+            <InfoPop judul={r.title}>
+              <p>{r.desc}</p>
+            </InfoPop>
+          </div>
         )
       })}
     </GlassCard>
@@ -215,9 +240,10 @@ function Daftar({ items }: { items: { path: string; icon: ItemMenu['icon']; titl
 /** Report > Riwayat. */
 export function MenuRiwayat() {
   const app = useApp()
+  const terbuka = useRiwayatTerbuka()
   if (!app.loaded) return <Loading />
   const items = riwayatItems(app.can)
-  return <div className="flex flex-col gap-space-md">{items.length ? <Daftar items={items} /> : <Kosong />}</div>
+  return <div className="flex flex-col gap-space-md">{items.length ? <Daftar items={items} terbuka={terbuka} /> : <Kosong />}</div>
 }
 
 /** Report > Export File. */

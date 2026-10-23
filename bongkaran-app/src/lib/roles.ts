@@ -126,9 +126,9 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/profil', '/profil/sandi',
     '/kalkulator',
   ],
-  security: ['/', '/laporan/bongkaran', '/laporan/lo', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
-  admin: ['/finance', '/finance/', '/laporan/so', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
-  cs: ['/', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  security: ['/', '/laporan/bongkaran', '/laporan/lo', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/finance/petty/settlement/', '/input', '/totalizer', '/totalizer/', '/laporan/totalizer', '/gts', '/gts/', '/laporan/gts', '/apar', '/apar/inspeksi', '/apar/inspeksi/', '/apar/unit/', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  admin: ['/', '/finance', '/finance/', '/laporan/totalizer', '/laporan/so', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
+  cs: ['/', '/finance', '/finance/petty', '/finance/petty/pengajuan', '/finance/petty/pengajuan/', '/finance/petty/settlement/', '/input', '/ops', '/ops/', '/lapor', '/insiden/baru', '/insiden/baru/', '/laporan/insiden', '/laporan/insiden/', '/laporan/henti', '/profil', '/profil/sandi'],
 }
 
 /** Halaman ikhtisar grup menu: boleh dibuka semua peran, isinya disaring per peran. */

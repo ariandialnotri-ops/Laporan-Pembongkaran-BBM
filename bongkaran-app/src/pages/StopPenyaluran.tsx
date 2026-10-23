@@ -7,7 +7,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
-import { HentiInfo, PilihProduk } from '@/components/insiden/henti'
+import { HentiInfo, PilihNozzle, PilihProduk } from '@/components/insiden/henti'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -134,6 +134,7 @@ export function StopPenyaluranBaru() {
   const keTerkirim = useKeTerkirim()
   const [id] = useState(() => genId('insiden'))
   const [produk, setProduk] = useState<string[]>([])
+  const [nozzle, setNozzle] = useState<string[]>([])
   const [mulai, setMulai] = useState(() => waktuLokal())
   const [d, setD] = useState<InsidenData>(() => ({
     jenis: 'henti',
@@ -207,6 +208,8 @@ export function StopPenyaluranBaru() {
 
   const kirim = async () => {
     if (!produk.length) return setError('Pilih produk yang penyalurannya dihentikan.')
+    const tanpaNozzle = produk.filter((p) => (s.nozzles ?? []).some((n) => n.produk === p) && !(s.nozzles ?? []).some((n) => n.produk === p && nozzle.includes(n.id)))
+    if (tanpaNozzle.length) return setError(`Centang nozzle ${tanpaNozzle.join(', ')} yang berhenti.`)
     if (!mulai) return setError('Isi waktu mulai berhenti.')
     if (mulai > waktuLokal()) return setError('Waktu mulai berhenti tidak boleh di masa depan.')
     if (!d.lokasi) return setError('Pilih lokasi.')
@@ -218,12 +221,13 @@ export function StopPenyaluranBaru() {
     try {
       const tanggal = mulai.slice(0, 10)
       const jam = mulai.slice(11, 16)
+      const namaNozzle = (s.nozzles ?? []).filter((n) => produk.includes(n.produk) && nozzle.includes(n.id)).map((n) => n.nama)
       const data: InsidenData = {
         ...d,
         jam,
         pelapor: d.pelapor.trim(),
-        henti: { produk, mulai },
-        riwayat: [{ at: new Date().toISOString(), oleh: d.pelapor.trim(), status: 'terbuka', catatan: `Penyaluran ${produk.join(', ')} dihentikan sejak ${labelWaktu(mulai, formatTanggalIso)}` }],
+        henti: { produk, nozzle: namaNozzle, mulai },
+        riwayat: [{ at: new Date().toISOString(), oleh: d.pelapor.trim(), status: 'terbuka', catatan: `Penyaluran ${produk.join(', ')}${namaNozzle.length ? ` (nozzle ${namaNozzle.join(', ')})` : ''} dihentikan sejak ${labelWaktu(mulai, formatTanggalIso)}` }],
       }
       await app.saveDaily({ id, kind: 'insiden', tanggal, shift: shiftKey(tanggal, jam)?.shift ?? 1, data, createdAt: Date.now(), updatedAt: Date.now(), createdBy: app.session.user?.id ?? null })
       guard.bypass()
@@ -231,6 +235,7 @@ export function StopPenyaluranBaru() {
         judul: 'Stop penyaluran dilaporkan',
         detail: `${produk.join(', ')} berhenti sejak ${labelWaktu(mulai, formatTanggalIso)}`,
         baris: [
+          ...(namaNozzle.length ? ([['Nozzle berhenti', namaNozzle.join(', ')]] as [string, string][]) : []),
           ['Alasan', d.kategori],
           ['Lokasi', `${d.lokasi}${d.aset.trim() ? `, ${d.aset.trim()}` : ''}`],
           ['Foto', `${d.foto.length} foto`],
@@ -256,8 +261,20 @@ export function StopPenyaluranBaru() {
         </span>
         <span className="text-body-sm text-on-surface-variant">{JENIS_HENTI.desc}. Penyaluran dibuka kembali lewat tindak lanjut (isi jam penyaluran kembali).</span>
         <Field label="Produk yang dihentikan">
-          <PilihProduk value={produk} onChange={(v) => (setError(null), setProduk(v))} options={produkSpbu(s)} />
+          <PilihProduk
+            value={produk}
+            onChange={(v) => {
+              setError(null)
+              // Produk baru: semua nozzle-nya langsung tercentang; produk yang dilepas: centangnya dibuang.
+              const baru = v.filter((p) => !produk.includes(p))
+              const ids = (s.nozzles ?? []).filter((n) => v.includes(n.produk)).map((n) => n.id)
+              setNozzle((x) => [...new Set([...x, ...(s.nozzles ?? []).filter((n) => baru.includes(n.produk)).map((n) => n.id)])].filter((id) => ids.includes(id)))
+              setProduk(v)
+            }}
+            options={produkSpbu(s)}
+          />
         </Field>
+        <PilihNozzle produk={produk} nozzles={s.nozzles ?? []} value={nozzle} onChange={(v) => (setError(null), setNozzle(v))} />
         <div className="grid grid-cols-2 gap-space-sm">
           <Field label="Mulai berhenti" htmlFor="sp-mulai" className="col-span-2">
             <Input id="sp-mulai" type="datetime-local" max={waktuLokal()} value={mulai} onChange={(e) => (setError(null), setMulai(e.target.value))} />

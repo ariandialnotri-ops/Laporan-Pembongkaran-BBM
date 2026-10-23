@@ -15,6 +15,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { idShift } from '@/lib/catatan'
 import {
@@ -96,9 +97,9 @@ export function ClosingMenu() {
   const rec = (tanggal: string, shift: Shift) => recs.find((r) => r.id === idShift(tanggal, shift))
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Closing setiap akhir shift oleh kepala shift dengan hitung buta: hitung fisik uang dan isi non tunai dari struk, angka penjualan baru tampil setelah dikirim. Penjualan BBM ditarik dari Totalizer shift yang sama × harga jual. Format sama dengan closing shift aplikasi One Touch Solution; laporan dikirim ke WhatsApp.
-      </p>
+      <InfoHalaman judul="Closing Shift">
+        <p>Closing setiap akhir shift oleh kepala shift dengan hitung buta: hitung fisik uang dan isi non tunai dari struk, angka penjualan baru tampil setelah dikirim. Penjualan BBM ditarik dari Totalizer shift yang sama × harga jual. Format sama dengan closing shift aplikasi One Touch Solution; laporan dikirim ke WhatsApp.</p>
+      </InfoHalaman>
       <ErrorBox text={error} />
       <PilihShift
         status={(k) => statusShift(k, !!rec(k.tanggal, k.shift))}

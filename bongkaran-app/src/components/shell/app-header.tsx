@@ -40,7 +40,7 @@ export function AppHeader() {
             </button>
           )}
           <div className="flex min-w-0 flex-col">
-            <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>
+            <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname, app.role)}</h1>
             <PemilihSpbu />
           </div>
         </div>

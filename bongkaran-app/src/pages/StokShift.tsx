@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { stokRecordId, type StokData, type StokItem, type StokRecord } from '@/lib/daily'
 import { formatTanggalIso } from '@/lib/date'
@@ -39,9 +40,9 @@ export function StokShift() {
   const rec = (tanggal: string, shift: Shift) => app.daily.find((d): d is StokRecord => d.kind === 'stok' && d.id === stokRecordId(tanggal, shift))
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">
-        Pilih shift untuk mengisi stok awal tiap produk. Pengeluaran dispenser dihitung otomatis dari totalizer shift itu.
-      </p>
+      <InfoHalaman judul="Stok Awal Shift">
+        <p>Pilih shift untuk mengisi stok awal tiap produk. Pengeluaran dispenser dihitung otomatis dari totalizer shift itu.</p>
+      </InfoHalaman>
       <PilihShift
         status={(k) => statusShift(k, stokLengkap(rec(k.tanggal, k.shift)))}
         keHalaman={(k) => `/stok/${k.tanggal}/${k.shift}`}

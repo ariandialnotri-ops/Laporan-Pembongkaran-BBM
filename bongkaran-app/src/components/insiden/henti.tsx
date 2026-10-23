@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Ban, ChevronRight, CircleCheck } from 'lucide-react'
+import { Ban, Check, ChevronRight, CircleCheck } from 'lucide-react'
 import { GlassCard } from '@/components/ui/glass-card'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -15,10 +15,63 @@ export function HentiInfo({ h }: { h: HentiPenyaluran }) {
         <b className={h.selesai ? 'text-on-surface' : 'text-on-error-container'}>
           {h.selesai ? 'Penyaluran sempat dihentikan' : 'Penyaluran dihentikan sementara'}: {h.produk.join(', ')}
         </b>
+        {!!h.nozzle?.length && <span className="font-semibold text-on-surface">Nozzle berhenti: {h.nozzle.join(', ')}</span>}
         <span className="tabular text-on-surface-variant">
           {labelWaktu(h.mulai, formatTanggalIso)} – {h.selesai ? labelWaktu(h.selesai, formatTanggalIso) : 'sekarang'} · {durasiHenti(h)}
         </span>
       </span>
+    </div>
+  )
+}
+
+/**
+ * Centang nozzle yang berhenti untuk setiap produk terpilih (dari database nozzle). Nozzle produk yang baru
+ * dipilih otomatis tercentang semua; petugas melepas centang nozzle yang masih menyalurkan.
+ */
+export function PilihNozzle({ produk, nozzles, value, onChange }: { produk: string[]; nozzles: { id: string; nama: string; produk: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+  const grup = produk.map((p) => ({ produk: p, list: nozzles.filter((n) => n.produk === p) })).filter((g) => g.list.length)
+  if (!grup.length) return null
+  return (
+    <div className="flex flex-col gap-space-sm">
+      {grup.map((g) => {
+        const semua = g.list.every((n) => value.includes(n.id))
+        return (
+          <div key={g.produk} role="group" aria-label={`Nozzle ${g.produk} yang berhenti`} className="flex flex-col gap-space-xs rounded-md bg-error-container/30 p-space-sm">
+            <div className="flex items-center justify-between gap-space-sm">
+              <span className="text-body-sm font-bold text-on-surface">
+                Nozzle {g.produk} yang berhenti ({g.list.filter((n) => value.includes(n.id)).length}/{g.list.length})
+              </span>
+              <button
+                type="button"
+                className="touch-44 text-body-sm font-semibold text-primary"
+                onClick={() => onChange(semua ? value.filter((v) => !g.list.some((n) => n.id === v)) : [...new Set([...value, ...g.list.map((n) => n.id)])])}
+              >
+                {semua ? 'Lepas semua' : 'Centang semua'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-space-xs">
+              {g.list.map((n) => {
+                const on = value.includes(n.id)
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    onClick={() => onChange(on ? value.filter((v) => v !== n.id) : [...value, n.id])}
+                    className={cn('flex min-h-11 items-center gap-1.5 rounded-md border-2 px-space-sm text-body-sm font-semibold transition-colors', on ? 'border-error bg-error text-on-error' : 'border-outline-variant bg-surface-container-lowest text-on-surface')}
+                  >
+                    <span aria-hidden="true" className={cn('flex size-5 items-center justify-center rounded border-2', on ? 'border-on-error bg-on-error text-error' : 'border-outline')}>
+                      {on && <Check className="size-3.5" strokeWidth={3} />}
+                    </span>
+                    Nozzle {n.nama}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -52,6 +52,8 @@ export interface InsidenLangkah {
 /** Pemberhentian penyaluran sementara karena kerusakan (produk yang tidak dapat disalurkan). */
 export interface HentiPenyaluran {
   produk: string[]
+  /** Nozzle yang berhenti (nama nozzle dari database), dicentang per produk terpilih. */
+  nozzle?: string[]
   /** Mulai berhenti, "YYYY-MM-DDTHH:mm" waktu lokal. */
   mulai: string
   /** Penyaluran dibuka kembali; kosong = masih berhenti. */

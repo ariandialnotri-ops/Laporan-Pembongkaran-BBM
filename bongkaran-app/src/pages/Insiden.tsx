@@ -21,6 +21,7 @@ import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { InfoHalaman } from '@/components/ui/info-pop'
 import { DEFAULT_AREAS, lokasiOptions } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { InsidenRecord } from '@/lib/daily'
@@ -96,7 +97,9 @@ export function PilihJenisInsiden() {
   const henti = app.daily.filter((x): x is InsidenRecord => x.kind === 'insiden' && !!x.data.henti && !x.data.henti.selesai)
   return (
     <div className="flex flex-col gap-space-md">
-      <p className="animate-entrance-1 px-space-xs text-body-sm text-on-surface-variant">Pilih jenis kejadian yang akan dilaporkan.</p>
+      <InfoHalaman judul="Lapor Insiden">
+        <p>Pilih jenis kejadian yang akan dilaporkan.</p>
+      </InfoHalaman>
       {henti.map((r) => (
         <Link key={r.id} to={`/laporan/insiden/${encodeURIComponent(r.id)}`} className="animate-entrance-1">
           <HentiInfo h={r.data.henti!} />
