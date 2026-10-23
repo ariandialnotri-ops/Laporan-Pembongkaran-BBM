@@ -82,7 +82,7 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
         <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-12 rounded-[14px] shadow-[0_8px_18px_rgba(15,23,42,0.18)]" />
         <span className="flex min-w-0 flex-col">
           <span className="text-headline-md font-bold tracking-tight text-on-surface">{APP_NAME}</span>
-          <span className="truncate text-[11px] leading-tight text-on-surface-variant">{TAGLINE}</span>
+          <span className="truncate text-xs leading-tight text-on-surface-variant">{TAGLINE}</span>
         </span>
       </Link>
 
@@ -118,7 +118,7 @@ export function SidebarIsi({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <Icon aria-hidden="true" className="size-[22px] shrink-0 text-on-surface-variant" strokeWidth={1.6} />
                 <span className="flex-1">{g.label}</span>
-                {g.segera && <span className="rounded-md bg-surface-container-high px-1.5 py-0.5 text-[11px] font-semibold uppercase text-on-surface-variant">Segera</span>}
+                {g.segera && <span className="rounded-md bg-surface-container-high px-1.5 py-0.5 text-xs font-semibold uppercase text-on-surface-variant">Segera</span>}
               </Link>
             )
           const ikhtisar: ItemMenu = { to: g.href, path: g.href, icon: g.icon, title: 'Daftar Fitur', desc: '', status: '' }

@@ -294,7 +294,7 @@ function FormTangki({ awal }: { awal: TankDef | null }) {
             )}
             <div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
               <Field label="Uji: tinggi (mm)" htmlFor="tk-uji">
-                <Input id="tk-uji" numeric inputMode="decimal" placeholder="1200" value={uji} onChange={(e) => setUji(e.target.value)} />
+                <Input id="tk-uji" numeric inputMode="decimal" value={uji} onChange={(e) => setUji(e.target.value)} />
               </Field>
               <span className="tabular min-w-24 pb-3 text-right text-body-md font-bold text-primary">
                 {ujiHasil?.volume !== undefined ? `${formatNumber(ujiHasil.volume, 1)} L` : ujiHasil?.error ? '-' : ''}

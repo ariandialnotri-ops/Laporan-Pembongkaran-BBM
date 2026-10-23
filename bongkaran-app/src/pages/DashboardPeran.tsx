@@ -49,7 +49,7 @@ function Angka({ items }: { items: [string, string | number, boolean?][] }) {
       {items.map(([l, v, buruk]) => (
         <div key={l} className={cn('rounded-md p-space-xs text-center', buruk ? 'bg-amber-50' : 'bg-surface-container-low')}>
           <span className={cn('tabular block text-headline-md font-bold', buruk ? 'text-amber-800' : 'text-on-surface')}>{v}</span>
-          <span className="text-[11px] uppercase text-on-surface-variant">{l}</span>
+          <span className="text-xs uppercase text-on-surface-variant">{l}</span>
         </div>
       ))}
     </div>
@@ -284,7 +284,7 @@ export function DashboardSecurity() {
           {LO_STATUS.filter((s) => !['deleted', 'alih'].includes(s.key)).map((s) => (
             <div key={s.key} className="rounded-md bg-surface-container-low p-space-xs text-center">
               <span className="tabular block text-headline-md font-bold text-on-surface">{los.filter((x) => x.st === s.key).length}</span>
-              <span className="text-[11px] uppercase text-on-surface-variant">{s.label}</span>
+              <span className="text-xs uppercase text-on-surface-variant">{s.label}</span>
             </div>
           ))}
         </div>

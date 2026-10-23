@@ -43,7 +43,7 @@ export function PilihHarian({
                 onClick={() => setTanggal(t)}
                 className={cn('flex w-14 flex-col items-center gap-1 rounded-[14px] py-2 transition-colors', aktif ? 'bg-primary text-on-primary shadow-md' : 'bg-surface-container-lowest/80 text-on-surface')}
               >
-                <span className={cn('text-[11px] uppercase', aktif ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
+                <span className={cn('text-xs uppercase', aktif ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
                 <span className="tabular text-body-md font-bold">{d.getDate()}</span>
                 <span className={cn('flex rounded-full px-1 py-0.5', aktif && 'bg-white/90')}>
                   <TitikStatus status={s} label={`${formatTanggalIso(t)}: ${s}`} />

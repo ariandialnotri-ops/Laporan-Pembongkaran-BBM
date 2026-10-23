@@ -229,7 +229,7 @@ export function TotalizerForm() {
               <span>
                 {i + 1} · Totalizer {l}
               </span>
-              <span className="tabular text-[11px] font-normal">
+              <span className="tabular text-xs font-normal">
                 {jumlah(l)}/{nozzles.length} nozzle
               </span>
             </button>
@@ -435,7 +435,7 @@ export function RiwayatTotalizer() {
           {totalBulan.map((x) => (
             <div key={x.produk} className="rounded-md bg-surface-container-low p-space-xs">
               <span className="tabular block text-body-md font-bold text-on-surface">{formatLiter(x.liter, 2)}</span>
-              <span className="text-[11px] uppercase text-on-surface-variant">{x.produk}</span>
+              <span className="text-xs uppercase text-on-surface-variant">{x.produk}</span>
             </div>
           ))}
           {!totalBulan.length && <span className="col-span-2 text-body-sm text-on-surface-variant">Belum ada penjualan tercatat bulan ini.</span>}
@@ -485,7 +485,7 @@ export function RiwayatTotalizer() {
               <div className="flex flex-wrap gap-space-xs">
                 {fotoBuka.map(({ p, label }) =>
                   srcFoto(p) ? (
-                    <a key={p.id} href={srcFoto(p)} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-0.5 text-[11px] text-on-surface-variant">
+                    <a key={p.id} href={srcFoto(p)} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-0.5 text-xs text-on-surface-variant">
                       <img src={srcFoto(p)} alt={`Totalisator manual nozzle ${label}`} className="size-16 rounded-md object-cover" />
                       {label}
                     </a>

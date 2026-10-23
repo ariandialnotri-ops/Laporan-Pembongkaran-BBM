@@ -66,6 +66,8 @@ export interface ItemMenu {
   status: string
   /** Perlu dikerjakan: badge oranye. */
   badge?: number
+  /** Nada status kartu menu (lihat MenuCard): bawaan pengingat bila ada badge. */
+  nada?: 'ok' | 'pengingat' | 'anomali'
   /** Informasi (sedang berjalan): badge hijau. */
   info?: number
 }
@@ -154,6 +156,7 @@ export function useMenu(): GrupMenu[] {
           desc: 'Density & suhu per produk, sekali sehari (shift 1, maks. 10:00)',
           status: diuji ? 'Hari ini sudah diuji' : lewat10 ? 'Terlewat (batas 10:00)' : 'Belum diuji (batas 10:00)',
           badge: diuji ? 0 : 1,
+          nada: diuji ? 'ok' : lewat10 ? 'anomali' : 'pengingat',
         },
         {
           to: '/sample',
@@ -180,6 +183,7 @@ export function useMenu(): GrupMenu[] {
           desc: 'Lapor penghentian penyaluran produk, jam penyaluran kembali, dashboard lama berhenti',
           status: hentiAktif.length ? `Berhenti: ${[...new Set(hentiAktif.flatMap((x) => x.h.produk))].join(', ')}` : 'Semua produk tersalurkan normal',
           badge: hentiAktif.length,
+          nada: hentiAktif.length ? 'anomali' : 'ok',
         },
         {
           to: '/totalizer',
@@ -188,6 +192,7 @@ export function useMenu(): GrupMenu[] {
           title: 'Totalizer',
           desc: 'Totalisator digital awal & akhir shift per nozzle dan produk',
           status: (s.nozzles ?? []).length ? `${(s.nozzles ?? []).length} nozzle · awal & akhir shift` : 'Database nozzle belum diisi',
+          nada: (s.nozzles ?? []).length ? 'ok' : 'pengingat',
         },
         {
           to: '/air',
@@ -196,6 +201,7 @@ export function useMenu(): GrupMenu[] {
           title: 'Water Content Tangki',
           desc: 'Pasta air di setiap tangki pendam, sekali sehari (shift 1, maks. 10:00)',
           status: stok.tanpaTangki ? 'Database tangki belum diisi' : 'Kolase foto + laporan WhatsApp',
+          nada: stok.tanpaTangki ? 'pengingat' : 'ok',
         },
         {
           to: '/takaran',
@@ -205,6 +211,7 @@ export function useMenu(): GrupMenu[] {
           desc: 'Bejana 20 L per nozzle, opsi Preset & Manual',
           status: takarLewatHariIni ? `${takarLewatHariIni} hasil melebihi toleransi` : takarHariIni.length ? `${takarHariIni.length} hasil hari ini` : 'Belum ada uji hari ini',
           badge: takarLewatHariIni,
+          nada: takarLewatHariIni ? 'anomali' : 'ok',
         },
         ...(adaOpsOperasional
           ? [
@@ -225,6 +232,7 @@ export function useMenu(): GrupMenu[] {
           title: 'Personil & Jadwal Shift',
           desc: 'Daftar personil SPBU, jadwal shift bulanan, dan siapa yang sedang bertugas',
           status: (s.personil ?? []).filter((p) => p.aktif).length ? `${(s.personil ?? []).filter((p) => p.aktif).length} personil aktif` : 'Daftar personil belum diisi',
+          nada: (s.personil ?? []).some((p) => p.aktif) ? 'ok' : 'pengingat',
         },
         {
           to: '/absen',
@@ -233,6 +241,7 @@ export function useMenu(): GrupMenu[] {
           title: 'Absensi Personil',
           desc: 'Absen masuk, istirahat & keluar dengan pindai QR SPBU dan GPS; rekap bulanan',
           status: typeof s.absensi?.lat === 'number' ? `Radius ${s.absensi.radius} m dari titik SPBU` : 'Lokasi & QR absensi belum diatur',
+          nada: typeof s.absensi?.lat === 'number' ? 'ok' : 'pengingat',
         },
       ],
     },
@@ -279,6 +288,7 @@ export function useMenu(): GrupMenu[] {
           desc: 'Pindai QR di unit, checklist & foto',
           status: !unitApar ? 'Data utama unit belum diisi' : aparBelum ? `${aparBelum} dari ${unitApar} unit belum bulan ini` : 'Semua unit sudah bulan ini',
           badge: aparBelum,
+          nada: !unitApar || aparBelum ? 'pengingat' : 'ok',
         },
         {
           to: '/insiden/baru',
@@ -288,6 +298,7 @@ export function useMenu(): GrupMenu[] {
           desc: 'Insiden, near miss, dan kerusakan peralatan',
           status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
           badge: insidenTerbuka,
+          nada: insidenTerbuka ? 'anomali' : 'ok',
         },
         {
           to: '/grounding',

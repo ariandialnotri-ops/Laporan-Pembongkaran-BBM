@@ -106,12 +106,12 @@ function BarisCek({ x, wajib, keBagian }: { x: ItemCek; wajib: boolean; keBagian
         {!x.ok && x.kurang.length > 0 && (
           <span className="flex flex-wrap gap-1 pt-1">
             {tampil.map((k) => (
-              <span key={k} className={cn('tabular rounded-md px-1.5 py-0.5 text-[11px] font-semibold', wajib ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
+              <span key={k} className={cn('tabular rounded-md px-1.5 py-0.5 text-xs font-semibold', wajib ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
                 {k}
               </span>
             ))}
             {x.kurang.length > 8 && (
-              <button type="button" onClick={() => setSemua(!semua)} className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+              <button type="button" onClick={() => setSemua(!semua)} className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-primary">
                 {semua ? 'Ringkas' : `+${x.kurang.length - 8} lainnya`}
               </button>
             )}

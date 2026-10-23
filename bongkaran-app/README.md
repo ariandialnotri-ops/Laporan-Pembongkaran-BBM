@@ -8,7 +8,7 @@ Logo dan ikon ada di `public/` (`floq-logo.webp` untuk halaman login,
 `floq-icon-256.png` untuk `manifest.webmanifest`).
 
 UI memakai design system **AeroShift** yang sama dengan aplikasi
-**Tepat Setoran SPBU**: kartu kaca (glassmorphism) bergaya iOS di atas kanvas
+**Tepat Setoran SPBU**: kartu putih (hampir) padat tanpa blur di atas kanvas
 gradasi dingin, dock navigasi melayang, font Inter (angka memakai `tabular-nums`)
 mengikuti referensi stitch "Sistem Serba Bisa". Brief lengkapnya ada di
 [`design-system/aeroshift/DESIGN.md`](design-system/aeroshift/DESIGN.md).

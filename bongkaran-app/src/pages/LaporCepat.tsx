@@ -373,7 +373,7 @@ export function LaporCepat() {
             {merekam ? <Square aria-hidden="true" className="size-7 fill-error text-error" /> : <span className="size-14 rounded-full bg-error" />}
           </button>
         )}
-        <span className="w-12 text-center text-[11px] text-on-surface-variant">
+        <span className="w-12 text-center text-xs text-on-surface-variant">
           {nFoto}/{MAKS_FOTO} foto{adaVideo ? ' · 1 video' : ''}
         </span>
       </div>

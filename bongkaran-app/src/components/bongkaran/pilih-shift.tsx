@@ -48,7 +48,7 @@ export function PilihShift({
                   aktif ? 'bg-primary text-on-primary shadow-md' : 'bg-surface-container-lowest/80 text-on-surface',
                 )}
               >
-                <span className={cn('text-[11px] uppercase', aktif ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
+                <span className={cn('text-xs uppercase', aktif ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
                 <span className="tabular text-body-md font-bold">{d.getDate()}</span>
                 <span className={cn('flex gap-1 rounded-full px-1 py-0.5', aktif && 'bg-white/90')}>
                   {SHIFTS.map((s) => {

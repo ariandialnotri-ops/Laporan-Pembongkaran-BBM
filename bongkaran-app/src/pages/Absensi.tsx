@@ -480,7 +480,7 @@ export function AbsensiRekap() {
                     {telat ? ` (telat ${labelMenit(telat)})` : ''} · keluar {jamDari(r.data.keluar?.at)} · kerja {r.data.keluar ? labelMenit(menitKerja(r.data)) : '-'}
                     {r.data.istirahat.length ? ` · istirahat ${labelMenit(menitIstirahat(r.data))}` : ''}
                   </span>
-                  <span className="flex items-center gap-1 text-[11px] text-on-surface-variant">
+                  <span className="flex items-center gap-1 text-xs text-on-surface-variant">
                     <MapPin aria-hidden="true" className="size-3" />
                     {r.data.masuk.jarak} m · ±{r.data.masuk.akurasi} m{r.data.masuk.olehNama ? ` · oleh ${r.data.masuk.olehNama}` : ''}
                   </span>

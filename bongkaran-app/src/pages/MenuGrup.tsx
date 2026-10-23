@@ -103,17 +103,17 @@ export function MenuOperation() {
           to={stok.missing ? `/stok/${stok.key.tanggal}/${stok.key.shift}` : '/stok'}
           className={cn(
             'animate-entrance-1 flex min-h-16 items-center gap-space-sm rounded-lg p-space-sm transition-transform active:scale-[0.99]',
-            stok.missing ? 'border border-error/40 bg-error-container/70' : 'glass-1',
+            stok.missing ? 'border border-amber-300 bg-amber-50' : 'glass-1',
           )}
         >
-          <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', stok.missing ? 'bg-error text-on-error' : 'bg-primary-fixed text-primary')}>
+          <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', stok.missing ? 'bg-amber-400 text-amber-950' : 'bg-primary-fixed text-primary')}>
             {stok.missing ? <Fuel className="size-5" /> : <CircleCheck className="size-5" />}
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className={cn('text-body-md font-bold', stok.missing ? 'text-on-error-container' : 'text-on-surface')}>
+            <span className={cn('text-body-md font-bold', stok.missing ? 'text-amber-950' : 'text-on-surface')}>
               {stok.missing ? `Isi stok awal ${shiftNama}` : `Stok awal ${shiftNama} terisi`}
             </span>
-            <span className={cn('text-body-sm', stok.missing ? 'text-on-error-container' : 'text-on-surface-variant')}>
+            <span className={cn('text-body-sm', stok.missing ? 'text-amber-900' : 'text-on-surface-variant')}>
               {stok.missing ? 'Wajib sebelum input bongkaran dan kualitas harian.' : 'Pengeluaran dispenser dihitung dari totalizer.'}
             </span>
           </span>

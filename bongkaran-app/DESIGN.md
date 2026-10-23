@@ -150,7 +150,7 @@ Ganti font cukup di `src/index.css`: `@import` font dan variabel `--font-jakarta
 | `numeric-md` | 16 / 22 | 500 | Angka di tile |
 | `numeric-sm` | 12 / 16 | 500 | Angka kecil, tanggal di kalender |
 | `tag` | 12 / 16 | 700, huruf besar, `+0.05em` | Label kecil, header tabel, pill |
-| (mikro) | 10-11 px | 600-700, huruf besar | Label kotak di kartu Dashboard (mis. "DITERIMA") |
+| (mikro) | **12 px minimum** (`text-xs`) | 600-700, huruf besar, warna `on-surface-variant` | Label kotak di kartu Dashboard (mis. "DITERIMA"). Tidak ada teks di bawah 12 px |
 
 ---
 
@@ -165,13 +165,15 @@ Ganti font cukup di `src/index.css`: `@import` font dan variabel `--font-jakarta
 | Jenis | Latar | Dipakai |
 |---|---|---|
 | Kartu Dashboard | putih padat `surface-container-lowest` + `shadow-sm`, radius 12 | Semua kartu di Dashboard (gaya referensi stitch) |
-| `glass-1` | putih 55%, blur 10 px (HP) | Kartu sekunder, chip, tombol bulat |
-| `glass-2` | putih 72%, blur 14 px (HP) | Kartu utama halaman Input/Laporan, dock |
-| `glass-3` | putih 88%, blur 18 px (HP) | Dropdown, toast |
+| `glass-1` | putih 82%, **tanpa blur** | Kartu sekunder, chip, tombol bulat |
+| `glass-2` | putih 90%, **tanpa blur** | Kartu utama halaman Input/Laporan |
+| `glass-3` | putih padat, **tanpa blur** | Dropdown, toast |
+| Header (`data-glass-bar`) | `surface` 70% + blur (laptop); padat di layar sentuh | Satu-satunya permukaan ber-blur |
+| Dock bawah | putih padat + garis atas | Navigasi HP |
 | Bottom sheet | **putih padat**, tanpa blur | Semua pop up / sheet (supaya tidak tembus di Android) |
 | `inset-field` | `rgba(235,242,250,.65)` + bayangan dalam | Kolom input, slot data |
 
-Mode **Kurangi Transparansi** (pengaturan HP): semua kaca jadi warna padat `#F7F9FD` / `#FBFCFE` / `#FFFFFF`.
+Kartu padat adalah **bawaan** (terbaca di bawah matahari, ringan untuk GPU HP murah). Mode **Kurangi Transparansi** (pengaturan HP) membuat kartu benar-benar padat `#F7F9FD` / `#FBFCFE` / `#FFFFFF` dan header tanpa blur.
 
 **Gerak**: masuk bertahap `fadeInUp` 0,5 s (`cubic-bezier(.16,1,.3,1)`, 5 tingkat jeda); tekan `scale(.95-.99)`; sheet geser dari bawah; titik shift berdenyut. Semua dimatikan saat **Kurangi Gerakan** aktif.
 
@@ -251,7 +253,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 
 | Komponen | File | Anatomi & varian | Status |
 |---|---|---|---|
-| **Button** | `ui/button.tsx` | Varian: `primary` (biru padat + bayangan), `glass`, `soft`, `ghost`, `danger`. Ukuran: `default` 44 px, `lg` 56 px, `sm`/`pill` 44 px bulat, `icon` 44 × 44 | disabled 50% opasitas, tekan scale .97 |
+| **Button** | `ui/button.tsx` | Varian: `primary` (biru padat + bayangan), `glass`, `soft`, `ghost`, `danger`. Ukuran: `default` 44 px, `lg` 56 px, `sm`/`pill` 44 px bulat, `icon` 44 × 44 | disabled 50% opasitas, tekan scale .97. Tombol yang **dikunci karena syarat** (mis. stok awal) tidak boleh biru pudar: abu-abu netral `neutral-200`/`neutral-700`, ikon gembok, dan label berisi alasannya ("Isi stok awal dulu") |
 | **Input** | `ui/input.tsx` | Kotak `inset-field` 48 px, teks 16 px, satuan di kanan (`L`, `mm`, `°C`, `ml`, `L/mm`, `kg`) | fokus: latar putih + cincin biru |
 | **Select** | `ui/select.tsx` | Pemicu seperti Input + chevron; daftar kaca `glass-3` | daftar selalu di atas sheet |
 | **Choice** | `bongkaran/form-bits.tsx` | Segmented pill (Shift 1/2) di dalam `inset-field` | terpilih: putih + teks biru |
@@ -266,7 +268,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 | **Tabs** | `ui/tabs.tsx` | Segmented dengan indikator geser (form: Bongkaran/Quality/Quantity/Finish) | |
 | **SectionHeader** | `section-header.tsx` | Judul bagian `headline-md` + aksi kanan | |
 | **StatTile** | `stat-tile.tsx` | Label tag + ikon + angka + hint | nada primary/error |
-| **MenuCard** | `menu-card.tsx` | Kartu menu Input/Laporan: ikon biru 44 px, judul, satu kalimat, baris status (biru = beres, merah = perlu dikerjakan) + lencana angka merah | |
+| **MenuCard** | `menu-card.tsx` | Kartu menu Input/Laporan: ikon biru 44 px, judul, satu kalimat, baris status dengan **tiga nada** (`nada`): biru `ok` = beres, amber `pengingat` = perlu dikerjakan/belum diatur, merah `anomali` = ada masalah (lewat batas, stop penyaluran, di luar toleransi, insiden terbuka). Lencana angka mengikuti nada | |
 | **RecordTable** | `record-table.tsx` | Riwayat: judul huruf besar + chip "n dari total"; **HP = daftar kartu** (judul, baris keterangan, lencana kanan, chevron); **≥ md = tabel** (header tag, kolom BBM berupa chip, kolom Aksi) | baris bisa membuka halaman atau pop up |
 | **ChipFilter** | `chip-filter.tsx` | Baris chip pilihan tunggal, bisa digeser | aktif: biru padat |
 | **DateFilter** | `date-filter.tsx` | Chip Hari ini / 7 hari / Bulan ini / Semua / Pilih tanggal (+ 2 kolom tanggal). Di Plan & Tracking LO, tanggal kirim mendatang selalu ikut tampil | |
@@ -296,7 +298,7 @@ Format tiap layar: **tujuan**, **isi berurutan**, **status khusus**.
 - Status: memuat, salah password (pesan merah), akun belum terdaftar sebagai anggota SPBU.
 
 ### 9.2 Dashboard (hanya data)
-Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
+Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib** (HP, satu kolom):
 
 1. **Kartu operasional**: ikon kalender dalam bulatan biru muda, label "OPERASIONAL SPBU", tanggal ("Kamis, 8 Okt 2026"), pill shift berjalan dengan titik hijau berdenyut ("Shift 1 (06:00 - 13:59)").
 2. **Status Bongkaran Pekan Ini** (Sen-Min), di kanan "W41 - Okt 2026" dengan panah pekan sebelum/berikut.
@@ -324,6 +326,12 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
      - Footer: Berita Acara, Tutup.
 7. **LO Tracking**: 6 kotak status berwarna (Proses, OS, Planned, On Delivery, Delivered, Closed) + "Total n LO"; ketuk ke Riwayat Tracking LO.
 8. **Proteksi Kebakaran** (bila ada unit APAR): strip jumlah unit (APAR terpasang | APAR cadangan | APAB), lalu 4 kotak (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat) + "n unit"; ketuk ke dashboard APAR.
+
+**Di antara kartu operasional dan kalender**: pengingat amber **Plan pengiriman besok belum dibuat** (tautan ke Plan) dan kartu Status penyaluran. Pengingat tidak lagi muncul sebagai toast.
+
+**Laptop (≥ 1024 px, `lg`)**: kartu 3-8 dalam grid 2 kolom berpasangan: Bongkaran Hari Ini | Rencana vs Realisasi, Kualitas Harian | LO Tracking, Kaleng Sample selebar 2 kolom, Uji Takaran | Proteksi Kebakaran. Urutan HP tidak berubah (pakai `lg:order-*`, bukan memindah markup).
+
+**Keadaan kosong diringkas**: produk yang belum diuji (Kualitas Harian) atau belum punya sampel (Kaleng Sample) digabung jadi **satu baris** ("5 produk belum diuji: Pertalite, …"), diketuk untuk membuka rinciannya. Jangan menampilkan lima baris berisi "Belum".
 
 ### 9.3 Menu Input
 - **Bar wajib Stok Awal Shift** paling atas: merah "Isi stok awal Shift n" / netral "Stok awal Shift n terisi".
@@ -378,6 +386,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
   - Tombol **Batal** dan **Simpan & kembali**; simpan otomatis kembali ke Tracking LO asal (`/plan` atau `?dari=/laporan/lo`). Keluar dengan perubahan belum disimpan memunculkan konfirmasi.
 
 ### 9.7 Kualitas Harian
+- **Stok awal wajib**, sama dengan Input Bongkaran: selama stok awal shift berjalan belum diisi, kartu amber "Isi stok awal" tampil di atas, seluruh form dikunci (`fieldset disabled`, pudar 60%), dan tombol akhir menjadi abu-abu bergembok "Isi stok awal dulu".
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
 - **Uji kualitas (density)**: kartu per produk: Produk, Density, Suhu, Pump test, tangga (density observasi, D15, acuan D15 bongkaran, selisih), baris status + **tombol Simpan per baris** ("Tersimpan jam" / "Belum disimpan"). Uji produk lain.
   - **Langkah terakhir**: PhotoSlot wajib *Foto struk pump test* & *Foto pengembalian minyak ke tangki*.
@@ -453,6 +462,16 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 
 ---
 
+### 9.14 Absensi Personil (Operation > Absensi)
+- Kartu status per personil (Belum masuk / Bekerja / Istirahat / Pulang) dengan jam masuk, total istirahat, dan jam kerja berjalan.
+- Tombol aksi sesuai status: **Absen masuk**, **Mulai istirahat**, **Selesai istirahat**, **Absen keluar**. Tiap aksi meminta izin lokasi (GPS) lalu membuka pemindai **QR absensi SPBU**; ditolak bila di luar radius atau QR bukan milik SPBU ini.
+- Personil hanya melihat dirinya sendiri (akun ditautkan di Daftar Personil); ABH/pengawas melihat semua dan boleh mengabsenkan.
+- **Rekap** bulanan per personil (hadir, terlambat, jam kerja, istirahat) + unduh Excel. **Pengaturan** (ABH/pengawas): titik lokasi, radius, unduh/ganti poster QR A4.
+
+### 9.15 Laporan SO Bulanan (Report > Stock Opname)
+- Pilih periode (tanggal 1 s.d. akhir bulan) lalu **Generate 1 klik**: PDF atau Excel sesuai format SO.
+- Sebelum generate tampil **cek kelengkapan**: daftar *wajib* (merah, harus dipenuhi dulu) dan *saran* (amber), masing-masing dengan tautan ke halaman pengisiannya, serta rangkuman data per tanggal tarikan.
+
 ## 10. Status & makna warna
 
 | Makna | Warna / nada | Contoh |
@@ -479,12 +498,14 @@ Aturan: status **tidak pernah hanya warna**. Selalu ada teks dan, bila penting, 
 
 **Aksesibilitas**
 - Target sentuh ≥ 44 px; teks input 16 px; fokus terlihat (garis biru 2 px).
-- Kontras teks ≥ 4,5 : 1; teks di atas kaca harus tetap terbaca di bawah sinar matahari.
+- Kontras teks ≥ 4,5 : 1; teks di atas kaca harus tetap terbaca di bawah sinar matahari. Teks minimal **12 px**; label kecil memakai `on-surface-variant` (`#424656`), bukan `outline`.
+- Tautan kecil di kartu ("Dashboard ›", "Total 3 LO ›") memakai `touch-44` agar area sentuhnya tetap 44 px.
+- **Placeholder angka** tidak boleh mirip nilai asli (mis. `0,7450`): kosongkan kolom, contoh ditulis sebagai teks bantu di bawahnya ("Contoh: 0,7450 (4 desimal)").
 - Semua ikon tanpa teks punya `aria-label`; tabel punya header; meter punya nilai; pilihan Baik/Tidak berupa radiogroup.
 
 **HP spesifikasi rendah**
-- Blur kaca dikurangi di layar sentuh (10/14/18 px); bottom sheet tanpa blur. Orb latar diam, tanpa animasi.
-- Halaman selain Dashboard & menu Input dimuat saat dibuka (lazy). Foto dikompres (maks 1280 px, JPEG 0,72) sebelum diunggah.
+- Kartu tanpa blur; blur hanya di header laptop, dan header pun padat di layar sentuh. Bottom sheet tanpa blur. Orb latar diam, tanpa animasi.
+- Halaman selain Dashboard & menu Input dimuat saat dibuka (lazy). Pustaka vendor dipisah ke chunk sendiri (`react`, `radix`, `supabase` di `vite.config.ts`) agar tetap tercache antar rilis; jsPDF/JSZip/html2canvas hanya dimuat saat ekspor. Foto dikompres (maks 1280 px, JPEG 0,72) sebelum diunggah.
 - Data dari perangkat lain dimuat ulang saat aplikasi tampil lagi, saat online, saat halaman terkait dibuka, dan tiap 60 detik.
 - Hindari: video latar, animasi terus-menerus, bayangan berlapis banyak, gambar besar dekoratif.
 

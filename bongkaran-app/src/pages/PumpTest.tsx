@@ -74,12 +74,12 @@ export function RiwayatPumpTest() {
         <div className="grid grid-cols-2 gap-space-xs">
           <div className="rounded-md bg-primary-fixed/50 p-space-xs">
             <span className="tabular block text-body-md font-bold text-on-surface">{formatLiter(total, 1)}</span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Total pump test</span>
+            <span className="text-xs uppercase text-on-surface-variant">Total pump test</span>
           </div>
           {perProduk.map((x) => (
             <div key={x.produk} className="rounded-md bg-surface-container-low p-space-xs">
               <span className="tabular block text-body-md font-bold text-on-surface">{formatLiter(x.liter, 1)}</span>
-              <span className="text-[11px] uppercase text-on-surface-variant">{x.produk}</span>
+              <span className="text-xs uppercase text-on-surface-variant">{x.produk}</span>
             </div>
           ))}
         </div>

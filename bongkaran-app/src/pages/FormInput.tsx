@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ClipboardList, LoaderCircle, Truck, TriangleAlert } from 'lucide-react'
+import { ArrowRight, ClipboardList, LoaderCircle, Lock, Truck, TriangleAlert } from 'lucide-react'
 import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StokGate, TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
@@ -49,7 +49,7 @@ export function FormInput() {
           </span>
         </div>
         <div className="flex flex-wrap gap-space-xs">
-          <Pill tone={openPlans > 0 ? 'cyan' : 'error'}>
+          <Pill tone={openPlans > 0 ? 'cyan' : 'neutral'}>
             <ClipboardList aria-hidden="true" />
             {openPlans > 0 ? `${openPlans} SO siap dibongkar` : 'Belum ada SO siap'}
           </Pill>
@@ -57,11 +57,19 @@ export function FormInput() {
         </div>
         <StokGate />
         <TangkiBelumAda detail="Bongkaran tetap bisa dicatat; volume dari tinggi deepstick/ATG belum dihitung otomatis sampai tabel kalibrasi tangki diisi." />
-        <Button size="lg" className="w-full" disabled={busy || stok.missing} onClick={mulai}>
-          {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Truck aria-hidden="true" />}
-          Mulai bongkaran baru
-          {!busy && <ArrowRight aria-hidden="true" />}
-        </Button>
+        {stok.missing ? (
+          // Terkunci: abu-abu netral + gembok, alasannya tertulis di tombol.
+          <Button size="lg" variant="soft" className="w-full bg-neutral-200 text-neutral-700 shadow-none disabled:opacity-100" disabled>
+            <Lock aria-hidden="true" />
+            Isi stok awal dulu
+          </Button>
+        ) : (
+          <Button size="lg" className="w-full" disabled={busy} onClick={mulai}>
+            {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Truck aria-hidden="true" />}
+            Mulai bongkaran baru
+            {!busy && <ArrowRight aria-hidden="true" />}
+          </Button>
+        )}
         {openPlans === 0 && (
           <Link to="/plan" className={cn(buttonVariants({ variant: 'glass', size: 'pill' }), 'self-center')}>
             Buka Plan Pengiriman

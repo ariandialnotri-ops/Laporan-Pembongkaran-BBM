@@ -24,9 +24,9 @@ export function StokGate({ className, action = 'mulai bongkar' }: { className?: 
   const { key, missing } = useStokShift()
   if (!missing) return null
   return (
-    <GlassCard level={3} role="alert" className={cn('flex flex-col gap-space-sm border border-error/40 p-space-md', className)}>
+    <GlassCard level={3} role="alert" className={cn('flex flex-col gap-space-sm border border-amber-300 bg-amber-50/90 p-space-md', className)}>
       <div className="flex items-start gap-space-sm">
-        <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-error-container text-error">
+        <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-amber-400 text-amber-950">
           <Fuel className="size-5" />
         </span>
         <div className="flex min-w-0 flex-col">

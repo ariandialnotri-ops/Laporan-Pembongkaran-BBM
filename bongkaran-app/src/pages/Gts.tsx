@@ -61,10 +61,10 @@ function KotakSlot({ slot, status, jbt, jbkp, kini }: { slot: number; status: St
     <div className={cn('flex flex-col gap-1 rounded-lg border p-space-xs', g.kartu, kini && 'ring-2 ring-primary')}>
       <span className="tabular text-body-sm font-bold text-on-surface">{labelSlot(slot).replace(' - ', '–')}</span>
       <span className="flex gap-1">
-        <span className={cn('rounded px-1.5 text-[11px] font-bold', jbt ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBT</span>
-        <span className={cn('rounded px-1.5 text-[11px] font-bold', jbkp ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBKP</span>
+        <span className={cn('rounded px-1.5 text-xs font-bold', jbt ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBT</span>
+        <span className={cn('rounded px-1.5 text-xs font-bold', jbkp ? 'bg-emerald-600 text-white' : 'bg-white/80 text-on-surface-variant')}>JBKP</span>
       </span>
-      <span className={cn('text-[11px] font-semibold', g.label)}>{status === 'sudah' ? 'Lengkap' : status === 'belum' ? 'Berjalan' : status === 'terlewat' ? 'Terlewat' : 'Nanti'}</span>
+      <span className={cn('text-xs font-semibold', g.label)}>{status === 'sudah' ? 'Lengkap' : status === 'belum' ? 'Berjalan' : status === 'terlewat' ? 'Terlewat' : 'Nanti'}</span>
     </div>
   )
 }
@@ -131,9 +131,9 @@ export function GtsMenu() {
                 onClick={() => setTanggal(t)}
                 className={cn('flex w-16 flex-col items-center gap-0.5 rounded-[14px] py-2', on ? 'bg-primary text-on-primary shadow-md' : 'bg-surface-container-lowest/80 text-on-surface')}
               >
-                <span className={cn('text-[11px] uppercase', on ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
+                <span className={cn('text-xs uppercase', on ? 'text-on-primary/80' : 'text-on-surface-variant')}>{hariSingkat(d)}</span>
                 <span className="tabular text-body-md font-bold">{d.getDate()}</span>
-                <span className={cn('tabular rounded-full px-1.5 text-[11px] font-bold', GAYA_STATUS[st].ikon)}>
+                <span className={cn('tabular rounded-full px-1.5 text-xs font-bold', GAYA_STATUS[st].ikon)}>
                   {n}/{m || JUMLAH_SLOT}
                 </span>
               </button>
@@ -436,15 +436,15 @@ export function LaporanGts() {
             <span className="tabular block text-numeric-md font-bold text-on-surface">
               {lengkap}/{lewat || 0}
             </span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Slot lengkap</span>
+            <span className="text-xs uppercase text-on-surface-variant">Slot lengkap</span>
           </div>
           <div className="rounded-md bg-surface-container-low p-space-xs">
             <span className="tabular block text-numeric-md font-bold text-on-surface">{data.filter((r) => r.jenis === 'JBT').length}</span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Sampling JBT</span>
+            <span className="text-xs uppercase text-on-surface-variant">Sampling JBT</span>
           </div>
           <div className="rounded-md bg-surface-container-low p-space-xs">
             <span className="tabular block text-numeric-md font-bold text-on-surface">{data.filter((r) => r.jenis === 'JBKP').length}</span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Sampling JBKP</span>
+            <span className="text-xs uppercase text-on-surface-variant">Sampling JBKP</span>
           </div>
         </div>
         <ErrorBox text={error} />
@@ -521,7 +521,7 @@ export function LaporanGts() {
                         ) : (
                           <span className="aspect-[3/4] w-full rounded-md bg-surface-container" />
                         )}
-                        <figcaption className="text-center text-[11px] text-on-surface-variant">{f.label.replace('Foto ', '')}</figcaption>
+                        <figcaption className="text-center text-xs text-on-surface-variant">{f.label.replace('Foto ', '')}</figcaption>
                       </figure>
                     )
                   })}

@@ -1,48 +1,59 @@
 <p align="center">
-  <img src="brand/logo/pantas-logo-stacked.svg" alt="PANTAS" height="120">
+  <img src="bongkaran-app/public/floq-logo.webp" alt="FLOQ" height="96">
 </p>
 
-<p align="center"><strong>Penyaluran yang pantas, tercatat, terawasi.</strong></p>
+# FLOQ: Fuel Logistics Operations & Quality
 
----
+Aplikasi web (PWA) operasional SPBU: evidence bongkaran BBM, Quality & Quantity (Q&Q), plan
+pengiriman dan LO tracking, kualitas harian, stok & totalizer, absensi, perawatan dan
+housekeeping, HSSE (APAR, insiden, stop penyaluran), petty cash, closing shift, serta laporan
+SO bulanan. Dipakai Kepala Shift, Pengawas, Area Business Head (ABH), Security, dan Cleaning
+Service, dengan menu dan hak tulis mengikuti peran.
 
-# PANTAS
+## Isi repo
 
-**P**emantauan **AN**omali **T**ransaksi & **A**liran **S**ubsidi — sistem pemantauan penyaluran BBM subsidi yang menandai transaksi menyimpang sebelum penyimpangan menjadi kerugian.
-
-## Ruang Lingkup
-
-PANTAS membaca data pembongkaran dan penyaluran BBM subsidi, lalu menilai setiap transaksi terhadap pola wajar dan ambang yang ditetapkan.
-
-Jenis anomali yang dipantau:
-
-| Kategori | Contoh temuan |
+| Folder | Isi |
 |---|---|
-| Selisih volume | Volume surat jalan tidak sama dengan volume terukur di tangki pendam |
-| Kuota | Konsumsi harian/bulanan SPBU melampaui alokasi |
-| Pola transaksi | Pengisian berulang oleh kendaraan yang sama dalam rentang waktu singkat |
-| Waktu | Pembongkaran atau penyaluran di luar jam operasional wajar |
-| Kelengkapan data | Pembongkaran tanpa dokumen pendukung atau data terukur |
+| [`bongkaran-app/`](bongkaran-app/) | Aplikasi FLOQ (React 19 + Vite + TypeScript + Tailwind v4) |
+| [`bongkaran-app/supabase/`](bongkaran-app/supabase/) | Migration database (Postgres + RLS) dan edge function |
+| [`bongkaran-app/DESIGN.md`](bongkaran-app/DESIGN.md) | Spesifikasi tampilan: token, komponen, setiap layar, aturan wajib |
+| [`pantas/`](pantas/) | Arsip identitas PANTAS (konsep terpisah, tidak dipakai aplikasi FLOQ) |
 
-Setiap temuan diberi salah satu status: **Normal**, **Perlu Ditinjau**, **Anomali**, atau **Data Tidak Lengkap**.
+## Menjalankan
 
-## Identitas Visual
+```bash
+cd bongkaran-app
+npm install
+cp .env.example .env.local   # opsional: isi URL & publishable key Supabase
+npm run dev                  # http://localhost:5173
+npm run build                # type-check + build produksi
+npm run lint
+```
 
-Identitas merek, logo, palet warna, dan design token ada di direktori [`brand/`](brand/).
+Tanpa `.env.local` aplikasi berjalan di **mode lokal**: data disimpan di IndexedDB perangkat,
+cocok untuk demo dan pengembangan. Dengan env terisi, aplikasi terhubung ke Supabase dan wajib login.
 
-- [`brand/BRAND-GUIDELINE.md`](brand/BRAND-GUIDELINE.md) — panduan lengkap merek
-- [`brand/tokens.css`](brand/tokens.css) — variabel CSS siap pakai di aplikasi
-- [`brand/preview.html`](brand/preview.html) — pratinjau visual (buka di peramban)
-- [`brand/logo/`](brand/logo/) — seluruh varian logo dalam format SVG
+| Variabel | Isi |
+|---|---|
+| `VITE_SUPABASE_URL` | URL project Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable (anon) key. Jangan pernah memakai service role key di frontend |
 
-## Aplikasi
+## Database
 
-[`bongkaran-app/`](bongkaran-app/) — aplikasi monitoring bongkaran BBM dan Q&Q (React + Vite), memakai design system AeroShift yang sama dengan aplikasi Tepat Setoran SPBU. Lihat README di direktori tersebut.
+Skema ada di [`bongkaran-app/supabase/migrations/`](bongkaran-app/supabase/migrations/) dan
+dijalankan berurutan menurut nama berkas (`supabase db push`, atau SQL Editor). Semua tabel
+memakai RLS per SPBU dan per peran. Aturan penting seperti penguncian Berita Acara yang sudah
+selesai, token QR absensi, dan validasi absen ditegakkan di database, bukan hanya di aplikasi.
+Rincian tiap migration ada di bagian *Backend: Supabase* pada
+[`bongkaran-app/README.md`](bongkaran-app/README.md).
 
-## Status
+## Deploy
 
-Kerangka UI aplikasi bongkaran sudah tersedia dengan data contoh; belum terhubung database.
+Vercel dengan **Root Directory** `bongkaran-app`, serta dua variabel env di atas untuk
+Production dan Preview. `bongkaran-app/vercel.json` mengatur rewrite SPA dan header keamanan
+(CSP, HSTS, X-Frame-Options, Permissions-Policy).
 
-## Catatan
+## Dokumentasi lanjut
 
-PANTAS adalah nama produk yang berdiri sendiri. Palet warnanya diselaraskan dengan bahasa warna korporat Pertamina agar serasi bila dipakai berdampingan, namun repositori ini tidak memuat logo maupun aset merek resmi Pertamina. Ketentuan penggunaan bersama dijelaskan pada bagian 6 panduan merek.
+- [`bongkaran-app/README.md`](bongkaran-app/README.md): fitur per layar, alur SOP bongkaran, perhitungan, laporan, multi SPBU, backend
+- [`bongkaran-app/DESIGN.md`](bongkaran-app/DESIGN.md): sistem desain dan aturan tampilan

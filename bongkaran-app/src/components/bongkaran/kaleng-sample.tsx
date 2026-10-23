@@ -32,6 +32,9 @@ export function KalengSample() {
   const [buka, setBuka] = useState<Record<string, boolean>>({})
   const [detail, setDetail] = useState<{ k: Kaleng; slot: number } | null>(null)
   const [sop, setSop] = useState(false)
+  // Produk tanpa sampel diringkas satu baris (dibuka bila diketuk) agar keadaan kosong tidak memanjang.
+  const [lihatKosong, setLihatKosong] = useState(false)
+  const kosong = data.filter((d) => d.cans.length === 0)
 
   const sesuai = data.filter((d) => d.status === 'sesuai').length
   const anomali = data.filter((d) => d.status === 'perhatian').length
@@ -72,7 +75,22 @@ export function KalengSample() {
         </dl>
       </GlassCard>
 
-      {data.map((d) => {
+      {kosong.length > 0 && !lihatKosong && (
+        <button
+          type="button"
+          onClick={() => setLihatKosong(true)}
+          className="glass-1 rim-light flex min-h-14 items-center gap-space-sm rounded-lg px-space-md py-space-sm text-left active:scale-[0.99]"
+        >
+          <Cylinder aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-body-md font-semibold text-on-surface">Belum ada sampel: {kosong.length} produk</span>
+            <span className="text-body-sm text-on-surface-variant">{kosong.map((d) => d.produk).join(', ')}</span>
+          </span>
+          <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+        </button>
+      )}
+
+      {data.filter((d) => d.cans.length > 0 || lihatKosong).map((d) => {
         const meta = produkMeta(d.produk)
         const tank = tankForProduk(d.produk)
         const open = buka[d.produk] ?? d.cans.length > 0
@@ -207,7 +225,7 @@ function Can({ label, produk, besar }: { label: string; produk: string; besar?: 
   return (
     <span aria-hidden="true" className={cn('relative flex shrink-0 flex-col overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-sm', besar ? 'h-16 w-14' : 'h-14 w-12')}>
       <span className="mx-1.5 mt-1.5 h-1.5 rounded-full bg-on-surface-variant/50" />
-      <span className="mx-1 mt-1 rounded-sm border border-outline-variant/70 bg-white px-0.5 text-center font-mono text-[10px] font-semibold leading-4 text-on-surface">{label}</span>
+      <span className="mx-1 mt-1 rounded-sm border border-outline-variant/70 bg-white px-0.5 text-center font-mono text-xs font-semibold leading-4 text-on-surface">{label}</span>
       <span className={cn('mt-auto h-1/3 w-full', meta.isi)} />
     </span>
   )

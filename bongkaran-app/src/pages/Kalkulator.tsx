@@ -37,11 +37,11 @@ export function Kalkulator() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Density observasi" htmlFor="k-obs">
-            <Input id="k-obs" numeric inputMode="decimal" placeholder="0,7450" value={obs} onChange={(e) => setObs(e.target.value)} />
+          <Field label="Density observasi" htmlFor="k-obs" hint="Contoh: 0,7450">
+            <Input id="k-obs" numeric inputMode="decimal" value={obs} onChange={(e) => setObs(e.target.value)} />
           </Field>
-          <Field label="Suhu observasi" htmlFor="k-suhu">
-            <Input id="k-suhu" numeric inputMode="decimal" suffix="°C" placeholder="30,0" value={suhu} onChange={(e) => setSuhu(e.target.value)} />
+          <Field label="Suhu observasi" htmlFor="k-suhu" hint="Contoh: 30,0">
+            <Input id="k-suhu" numeric inputMode="decimal" suffix="°C" value={suhu} onChange={(e) => setSuhu(e.target.value)} />
           </Field>
         </div>
         <div className="inset-field flex items-end justify-between gap-2 rounded-md p-space-sm">
@@ -81,7 +81,7 @@ export function Kalkulator() {
           </Select>
         </Field>
         <Field label="Ketinggian minyak (deepstick / ATG)" htmlFor="k-level">
-          <Input id="k-level" numeric inputMode="decimal" suffix="mm" placeholder="1200" value={level} onChange={(e) => setLevel(e.target.value)} />
+          <Input id="k-level" numeric inputMode="decimal" suffix="mm" value={level} onChange={(e) => setLevel(e.target.value)} />
         </Field>
         <div className="inset-field flex items-end justify-between gap-2 rounded-md p-space-sm">
           <span className="text-body-sm font-bold text-on-surface">Volume</span>

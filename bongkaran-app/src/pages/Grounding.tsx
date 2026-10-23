@@ -233,7 +233,7 @@ export function GroundingForm() {
           ].map(([k, v, buruk]) => (
             <div key={String(k)} className={cn('rounded-md p-space-xs', buruk ? 'bg-error-container text-on-error-container' : 'bg-surface-container-low')}>
               <span className="tabular block text-headline-md font-bold">{v}</span>
-              <span className="text-[11px] uppercase">{k}</span>
+              <span className="text-xs uppercase">{k}</span>
             </div>
           ))}
         </div>

@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Beaker,
+  CalendarClock,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
@@ -37,7 +38,7 @@ import { berlakuSertifikat, statusSertifikat } from '@/lib/berlaku'
 import { qqD15, type AparRecord, type QqKualitas, type QqRecord, type TakarRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
-import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
+import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, planSupply, type LoDisplayStatus } from '@/lib/plan'
 import { produkMeta } from '@/lib/produk'
 import { formatMl, opsiLabel, takarStatus } from '@/lib/takar'
 import { acuanD15, detailTanggal, kalenderMinggu, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
@@ -87,6 +88,7 @@ function DashboardUtama() {
   const [filter, setFilter] = useState(false)
   const [buka, setBuka] = useState<string | null>(null)
   const [ujiKunci, setUjiKunci] = useState<string | null>(null)
+  const [lihatBelum, setLihatBelum] = useState(false)
 
   // Uji kualitas harian terakhir tiap produk.
   const harian = useMemo(() => {
@@ -97,6 +99,8 @@ function DashboardUtama() {
       .forEach((rec) => rec.data.kualitas.forEach((k) => k.produk && qqD15(k).d15 && m.set(k.produk, { k, rec })))
     return m
   }, [app.daily])
+  // Produk yang belum pernah diuji diringkas satu baris (dibuka bila diketuk).
+  const belumUji = PRODUK_OPTIONS.filter((p) => !harian.has(p))
 
   const loCounts = useMemo(() => {
     const c = new Map<LoDisplayStatus, number>()
@@ -171,23 +175,25 @@ function DashboardUtama() {
       {/* 1. Operasional & shift */}
       <KartuUnitBisnis />
       <TangkiBelumAda className="animate-entrance-1" />
-      <section aria-label="Operasional SPBU" className="animate-entrance-1 flex items-center justify-between gap-space-sm rounded-md bg-surface-container-lowest/85 p-3.5 shadow-sm">
+      {/* HP: tanggal & shift dua baris agar tanggal tidak terpotong; layar lebar satu baris. */}
+      <section aria-label="Operasional SPBU" className="animate-entrance-1 flex flex-col items-start gap-2 rounded-md bg-surface-container-lowest/85 p-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2.5">
           <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
             <CalendarDays className="size-[18px]" />
           </span>
           <span className="flex min-w-0 flex-col">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-outline">Operasional SPBU</span>
-            <span className="truncate text-body-md font-bold text-on-surface" title={formatTanggalPanjang(now)}>
+            <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Operasional SPBU</span>
+            <span className="text-body-md font-bold text-on-surface" title={formatTanggalPanjang(now)}>
               {formatTanggalPanjang(now).split(', ')[0]}, {formatTanggalSingkat(now)}
             </span>
           </span>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-container-high/90 px-3 py-1.5 text-primary shadow-sm">
           <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-emerald-500 motion-reduce:animate-none" />
-          <span className="tabular whitespace-nowrap text-[11px] font-bold sm:text-tag">{shiftLabel(shift)}</span>
+          <span className="tabular whitespace-nowrap text-xs font-bold sm:text-tag">{shiftLabel(shift)}</span>
         </span>
       </section>
+      <PengingatPlan />
       <KartuStopPenyaluran className="animate-entrance-1" />
 
       {/* 2. Kalender pekan */}
@@ -227,19 +233,21 @@ function DashboardUtama() {
         </div>
       </section>
 
+      {/* Laptop (lg): dua kolom berpasangan; HP tetap satu kolom dengan urutan DESIGN.md 9.2. */}
+      <div className="grid grid-cols-1 gap-space-md lg:grid-cols-2 lg:items-start">
       {/* 3. Bongkaran */}
       <Kartu
         id="total-bongkaran"
         icon={Truck}
         title={isToday ? 'Bongkaran Hari Ini' : 'Total Bongkaran'}
-        className="animate-entrance-2"
+        className="animate-entrance-2 lg:order-1"
         action={
           <button
             type="button"
             aria-expanded={filter}
             aria-controls="dash-filter"
             onClick={() => setFilter(!filter)}
-            className="touch-44 flex items-center gap-1 rounded-full bg-surface-container px-2.5 py-1 text-[11px] font-bold text-primary active:scale-95"
+            className="touch-44 flex items-center gap-1 rounded-full bg-surface-container px-2.5 py-1 text-xs font-bold text-primary active:scale-95"
           >
             {range.preset === 'custom' ? `${formatTanggalIso(range.from)} - ${formatTanggalIso(range.to)}` : presetLabel(range.preset)}
             <SlidersHorizontal aria-hidden="true" className="size-3.5" />
@@ -259,7 +267,7 @@ function DashboardUtama() {
 
         {/* Per produk, ketuk untuk rincian MT, diterima, transport loss, dan discharge loss. */}
         <div className="flex flex-col rounded-md bg-surface-container-low/70 p-3">
-          <div className="flex items-center justify-between pb-1 text-[11px] font-bold uppercase text-outline">
+          <div className="flex items-center justify-between pb-1 text-xs font-bold uppercase text-on-surface-variant">
             <span>Produk</span>
             <span>Vol. diterima</span>
           </div>
@@ -281,7 +289,7 @@ function DashboardUtama() {
                   >
                     <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', meta.dot)} />
                     <span className="min-w-0 truncate text-body-md font-bold text-on-surface">{x.produk}</span>
-                    <span className="tabular shrink-0 rounded-sm bg-surface-container px-1.5 text-[10px] text-on-surface-variant">{x.mt} MT</span>
+                    <span className="tabular shrink-0 rounded-sm bg-surface-container px-1.5 text-xs text-on-surface-variant">{x.mt} MT</span>
                     <span className="tabular ml-auto whitespace-nowrap text-numeric-md font-bold text-on-surface">{formatNumber(x.liter)} L</span>
                     <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-outline transition-transform', open && 'rotate-180')} />
                   </button>
@@ -346,7 +354,7 @@ function DashboardUtama() {
         id="plan-hari-ini"
         icon={ClipboardCheck}
         title="Rencana vs Realisasi"
-        className="animate-entrance-3"
+        className="animate-entrance-3 lg:order-2"
         action={targetHariIni > 0 && <span className="tabular whitespace-nowrap text-numeric-sm text-outline">Target {formatNumber(targetHariIni)} L</span>}
       >
         {planHariIni.length === 0 ? (
@@ -362,7 +370,7 @@ function DashboardUtama() {
                     <span aria-hidden="true" className={cn('size-2.5 rounded-full', meta.dot)} />
                     <span className="text-body-md font-bold text-on-surface">{x.produk}</span>
                   </span>
-                  <span className={cn('tabular text-[11px] font-bold', meta.teks)}>
+                  <span className={cn('tabular text-xs font-bold', meta.teks)}>
                     {x.selesai} dari {x.lo} LO dibongkar ({pct}%){x.jalan ? `, +${x.jalan} berjalan` : ''}
                   </span>
                 </div>
@@ -377,7 +385,7 @@ function DashboardUtama() {
                   <div className={cn('h-full transition-[width] duration-500', meta.dot)} style={{ width: `${(x.volSelesai / x.volume) * 100}%` }} />
                   <div className={cn('h-full opacity-40 transition-[width] duration-500', meta.dot)} style={{ width: `${(x.volJalan / x.volume) * 100}%` }} />
                 </div>
-                <div className="tabular flex items-center justify-between gap-2 text-[11px] text-outline">
+                <div className="tabular flex items-center justify-between gap-2 text-xs text-on-surface-variant">
                   <span>
                     {formatNumber(x.volSelesai)} L dibongkar{x.volJalan ? ` (${formatNumber(x.volJalan)} L berjalan)` : ''}
                   </span>
@@ -391,7 +399,7 @@ function DashboardUtama() {
 
       {/* Sertifikat tera metrologi nozzle (maks. 1 tahun) yang lewat atau tinggal ≤ 30 hari. */}
       {teraMasalah.length > 0 && (
-        <div role="status" className="animate-entrance-3 flex items-start gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-sm">
+        <div role="status" className="animate-entrance-3 flex lg:col-span-2 items-start gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-sm">
           <Gauge aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
           <span className="min-w-0 flex-1 text-body-sm text-on-surface">
             <b>Tera metrologi:</b> {teraMasalah.map((n) => `${n.nama} ${statusSertifikat(n.teraTanggal, hariIni) === 'lewat' ? 'lewat' : 's/d ' + formatTanggalIso(berlakuSertifikat(n.teraTanggal))}`).join(', ')}
@@ -410,10 +418,26 @@ function DashboardUtama() {
         icon={FlaskConical}
         title="Kualitas Harian (Density std. 15 °C)"
         sub="Uji density terakhir tiap produk, dibanding Density std. 15 °C uji pasca penerimaan terbaru."
-        className="animate-entrance-3"
-        action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-[11px] font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
+        className="animate-entrance-3 lg:order-3"
+        action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-xs font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
       >
-        {PRODUK_OPTIONS.map((p) => {
+        {belumUji.length > 0 && !lihatBelum && (
+          <button
+            type="button"
+            onClick={() => setLihatBelum(true)}
+            className="flex min-h-14 w-full items-center gap-2.5 rounded-md bg-surface-container-low p-3 text-left active:scale-[0.99]"
+          >
+            <span aria-hidden="true" className="h-8 w-1.5 shrink-0 rounded-full bg-outline-variant" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-body-md font-bold text-on-surface">
+                {belumUji.length === PRODUK_OPTIONS.length ? `${belumUji.length} produk belum diuji` : `${belumUji.length} produk lain belum diuji`}
+              </span>
+              <span className="truncate text-body-sm text-on-surface-variant">{belumUji.join(', ')}</span>
+            </span>
+            <Pill>Belum</Pill>
+          </button>
+        )}
+        {PRODUK_OPTIONS.filter((p) => harian.has(p) || lihatBelum).map((p) => {
           const h = harian.get(p)
           const d15 = h ? qqD15(h.k).d15?.value ?? null : null
           const ref = h ? acuanD15(app.reports, p, h.rec.tanggal) : null
@@ -431,9 +455,9 @@ function DashboardUtama() {
               {h && (
                 <span className="tabular flex flex-col items-end">
                   <span className="whitespace-nowrap text-numeric-md font-bold text-on-surface">
-                    {formatDensity(d15)} <span className="text-[10px] font-normal text-outline">g/ml</span>
+                    {formatDensity(d15)} <span className="text-xs font-normal text-on-surface-variant">g/ml</span>
                   </span>
-                  <span className={cn('text-[11px] font-bold', ok === false ? 'text-error' : ok ? 'text-emerald-700' : 'text-outline')}>{selisih !== null ? formatDensitySigned(selisih) : 'tanpa acuan'}</span>
+                  <span className={cn('text-xs font-bold', ok === false ? 'text-error' : ok ? 'text-emerald-700' : 'text-on-surface-variant')}>{selisih !== null ? formatDensitySigned(selisih) : 'tanpa acuan'}</span>
                 </span>
               )}
               {ok === null ? <Pill>{h ? 'Tanpa acuan' : 'Belum'}</Pill> : ok ? <Pill tone="success">Sesuai</Pill> : <Pill tone="error">Tidak sesuai</Pill>}
@@ -467,12 +491,14 @@ function DashboardUtama() {
         )}
       </Sheet>
 
-      <div className="animate-entrance-4">
+      <div className="animate-entrance-4 lg:order-5 lg:col-span-2">
         <KalengSample />
       </div>
 
       {/* Uji takaran bejana 20 L */}
-      <KartuTakaran hariIni={hariIni} />
+      <div className="lg:order-6">
+        <KartuTakaran hariIni={hariIni} />
+      </div>
 
       {/* 7. Status alur LO */}
       <Kartu
@@ -480,9 +506,9 @@ function DashboardUtama() {
         icon={Network}
         title="LO Tracking"
         sub="Status alur Loading Order"
-        className="animate-entrance-5"
+        className="animate-entrance-5 lg:order-4"
         action={
-          <Link to="/laporan/lo" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+          <Link to="/laporan/lo" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
             Total {loTotal} LO <ChevronRight aria-hidden="true" className="size-4" />
           </Link>
         }
@@ -490,9 +516,9 @@ function DashboardUtama() {
         <div className="grid grid-cols-3 gap-2">
           {LO_DASH.map((x) => (
             <Link key={x.key} to="/laporan/lo" className={cn('flex min-w-0 flex-col items-center rounded-md p-2.5 text-center active:scale-[0.98]', x.tile)}>
-              <span className={cn('truncate text-[10px] font-bold uppercase', x.teks)}>{LO_STATUS.find((s) => s.key === x.key)!.label}</span>
+              <span className={cn('truncate text-xs font-bold uppercase', x.teks)}>{LO_STATUS.find((s) => s.key === x.key)!.label}</span>
               <span className={cn('tabular text-numeric-lg font-bold', x.teks)}>{loCounts.get(x.key) ?? 0}</span>
-              <span className={cn('text-[10px] leading-tight', x.teks)}>{x.sub}</span>
+              <span className={cn('text-xs leading-tight', x.teks)}>{x.sub}</span>
             </Link>
           ))}
         </div>
@@ -505,9 +531,9 @@ function DashboardUtama() {
           icon={FireExtinguisher}
           title="Proteksi Kebakaran"
           sub="Kondisi APAR & APAB dari inspeksi terakhir"
-          className="animate-entrance-5"
+          className="animate-entrance-5 lg:order-7"
           action={
-            <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+            <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
               {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
             </Link>
           }
@@ -520,30 +546,32 @@ function DashboardUtama() {
             ].map((x) => (
               <Link key={x.label} to="/apar" className="flex min-w-0 flex-col items-center px-1 py-2 text-center active:scale-[0.98]">
                 <span className="tabular text-numeric-lg font-bold text-on-surface">{x.value}</span>
-                <span className="text-[10px] font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
+                <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
               </Link>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
-              <span className="text-[10px] font-bold uppercase text-emerald-700">Baik</span>
+              <span className="text-xs font-bold uppercase text-emerald-700">Baik</span>
               <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
             </Link>
             <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-[10px] font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
+              <span className={cn('text-xs font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
               <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
             </Link>
             <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
-              <span className="text-[10px] font-bold uppercase text-amber-700">Belum bulan ini</span>
+              <span className="text-xs font-bold uppercase text-amber-700">Belum bulan ini</span>
               <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
             </Link>
             <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-[10px] font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
+              <span className={cn('text-xs font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
               <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
             </Link>
           </div>
         </Kartu>
       )}
+
+      </div>
 
       <DetailHari iso={hari} onClose={() => setHari(null)} />
     </div>
@@ -551,6 +579,25 @@ function DashboardUtama() {
 }
 
 /** Satu hari pada kalender pekan: label, tanggal, titik plan, dan ikon status. */
+/** Pengingat plan pengiriman besok: baris amber di alur halaman (tidak menutupi kartu tanggal & shift). */
+function PengingatPlan() {
+  const app = useApp()
+  const besok = app.spbuSiap && app.can('/plan') ? planBesokKurang(app.plans) : null
+  if (!besok) return null
+  return (
+    <Link to="/plan" className="animate-entrance-1 flex min-h-14 items-center gap-space-sm rounded-md border border-amber-300 bg-amber-50 p-space-sm active:scale-[0.99]">
+      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950">
+        <CalendarClock className="size-[18px]" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-body-md font-bold text-amber-950">Plan pengiriman besok belum dibuat</span>
+        <span className="text-body-sm text-amber-900">Kirim {formatTanggalIso(besok)} · buat permintaan MS2 di Plan Pengiriman</span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-amber-900" />
+    </Link>
+  )
+}
+
 function HariTile({ day, plan, future, onOpen }: { day: CalendarDay & { iso: string }; plan: boolean; future: boolean; onOpen: () => void }) {
   const anomali = day.status === 'catatan'
   const status = anomali ? 'ada anomali' : day.status === 'sesuai' ? 'bongkaran sesuai' : day.isToday ? 'berjalan' : 'tidak ada data'
@@ -566,7 +613,7 @@ function HariTile({ day, plan, future, onOpen }: { day: CalendarDay & { iso: str
         future && !plan && 'opacity-60',
       )}
     >
-      <span className={cn('text-[10px] font-bold uppercase', day.isToday ? 'text-primary' : anomali ? 'text-error' : future ? 'text-outline' : 'text-on-surface-variant')}>{day.label}</span>
+      <span className={cn('text-xs font-bold uppercase', day.isToday ? 'text-primary' : anomali ? 'text-error' : future ? 'text-on-surface-variant' : 'text-on-surface-variant')}>{day.label}</span>
       <span
         className={cn(
           'tabular relative flex size-8 items-center justify-center rounded-full text-numeric-sm font-semibold',
@@ -596,7 +643,7 @@ function Kartu({ id, icon: Icon, title, sub, action, className, children }: { id
             <h2 id={id} className="scroll-mt-24 text-headline-md font-bold text-on-surface">
               {title}
             </h2>
-            {sub && <span className="text-[11px] text-outline">{sub}</span>}
+            {sub && <span className="text-xs text-on-surface-variant">{sub}</span>}
           </span>
         </div>
         {action}
@@ -609,11 +656,11 @@ function Kartu({ id, icon: Icon, title, sub, action, className, children }: { id
 function Stat({ label, value, unit, sub, subTone }: { label: string; value: string; unit: string; sub: string; subTone: 'primary' | 'ok' | 'error' }) {
   return (
     <div className="flex min-w-0 flex-col justify-between rounded-md bg-surface-container-low p-2.5">
-      <span className="text-[10px] font-bold uppercase leading-tight text-on-surface-variant">{label}</span>
+      <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{label}</span>
       <span className={cn('tabular mt-1 truncate text-numeric-md font-bold', subTone === 'error' ? 'text-error' : 'text-on-surface')}>
-        {value} <span className="text-[10px] font-normal text-outline">{unit}</span>
+        {value} <span className="text-xs font-normal text-on-surface-variant">{unit}</span>
       </span>
-      <span className={cn('tabular mt-0.5 truncate text-[10px] font-semibold', subTone === 'primary' ? 'text-primary' : subTone === 'error' ? 'text-error' : 'text-emerald-700')}>{sub}</span>
+      <span className={cn('tabular mt-0.5 truncate text-xs font-semibold', subTone === 'primary' ? 'text-primary' : subTone === 'error' ? 'text-error' : 'text-emerald-700')}>{sub}</span>
     </div>
   )
 }
@@ -621,7 +668,7 @@ function Stat({ label, value, unit, sub, subTone }: { label: string; value: stri
 function Mini({ label, value, sub, bad }: { label: string; value: string; sub?: string; bad?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col rounded-sm bg-surface-container-lowest/80 px-2 py-1.5">
-      <dt className="text-[10px] font-bold uppercase text-outline">{label}</dt>
+      <dt className="text-xs font-bold uppercase text-on-surface-variant">{label}</dt>
       <dd className={cn('tabular text-body-sm font-bold', bad ? 'text-error' : 'text-on-surface')}>
         {value}
         {sub && <span className="ml-1 font-semibold">({sub})</span>}
@@ -635,9 +682,9 @@ function SlaTile({ icon: Icon, label, value, keterangan }: { icon: typeof Timer;
     <div className="flex min-w-0 items-center gap-2.5 rounded-md bg-surface-container p-2.5">
       <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[10px] font-semibold uppercase leading-tight text-outline">{label}</span>
+        <span className="truncate text-xs font-semibold uppercase leading-tight text-on-surface-variant">{label}</span>
         <span className="tabular text-numeric-md font-bold text-on-surface">{value}</span>
-        <span className="text-[11px] leading-tight text-on-surface-variant">{keterangan}</span>
+        <span className="text-xs leading-tight text-on-surface-variant">{keterangan}</span>
       </span>
     </div>
   )
@@ -647,7 +694,7 @@ function Legend({ className, label }: { className: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
       <span aria-hidden="true" className={cn('size-2 rounded-full', className)} />
-      <span className="text-[11px] text-outline">{label}</span>
+      <span className="text-xs text-on-surface-variant">{label}</span>
     </span>
   )
 }
@@ -687,39 +734,39 @@ function KartuTakaran({ hariIni }: { hariIni: string }) {
       sub="Bejana ukur 20 L, batas -60 ml"
       className="animate-entrance-5"
       action={
-        <Link to={app.can('/laporan/takaran') ? '/laporan/takaran' : '/takaran'} className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+        <Link to={app.can('/laporan/takaran') ? '/laporan/takaran' : '/takaran'} className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
           Riwayat <ChevronRight aria-hidden="true" className="size-4" />
         </Link>
       }
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className={cn('flex flex-col rounded-md p-2.5', hari.length ? 'bg-emerald-50' : 'bg-amber-50')}>
-          <span className={cn('text-[10px] font-bold uppercase', hari.length ? 'text-emerald-700' : 'text-amber-700')}>Hari ini</span>
+          <span className={cn('text-xs font-bold uppercase', hari.length ? 'text-emerald-700' : 'text-amber-700')}>Hari ini</span>
           <span className={cn('tabular text-numeric-lg font-bold', hari.length ? 'text-emerald-700' : 'text-amber-700')}>{hari.length}</span>
-          <span className={cn('text-[10px]', lewatHari ? 'font-semibold text-error' : hari.length ? 'text-emerald-700' : 'text-amber-700')}>{lewatHari ? `${lewatHari} lewat toleransi` : hari.length ? 'hasil uji' : 'belum ada uji'}</span>
+          <span className={cn('text-xs', lewatHari ? 'font-semibold text-error' : hari.length ? 'text-emerald-700' : 'text-amber-700')}>{lewatHari ? `${lewatHari} lewat toleransi` : hari.length ? 'hasil uji' : 'belum ada uji'}</span>
         </div>
         <div className={cn('flex flex-col rounded-md p-2.5', lewatBulan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-          <span className={cn('text-[10px] font-bold uppercase', lewatBulan ? 'text-error' : 'text-on-surface-variant')}>Lewat toleransi</span>
+          <span className={cn('text-xs font-bold uppercase', lewatBulan ? 'text-error' : 'text-on-surface-variant')}>Lewat toleransi</span>
           <span className={cn('tabular text-numeric-lg font-bold', lewatBulan ? 'text-error' : 'text-on-surface')}>{lewatBulan}</span>
-          <span className="text-[10px] text-on-surface-variant">bulan ini</span>
+          <span className="text-xs text-on-surface-variant">bulan ini</span>
         </div>
         <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
-          <span className="text-[10px] font-bold uppercase text-on-surface-variant">Nozzle diuji</span>
+          <span className="text-xs font-bold uppercase text-on-surface-variant">Nozzle diuji</span>
           <span className="tabular text-numeric-lg font-bold text-on-surface">
             {nozzleBulan.size}
             <span className="text-body-sm font-semibold text-outline">/{totalNozzle}</span>
           </span>
-          <span className="text-[10px] text-on-surface-variant">bulan ini</span>
+          <span className="text-xs text-on-surface-variant">bulan ini</span>
         </div>
         <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
-          <span className="text-[10px] font-bold uppercase text-on-surface-variant">Uji terakhir</span>
+          <span className="text-xs font-bold uppercase text-on-surface-variant">Uji terakhir</span>
           <span className="tabular truncate text-body-md font-bold text-on-surface">{terakhir ? formatTanggalIso(terakhir.tanggal) : '-'}</span>
-          <span className="truncate text-[10px] text-on-surface-variant">{terakhir ? `${terakhir.data.jam}, Nozzle ${terakhir.data.nozzle}` : 'belum ada'}</span>
+          <span className="truncate text-xs text-on-surface-variant">{terakhir ? `${terakhir.data.jam}, Nozzle ${terakhir.data.nozzle}` : 'belum ada'}</span>
         </div>
       </div>
       {nozzles.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Hasil terakhir per nozzle</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Hasil terakhir per nozzle</span>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {nozzles.map((n) => {
               const lewat = [n.P, n.M].some((r) => r && takarStatus(r.data.hasilMl) === 'lewat')
@@ -727,9 +774,9 @@ function KartuTakaran({ hariIni }: { hariIni: string }) {
                 <div key={n.nozzle} className={cn('flex items-center gap-2 rounded-md px-2.5 py-1.5 text-body-sm', lewat ? 'bg-error-container/50' : 'bg-surface-container-low')}>
                   <span className="tabular w-16 shrink-0 font-bold text-on-surface">Nozzle {n.nozzle}</span>
                   <span className="min-w-0 flex-1 truncate text-on-surface-variant">{n.produk}</span>
-                  <span className="text-[10px] font-bold text-outline">P</span>
+                  <span className="text-xs font-bold text-on-surface-variant">P</span>
                   {nilai(n.P)}
-                  <span className="text-[10px] font-bold text-outline">M</span>
+                  <span className="text-xs font-bold text-on-surface-variant">M</span>
                   {nilai(n.M)}
                 </div>
               )

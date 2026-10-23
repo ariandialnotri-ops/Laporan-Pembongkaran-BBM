@@ -52,12 +52,12 @@ export function DockNav() {
                       <span className="relative">
                         <Icon aria-hidden="true" className="size-[22px]" strokeWidth={active ? 2.1 : 1.7} />
                         {jumlah > 0 && (
-                          <span className="tabular absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-md bg-[#ffc9ad] px-1 text-[10px] font-bold text-[#4d1d02]" aria-label={`${jumlah} perlu dikerjakan`}>
+                          <span className="tabular absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-md bg-[#ffc9ad] px-1 text-xs font-bold text-[#4d1d02]" aria-label={`${jumlah} perlu dikerjakan`}>
                             {jumlah}
                           </span>
                         )}
                       </span>
-                      <span className="max-w-full truncate text-[11px] tracking-normal">{g.labelPendek ?? g.label}</span>
+                      <span className="max-w-full truncate text-xs tracking-normal">{g.labelPendek ?? g.label}</span>
                     </Link>
                   )
                 })}
@@ -82,7 +82,7 @@ function TombolLapor({ aktif }: { aktif: boolean }) {
         <ScanLine className="size-7" strokeWidth={2} />
       </span>
       <span aria-hidden="true" className="size-[22px]" />
-      <span className={cn('max-w-full truncate text-[11px] tracking-normal', aktif ? 'font-semibold text-primary' : 'text-on-surface-variant')}>Lapor</span>
+      <span className={cn('max-w-full truncate text-xs tracking-normal', aktif ? 'font-semibold text-primary' : 'text-on-surface-variant')}>Lapor</span>
     </Link>
   )
 }

@@ -314,7 +314,7 @@ export function UjiTakaran() {
         </div>
 
         <Field label={`Hasil ${opsiLabel(opsi)} (selisih dari 20 L)`} htmlFor="tk-hasil" hint="Minus bila kurang dari 20 L, mis. -40. Plus bila lebih.">
-          <Input id="tk-hasil" numeric inputMode="text" suffix="ml" placeholder="-40" value={hasil} onChange={(e) => ubah(() => setHasil(e.target.value))} />
+          <Input id="tk-hasil" numeric inputMode="text" suffix="ml" value={hasil} onChange={(e) => ubah(() => setHasil(e.target.value))} />
         </Field>
         {status !== 'kosong' && (
           <div role="status" className={cn('flex items-start gap-space-sm rounded-md p-space-sm text-body-sm', status === 'lewat' ? 'bg-error-container/70 text-on-error-container' : 'bg-emerald-50 text-emerald-800')}>

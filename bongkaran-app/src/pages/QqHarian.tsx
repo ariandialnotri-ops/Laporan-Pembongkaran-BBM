@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Beaker, Camera, ChevronRight, CircleCheck, CircleDot, Flag, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
+import { Beaker, Camera, ChevronRight, CircleCheck, CircleDot, Flag, Lock, Plus, Save, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
@@ -94,7 +94,7 @@ export function QqHarian() {
   const { tanggal, shift, valid } = useKunciShift()
   const bolehIsi = tanggal === todayIso() && shift === 1
   const key = { tanggal, shift }
-  const { key: now } = useStokShift()
+  const { key: now, missing: stokKosong } = useStokShift()
   const records = useMemo(() => app.daily.filter((d): d is QqRecord => d.kind === 'qq'), [app.daily])
   const id = qqRecordId(key.tanggal, key.shift)
   const existing = records.find((r) => r.id === id) ?? null
@@ -315,10 +315,14 @@ export function QqHarian() {
   const pump = totalPumpTest(data)
   const isNow = key.tanggal === now.tanggal && key.shift === now.shift
   const selesai = !!existing?.data.selesaiAt && !draft
+  // Sama dengan Input Bongkaran: form shift berjalan dikunci sampai stok awal shift diisi.
+  const kunci = isNow && stokKosong
 
   return (
     <div className="flex flex-col gap-space-md">
       {isNow && <StokGate action="uji Q&Q" />}
+
+      <fieldset disabled={kunci} className="flex min-w-0 flex-col gap-space-md disabled:*:not-last:[filter:opacity(0.6)]">
 
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start justify-between gap-2">
@@ -390,8 +394,8 @@ export function QqHarian() {
                 ) : null
               })()}
               <div className="grid grid-cols-3 gap-space-sm">
-                <Field label="Density" htmlFor={`qk-d-${k.id}`}>
-                  <Input id={`qk-d-${k.id}`} numeric inputMode="decimal" placeholder="0,7450" value={k.densityObs} onChange={(e) => setK(i, { densityObs: e.target.value })} />
+                <Field label="Density" htmlFor={`qk-d-${k.id}`} hint="Contoh: 0,7450">
+                  <Input id={`qk-d-${k.id}`} numeric inputMode="decimal" value={k.densityObs} onChange={(e) => setK(i, { densityObs: e.target.value })} />
                 </Field>
                 <Field label="Suhu" htmlFor={`qk-s-${k.id}`}>
                   <Input id={`qk-s-${k.id}`} numeric inputMode="decimal" suffix="°C" value={k.suhu} onChange={(e) => setK(i, { suhu: e.target.value })} />
@@ -468,11 +472,19 @@ export function QqHarian() {
             Uji selesai {jamDari(existing?.data.selesaiAt)}; kirim ulang bila ada koreksi (ambil foto lagi).
           </span>
         )}
-        <Button size="lg" className="w-full" disabled={busy !== null} onClick={selesaikan}>
-          <Send aria-hidden="true" />
-          {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang laporan ke WhatsApp' : 'Selesaikan & lanjut kirim ke WhatsApp'}
-        </Button>
+        {kunci ? (
+          <Button size="lg" variant="soft" className="w-full bg-neutral-200 text-neutral-700 shadow-none disabled:opacity-100" disabled>
+            <Lock aria-hidden="true" />
+            Isi stok awal dulu
+          </Button>
+        ) : (
+          <Button size="lg" className="w-full" disabled={busy !== null} onClick={selesaikan}>
+            <Send aria-hidden="true" />
+            {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang laporan ke WhatsApp' : 'Selesaikan & lanjut kirim ke WhatsApp'}
+          </Button>
+        )}
       </GlassCard>
+      </fieldset>
 
       {guard.dialog}
     </div>

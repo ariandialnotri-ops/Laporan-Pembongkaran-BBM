@@ -345,7 +345,7 @@ export function JadwalShift() {
                   const w = new Date(`${iso}T00:00:00`).getDay()
                   return (
                     <th key={d} className={cn('min-w-9 px-0.5 py-space-xs text-center font-semibold', w === 0 ? 'text-error' : 'text-on-surface-variant', iso === hariIni && 'bg-primary/10')}>
-                      <span className="block text-[10px] font-normal">{HARI[w]}</span>
+                      <span className="block text-xs font-normal">{HARI[w]}</span>
                       {d}
                     </th>
                   )
@@ -357,7 +357,7 @@ export function JadwalShift() {
                 <tr key={p.id}>
                   <td className="sticky left-0 z-10 border-t border-outline-variant/40 bg-surface-container-lowest px-space-sm py-1">
                     <span className="block max-w-40 truncate font-semibold text-on-surface">{p.nama}</span>
-                    <span className="block text-[11px] text-on-surface-variant">{p.jabatan}</span>
+                    <span className="block text-xs text-on-surface-variant">{p.jabatan}</span>
                   </td>
                   {hari.map((d) => {
                     const k = roster[p.id]?.[d]
@@ -380,7 +380,7 @@ export function JadwalShift() {
               ))}
               {SHIFTS.map((s) => (
                 <tr key={s.no}>
-                  <td className="sticky left-0 z-10 border-t border-outline-variant/40 bg-surface-container-lowest px-space-sm py-1 text-[11px] font-semibold uppercase text-on-surface-variant">Jumlah {s.label}</td>
+                  <td className="sticky left-0 z-10 border-t border-outline-variant/40 bg-surface-container-lowest px-space-sm py-1 text-xs font-semibold uppercase text-on-surface-variant">Jumlah {s.label}</td>
                   {hari.map((d) => (
                     <td key={d} className={cn('tabular border-t border-outline-variant/40 text-center text-[12px]', jumlah(d, s.no) ? 'text-on-surface' : 'text-error')}>
                       {jumlah(d, s.no)}

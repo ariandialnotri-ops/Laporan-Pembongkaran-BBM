@@ -567,7 +567,7 @@ function Checklist({
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-body-md text-on-surface">{item}</span>
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', NADA_JADWAL(j.jadwal))}>{j.jadwal}</span>
+                    <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', NADA_JADWAL(j.jadwal))}>{j.jadwal}</span>
                     {j.jadwal !== 'harian' && j.selang !== null && (
                       <span className={cn('text-[12px]', j.tempo ? 'font-semibold text-amber-800' : 'text-on-surface-variant')}>
                         {j.tempo ? `Jatuh tempo${j.terakhir ? ` · terakhir ${tglPendek(j.terakhir)}` : ' · belum tercatat'}` : j.berikut ? `Berikutnya ${tglPendek(j.berikut)} · terakhir ${tglPendek(j.terakhir!)}` : 'Belum tercatat dalam riwayat'}

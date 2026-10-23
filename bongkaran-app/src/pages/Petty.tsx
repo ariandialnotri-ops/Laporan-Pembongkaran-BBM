@@ -71,7 +71,7 @@ function Ringkas({ items }: { items: [string, string, boolean?][] }) {
       {items.map(([k, v, merah]) => (
         <div key={k} className={cn('rounded-md p-space-xs', merah ? 'bg-error-container' : 'bg-surface-container-low')}>
           <span className={cn('tabular block text-body-md font-bold', merah ? 'text-on-error-container' : 'text-on-surface')}>{v}</span>
-          <span className="text-[11px] uppercase text-on-surface-variant">{k}</span>
+          <span className="text-xs uppercase text-on-surface-variant">{k}</span>
         </div>
       ))}
     </div>

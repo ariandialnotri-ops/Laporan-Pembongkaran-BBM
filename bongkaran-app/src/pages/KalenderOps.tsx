@@ -109,7 +109,7 @@ export function KalenderOps() {
           </section>
 
           <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-xs p-space-md">
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase text-on-surface-variant">
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase text-on-surface-variant">
               {HARI.map((h) => (
                 <span key={h}>{h}</span>
               ))}
@@ -130,7 +130,7 @@ export function KalenderOps() {
                     className={cn('flex aspect-square flex-col items-center justify-center rounded-md text-body-sm font-bold transition-transform active:scale-95', warnaHari(h), h.tanggal === hariIni && 'ring-2 ring-primary ring-offset-1')}
                   >
                     <span>{Number(h.tanggal.slice(8))}</span>
-                    {!h.nanti && <span className="tabular text-[10px] font-semibold opacity-90">{pct}%</span>}
+                    {!h.nanti && <span className="tabular text-xs font-semibold opacity-90">{pct}%</span>}
                   </button>
                 )
               })}

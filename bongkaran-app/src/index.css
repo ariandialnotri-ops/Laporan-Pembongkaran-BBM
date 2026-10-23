@@ -70,22 +70,23 @@
   --on-background: #0a1c30;
 
   /* --- Glass recipes ---------------------------------------------------
-     Elevation comes from refraction, not opaque borders (DESIGN.md
-     "Elevation & Depth"). Each level pairs a fill, a blur and a rim. */
-  --glass-1-bg: rgba(255, 255, 255, 0.55);
-  --glass-1-blur: blur(20px) saturate(160%);
+     Kartu memakai permukaan (hampir) padat tanpa blur: paling mudah dibaca di
+     bawah matahari dan ringan untuk GPU HP murah. Blur hanya dipakai header
+     (data-glass-bar). Tiap level tetap punya fill, rim, dan bayangan. */
+  --glass-1-bg: rgba(255, 255, 255, 0.82);
+  --glass-1-blur: none;
   --glass-1-border: rgba(255, 255, 255, 0.6);
   --glass-1-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
 
-  --glass-2-bg: rgba(255, 255, 255, 0.72);
-  --glass-2-blur: blur(28px) saturate(190%);
+  --glass-2-bg: rgba(255, 255, 255, 0.9);
+  --glass-2-blur: none;
   --glass-2-border: rgba(255, 255, 255, 0.8);
   --glass-2-shadow:
     0 12px 40px -4px rgba(112, 144, 176, 0.2),
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
 
-  --glass-3-bg: rgba(255, 255, 255, 0.88);
-  --glass-3-blur: blur(36px) saturate(200%);
+  --glass-3-bg: #ffffff;
+  --glass-3-blur: none;
   --glass-3-border: #ffffff;
   --glass-3-shadow:
     0 24px 60px -8px rgba(30, 41, 59, 0.22),
@@ -501,13 +502,12 @@
 
 /* Every ambient and decorative animation above is non-essential, so it all
    stops here. Entrance animations resolve to their final state. */
-/* HP (layar sentuh): blur kaca lebih ringan. Latar orb sudah sangat kabur,
-   jadi tampilan hampir sama tetapi GPU jauh lebih ringan saat menggulir. */
+/* HP (layar sentuh): header juga padat, tanpa blur sama sekali. */
 @media (pointer: coarse) {
-  :root {
-    --glass-1-blur: blur(10px) saturate(150%);
-    --glass-2-blur: blur(14px) saturate(170%);
-    --glass-3-blur: blur(18px) saturate(180%);
+  [data-glass-bar] {
+    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -547,18 +547,10 @@ html[data-keyboard='open'] [data-dock] {
 
 /* iPhone/iPad (Safari & semua browser iOS memakai WebKit): banyak lapisan backdrop-filter
    pada halaman panjang menghabiskan memori GPU, sehingga dock/konten bawah bisa tidak
-   tergambar dan halaman terasa tidak bisa digulir sampai bawah. Di iOS, kartu memakai
-   permukaan padat tanpa blur, orb latar dimatikan, latar tidak "fixed", dan gulir
-   memantul bawaan iOS dibiarkan. */
+   tergambar dan halaman terasa tidak bisa digulir sampai bawah. Kartu sudah padat tanpa
+   blur (lihat Glass recipes); di iOS orb latar juga dimatikan, latar tidak "fixed", dan
+   gulir memantul bawaan iOS dibiarkan. */
 @supports (-webkit-touch-callout: none) {
-  :root {
-    --glass-1-bg: rgba(255, 255, 255, 0.82);
-    --glass-2-bg: rgba(255, 255, 255, 0.9);
-    --glass-3-bg: #ffffff;
-    --glass-1-blur: none;
-    --glass-2-blur: none;
-    --glass-3-blur: none;
-  }
   body {
     background-attachment: scroll;
     /* overscroll-behavior: none di Safari iOS menghambat toolbar bawah menyusut,

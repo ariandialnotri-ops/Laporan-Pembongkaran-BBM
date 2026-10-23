@@ -333,17 +333,17 @@ export function LaporanAir() {
         <div className="grid grid-cols-3 gap-space-xs text-center">
           <div className="rounded-md bg-surface-container-low p-space-xs">
             <span className="tabular block text-numeric-md font-bold text-on-surface">{data.length}</span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Pengecekan</span>
+            <span className="text-xs uppercase text-on-surface-variant">Pengecekan</span>
           </div>
           <div className={cn('rounded-md p-space-xs', temuan ? 'bg-error-container' : 'bg-surface-container-low')}>
             <span className={cn('tabular block text-numeric-md font-bold', temuan ? 'text-on-error-container' : 'text-on-surface')}>{temuan}</span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Ada air</span>
+            <span className="text-xs uppercase text-on-surface-variant">Ada air</span>
           </div>
           <div className="rounded-md bg-surface-container-low p-space-xs">
             <span className="tabular block text-numeric-md font-bold text-on-surface">
               {terlewat}/{wajib}
             </span>
-            <span className="text-[11px] uppercase text-on-surface-variant">Hari terlewat</span>
+            <span className="text-xs uppercase text-on-surface-variant">Hari terlewat</span>
           </div>
         </div>
         <ErrorBox text={error} />

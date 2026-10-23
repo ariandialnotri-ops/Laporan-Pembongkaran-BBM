@@ -61,7 +61,7 @@ export function KartuStopPenyaluran({ className }: { className?: string }) {
             {r.aktif.length ? `${r.aktif.length} stop penyaluran masih berjalan` : 'Semua produk tersalurkan normal'} · {r.kejadian} kejadian bulan ini
           </span>
         </div>
-        <Link to="/stop-penyaluran" className="flex shrink-0 items-center gap-0.5 text-body-sm font-semibold text-primary">
+        <Link to="/stop-penyaluran" className="touch-44 flex shrink-0 items-center gap-0.5 text-body-sm font-semibold text-primary">
           Dashboard
           <ChevronRight aria-hidden="true" className="size-4" />
         </Link>

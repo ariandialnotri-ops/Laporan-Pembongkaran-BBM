@@ -150,10 +150,10 @@ export function StepContent(props: StepProps) {
                     <Num id={`tera-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
                   <Field label="Kapasitas" htmlFor={`kap-${c.id}`}>
-                    <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
+                    <Num id={`kap-${c.id}`} suffix="L" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                   <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
-                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
+                    <Num id={`kpk-${c.id}`} suffix="L/mm" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
                   </Field>
                 </div>
               </div>
@@ -453,7 +453,7 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
         {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
+          <StatusBanner tone="warn" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -552,15 +552,15 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">Density depot & keberangkatan</span>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Density OBS depot" htmlFor="dobs-depot">
-            <Num id="dobs-depot" placeholder="0,7450" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
+          <Field label="Density OBS depot" htmlFor="dobs-depot" hint="Contoh: 0,7450">
+            <Num id="dobs-depot" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
           </Field>
-          <Field label="Suhu OBS depot" htmlFor="suhu-depot">
-            <Num id="suhu-depot" suffix="°C" placeholder="30,0" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
+          <Field label="Suhu OBS depot" htmlFor="suhu-depot" hint="Contoh: 30,0">
+            <Num id="suhu-depot" suffix="°C" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
           </Field>
         </div>
-        <Field label="Density std. 15 °C (dokumen DO)" htmlFor="d15-depot">
-          <Num id="d15-depot" placeholder="0,7567" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
+        <Field label="Density std. 15 °C (dokumen DO)" htmlFor="d15-depot" hint="Contoh: 0,7567 (4 desimal)">
+          <Num id="d15-depot" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
         </Field>
         <StatusBanner {...depotBanner} />
         <div className="grid grid-cols-2 gap-space-sm">
@@ -642,11 +642,11 @@ function DensityStep(props: StepProps) {
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Density observasi" htmlFor={`dobs-${r.id}`}>
-              <Num id={`dobs-${r.id}`} placeholder="0,7452" value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
+            <Field label="Density observasi" htmlFor={`dobs-${r.id}`} hint="Contoh: 0,7452">
+              <Num id={`dobs-${r.id}`} value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
             </Field>
-            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`}>
-              <Num id={`dsuhu-${r.id}`} suffix="°C" placeholder="30,5" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
+            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`} hint="Contoh: 30,5">
+              <Num id={`dsuhu-${r.id}`} suffix="°C" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
             </Field>
           </div>
           <Ladder

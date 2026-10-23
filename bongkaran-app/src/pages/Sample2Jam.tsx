@@ -202,8 +202,8 @@ export function Sample2JamForm() {
           <Field label="Jam uji" htmlFor="smp-jam">
             <Input id="smp-jam" type="time" value={s.jam} onChange={(e) => set({ jam: e.target.value })} />
           </Field>
-          <Field label="Density" htmlFor="smp-d">
-            <Input id="smp-d" numeric inputMode="decimal" placeholder="0,7450" value={s.densityObs} onChange={(e) => set({ densityObs: e.target.value })} />
+          <Field label="Density" htmlFor="smp-d" hint="Contoh: 0,7450 (4 desimal)">
+            <Input id="smp-d" numeric inputMode="decimal" value={s.densityObs} onChange={(e) => set({ densityObs: e.target.value })} />
           </Field>
           <Field label="Suhu" htmlFor="smp-s">
             <Input id="smp-s" numeric inputMode="decimal" suffix="°C" value={s.suhu} onChange={(e) => set({ suhu: e.target.value })} />
