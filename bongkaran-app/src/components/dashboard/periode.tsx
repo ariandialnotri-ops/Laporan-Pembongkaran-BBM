@@ -61,14 +61,14 @@ export function PilihPeriode({ value, onChange, className }: { value: PeriodeDas
         aria-label={`Filter tanggal: ${labelPeriode(value)}, ${rentangRingkas(value)}. Ubah periode`}
         aria-expanded={buka}
         className={cn(
-          'group flex min-h-12 items-center gap-space-sm rounded-xl bg-surface-container-low py-1.5 pl-1.5 pr-space-sm text-left ring-1 ring-inset ring-outline-variant/50 transition-colors hover:bg-primary/5 active:scale-[0.98]',
+          'group flex min-h-12 items-center gap-space-sm rounded-xl bg-surface-container-lowest py-1.5 shadow-sm pl-1.5 pr-space-sm text-left ring-1 ring-inset ring-outline-variant/50 transition-colors hover:bg-primary/5 active:scale-[0.98]',
           className,
         )}
       >
         <span aria-hidden="true" className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-on-primary shadow-sm transition-transform duration-200 group-hover:scale-105 group-active:scale-90">
           <Funnel className="size-4" />
           {/* Titik: periode bukan bawaan (bulan ini). */}
-          {value.preset !== 'bulan' && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-surface-container-low" />}
+          {value.preset !== 'bulan' && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-surface-container-lowest" />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-xs font-semibold text-on-surface-variant">Filter Tanggal</span>

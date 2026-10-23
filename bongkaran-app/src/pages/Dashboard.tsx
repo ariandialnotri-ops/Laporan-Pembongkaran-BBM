@@ -101,10 +101,10 @@ export function Dashboard() {
   return (
     <div className="flex flex-col gap-space-md">
       <HeroDashboard>
-        <PanelDashboard pilihan={pilihan} value={aktif} onChange={ganti}>
-          {pakaiPeriode && <PilihPeriode value={periode} onChange={setPeriode} className="w-full" />}
-        </PanelDashboard>
+        <PanelDashboard pilihan={pilihan} value={aktif} onChange={ganti} />
       </HeroDashboard>
+      {/* Filter Tanggal: di bawah header biru, di atas kartu KPI. */}
+      {pakaiPeriode && <PilihPeriode value={periode} onChange={setPeriode} className="animate-entrance-1 w-full sm:ml-auto sm:w-auto sm:min-w-80" />}
       <Suspense fallback={<Loading />}>
         {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse periode={periode} /> : aktif === 'sales' ? <DashboardSales periode={periode} /> : <DashboardUtama periode={periode} />}
       </Suspense>
@@ -167,9 +167,9 @@ const LENGKUNG_KANAN = { background: 'radial-gradient(circle at 100% 0, transpar
 /**
  * Pemilih dashboard bergaya tab kartu (seperti SIMPATI | Halo | IndiHome di aplikasi Telkomsel): tab sama lebar
  * di atas latar biru; tab aktif berwarna putih dan menyatu ke panel di bawahnya lewat lengkung cekung. Panel
- * berisi ikon, nama & cakupan dashboard aktif, lalu Filter Tanggal. Satu pilihan saja → tanpa baris tab.
+ * berisi ikon, nama & cakupan dashboard aktif. Satu pilihan saja → tanpa baris tab.
  */
-function PanelDashboard({ pilihan, value, onChange, children }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void; children?: ReactNode }) {
+function PanelDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
   const i = Math.max(0, pilihan.findIndex((p) => p.value === value))
   const p = pilihan[i]
   const Ikon = p.icon
@@ -223,7 +223,7 @@ function PanelDashboard({ pilihan, value, onChange, children }: { pilihan: Pilih
         id="panel-dashboard"
         role={tab ? 'tabpanel' : undefined}
         aria-labelledby={tab ? `tab-dash-${p.value}` : undefined}
-        className={cn('flex flex-col gap-space-sm rounded-2xl bg-white p-space-sm text-on-surface shadow-[0_10px_24px_-12px_rgba(0,20,60,0.5)]', tab && i === 0 && 'rounded-tl-none', tab && i === pilihan.length - 1 && 'rounded-tr-none')}
+        className={cn('flex flex-col rounded-2xl bg-white p-space-sm text-on-surface shadow-[0_10px_24px_-12px_rgba(0,20,60,0.5)]', tab && i === 0 && 'rounded-tl-none', tab && i === pilihan.length - 1 && 'rounded-tr-none')}
       >
         <div key={p.value} className="animate-entrance-1 flex items-center gap-space-sm">
           <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md', p.nada)}>
@@ -234,7 +234,6 @@ function PanelDashboard({ pilihan, value, onChange, children }: { pilihan: Pilih
             <span className="text-body-sm leading-snug text-on-surface-variant">{p.sub}</span>
           </span>
         </div>
-        {children}
       </div>
     </div>
   )
