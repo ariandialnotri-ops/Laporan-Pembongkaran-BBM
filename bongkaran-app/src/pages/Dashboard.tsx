@@ -1,6 +1,8 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   Beaker,
   BrushCleaning,
   CalendarClock,
@@ -33,12 +35,14 @@ import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-
 import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
 import { KartuStopPenyaluran } from '@/components/insiden/henti'
 import { KartuUnitBisnis } from '@/components/shell/kartu-unit-bisnis'
+import { PemilihSpbu } from '@/components/shell/pemilih-spbu'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
 import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
 import { KpiOperation } from '@/components/dashboard/kpi-highlight'
-import { BarChart, DonutChart, KATEGORI, warnaProduk } from '@/components/dashboard/charts'
+import { BarChart, KATEGORI, warnaProduk } from '@/components/dashboard/charts'
+import { periodeSebelum } from '@/lib/kpi'
 import { kelompokPeriode, periodeDari, PilihPeriode, type PeriodeDashboard } from '@/components/dashboard/periode'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
@@ -99,7 +103,7 @@ export function Dashboard() {
   const pakaiPeriode = aktif === 'operation' || aktif === 'sales' || aktif === 'hsse'
   return (
     <div className="flex flex-col gap-space-md">
-      {pilihan.length > 1 && <PilihDashboard pilihan={pilihan} value={aktif} onChange={ganti} />}
+      <HeroDashboard>{pilihan.length > 1 && <PilihDashboard pilihan={pilihan} value={aktif} onChange={ganti} />}</HeroDashboard>
       {pakaiPeriode && (
         <div className="animate-entrance-1 flex items-center justify-between gap-space-sm px-space-xs">
           <span className="flex min-w-0 flex-col">
@@ -133,10 +137,41 @@ function pilihanDashboard(role: string | null): PilihanDashboard[] {
   return [op, hsse]
 }
 
-/** Pemilih dashboard: kartu ikon interaktif (geser di HP); yang aktif berwarna penuh & terangkat. */
+/**
+ * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): SPBU aktif & tanggal, lalu pemilih
+ * dashboard di atas latar biru. Di HP menempel ke header dan selebar layar; di laptop menjadi panel membulat.
+ */
+function HeroDashboard({ children }: { children: ReactNode }) {
+  const app = useApp()
+  const now = new Date()
+  return (
+    <div className="relative -mx-margin -mt-space-md overflow-hidden rounded-b-[28px] bg-gradient-to-b from-[#0047b8] to-[#1f6ad8] px-margin pb-space-md pt-space-sm text-white shadow-[0_12px_28px_-14px_rgba(0,71,184,0.6)] lg:mx-0 lg:mt-0 lg:rounded-3xl lg:pt-space-md">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-white/[0.07]" />
+      <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-10 size-48 rounded-full bg-white/[0.05]" />
+      <div className="relative flex flex-col gap-space-sm">
+        <div className="flex min-h-9 items-center justify-between gap-space-sm">
+          {/* ABH: pil pemilih SPBU (nama SPBU sudah ada di header); peran lain: salam. */}
+          {app.isAdmin ? <PemilihSpbu varian="hero" /> : <span className="truncate text-body-md font-semibold">{salam(now)} 👋</span>}
+          <span className="tabular flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/20">
+            <CalendarDays aria-hidden="true" className="size-3.5" />
+            {formatTanggalSingkat(now)} · Shift {currentShift(now).shift}
+          </span>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const salam = (d: Date) => {
+  const j = d.getHours()
+  return j < 11 ? 'Selamat pagi' : j < 15 ? 'Selamat siang' : j < 18 ? 'Selamat sore' : 'Selamat malam'
+}
+
+/** Pemilih dashboard di atas latar biru: kartu kaca; yang aktif menjadi kartu putih dengan ikon bergradasi. */
 function PilihDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
   return (
-    <div role="tablist" aria-label="Pilih dashboard" className="-mx-space-md flex snap-x scroll-px-space-md gap-space-sm overflow-x-auto px-space-md pb-1 pt-0.5 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
+    <div role="tablist" aria-label="Pilih dashboard" className="-mx-margin flex snap-x scroll-px-margin gap-space-sm overflow-x-auto px-margin py-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
       {pilihan.map((p) => {
         const on = p.value === value
         const Ikon = p.icon
@@ -151,18 +186,18 @@ function PilihDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboar
               e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
             }}
             className={cn(
-              'relative flex min-h-20 w-44 shrink-0 snap-start items-center gap-space-sm overflow-hidden rounded-xl p-space-sm text-left transition-all duration-300 active:scale-[0.97] lg:w-auto',
-              on ? `bg-gradient-to-br ${p.nada} text-white shadow-[0_10px_24px_-8px_rgba(0,80,203,0.45)]` : 'border border-outline-variant/50 bg-surface-container-lowest text-on-surface shadow-sm hover:-translate-y-0.5',
+              'relative flex min-h-[4.5rem] w-[11.5rem] shrink-0 snap-start items-center gap-space-sm rounded-2xl p-space-sm text-left transition-all duration-300 active:scale-[0.97] lg:w-auto',
+              on ? 'bg-white text-on-surface shadow-[0_10px_24px_-10px_rgba(0,20,60,0.55)]' : 'bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/15',
             )}
           >
-            {on && <span aria-hidden="true" className="absolute -right-6 -top-6 size-20 rounded-full bg-white/15" />}
-            <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors', on ? 'bg-white/20 text-white' : 'bg-primary-fixed text-primary')}>
-              <Ikon className="size-6" />
+            <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors', on ? `bg-gradient-to-br ${p.nada} text-white shadow-md` : 'bg-white/15 text-white')}>
+              <Ikon className="size-[22px]" />
             </span>
-            <span className="relative flex min-w-0 flex-col">
+            <span className="flex min-w-0 flex-1 flex-col">
               <span className="text-body-md font-bold leading-tight">{p.label}</span>
-              <span className={cn('line-clamp-2 text-xs leading-snug', on ? 'text-white/85' : 'text-on-surface-variant')}>{p.sub}</span>
+              <span className={cn('line-clamp-2 text-xs leading-snug', on ? 'text-on-surface-variant' : 'text-white/75')}>{p.sub}</span>
             </span>
+            {on && <span aria-hidden="true" className="absolute right-2.5 top-2.5 size-2 rounded-full bg-primary" />}
           </button>
         )
       })}
@@ -686,25 +721,70 @@ export function KartuProteksi({ className }: { className?: string }) {
 /** Grafik Dashboard Operation: volume diterima per hari/minggu dan komposisi penerimaan per produk. */
 function GrafikOperation({ periode }: { periode: PeriodeDashboard }) {
   const app = useApp()
-  const rows = app.reports.filter((r) => r.status !== 'draft' && r.tanggal >= periode.dari && r.tanggal <= periode.sampai)
+  const dalam = (p: { dari: string; sampai: string }) => app.reports.filter((r) => r.status !== 'draft' && r.tanggal >= p.dari && r.tanggal <= p.sampai)
+  const rows = dalam(periode)
   const vol = (r: (typeof rows)[number]) => r.terimaAktual ?? r.volumeDO ?? 0
   const batang = kelompokPeriode(periode, rows.map((r) => ({ tanggal: r.tanggal, value: vol(r) })))
-  const perProduk = new Map<string, number>()
-  for (const r of rows) perProduk.set(r.produk, (perProduk.get(r.produk) ?? 0) + vol(r))
-  const produk = [...perProduk.entries()].sort((a, b) => b[1] - a[1])
-  const total = produk.reduce((a, [, v]) => a + v, 0)
+  const perProduk = new Map<string, { v: number; n: number }>()
+  for (const r of rows) {
+    const x = perProduk.get(r.produk) ?? { v: 0, n: 0 }
+    perProduk.set(r.produk, { v: x.v + vol(r), n: x.n + 1 })
+  }
+  const produk = [...perProduk.entries()].sort((a, b) => b[1].v - a[1].v)
+  const total = rows.reduce((a, r) => a + vol(r), 0)
+  const lalu = dalam(periodeSebelum(periode)).reduce((a, r) => a + vol(r), 0)
+  const delta = lalu > 0 ? ((total - lalu) / lalu) * 100 : null
   const anomali = rows.filter((r) => r.status === 'anomali').length
   return (
-    <div className="animate-entrance-2 grid grid-cols-1 gap-space-md lg:grid-cols-2">
-      <Kartu id="grafik-penerimaan" icon={Truck} title="Volume diterima" sub={`${formatNumber(total)} L · ${rows.length} bongkaran${anomali ? ` · ${anomali} anomali` : ''}`}>
+    <section aria-labelledby="grafik-penerimaan" className="animate-entrance-2 flex flex-col gap-space-md rounded-md bg-surface-container-lowest p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-space-sm">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="grafik-penerimaan" className="flex items-center gap-2 text-body-md font-semibold text-on-surface-variant">
+            <Truck aria-hidden="true" className="size-4 text-primary" />
+            Volume diterima
+          </h2>
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="tabular text-[2rem] font-bold leading-none text-on-surface">{formatNumber(total)}</span>
+            <span className="text-body-md font-semibold text-on-surface-variant">liter</span>
+            {delta !== null && (
+              <span className={cn('tabular inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold', delta >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
+                {delta >= 0 ? <ArrowUpRight aria-hidden="true" className="size-3" /> : <ArrowDownLeft aria-hidden="true" className="size-3" />}
+                {Math.abs(delta).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%<span className="sr-only"> dibanding periode sebelumnya</span>
+              </span>
+            )}
+          </span>
+          <span className="text-body-sm text-on-surface-variant">
+            {rows.length} bongkaran{anomali ? ` · ${anomali} anomali` : ''}{lalu > 0 ? ` · periode lalu ${formatNumber(lalu)} L` : ''}
+          </span>
+        </div>
+      </div>
+      {produk.length > 0 && (
+        <ul className="grid grid-cols-2 gap-space-xs sm:grid-cols-3 lg:grid-cols-5" aria-label="Volume diterima per produk">
+          {produk.map(([p, x], i) => (
+            <li key={p} className="flex flex-col gap-0.5 rounded-md bg-surface-container-low px-space-sm py-space-xs">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
+                <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: warnaProduk(p, i) }} />
+                <span className="truncate">{p}</span>
+              </span>
+              <span className="tabular text-body-lg font-bold text-on-surface">
+                {formatNumber(x.v)} <span className="text-xs font-semibold text-on-surface-variant">L</span>
+              </span>
+              <span className="text-xs text-on-surface-variant">
+                {x.n} bongkaran · {total ? Math.round((x.v / total) * 100) : 0}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Volume per {periodeHari(periode) > 31 ? 'pekan' : 'hari'}</span>
         <BarChart data={batang} warna={KATEGORI[0]} satuan=" L" label="Volume diterima" />
-      </Kartu>
-      <Kartu id="grafik-produk" icon={Fuel} title="Penerimaan per produk" sub="Komposisi volume diterima pada periode">
-        <DonutChart data={produk.map(([p, v], i) => ({ label: p, value: v, warna: warnaProduk(p, i) }))} subTengah="volume" label="Penerimaan per produk" satuan=" L" />
-      </Kartu>
-    </div>
+      </div>
+    </section>
   )
 }
+
+const periodeHari = (p: { dari: string; sampai: string }) => Math.round((Date.parse(`${p.sampai}T00:00:00`) - Date.parse(`${p.dari}T00:00:00`)) / 86400_000) + 1
 
 /** Satu hari pada kalender pekan: label, tanggal, titik plan, dan ikon status. */
 /** Pengingat plan pengiriman besok: baris amber di alur halaman (tidak menutupi kartu tanggal & shift). */

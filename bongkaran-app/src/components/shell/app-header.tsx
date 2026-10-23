@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
+import { roleLabel } from '@/lib/roles'
 import { titleFor } from '@/lib/nav'
 import { useKembali } from './kembali'
 import { PemilihSpbu } from './pemilih-spbu'
@@ -12,6 +14,7 @@ export function AppHeader() {
   const app = useApp()
   const kembali = useKembali()
   const sidebar = useSidebar()
+  if (pathname === '/') return <HeaderBeranda />
 
   return (
     <header data-glass-bar className={cn('fixed inset-x-0 top-0 z-40 transition-[left] duration-300 motion-reduce:transition-none', !sidebar.tertutup && 'lg:left-72', 'print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl')}>
@@ -52,6 +55,53 @@ export function AppHeader() {
           <span className="hidden max-w-40 truncate text-body-sm font-semibold text-on-surface sm:inline">{app.displayName}</span>
           <span className="sr-only">Buka profil</span>
         </Link>
+      </div>
+    </header>
+  )
+}
+
+/**
+ * Header biru halaman Dashboard (beranda aplikasi HP): foto/inisial profil, nama, jabatan, dan nama SPBU,
+ * menyambung ke panel biru pemilih dashboard di bawahnya.
+ */
+function HeaderBeranda() {
+  const app = useApp()
+  // Bilah status HP (PWA/Chrome) ikut biru selama di Dashboard.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) return
+    const asal = meta.content
+    meta.content = '#0047b8'
+    return () => {
+      meta.content = asal
+    }
+  }, [])
+  const sidebar = useSidebar()
+  const nama = app.settings.namaSpbu || app.spbu?.nama || 'SPBU'
+  return (
+    <header className={cn('fixed inset-x-0 top-0 z-40 bg-[#0047b8] pt-[env(safe-area-inset-top,0px)] text-white transition-[left] duration-300 motion-reduce:transition-none print:hidden', !sidebar.tertutup && 'lg:left-72')}>
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
+        <Link to="/profil" aria-label={`Profil ${app.displayName}, ${roleLabel(app.role)}, ${nama}`} className="flex min-w-0 items-center gap-space-sm rounded-full transition-transform duration-200 active:scale-[0.98]">
+          <span aria-hidden="true" className="tabular flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-body-md font-bold text-[#0047b8] ring-2 ring-white/40 ring-offset-2 ring-offset-[#0047b8]">
+            {app.initials}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-body-lg font-bold leading-tight">{app.displayName}</span>
+            <span className="truncate text-xs font-medium text-white/80">
+              {roleLabel(app.role)} · {nama}
+            </span>
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={sidebar.toggle}
+          aria-label={sidebar.tertutup ? 'Buka menu' : 'Menu'}
+          aria-expanded={sidebar.laci}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/20 transition-transform duration-200 active:scale-95"
+        >
+          <Menu aria-hidden="true" className="size-5 lg:hidden" />
+          {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
+        </button>
       </div>
     </header>
   )

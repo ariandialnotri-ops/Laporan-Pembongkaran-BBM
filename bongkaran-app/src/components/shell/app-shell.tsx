@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SidebarTetap tertutup={tertutup} />
       <SidebarLaci open={laci} onOpenChange={setLaci} />
       <AppHeader />
-      <IndikatorSegarkan tarik={segar.tarik} sibuk={segar.sibuk} />
+      <IndikatorSegarkan tarik={segar.tarik} sibuk={segar.sibuk} tertutup={tertutup} />
 
       {/* Ruang untuk header tetap (+ notch), bar bawah (+ garis home iPhone), dan sidebar di layar lebar. */}
       <div className={cn('transition-[padding] duration-300 motion-reduce:transition-none print:p-0', !tertutup && 'lg:pl-72')}>
