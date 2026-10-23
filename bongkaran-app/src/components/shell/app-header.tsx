@@ -61,7 +61,8 @@ export function AppHeader() {
 }
 
 /**
- * Header biru halaman Dashboard (beranda aplikasi HP): foto/inisial profil, nama, jabatan, dan nama SPBU,
+ * Header biru halaman Dashboard (beranda aplikasi HP): tombol menu (sidebar) di kiri; nama, jabatan, nama SPBU, dan
+ * foto/inisial profil rata kanan,
  * menyambung ke panel biru pemilih dashboard di bawahnya.
  */
 function HeaderBeranda() {
@@ -81,17 +82,6 @@ function HeaderBeranda() {
   return (
     <header className={cn('fixed inset-x-0 top-0 z-40 bg-[#0047b8] pt-[env(safe-area-inset-top,0px)] text-white transition-[left] duration-300 motion-reduce:transition-none print:hidden', !sidebar.tertutup && 'lg:left-72')}>
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
-        <Link to="/profil" aria-label={`Profil ${app.displayName}, ${roleLabel(app.role)}, ${nama}`} className="flex min-w-0 items-center gap-space-sm rounded-full transition-transform duration-200 active:scale-[0.98]">
-          <span aria-hidden="true" className="tabular flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-body-md font-bold text-[#0047b8] ring-2 ring-white/40 ring-offset-2 ring-offset-[#0047b8]">
-            {app.initials}
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-body-lg font-bold leading-tight">{app.displayName}</span>
-            <span className="truncate text-xs font-medium text-white/80">
-              {roleLabel(app.role)} · {nama}
-            </span>
-          </span>
-        </Link>
         <button
           type="button"
           onClick={sidebar.toggle}
@@ -102,6 +92,17 @@ function HeaderBeranda() {
           <Menu aria-hidden="true" className="size-5 lg:hidden" />
           {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
         </button>
+        <Link to="/profil" aria-label={`Profil ${app.displayName}, ${roleLabel(app.role)}, ${nama}`} className="flex min-w-0 items-center gap-space-sm rounded-full transition-transform duration-200 active:scale-[0.98]">
+          <span className="flex min-w-0 flex-col items-end text-right">
+            <span className="max-w-full truncate text-body-lg font-bold leading-tight">{app.displayName}</span>
+            <span className="max-w-full truncate text-xs font-medium text-white/80">
+              {roleLabel(app.role)} · {nama}
+            </span>
+          </span>
+          <span aria-hidden="true" className="tabular flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-body-md font-bold text-[#0047b8] ring-2 ring-white/40 ring-offset-2 ring-offset-[#0047b8]">
+            {app.initials}
+          </span>
+        </Link>
       </div>
     </header>
   )
