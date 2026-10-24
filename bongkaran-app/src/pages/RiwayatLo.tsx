@@ -50,7 +50,7 @@ const COLS: Col<Row>[] = [
   },
 ]
 
-/** Laporan > Riwayat Tracking LO. Ketuk baris untuk membuka halaman Edit SO & LO; LO Closed terkunci. */
+/** Laporan > Riwayat Tracking LO. Ketuk baris untuk membuka detail LO (stepper, riwayat, edit/update). */
 export function RiwayatLo() {
   const app = useApp()
   const [range, setRange] = useDateRange('month')
@@ -78,11 +78,11 @@ export function RiwayatLo() {
           options={[{ value: 'semua' as const, label: `Semua ${inDate.length}` }, ...LO_STATUS.map((s) => ({ value: s.key, label: `${s.label} ${n(s.key)}` }))]}
         />
         <span className="text-body-sm text-on-surface-variant">
-          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Baris oranye: SO/LO belum terbit. Plan dengan tanggal kirim mendatang selalu tampil. Ketuk baris untuk mengubah LO. LO Closed tidak dapat diubah.
+          {status !== 'semua' ? `${loStatusMeta(status).desc}. ` : ''}Baris oranye: SO/LO belum terbit. Plan dengan tanggal kirim mendatang selalu tampil. Ketuk baris untuk melihat tahap pengiriman, riwayat perubahan, dan tombol edit/update. LO Closed tidak dapat diubah.
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} rowClass={(x) => (x.plan.id === baru ? BARIS_BARU : belumTerbit(x.plan, x.lo) ? BARIS_ORANYE : undefined)} onRow={(x) => navigate(`/plan/so/${encodeURIComponent(x.plan.id)}?lo=${encodeURIComponent(x.lo.id)}&dari=/laporan/lo`)} empty="Tidak ada LO pada rentang ini." />
+        <RecordTable title="Tracking LO" rows={rows} total={all.length} cols={COLS} rowKey={(x) => x.lo.id} rowClass={(x) => (x.plan.id === baru ? BARIS_BARU : belumTerbit(x.plan, x.lo) ? BARIS_ORANYE : undefined)} onRow={(x) => navigate(`/laporan/lo/${encodeURIComponent(x.plan.id)}/${encodeURIComponent(x.lo.id)}`)} empty="Tidak ada LO pada rentang ini." />
       </div>
     </div>
   )

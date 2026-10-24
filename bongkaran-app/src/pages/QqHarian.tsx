@@ -77,17 +77,15 @@ export function QqHarianMenu() {
 }
 
 type SelesaiQq = { teks: string; files: File[]; urls: string[] }
-type FotoUmum = 'struk' | 'kembali'
+type FotoUmum = 'struk'
+/** Foto struk pump test: disimpan di riwayat aplikasi, tidak pernah ikut kolase WhatsApp grup SPBU. */
 const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
   { key: 'struk', label: 'Foto struk pump test', hint: 'Struk pump test uji kualitas terbaca. Disimpan di riwayat aplikasi, tidak ikut kolase WhatsApp grup SPBU.' },
-  { key: 'kembali', label: 'Foto pengembalian minyak ke tangki', hint: 'Minyak sampel dituang kembali ke tangki pendam.' },
 ]
-/** Foto yang masuk kolase WhatsApp grup SPBU (struk pump test tidak: disimpan di riwayat aplikasi). */
-const FOTO_KOLASE = FOTO_UMUM.filter((f) => f.key !== 'struk')
 
 /**
  * Halaman form Density Harian (hari ini, shift 1, paling lambat 10:00): density per produk (disimpan
- * per baris), foto hydrometer tiap produk + pengembalian (kolase WhatsApp) dan struk pump test (disimpan
+ * per baris), foto hydrometer tiap produk (kolase WhatsApp) dan struk pump test (disimpan
  * di riwayat aplikasi). Foto kolase juga disimpan sementara di HP untuk laporan gabungan Kualitas Harian.
  */
 export function QqHarian() {
@@ -113,7 +111,7 @@ export function QqHarian() {
     catatan: '',
   })
   const data: QqData = draft?.id === id ? draft.data : (existing?.data ?? fresh())
-  // Foto hanya di HP sampai dikirim ke WhatsApp: per baris produk + struk & pengembalian.
+  // Foto hanya di HP sampai dikirim ke WhatsApp: per baris produk + struk pump test.
   const [foto, setFoto] = useState<Record<string, FotoLokal>>({})
   const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
   const [selesaiWa, setSelesaiWa] = useState<SelesaiQq | null>(null)
@@ -267,13 +265,11 @@ export function QqHarian() {
       const spbu = namaSpbuWa(app.settings)
       const baris = barisWa()
       const cap = (f: FotoLokal, ket: string) => ({ blob: f.blob, cap: [waktuFoto[f.id] ?? capWaktu(), spbu, ket] })
-      const bagian = [
-        ...data.kualitas.map((k, i) => {
-          const b = baris[i]
-          return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
-        }),
-        ...FOTO_KOLASE.map((f) => cap(foto[f.key], f.label.replace('Foto ', ''))),
-      ]
+      // Kolase hanya foto hydrometer per produk (struk pump test tidak pernah ikut).
+      const bagian = data.kualitas.map((k, i) => {
+        const b = baris[i]
+        return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
+      })
       const kolase = await buatKolaseGrid(bagian)
       // Disimpan sementara di HP untuk menu Kirim ke grup WA (gabungan density & water content).
       void simpanFotoHarian(app.spbuId, key.tanggal, 'density', bagian)
@@ -451,7 +447,7 @@ export function QqHarian() {
           </Field>
           <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
             <Camera aria-hidden="true" className="size-4 shrink-0" />
-            Foto hydrometer dan pengembalian minyak digabung otomatis menjadi satu kolase bercap jam, SPBU, dan hasil untuk WhatsApp grup SPBU. Foto struk pump test tidak ikut kolase: disimpan di riwayat kualitas aplikasi.
+            Foto hydrometer tiap produk digabung otomatis menjadi satu kolase bercap jam, SPBU, dan hasil untuk WhatsApp grup SPBU. Foto struk pump test tidak ikut kolase: disimpan di riwayat kualitas aplikasi.
           </span>
         </GlassCard>
       )}

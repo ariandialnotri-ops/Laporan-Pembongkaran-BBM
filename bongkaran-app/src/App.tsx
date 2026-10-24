@@ -76,6 +76,7 @@ const Persediaan = lazy(() => import('@/pages/Persediaan').then((m) => ({ defaul
 const Plan = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.Plan })))
 const PlanBaru = lazy(() => import('@/pages/Plan').then((m) => ({ default: m.PlanBaru })))
 const EditLo = lazy(() => import('@/pages/EditLo').then((m) => ({ default: m.EditLo })))
+const DetailLo = lazy(() => import('@/pages/DetailLo').then((m) => ({ default: m.DetailLo })))
 const Profil = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.Profil })))
 const GantiSandi = lazy(() => import('@/pages/Profil').then((m) => ({ default: m.GantiSandi })))
 const QqHarian = lazy(() => import('@/pages/QqHarian').then((m) => ({ default: m.QqHarian })))
@@ -222,6 +223,7 @@ function Gate() {
           <Route path="/laporan/ba" element={<BeritaAcara />} />
           <Route path="/laporan/bongkaran" element={<RiwayatBongkaran />} />
           <Route path="/laporan/lo" element={<RiwayatLo />} />
+          <Route path="/laporan/lo/:planId/:loId" element={<DetailLo />} />
           <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
           <Route path="/laporan/kualitas/:kunci" element={<KualitasDetail />} />
           {/* Riwayat tera lama kini Riwayat Uji Takaran. */}

@@ -24,13 +24,14 @@ export const STATUS_WARNA = { baik: '#0ca30c', peringatan: '#fab219', serius: '#
 
 const SURFACE = '#ffffff'
 
-/** Skala sumbu "rapi": 0..maks dibulatkan ke 1/2/5 × 10^n, 4 garis. */
-function skala(maks: number) {
+/** Skala sumbu "rapi": 0..maks dibulatkan ke 1/2/5 × 10^n, 4 garis. Data bilangan bulat (jumlah) → langkah ≥ 1 agar label tidak kembar. */
+function skala(maks: number, bulat = false) {
   if (maks <= 0) return { atas: 4, langkah: 1 }
   const kasar = maks / 4
   const p = 10 ** Math.floor(Math.log10(kasar))
   const n = kasar / p
-  const langkah = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p
+  let langkah = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p
+  if (bulat) langkah = Math.max(1, Math.ceil(langkah))
   return { atas: langkah * 4, langkah }
 }
 const singkat = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt` : Math.abs(v) >= 1e3 ? `${(v / 1e3).toLocaleString('id-ID', { maximumFractionDigits: 1 })} rb` : v.toLocaleString('id-ID', { maximumFractionDigits: 1 }))
@@ -45,14 +46,17 @@ export interface Batang {
 /** Grafik batang satu seri (judul kartu menamai serinya, jadi tanpa legenda). */
 export function BarChart({ data, warna = KATEGORI[0], satuan = '', format = singkat, tinggi = 180, className, label }: { data: Batang[]; warna?: string; satuan?: string; format?: (v: number) => string; tinggi?: number; className?: string; label: string }) {
   const [aktif, setAktif] = useState<number | null>(null)
-  const { atas, langkah } = skala(Math.max(0, ...data.map((d) => d.value)))
+  const { atas, langkah } = skala(Math.max(0, ...data.map((d) => d.value)), data.every((d) => Number.isInteger(d.value)))
   const kiri = 40
   const bawah = 22
+  const atasPad = 18
   const lebar = 320
-  const tPlot = tinggi - bawah - 8
+  const tPlot = tinggi - bawah - atasPad
   const band = (lebar - kiri) / Math.max(1, data.length)
-  const bw = Math.min(24, Math.max(4, band * 0.62))
-  const y = (v: number) => 8 + tPlot - (v / atas) * tPlot
+  // Batang selebar mungkin (≤ 32 px) agar terbaca di HP; label nilai langsung di atas batang bila ≤ 10 batang.
+  const bw = Math.min(32, Math.max(6, band * 0.6))
+  const labelNilai = data.length <= 10
+  const y = (v: number) => atasPad + tPlot - (v / atas) * tPlot
   // Label sumbu-x jarang bila batang banyak.
   const tiap = Math.ceil(data.length / 7)
   const pilih = aktif !== null ? data[aktif] : null
@@ -81,13 +85,18 @@ export function BarChart({ data, warna = KATEGORI[0], satuan = '', format = sing
           const yt = y(d.value)
           return (
             <g key={i} onMouseEnter={() => setAktif(i)} onClick={() => setAktif(aktif === i ? null : i)} className="cursor-pointer">
-              <rect x={kiri + band * i} y={8} width={band} height={tPlot} fill="transparent" />
+              <rect x={kiri + band * i} y={atasPad} width={band} height={tPlot} fill="transparent" />
               {h > 0 && (
                 <path
                   d={`M${x0},${y(0)} V${yt + r} Q${x0},${yt} ${x0 + r},${yt} H${x0 + bw - r} Q${x0 + bw},${yt} ${x0 + bw},${yt + r} V${y(0)} Z`}
                   fill={warna}
                   opacity={aktif === null || aktif === i ? 1 : 0.45}
                 />
+              )}
+              {labelNilai && d.value > 0 && (
+                <text x={cx} y={yt - 5} textAnchor="middle" className="tabular fill-on-surface text-xs font-semibold">
+                  {format(d.value)}
+                </text>
               )}
               {i % tiap === 0 && (
                 <text x={cx} y={tinggi - 6} textAnchor="middle" className="fill-on-surface-variant text-xs">
@@ -124,7 +133,7 @@ export function DonutChart({ data, tengah, subTengah, label, format = singkat, s
   const C = 2 * Math.PI * R
   let off = 0
   return (
-    <div className="flex items-center gap-space-md">
+    <div className="flex flex-col items-center gap-space-md sm:flex-row">
       <div className="relative size-36 shrink-0">
         <svg viewBox="0 0 140 140" className="size-full -rotate-90" role="img" aria-label={`${label}: ${isi.map((d) => `${d.label} ${Math.round((d.value / total) * 100)}%`).join(', ')}`}>
           <circle cx={70} cy={70} r={R} fill="none" stroke="#eef0f4" strokeWidth={t} />
@@ -160,10 +169,10 @@ export function DonutChart({ data, tengah, subTengah, label, format = singkat, s
           <span className="max-w-20 truncate text-xs text-on-surface-variant">{aktif !== null && isi[aktif] ? isi[aktif].label : subTengah}</span>
         </div>
       </div>
-      <ul className="flex min-w-0 flex-1 flex-col gap-space-xs">
+      <ul className="flex w-full min-w-0 flex-1 flex-col gap-space-xs">
         {isi.map((d, i) => (
           <li key={d.label}>
-            <button type="button" onClick={() => setAktif(aktif === i ? null : i)} className={cn('flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-body-sm', aktif === i && 'bg-surface-container-low')}>
+            <button type="button" onClick={() => setAktif(aktif === i ? null : i)} className={cn('flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-body-sm', aktif === i && 'bg-surface-container-low')}>
               <span aria-hidden="true" className="size-3 shrink-0 rounded-full" style={{ background: d.warna }} />
               <span className="min-w-0 flex-1 leading-snug text-on-surface">{d.label}</span>
               <span className="tabular shrink-0 font-semibold text-on-surface">{Math.round((d.value / total) * 100)}%</span>
@@ -179,5 +188,47 @@ export function DonutChart({ data, tengah, subTengah, label, format = singkat, s
         {!isi.length && <li className="text-body-sm text-on-surface-variant">Belum ada data pada periode ini.</li>}
       </ul>
     </div>
+  )
+}
+
+export interface BarisH {
+  label: string
+  value: number
+  warna: string
+  /** Teks kecil di bawah label, mis. "2 kejadian". */
+  sub?: string
+}
+
+/**
+ * Batang horizontal per kategori (mis. lama stop penyaluran per produk): label + titik warna di kiri, batang
+ * membulat di jalur abu, nilai di kanan memakai warna teks. Diurutkan dari terbesar.
+ */
+export function HBarChart({ data, format = singkat, label }: { data: BarisH[]; format?: (v: number) => string; label: string }) {
+  const isi = data.filter((d) => d.value > 0).sort((a, b) => b.value - a.value)
+  const maks = Math.max(0, ...isi.map((d) => d.value))
+  if (!isi.length)
+    return (
+      <div className="flex h-24 items-center justify-center rounded-md bg-surface-container-low text-body-sm text-on-surface-variant" role="img" aria-label={`${label}: belum ada data`}>
+        Belum ada data pada periode ini
+      </div>
+    )
+  return (
+    <ul className="flex flex-col gap-space-sm" aria-label={label}>
+      {isi.map((d) => (
+        <li key={d.label} className="flex flex-col gap-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5 text-body-sm font-semibold text-on-surface">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: d.warna }} />
+              <span className="truncate">{d.label}</span>
+              {d.sub && <span className="shrink-0 text-xs font-normal text-on-surface-variant">· {d.sub}</span>}
+            </span>
+            <span className="tabular shrink-0 text-body-sm font-bold text-on-surface">{format(d.value)}</span>
+          </span>
+          <span aria-hidden="true" className="h-3 w-full overflow-hidden rounded-full bg-surface-container-high">
+            <span className="block h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${Math.max(3, (d.value / maks) * 100)}%`, background: d.warna }} />
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }

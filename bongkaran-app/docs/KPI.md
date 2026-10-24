@@ -1,6 +1,6 @@
 # Model KPI FLOQ
 
-Rekomendasi KPI per modul untuk SPBU COCO. Semua KPI dihitung otomatis dari data aplikasi untuk **periode yang dipilih di dashboard** (7 hari, 30 hari, bulan ini, bulan lalu, 3 bulan, atau rentang sendiri; bawaan bulan ini) dan tampil sebagai **highlight di bagian atas dashboard**, dalam dropdown per modul. Setiap kartu menampilkan nilai, pil perubahan terhadap periode sebelumnya yang sama panjang (↗/↙; hijau membaik, merah memburuk), dan rincian. Kode perhitungan ada di `src/lib/kpi.ts`, tampilannya di `src/components/dashboard/kpi-highlight.tsx`.
+Rekomendasi KPI per modul untuk SPBU COCO. Semua KPI dihitung otomatis dari data aplikasi untuk **periode yang dipilih di dashboard** (7 hari, 30 hari, bulan ini, bulan lalu, 3 bulan, atau rentang sendiri; bawaan bulan ini) dan tampil sebagai **highlight di bagian atas dashboard**, dalam dropdown per modul. Setiap kartu menampilkan nilai, pil perubahan terhadap periode sebelumnya yang sama panjang (↗/↙; hijau membaik, merah memburuk), rincian, dan garis tren kecil (nilai KPI per ≤ 6 bagian periode). Kode perhitungan ada di `src/lib/kpi.ts`, tampilannya di `src/components/dashboard/kpi-highlight.tsx`.
 
 ## Cara membaca
 

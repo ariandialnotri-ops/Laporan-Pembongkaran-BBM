@@ -171,6 +171,19 @@ export interface PlanLo {
   jumlahDO?: number
 }
 
+/** Satu catatan perubahan plan/LO (waktu submit & perubahan, ditampilkan di detail Tracking LO). */
+export interface JejakPlan {
+  /** Epoch ms. */
+  waktu: number
+  oleh: string
+  jenis: 'buat' | 'so' | 'lo' | 'status' | 'ubah'
+  teks: string
+  /** LO yang berubah; kosong = berlaku untuk seluruh permintaan (SO, tanggal kirim). */
+  loId?: string
+  /** Status baru (jenis "status"). */
+  status?: LoStatus
+}
+
 export interface Plan {
   id: string
   createdAt: number
@@ -190,6 +203,8 @@ export interface Plan {
   /** Plan lama: Sold To. */
   soldTo: string
   los: PlanLo[]
+  /** Riwayat submit & perubahan (terbaru di akhir). */
+  riwayat?: JejakPlan[]
 }
 
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']

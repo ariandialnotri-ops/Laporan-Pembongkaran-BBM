@@ -65,6 +65,7 @@ const PAGES: { href: string; title: string; parent: string }[] = [
   { href: '/laporan/ba', title: 'Berita Acara', parent: '/laporan' },
   { href: '/laporan/bongkaran', title: 'Riwayat Pembongkaran MT', parent: '/laporan/riwayat' },
   { href: '/laporan/lo', title: 'Tracking LO', parent: '/delivery' },
+  { href: '/laporan/lo/', title: 'Detail LO', parent: '/laporan/lo' },
   { href: '/laporan/kualitas', title: 'Riwayat Kualitas Harian', parent: '/laporan/riwayat' },
   { href: '/laporan/kualitas/', title: 'Detail Uji Kualitas', parent: '/laporan/kualitas' },
   { href: '/laporan/apar', title: 'Riwayat Inspeksi APAR', parent: '/laporan/riwayat' },

@@ -9,7 +9,7 @@ import { SectionHeader } from '@/components/bongkaran/section-header'
 import { TangkiBelumAda, useStokShift } from '@/components/bongkaran/stok-gate'
 import { EXPORT, patrolItems, riwayatItems, useMenu, useRiwayatTerbuka, type GrupKey, type ItemMenu } from '@/components/shell/menu-data'
 import { GlassCard } from '@/components/ui/glass-card'
-import { InfoPop } from '@/components/ui/info-pop'
+import { InfoHalaman, InfoPop } from '@/components/ui/info-pop'
 import { useApp } from '@/lib/app-state'
 import { todayIso } from '@/lib/date'
 import { formTampil, statusOps, type OpsRecord } from '@/lib/ops'
@@ -29,17 +29,11 @@ function Grid({ items, label }: { items: MenuItem[]; label: string }) {
 function Judul({ grup }: { grup: GrupKey }) {
   const g = useMenu().find((x) => x.key === grup)
   if (!g) return null
-  const Icon = g.icon
+  // Tanpa ikon & nama modul (sudah ada di header, bar bawah, dan sidebar): hanya tombol info.
   return (
-    <div className="animate-entrance-1 flex items-center gap-space-sm px-space-xs">
-      <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-surface-container-lowest text-on-surface shadow-sm">
-        <Icon className="size-5" strokeWidth={1.7} />
-      </span>
-      <span className="flex-1 text-body-md font-bold text-on-surface">{g.label}</span>
-      <InfoPop judul={g.label}>
-        <p>{g.desc}</p>
-      </InfoPop>
-    </div>
+    <InfoHalaman judul={g.label}>
+      <p>{g.desc}</p>
+    </InfoHalaman>
   )
 }
 

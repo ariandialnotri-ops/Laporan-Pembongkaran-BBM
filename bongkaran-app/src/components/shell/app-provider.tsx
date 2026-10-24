@@ -3,6 +3,7 @@ import { AppContext, type AppState, type SessionStatus } from '@/lib/app-state'
 import { backend, type SessionInfo, type Spbu } from '@/lib/backend'
 import type { DailyRecord } from '@/lib/daily'
 import { addDays, todayIso } from '@/lib/date'
+import { denganJejak } from '@/lib/plan'
 import { bolehBuka, type Role } from '@/lib/roles'
 import { DEFAULT_RULES, effectiveRules, type Plan, type ReportSummary, type Settings } from '@/lib/sop'
 import { setTanks, urutTangki, type TankDef } from '@/lib/tank'
@@ -68,6 +69,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const spbuIdRef = useRef(spbuId)
   spbuIdRef.current = spbuId
   const [plans, setPlans] = useState<Plan[]>([])
+  // Plan terakhir yang diketahui, untuk mencatat riwayat perubahan saat disimpan.
+  const plansRef = useRef(plans)
+  plansRef.current = plans
   const [reports, setReports] = useState<ReportSummary[]>([])
   const [daily, setDaily] = useState<DailyRecord[]>([])
   const settingsDirty = useRef(false)
@@ -253,7 +257,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [settings, flushSettings])
 
   const savePlan = useCallback(
-    async (plan: Plan) => {
+    async (input: Plan) => {
+      // Setiap simpan mencatat waktu submit/perubahan & pelakunya (detail Tracking LO).
+      const lama = plansRef.current.find((p) => p.id === input.id)
+      const plan = denganJejak(lama, input, session.nama || session.user?.email || 'Mode lokal')
       setPlans((prev) => upsertById(prev, plan))
       try {
         await tulis(() => backend.savePlan(plan))
@@ -262,7 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw e
       }
     },
-    [refresh, tulis],
+    [refresh, tulis, session.nama, session.user?.email],
   )
   const deletePlan = useCallback(
     async (plan: Plan) => {

@@ -40,7 +40,7 @@ import { Pill } from '@/components/ui/pill'
 import { KpiOperation } from '@/components/dashboard/kpi-highlight'
 import { BarChart, KATEGORI, warnaProduk } from '@/components/dashboard/charts'
 import { periodeSebelum } from '@/lib/kpi'
-import { kelompokPeriode, periodeDari, PilihPeriode, type PeriodeDashboard } from '@/components/dashboard/periode'
+import { HARIAN_MAKS, jumlahHari, kelompokPeriode, periodeDari, PilihPeriode, type PeriodeDashboard } from '@/components/dashboard/periode'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
@@ -790,14 +790,12 @@ function GrafikOperation({ periode }: { periode: PeriodeDashboard }) {
         </ul>
       )}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Volume per {periodeHari(periode) > 31 ? 'pekan' : 'hari'}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Volume per {jumlahHari(periode) > HARIAN_MAKS ? 'pekan' : 'hari'}</span>
         <BarChart data={batang} warna={KATEGORI[0]} satuan=" L" label="Volume diterima" />
       </div>
     </section>
   )
 }
-
-const periodeHari = (p: { dari: string; sampai: string }) => Math.round((Date.parse(`${p.sampai}T00:00:00`) - Date.parse(`${p.dari}T00:00:00`)) / 86400_000) + 1
 
 /** Satu hari pada kalender pekan: label, tanggal, titik plan, dan ikon status. */
 /** Pengingat plan pengiriman besok: baris amber di alur halaman (tidak menutupi kartu tanggal & shift). */

@@ -19,7 +19,7 @@ import type { Backend, Member, RingkasanUnit, Role } from './types'
 
 const BUCKET = 'bbm-evidence'
 
-type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint'>
+type PlanMeta = Pick<Plan, 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint' | 'riwayat'>
 type PlanRow = { id: string; tanggal: string | null; no_so: string; produk: string; sold_to: string | null; los: Plan['los']; meta: Partial<PlanMeta> | null; created_at: string }
 type DailyRow = { id: string; kind: DailyRecord['kind']; tanggal: string; shift: number; data: DailyRecord['data']; created_at: string; updated_at: string; created_by: string | null }
 type OpsRow = { id: string; form: string; tanggal: string; data: OpsRecord['data']; updated_at: string; updated_by: string | null }
@@ -278,7 +278,7 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
           produk: p.produk,
           sold_to: p.soldTo || null,
           los: p.los,
-          meta: { ms2Tanggal: p.ms2Tanggal, ms2Jam: p.ms2Jam, ms2Shift: p.ms2Shift, poSap: p.poSap, shipTo: p.shipTo, supplyPoint: p.supplyPoint } satisfies PlanMeta,
+          meta: { ms2Tanggal: p.ms2Tanggal, ms2Jam: p.ms2Jam, ms2Shift: p.ms2Shift, poSap: p.poSap, shipTo: p.shipTo, supplyPoint: p.supplyPoint, riwayat: p.riwayat ?? [] } satisfies PlanMeta,
           created_at: new Date(p.createdAt).toISOString(),
         }),
       )

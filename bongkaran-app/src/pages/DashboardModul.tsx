@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Banknote, ChevronRight, FireExtinguisher, Fuel, HandCoins, ShieldAlert, TrendingUp, Zap, type LucideIcon } from 'lucide-react'
-import { BarChart, DonutChart, KATEGORI, STATUS_WARNA, warnaProduk } from '@/components/dashboard/charts'
+import { Ban, Banknote, ChevronRight, FireExtinguisher, Fuel, HandCoins, ShieldAlert, TrendingUp, Zap, type LucideIcon } from 'lucide-react'
+import { BarChart, DonutChart, HBarChart, KATEGORI, STATUS_WARNA, warnaProduk } from '@/components/dashboard/charts'
 import { KpiFinance, KpiHsse } from '@/components/dashboard/kpi-highlight'
-import { kelompokPeriode } from '@/components/dashboard/periode'
+import { HARIAN_MAKS, jumlahHari, kelompokPeriode } from '@/components/dashboard/periode'
 import { KartuStopPenyaluran } from '@/components/insiden/henti'
 import { Loading } from '@/components/bongkaran/load-state'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -14,6 +14,7 @@ import { tambahBulan } from '@/lib/berlaku'
 import type { AparRecord, InsidenRecord } from '@/lib/daily'
 import { labelSelisih, ringkasClosing, rupiah, type ClosingData } from '@/lib/closing'
 import { formatTanggalIso, todayIso } from '@/lib/date'
+import { hentiDari, produkSpbu } from '@/lib/insiden'
 import { formatNumber } from '@/lib/format'
 import { SELANG_BULAN, type GroundingData } from '@/lib/grounding'
 import type { Periode } from '@/lib/kpi'
@@ -82,6 +83,37 @@ function KartuGrounding() {
 }
 
 /** Dashboard HSSE & Guard Patrol: stop penyaluran, proteksi kebakaran, guard tour, insiden, grounding. */
+/** Menit tumpang tindih [a, b) dengan rentang periode (waktu lokal). */
+function menitDalam(mulai: string, selesai: string, p: Periode) {
+  const a = Math.max(Date.parse(mulai), Date.parse(`${p.dari}T00:00`))
+  const b = Math.min(Date.parse(selesai), Date.parse(`${p.sampai}T23:59`) + 60000)
+  return Number.isFinite(a) && Number.isFinite(b) && b > a ? Math.round((b - a) / 60000) : 0
+}
+const jamMenit = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} j ${m % 60} m` : `${m} m`)
+
+/** Lama stop penyaluran per produk pada periode (bagian yang jatuh di dalam periode; yang masih berhenti dihitung sampai sekarang). */
+function GrafikHenti({ periode }: { periode: Periode }) {
+  const app = useApp()
+  const sekarang = new Date()
+  const kini = `${todayIso(sekarang)}T${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`
+  const items = hentiDari(app.daily)
+    .map((x) => ({ ...x, menit: menitDalam(x.h.mulai, x.h.selesai || kini, periode) }))
+    .filter((x) => x.menit > 0)
+  const urut = produkSpbu(app.settings)
+  const produk = [...new Set(items.flatMap((x) => x.h.produk))]
+  const data = produk.map((p) => {
+    const xs = items.filter((x) => x.h.produk.includes(p))
+    const berhenti = xs.some((x) => !x.h.selesai)
+    return { label: p, value: xs.reduce((n, x) => n + x.menit, 0), warna: warnaProduk(p, Math.max(0, urut.indexOf(p))), sub: `${xs.length} kejadian${berhenti ? ' · masih berhenti' : ''}` }
+  })
+  const total = items.reduce((n, x) => n + x.menit, 0)
+  return (
+    <Kartu icon={Ban} judul="Lama stop penyaluran per produk" sub={items.length ? `${items.length} kejadian · total ${jamMenit(total)} pada periode` : 'Tidak ada stop penyaluran pada periode'} ke="/stop-penyaluran" aksi="Detail" className="animate-entrance-2">
+      <HBarChart data={data} format={jamMenit} label="Lama stop penyaluran per produk" />
+    </Kartu>
+  )
+}
+
 export function DashboardHsse({ periode }: { periode: Periode }) {
   const app = useApp()
   useSyncOnOpen()
@@ -112,8 +144,9 @@ export function DashboardHsse({ periode }: { periode: Periode }) {
         </Kartu>
       )}
       <Kartu icon={ShieldAlert} judul="Laporan insiden & near miss" sub={`${ins.length} laporan pada periode`} ke="/laporan/insiden" aksi="Riwayat" className="animate-entrance-2">
-        <BarChart data={batangIns} warna={KATEGORI[1]} satuan=" laporan" format={(v) => String(Math.round(v))} label="Laporan insiden per periode" />
+        <BarChart data={batangIns} warna={KATEGORI[1]} satuan=" laporan" format={(v) => String(Math.round(v))} label={`Laporan insiden per ${jumlahHari(periode) > HARIAN_MAKS ? 'pekan' : 'hari'}`} />
       </Kartu>
+      <GrafikHenti periode={periode} />
       <KartuStopPenyaluran className="animate-entrance-1 lg:col-span-2" />
       {/* Data sampling guard tour hanya terbaca ABH, pengawas, dan security (RLS bbm_gts). */}
       {['abh', 'pengawas', 'security'].includes(app.role ?? '') && <KartuGuardTour className="animate-entrance-2" />}

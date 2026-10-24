@@ -8,8 +8,7 @@ import { qqD15, type QqRecord } from '@/lib/daily'
 import { formatTanggalIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned } from '@/lib/format'
 import { acuanD15 } from '@/lib/ringkasan'
-import type { Photo, Report } from '@/lib/sop'
-import { usePhotoSrc } from '@/lib/use-photo-src'
+import type { Report } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Kunci satu hasil uji: harian `h.<recordId>.<barisId>` atau pasca penerimaan `p.<reportId>`. */
@@ -30,7 +29,6 @@ type Uji = {
   selisih: number | null
   ok: boolean | null
   catatan: string
-  foto: Photo[]
 }
 
 /**
@@ -78,7 +76,6 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
         selisih,
         ok: selisih !== null ? Math.abs(selisih) <= app.rules.densityTolerance + 1e-9 : null,
         catatan: rec.data.catatan,
-        foto: [...(rec.data.foto?.kualitasStruk ?? []), ...(rec.data.foto?.kualitasKembali ?? [])],
       }
     }
   } else if (summary?.sample2Jam) {
@@ -98,11 +95,9 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
       selisih: summary.sample2Jam.selisih,
       ok: summary.sample2Jam.ok,
       catatan: s?.catatan ?? '',
-      foto: [],
     }
   }
 
-  const srcOf = usePhotoSrc(uji?.foto ?? [])
   if (!uji) return <p className="p-space-md text-center text-body-sm text-on-surface-variant">Data uji tidak ditemukan (mungkin sudah dihapus).</p>
 
   const tone = uji.ok === false ? 'bad' : uji.ok ? 'ok' : 'none'
@@ -153,21 +148,6 @@ export function KualitasHighlight({ kunci }: { kunci: string }) {
         <Info label="Petugas" value={uji.petugas || (pasca && report === undefined ? 'memuat…' : '-')} />
         {uji.catatan && <Info label="Catatan" value={uji.catatan} wide />}
       </dl>
-
-      {uji.foto.length > 0 && (
-        <div className="flex gap-space-xs overflow-x-auto">
-          {uji.foto.map((p) => {
-            const src = srcOf(p)
-            return src ? (
-              <a key={p.id} href={src} target="_blank" rel="noreferrer" className="shrink-0">
-                <img src={src} alt="Foto uji" className="size-16 rounded-md object-cover" />
-              </a>
-            ) : (
-              <span key={p.id} className="size-16 shrink-0 animate-pulse rounded-md bg-surface-container" />
-            )
-          })}
-        </div>
-      )}
 
       {/* Info minor: bongkaran terkait uji pasca penerimaan. */}
       {pasca && summary && (

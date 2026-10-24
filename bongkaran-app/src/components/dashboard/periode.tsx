@@ -133,6 +133,10 @@ const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt
  * Kelompokkan nilai per tanggal menjadi batang grafik untuk periode: per hari (≤ 31 hari; label nama hari bila
  * ≤ 7 hari) atau per minggu (periode lebih panjang). Periode yang belum terjadi tidak ditampilkan.
  */
+/** Grafik per hari sampai 14 hari; lebih panjang per pekan agar batang tetap lebar & terbaca di HP. */
+export const HARIAN_MAKS = 14
+export const jumlahHari = (p: Periode) => Math.round((Date.parse(`${p.sampai}T00:00:00`) - Date.parse(`${p.dari}T00:00:00`)) / 86400_000) + 1
+
 export function kelompokPeriode(p: Periode, items: { tanggal: string; value: number }[]) {
   const akhir = p.sampai < todayIso() ? p.sampai : todayIso()
   const hari: string[] = []
@@ -140,7 +144,7 @@ export function kelompokPeriode(p: Periode, items: { tanggal: string; value: num
   const jumlah = new Map<string, number>()
   for (const x of items) if (x.tanggal >= p.dari && x.tanggal <= akhir) jumlah.set(x.tanggal, (jumlah.get(x.tanggal) ?? 0) + x.value)
   const tgl = (t: string) => new Date(`${t}T00:00:00`)
-  if (hari.length <= 31)
+  if (hari.length <= HARIAN_MAKS)
     return hari.map((t) => ({ label: hari.length <= 7 ? HARI[tgl(t).getDay()] : String(Number(t.slice(8))), judul: formatTanggalIso(t), value: jumlah.get(t) ?? 0 }))
   const out: { label: string; judul: string; value: number }[] = []
   for (let i = 0; i < hari.length; i += 7) {
