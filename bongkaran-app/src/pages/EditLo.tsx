@@ -68,7 +68,7 @@ export function EditLo() {
         <span className="text-body-md font-semibold text-on-surface">Permintaan tidak ditemukan</span>
         <span className="text-body-sm text-on-surface-variant">Plan ini mungkin sudah dihapus dari perangkat lain.</span>
         <Link to="/plan" className={buttonVariants({ size: 'pill' })}>
-          Ke Tracking LO
+          Ke Plan & Tracking LO
         </Link>
       </GlassCard>
     )
@@ -186,7 +186,7 @@ function Form({ plan }: { plan: Plan }) {
         detail: `Kirim ${formatTanggalIso(plan.tanggal)}${soBaru ? `, SO ${soBaru}` : ''}${laporanSo.length ? ` · ${laporanSo.length} laporan bongkaran ikut diperbarui` : ''}`,
         baris: los.map((lo): [string, string] => [`${lo.produk} ${formatNumber(lo.volume)} L`, lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit']),
         aksi: [
-          { to: `${kembaliKe}?baru=${encodeURIComponent(plan.id)}`, label: kembaliKe === '/plan' ? 'Kembali ke Plan Pengiriman' : 'Kembali ke Tracking LO' },
+          { to: `${kembaliKe}?baru=${encodeURIComponent(plan.id)}`, label: kembaliKe.startsWith('/plan/lo/') ? 'Kembali ke detail LO' : 'Kembali ke Plan & Tracking LO' },
         ],
       })
     } catch (e) {

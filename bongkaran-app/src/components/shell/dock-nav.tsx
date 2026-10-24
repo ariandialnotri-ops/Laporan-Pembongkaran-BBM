@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ScanLine } from 'lucide-react'
+import { HandCoins, ScanLine } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useApp } from '@/lib/app-state'
 import { useMenu } from './menu-data'
@@ -15,7 +15,13 @@ import { grupAktif } from './sidebar'
 export function DockNav() {
   const { pathname, search } = useLocation()
   const app = useApp()
-  const grup = useMenu().filter((g) => g.key !== 'report' && (g.key !== 'finance' || app.role === 'admin'))
+  // Finance di bar bawah: Admin/Cashier (modul utamanya) dan Cleaning Service (Keuangan = pengajuan anggaran,
+  // paling kanan agar bar seimbang di kedua sisi tombol Lapor).
+  const financeCs = app.role === 'cs'
+  const grup = useMenu()
+    .filter((g) => g.key !== 'report' && (g.key !== 'finance' || app.role === 'admin' || financeCs))
+    .map((g) => (g.key === 'finance' && financeCs ? { ...g, label: 'Keuangan', labelPendek: 'Keuangan', icon: HandCoins } : g))
+    .sort((a, b) => (financeCs ? Number(a.key === 'finance') - Number(b.key === 'finance') : 0))
   const aktif = grupAktif(grup, pathname, search)
   const lapor = app.can('/lapor')
   // Lapor selalu tepat di tengah layar: grup dibagi dua sisi yang lebarnya sama.

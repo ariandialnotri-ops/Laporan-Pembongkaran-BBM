@@ -23,6 +23,7 @@ import { shiftLabel, type Shift } from '@/lib/shift'
 import { jualPerProduk, type TotalizerData } from '@/lib/totalizer'
 import { useCatatan } from '@/lib/use-catatan'
 import { cn } from '@/lib/utils'
+import { usePumpTestShift } from '@/lib/use-pump-test'
 import { KartuGuardTour, KartuInsiden } from '@/pages/DashboardPeran'
 
 function Kartu({ icon: Icon, judul, sub, ke, aksi, children, className }: { icon: LucideIcon; judul: string; sub?: string; ke?: string; aksi?: string; children: ReactNode; className?: string }) {
@@ -159,6 +160,7 @@ export function DashboardHsse({ periode }: { periode: Periode }) {
 /** Dashboard Sales / Finance: grafik penjualan BBM & metode bayar, closing shift, dan petty cash untuk periode terpilih. */
 export function DashboardSales({ periode }: { periode: Periode }) {
   const app = useApp()
+  const pumpTest = usePumpTestShift()
   const { dari, sampai } = periode
   const { recs: tot } = useCatatan<TotalizerData>('totalizer', dari, sampai)
   const { recs: closing } = useCatatan<ClosingData>('closing', dari, sampai)
@@ -173,11 +175,11 @@ export function DashboardSales({ periode }: { periode: Periode }) {
   if (!app.loaded) return <Loading />
 
   const harga = app.settings.hargaProduk ?? {}
-  const jual = jualPerProduk(tot ?? []).map((x) => ({ ...x, rupiah: harga[x.produk] ? Math.round(x.liter * harga[x.produk]!) : null }))
+  const jual = jualPerProduk(tot ?? [], pumpTest).map((x) => ({ ...x, rupiah: harga[x.produk] ? Math.round(x.liter * harga[x.produk]!) : null }))
   const totalLiter = jual.reduce((a, x) => a + x.liter, 0)
   const totalRp = jual.reduce((a, x) => a + (x.rupiah ?? 0), 0)
   const hariIni = todayIso()
-  const batangJual = kelompokPeriode(periode, (tot ?? []).map((r) => ({ tanggal: r.tanggal, value: jualPerProduk([r]).reduce((a, x) => a + x.liter, 0) })))
+  const batangJual = kelompokPeriode(periode, (tot ?? []).map((r) => ({ tanggal: r.tanggal, value: jualPerProduk([r], pumpTest).reduce((a, x) => a + x.liter, 0) })))
   const sumNt = (keys: string[]) => (closing ?? []).reduce((a, r) => a + keys.reduce((n, k) => n + ((r.data.nonTunai as Record<string, number>)[k] || 0), 0), 0)
   const bayar = [
     { label: 'Tunai', value: (closing ?? []).reduce((a, r) => a + r.data.cash, 0), warna: KATEGORI[0] },
@@ -185,7 +187,7 @@ export function DashboardSales({ periode }: { periode: Periode }) {
     { label: 'MyPertamina / LinkAja', value: sumNt(['myp_linkaja']), warna: KATEGORI[2] },
     { label: 'RFID & voucher', value: sumNt(['rfid', 'e_voucher', 'p_voucher']), warna: KATEGORI[3] },
   ]
-  const jualHariIni = jualPerProduk((tot ?? []).filter((r) => r.tanggal === hariIni)).reduce((a, x) => a + x.liter, 0)
+  const jualHariIni = jualPerProduk((tot ?? []).filter((r) => r.tanggal === hariIni), pumpTest).reduce((a, x) => a + x.liter, 0)
   const cl = [...(closing ?? [])].sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
   const ringkas = cl.map((r) => ({ r, k: ringkasClosing(r.data) }))
   const kurang = ringkas.filter((x) => x.k.selisih !== null && x.k.selisih < 0)

@@ -59,15 +59,34 @@ export const totalizerLengkap = (r: TotalizerRecord | undefined, nozzles: Nozzle
 /** Baru awal shift yang terisi. */
 export const totalizerAwalSaja = (r: TotalizerRecord | undefined, nozzles: Nozzle[]) => !!r && !totalizerLengkap(r, nozzles) && nozzles.some((n) => parseAngka(r.data.nozzle[n.id]?.awal ?? '') !== null)
 
-/** Penjualan (liter) per produk dari satu atau beberapa catatan totalizer. */
-export function jualPerProduk(recs: TotalizerRecord[]) {
-  const m = new Map<string, number>()
-  for (const r of recs) for (const x of Object.values(r.data.nozzle)) {
-    const j = jualNozzle(x)
-    if (j !== null) m.set(x.produk, (m.get(x.produk) ?? 0) + j)
+/** Liter pump test per kunci "tanggal|shift|produk" (lihat `pumpTestPerShift` di lib/pumptest). */
+export type PumpTestShift = Map<string, number>
+export const kunciPumpTest = (tanggal: string, shift: number, produk: string) => `${tanggal}|${shift}|${produk}`
+
+/**
+ * Penjualan per produk dari satu atau beberapa catatan totalizer. `kotor` = selisih totalisator (akhir − awal);
+ * `liter` = penjualan bersih = kotor − pump test shift itu (BBM uji dikembalikan ke tangki, bukan penjualan).
+ */
+export function jualPerProduk(recs: TotalizerRecord[], pumpTest?: PumpTestShift) {
+  const kotor = new Map<string, number>()
+  const pt = new Map<string, number>()
+  for (const r of recs) {
+    const ada = new Set<string>()
+    for (const x of Object.values(r.data.nozzle)) {
+      const j = jualNozzle(x)
+      if (j === null) continue
+      kotor.set(x.produk, (kotor.get(x.produk) ?? 0) + j)
+      ada.add(x.produk)
+    }
+    // Pump test dikurangkan hanya untuk produk yang punya angka totalisator di shift itu.
+    if (pumpTest) for (const p of ada) pt.set(p, (pt.get(p) ?? 0) + (pumpTest.get(kunciPumpTest(r.tanggal, r.shift, p)) ?? 0))
   }
-  const urut = [...PRODUK_OPTIONS, ...[...m.keys()].filter((p) => !PRODUK_OPTIONS.includes(p))]
-  return urut.filter((p) => m.has(p)).map((produk) => ({ produk, liter: m.get(produk)! }))
+  const urut = [...PRODUK_OPTIONS, ...[...kotor.keys()].filter((p) => !PRODUK_OPTIONS.includes(p))]
+  return urut.filter((p) => kotor.has(p)).map((produk) => {
+    const k = kotor.get(produk)!
+    const u = pt.get(produk) ?? 0
+    return { produk, kotor: k, pumpTest: u, liter: k - u }
+  })
 }
 
 /** Nozzle dikelompokkan per pulau pompa & dispenser (urutan data utama). */

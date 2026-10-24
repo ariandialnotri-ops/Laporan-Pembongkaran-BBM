@@ -36,7 +36,7 @@ const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
 
 type TRow = { plan: PlanT; lo: PlanLo; status: LoDisplayStatus }
 
-/** Tabel plan pengiriman: satu baris per LO, ketuk untuk membuka halaman Edit SO & LO. */
+/** Tabel Plan & Tracking LO: satu baris per LO, ketuk untuk membuka detail LO (stepper, riwayat, edit/update). */
 const COLS: Col<TRow>[] = [
   { header: 'Tgl kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobileCell: (x) => `Kirim ${formatTanggalIso(x.plan.tanggal)}`, mobile: 'sub' },
   { header: 'No SO', cell: (x) => <span className="tabular whitespace-nowrap">{x.plan.noSO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>, mobile: 'hide' },
@@ -148,7 +148,9 @@ export function Plan() {
   const soTerbit = inDate.filter((p) => p.noSO.trim()).length
   const besok = planBesokKurang(app.plans)
 
-  const bukaLo = (plan: PlanT, lo: PlanLo) => navigate(`/plan/so/${encodeURIComponent(plan.id)}?lo=${encodeURIComponent(lo.id)}`)
+  // Plan & Tracking LO satu halaman: ketuk LO untuk stepper tahap pengiriman (edit/update dari sana).
+  const bukaLo = (plan: PlanT, lo: PlanLo) => navigate(`/plan/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(lo.id)}`)
+  const bolehBuat = app.can('/plan/baru')
 
 
   const visible = inDate
@@ -158,7 +160,7 @@ export function Plan() {
 
   return (
     <div className="flex flex-col gap-space-md">
-      {besok && (
+      {besok && bolehBuat && (
         <div role="status" className="animate-entrance-1 flex flex-col gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-md">
           <div className="flex items-start gap-space-sm">
             <CalendarClock aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
@@ -181,10 +183,12 @@ export function Plan() {
         </div>
       )}
 
-      <Link to="/plan/baru" className={cn(buttonVariants({ size: 'lg' }), 'animate-entrance-1 w-full')}>
-        <Plus aria-hidden="true" />
-        Permintaan baru (MS2)
-      </Link>
+      {bolehBuat && (
+        <Link to="/plan/baru" className={cn(buttonVariants({ size: 'lg' }), 'animate-entrance-1 w-full')}>
+          <Plus aria-hidden="true" />
+          Permintaan baru (MS2)
+        </Link>
+      )}
 
       {/* Dashboard SO & LO per status */}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
@@ -230,7 +234,7 @@ export function Plan() {
 
       <div className="animate-entrance-2">
         <RecordTable
-          title="Plan Pengiriman"
+          title="Plan & Tracking LO"
           rows={tabel}
           total={app.plans.reduce((n, p) => n + p.los.length, 0)}
           cols={COLS}

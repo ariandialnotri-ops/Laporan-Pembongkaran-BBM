@@ -55,6 +55,7 @@ import { acuanD15, detailTanggal, kalenderMinggu, labelQQ, qqOf, type CalendarDa
 import { currentShift, shiftLabel } from '@/lib/shift'
 import { formatDurasi, rataRata, slaOf } from '@/lib/sla'
 import { PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
+import { barisPumpTest, LABEL_PUMP_TEST } from '@/lib/pumptest'
 import { cn } from '@/lib/utils'
 
 /** Status LO yang diringkas di kartu Status Alur LO; Alih Supply & Deleted ada di riwayat. */
@@ -337,6 +338,7 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
       {/* Highlight KPI bulan berjalan (lib/kpi.ts, docs/KPI.md). */}
       <KpiOperation periode={periodeDash} className="animate-entrance-1" />
       <GrafikOperation periode={periodeDash} />
+      <KartuPumpTest periode={periodeDash} />
       <PengingatPlan />
       <KartuStopPenyaluran className="animate-entrance-1" />
 
@@ -652,14 +654,14 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
         sub="Status alur Loading Order"
         className="animate-entrance-5 lg:order-4"
         action={
-          <Link to="/laporan/lo" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
+          <Link to="/plan" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
             Total {loTotal} LO <ChevronRight aria-hidden="true" className="size-4" />
           </Link>
         }
       >
         <div className="grid grid-cols-3 gap-2">
           {LO_DASH.map((x) => (
-            <Link key={x.key} to="/laporan/lo" className={cn('flex min-w-0 flex-col items-center rounded-md p-2.5 text-center active:scale-[0.98]', x.tile)}>
+            <Link key={x.key} to="/plan" className={cn('flex min-w-0 flex-col items-center rounded-md p-2.5 text-center active:scale-[0.98]', x.tile)}>
               <span className={cn('truncate text-xs font-bold uppercase', x.teks)}>{LO_STATUS.find((s) => s.key === x.key)!.label}</span>
               <span className={cn('tabular text-numeric-lg font-bold', x.teks)}>{loCounts.get(x.key) ?? 0}</span>
               <span className={cn('text-xs leading-tight', x.teks)}>{x.sub}</span>
@@ -793,6 +795,62 @@ function GrafikOperation({ periode }: { periode: PeriodeDashboard }) {
         <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Volume per {jumlahHari(periode) > HARIAN_MAKS ? 'pekan' : 'hari'}</span>
         <BarChart data={batang} warna={KATEGORI[0]} satuan=" L" label="Volume diterima" />
       </div>
+    </section>
+  )
+}
+
+/** Pump test pada periode: total liter (pengurang penjualan totalisator), jumlah uji, per jenis & per produk. */
+function KartuPumpTest({ periode }: { periode: PeriodeDashboard }) {
+  const app = useApp()
+  const rows = barisPumpTest(app.daily, app.settings.nozzles ?? []).filter((r) => r.tanggal >= periode.dari && r.tanggal <= periode.sampai)
+  const total = rows.reduce((n, r) => n + r.liter, 0)
+  const perJenis = (['kualitas', 'kuantitas', 'takaran'] as const).map((j) => ({ j, n: rows.filter((r) => r.jenis === j).length, l: rows.filter((r) => r.jenis === j).reduce((a, r) => a + r.liter, 0) }))
+  const perProduk = new Map<string, number>()
+  for (const r of rows) perProduk.set(r.produk, (perProduk.get(r.produk) ?? 0) + r.liter)
+  const urut = PRODUK_OPTIONS.filter((p) => perProduk.has(p)).concat([...perProduk.keys()].filter((p) => !PRODUK_OPTIONS.includes(p)))
+  const lewat = rows.filter((r) => r.lewat).length
+  return (
+    <section aria-labelledby="kartu-pump-test" className="animate-entrance-2 flex flex-col gap-space-sm rounded-md bg-surface-container-lowest p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-space-sm">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="kartu-pump-test" className="flex items-center gap-2 text-body-md font-semibold text-on-surface-variant">
+            <FlaskConical aria-hidden="true" className="size-4 text-primary" />
+            Pump test
+          </h2>
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            <span className="tabular text-[2rem] font-bold leading-none text-on-surface">{formatNumber(total)}</span>
+            <span className="text-body-md font-semibold text-on-surface-variant">liter</span>
+          </span>
+          <span className="text-body-sm text-on-surface-variant">
+            {rows.length} uji{lewat ? ` · ${lewat} di luar toleransi` : ''} · dikurangkan dari penjualan totalisator
+          </span>
+        </div>
+        {app.can('/laporan/pump-test') && (
+          <Link to="/laporan/pump-test" className="touch-44 flex shrink-0 items-center gap-0.5 text-body-sm font-semibold text-primary">
+            Riwayat
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+      </div>
+      <ul className="grid grid-cols-3 gap-space-xs" aria-label="Pump test per jenis uji">
+        {perJenis.map((x) => (
+          <li key={x.j} className="flex flex-col rounded-md bg-surface-container-low px-space-sm py-space-xs">
+            <span className="tabular text-body-lg font-bold text-on-surface">{x.n}</span>
+            <span className="text-xs leading-tight text-on-surface-variant">{LABEL_PUMP_TEST[x.j]}</span>
+            <span className="tabular text-xs text-on-surface-variant">{formatNumber(x.l)} L</span>
+          </li>
+        ))}
+      </ul>
+      {urut.length > 0 && (
+        <ul className="flex flex-wrap gap-space-xs" aria-label="Pump test per produk">
+          {urut.map((p, i) => (
+            <li key={p} className="tabular flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface">
+              <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: warnaProduk(p, i) }} />
+              {p} {formatNumber(perProduk.get(p)!)} L
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

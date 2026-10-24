@@ -37,6 +37,17 @@ function sel(doc: jsPDF, x: number, y: number, w: number, h: number, t: string, 
   doc.text(lines, tx, y + 13, { align: o.align ?? 'left' })
 }
 
+/** Gambar tanda tangan (PNG data URL) di tengah cx, maks 120×40 pt. */
+function gambarTtd(doc: jsPDF, img: string, cx: number, y: number) {
+  try {
+    const pr = doc.getImageProperties(img)
+    const s = Math.min(120 / pr.width, 40 / pr.height)
+    doc.addImage(img, 'PNG', cx - (pr.width * s) / 2, y, pr.width * s, pr.height * s)
+  } catch {
+    // tanda tangan rusak: nama tetap tercetak
+  }
+}
+
 export function voucherPdf(v: VoucherPdfInput): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
   const nama = (v.settings.namaSpbu || 'SPBU').replace(/^SPBU\s*(COCO\s*)?/i, '').trim()
@@ -103,20 +114,23 @@ export function voucherPdf(v: VoucherPdfInput): Blob {
   // Tanda tangan
   doc.setFont('helvetica', 'bold')
   const kol = LEBAR / 3
+  // E-sign kasir dari realisasi terakhir yang ditandatangani (kolom KASIR).
+  const esign = [...v.baris].reverse().find((b) => b.ttd?.kasir?.img)
   ;[
-    ['BUH. SPBU', v.ttd.buh],
-    ['ADMIN', v.ttd.admin],
-    ['KASIR', v.ttd.kasir],
-  ].forEach(([j, nm], i) => {
+    ['BUH. SPBU', v.ttd.buh, ''],
+    ['ADMIN', v.ttd.admin, ''],
+    ['KASIR', v.ttd.kasir || esign?.ttd?.kasir?.nama || '', esign?.ttd?.kasir?.img ?? ''],
+  ].forEach(([j, nm, img], i) => {
     const cx = KIRI + kol * i + kol / 2
     doc.setFont('helvetica', 'bold')
     doc.text(j, cx, y, { align: 'center' })
+    if (img) gambarTtd(doc, img, cx, y + 6)
     doc.setFont('helvetica', 'normal')
     doc.text(nm.trim() || '(.................................)', cx, y + 60, { align: 'center' })
   })
 
   // Lampiran foto struk & barang per pengajuan
-  const lampiran = v.baris.filter((b) => b.struk.length || b.barang.length)
+  const lampiran = v.baris.filter((b) => b.struk.length || b.barang.length || b.ttd?.kasir || b.ttd?.penerima)
   for (const [i, b] of lampiran.entries()) {
     doc.addPage()
     let ly = 50
@@ -150,6 +164,20 @@ export function voucherPdf(v: VoucherPdfInput): Blob {
       doc.setFontSize(10)
     })
     if (!foto.length) doc.text('Tidak ada foto terlampir.', KIRI, ly + 10)
+    // E-sign realisasi item ini: dibayar (Admin/Cashier) & diterima (penerima dana).
+    const ttdY = ly + Math.max(1, Math.ceil(foto.length / 2)) * (kh + 26) + 10
+    ;[
+      ['Dibayar', b.ttd?.kasir],
+      ['Diterima', b.ttd?.penerima],
+    ].forEach(([j, t], k) => {
+      const tt = t as { img: string; nama: string } | undefined
+      const cx = KIRI + kw / 2 + k * (kw + 12)
+      doc.setFont('helvetica', 'bold')
+      doc.text(j as string, cx, ttdY, { align: 'center' })
+      if (tt?.img) gambarTtd(doc, tt.img, cx, ttdY + 6)
+      doc.setFont('helvetica', 'normal')
+      doc.text(tt?.nama || '(.................................)', cx, ttdY + 60, { align: 'center' })
+    })
   }
   return doc.output('blob')
 }

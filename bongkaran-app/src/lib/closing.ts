@@ -6,7 +6,7 @@
  */
 import type { Catatan } from '@/lib/catatan'
 import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
-import { jualPerProduk, type TotalizerRecord } from '@/lib/totalizer'
+import { jualPerProduk, type PumpTestShift, type TotalizerRecord } from '@/lib/totalizer'
 import type { Settings } from '@/lib/sop'
 
 /** [kunci, label, nilai, k = kertas | l = logam] (DENOMS One Touch). */
@@ -48,7 +48,10 @@ export const NON_FUEL: [NonFuelKey, string][] = [
 
 export interface PenjualanProduk {
   produk: string
+  /** Penjualan bersih: selisih totalisator − pump test. */
   liter: number
+  /** Pump test shift ini (L) yang sudah dikurangkan; kosong pada closing lama. */
+  pumpTest?: number
   /** Harga per liter saat closing (null = belum diatur). */
   harga: number | null
   rupiah: number | null
@@ -76,12 +79,12 @@ const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a +
 
 export const hitungCash = (pecahan: Record<string, number>) => PECAHAN.reduce((n, [k, , v]) => n + (pecahan[k] || 0) * v, 0)
 
-/** Penjualan BBM per produk dari totalizer shift ini × harga jual. */
-export function penjualanDari(tot: TotalizerRecord | undefined, harga: Settings['hargaProduk']): PenjualanProduk[] {
+/** Penjualan BBM bersih per produk (totalisator − pump test) shift ini × harga jual. */
+export function penjualanDari(tot: TotalizerRecord | undefined, harga: Settings['hargaProduk'], pumpTest?: PumpTestShift): PenjualanProduk[] {
   if (!tot) return []
-  return jualPerProduk([tot]).map(({ produk, liter }) => {
+  return jualPerProduk([tot], pumpTest).map(({ produk, liter, pumpTest: pt }) => {
     const h = harga?.[produk] || null
-    return { produk, liter, harga: h, rupiah: h === null ? null : Math.round(liter * h) }
+    return { produk, liter, pumpTest: pt, harga: h, rupiah: h === null ? null : Math.round(liter * h) }
   })
 }
 

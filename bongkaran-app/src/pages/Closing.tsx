@@ -43,6 +43,7 @@ import { PRODUK_OPTIONS } from '@/lib/sop'
 import { statusShift } from '@/lib/status-isi'
 import { totalizerLengkap, type TotalizerData, type TotalizerRecord } from '@/lib/totalizer'
 import { useCatatan } from '@/lib/use-catatan'
+import { usePumpTestShift } from '@/lib/use-pump-test'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -98,7 +99,7 @@ export function ClosingMenu() {
   return (
     <div className="flex flex-col gap-space-md">
       <InfoHalaman judul="Closing Shift">
-        <p>Closing setiap akhir shift oleh kepala shift dengan hitung buta: hitung fisik uang dan isi non tunai dari struk, angka penjualan baru tampil setelah dikirim. Penjualan BBM ditarik dari Totalizer shift yang sama × harga jual. Format sama dengan closing shift aplikasi One Touch Solution; laporan dikirim ke WhatsApp.</p>
+        <p>Closing setiap akhir shift oleh kepala shift dengan hitung buta: hitung fisik uang dan isi non tunai dari struk, angka penjualan baru tampil setelah dikirim. Penjualan BBM bersih = selisih Totalizer shift yang sama − pump test (uji kualitas, Q&Q, uji takaran) × harga jual. Format sama dengan closing shift aplikasi One Touch Solution; laporan dikirim ke WhatsApp.</p>
       </InfoHalaman>
       <ErrorBox text={error} />
       <PilihShift
@@ -141,6 +142,8 @@ export function ClosingShift() {
 
 function ClosingForm({ tanggal, shift, totalizer }: { tanggal: string; shift: Shift; totalizer: TotalizerRecord | undefined }) {
   const app = useApp()
+  // Penjualan bersih = selisih totalisator − pump test shift ini.
+  const pumpTest = usePumpTestShift()
   const konfirmasi = useKonfirmasi()
   const [pecahan, setPecahan] = useState<Record<string, string>>({})
   const [nonTunai, setNonTunai] = useState<Partial<Record<NonTunaiKey, string>>>({})
@@ -217,7 +220,7 @@ function ClosingForm({ tanggal, shift, totalizer }: { tanggal: string; shift: Sh
         cash,
         nonTunai: Object.fromEntries(NON_TUNAI.map(([k]) => [k, angka(nonTunai[k])])) as ClosingData['nonTunai'],
         nonFuel: Object.fromEntries(NON_FUEL.map(([k]) => [k, angka(nonFuel[k])])) as ClosingData['nonFuel'],
-        penjualan: penjualanDari(totalizer, app.settings.hargaProduk),
+        penjualan: penjualanDari(totalizer, app.settings.hargaProduk, pumpTest),
         totalizerLengkap: lengkap,
         catatan: catatan.trim(),
       }
@@ -372,7 +375,7 @@ function ClosingDetail({ rec, onHapus }: { rec: ClosingRecord; onHapus: () => vo
         </div>
         <div className="divide-y divide-outline-variant/40">
           {d.penjualan.map((p) => (
-            <Baris key={p.produk} k={`${p.produk} ${formatLiter(p.liter, 2)}${p.harga ? ` × ${p.harga.toLocaleString('id-ID')}` : ''}`} v={p.rupiah === null ? 'harga belum diatur' : rupiah(p.rupiah)} />
+            <Baris key={p.produk} k={`${p.produk} ${formatLiter(p.liter, 2)}${p.pumpTest ? ` (bersih, pump test ${formatLiter(p.pumpTest, 0)})` : ''}${p.harga ? ` × ${p.harga.toLocaleString('id-ID')}` : ''}`} v={p.rupiah === null ? 'harga belum diatur' : rupiah(p.rupiah)} />
           ))}
           <Baris k="1. Penjualan BBM (totalizer)" v={d.totalizerLengkap ? rupiah(r.bbm) : 'Totalizer belum lengkap'} tebal />
           {r.nonFuel > 0 && <Baris k="Penjualan non BBM" v={rupiah(r.nonFuel)} />}

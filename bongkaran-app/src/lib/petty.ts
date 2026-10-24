@@ -29,6 +29,29 @@ export const JENIS_PETTY: { value: JenisPetty; label: string; desc: string }[] =
 ]
 
 /** Nama modul: "Petty Cash" untuk ABH & Admin/Cashier, "Pengajuan Anggaran" untuk personil lain. */
+/**
+ * Kategori pengajuan anggaran (dipilih pengaju) beserta saran akun COA untuk Admin/Cashier saat realisasi.
+ * Disusun dari kebutuhan rutin SPBU COCO dan akun COA petty cash One Touch.
+ */
+export const KATEGORI_PETTY: { value: string; label: string; desc: string; coa: string }[] = [
+  { value: 'perlengkapan', label: 'Perlengkapan SPBU', desc: 'Nozzle, selang, pasta minyak & air, dipstick, segel', coa: '07.1.04.1.01.01' },
+  { value: 'dispenser', label: 'Perbaikan dispenser', desc: 'Suku cadang & servis dispenser / pompa', coa: '07.1.04.2.01.02' },
+  { value: 'atg', label: 'ATG & alat ukur', desc: 'Probe ATG, kalibrasi, alat ukur tangki', coa: '07.1.04.2.01.03' },
+  { value: 'listrik', label: 'Listrik & penerangan', desc: 'Lampu kanopi, stop kontak, kabel, baterai', coa: '07.1.04.2.01.01' },
+  { value: 'ac', label: 'AC & pendingin', desc: 'Servis AC, freon, kulkas', coa: '07.1.04.2.01.05' },
+  { value: 'kebersihan', label: 'Kebersihan & pantry', desc: 'Alat kebersihan, majun, pengharum, galon air', coa: '07.1.04.1.01.04' },
+  { value: 'atk', label: 'ATK & cetak', desc: 'Kertas dispenser, tinta printer, fotokopi, jilid', coa: '07.2.02.1.01.01' },
+  { value: 'pegawai', label: 'Kebutuhan pegawai', desc: 'Jas hujan, payung, name tag, seragam ringan', coa: '07.1.04.1.01.06' },
+  { value: 'konsumsi', label: 'Konsumsi & extra fooding', desc: 'Makan/minum pekerja, susu, konsumsi rapat', coa: '07.2.02.1.01.23' },
+  { value: 'p3k', label: 'Obat & P3K', desc: 'Obat-obatan, isi kotak P3K', coa: '07.2.02.1.01.17' },
+  { value: 'komunikasi', label: 'Pulsa & komunikasi', desc: 'Pulsa/paket data koordinasi BBM', coa: '07.2.02.1.01.03' },
+  { value: 'utilitas', label: 'Listrik PLN, air & retribusi', desc: 'Tagihan listrik, PAM, retribusi sampah, IPL', coa: '07.5.01.1.01.01' },
+  { value: 'koordinasi', label: 'Koordinasi & keamanan', desc: 'Koordinasi tamu, sopir tangki, aparat & lingkungan', coa: '07.2.02.1.01.21' },
+  { value: 'transport', label: 'Transportasi lokal', desc: 'Ongkos kirim, transport dalam kota', coa: '07.2.01.2.01.02' },
+  { value: 'lain', label: 'Lainnya', desc: 'Peralatan lain di luar kategori di atas', coa: '07.1.04.2.01.06' },
+]
+export const kategoriPetty = (v: string | undefined) => KATEGORI_PETTY.find((k) => k.value === v)
+
 export const namaModulPetty = (role: Role | null) => (role === 'abh' || role === 'admin' ? 'Petty Cash' : 'Pengajuan Anggaran')
 
 /** Peran yang boleh mengajukan: seluruh personil kecuali ABH (ABH adalah pemberi persetujuan akhir). */
@@ -51,6 +74,8 @@ export interface Realisasi {
   catatan: string
   /** Foto nota/kuitansi (wajib). */
   nota: Photo[]
+  /** E-sign realisasi: Admin/Cashier yang membayar (wajib) dan penerima dana (opsional), gambar PNG data URL. */
+  ttd?: { kasir?: { img: string; nama: string }; penerima?: { img: string; nama: string } }
   by: string | null
   nama: string
   at: string
@@ -78,6 +103,8 @@ export interface PettyData {
   coa?: Pick<Coa, 'accountNo' | 'activity' | 'sapAccount' | 'coaId'>
   /** Peran pengaju (diisi database): laporan pengajuan per peran (mis. Cleaning Service). */
   peran?: Role
+  /** Kategori pengajuan (KATEGORI_PETTY); pengajuan lama tanpa kategori. */
+  kategori?: string
   /** Barang/jasa yang diadakan. */
   uraian: string
   qty: number
@@ -178,6 +205,9 @@ export interface BarisVoucherCetak extends BarisVoucher {
   struk: Photo[]
   /** Foto barang yang dibeli (settlement). */
   barang: Photo[]
+  /** E-sign realisasi (kasir & penerima). */
+  ttd?: Realisasi['ttd']
+  kasir?: string
 }
 
 /**
@@ -202,6 +232,8 @@ export function voucherRentang(recs: PettyRecord[], dari: string, sampai: string
         pengaju: r.data.diajukanNama,
         struk: [...(st?.struk ?? []), ...x.nota, ...(jenisPetty(r) === 'reimburse' ? r.data.lampiran : [])],
         barang: st?.barang ?? [],
+        ttd: x.ttd,
+        kasir: x.nama,
       }
     })
 }

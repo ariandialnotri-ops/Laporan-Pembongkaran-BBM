@@ -19,6 +19,7 @@ import { jualPerProduk, type TotalizerData } from '@/lib/totalizer'
 import { useCatatan } from '@/lib/use-catatan'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { tankForProduk, tankName } from '@/lib/tank'
+import { usePumpTestShift } from '@/lib/use-pump-test'
 import { cn } from '@/lib/utils'
 
 /** Laporan > Persediaan BBM: pilih produk & tanggal, lihat baris per shift, unduh sesuai template. */
@@ -35,7 +36,9 @@ export function Persediaan() {
   const to = range.to || todayIso()
   // Pengeluaran dispenser per shift dari totalizer (bukan lagi isian stok awal).
   const { recs: totalizer } = useCatatan<TotalizerData>('totalizer', from, to)
-  const jual = useMemo(() => new Map((totalizer ?? []).map((t) => [shiftId({ tanggal: t.tanggal, shift: t.shift as Shift }), new Map(jualPerProduk([t]).map((x) => [x.produk, x.liter]))])), [totalizer])
+  // Pengeluaran dispenser bersih: pump test dikembalikan ke tangki, bukan penjualan.
+  const pumpTest = usePumpTestShift()
+  const jual = useMemo(() => new Map((totalizer ?? []).map((t) => [shiftId({ tanggal: t.tanggal, shift: t.shift as Shift }), new Map(jualPerProduk([t], pumpTest).map((x) => [x.produk, x.liter]))])), [totalizer, pumpTest])
   const rows = useMemo(() => persediaanRows(produk, from, to, stok, app.reports, jual), [produk, from, to, stok, app.reports, jual])
 
   if (!app.loaded) return <Loading />

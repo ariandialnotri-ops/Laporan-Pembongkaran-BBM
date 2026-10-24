@@ -270,7 +270,7 @@ export function kpiOperation(d: DataOperation): Kpi[] {
     definisi: 'Rata-rata waktu dari permintaan MS2 sampai bongkar selesai untuk bongkaran pada periode ini.',
     rumus: 'rata-rata (jam bongkar selesai − jam permintaan MS2)',
     sumber: 'Delivery › Plan Pengiriman & Input Bongkaran',
-    ke: '/laporan/lo',
+    ke: '/plan',
   })
 
   const takar = d.daily.filter((x): x is TakarRecord => x.kind === 'takar' && dalam((x as TakarRecord).tanggal, periode))

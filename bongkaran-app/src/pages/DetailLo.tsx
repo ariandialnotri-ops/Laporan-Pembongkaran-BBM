@@ -90,7 +90,7 @@ function tahapLo(plan: Plan, lo: PlanLo, report: ReportSummary | undefined, stat
   return tahap
 }
 
-/** Laporan > Tracking LO > detail satu LO: stepper tahap pengiriman, tombol edit/update, dan riwayat perubahan. */
+/** Delivery > Plan & Tracking LO > detail satu LO: stepper tahap pengiriman, tombol edit/update, dan riwayat perubahan. */
 export function DetailLo() {
   const app = useApp()
   const navigate = useNavigate()
@@ -104,8 +104,8 @@ export function DetailLo() {
       <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
         <span className="text-body-md font-bold text-on-surface">LO tidak ditemukan</span>
         <span className="text-body-sm text-on-surface-variant">LO ini mungkin sudah dihapus dari perangkat lain.</span>
-        <Link to="/laporan/lo" className={buttonVariants({ variant: 'glass' })}>
-          Kembali ke Tracking LO
+        <Link to="/plan" className={buttonVariants({ variant: 'glass' })}>
+          Kembali ke Plan & Tracking LO
         </Link>
       </GlassCard>
     )
@@ -117,7 +117,7 @@ export function DetailLo() {
   const terkunci = status === 'closed'
   const bolehUbah = app.can(`/plan/so/${plan.id}`)
   const riwayat = (plan.riwayat ?? []).filter((x) => !x.loId || x.loId === lo.id).reverse()
-  const keEdit = `/plan/so/${encodeURIComponent(plan.id)}?lo=${encodeURIComponent(lo.id)}&dari=${encodeURIComponent(`/laporan/lo/${plan.id}/${lo.id}`)}`
+  const keEdit = `/plan/so/${encodeURIComponent(plan.id)}?lo=${encodeURIComponent(lo.id)}&dari=${encodeURIComponent(`/plan/lo/${plan.id}/${lo.id}`)}`
 
   return (
     <div className="flex flex-col gap-space-md lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">

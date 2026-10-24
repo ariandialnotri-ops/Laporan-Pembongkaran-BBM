@@ -89,7 +89,6 @@ const RiwayatApar = lazy(() => import('@/pages/RiwayatApar').then((m) => ({ defa
 const RiwayatBongkaran = lazy(() => import('@/pages/RiwayatBongkaran').then((m) => ({ default: m.RiwayatBongkaran })))
 const KualitasDetail = lazy(() => import('@/pages/KualitasDetail').then((m) => ({ default: m.KualitasDetail })))
 const RiwayatKualitas = lazy(() => import('@/pages/RiwayatKualitas').then((m) => ({ default: m.RiwayatKualitas })))
-const RiwayatLo = lazy(() => import('@/pages/RiwayatLo').then((m) => ({ default: m.RiwayatLo })))
 const Sample2Jam = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2Jam })))
 const Sample2JamForm = lazy(() => import('@/pages/Sample2Jam').then((m) => ({ default: m.Sample2JamForm })))
 const UnitBisnis = lazy(() => import('@/pages/Spbu').then((m) => ({ default: m.UnitBisnis })))
@@ -222,8 +221,10 @@ function Gate() {
           <Route path="/laporan/persediaan" element={<Persediaan />} />
           <Route path="/laporan/ba" element={<BeritaAcara />} />
           <Route path="/laporan/bongkaran" element={<RiwayatBongkaran />} />
-          <Route path="/laporan/lo" element={<RiwayatLo />} />
+          {/* Tracking LO digabung ke Plan Pengiriman (/plan); alamat lama dialihkan. */}
+          <Route path="/laporan/lo" element={<Navigate to="/plan" replace />} />
           <Route path="/laporan/lo/:planId/:loId" element={<DetailLo />} />
+          <Route path="/plan/lo/:planId/:loId" element={<DetailLo />} />
           <Route path="/laporan/kualitas" element={<RiwayatKualitas />} />
           <Route path="/laporan/kualitas/:kunci" element={<KualitasDetail />} />
           {/* Riwayat tera lama kini Riwayat Uji Takaran. */}

@@ -28,6 +28,7 @@ import { catatanLama, jualNozzle, jualPerProduk, nozzlePerDispenser, nozzleTerki
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { useCatatan } from '@/lib/use-catatan'
 import { useKeTerkirim } from '@/lib/terkirim'
+import { usePumpTestShift } from '@/lib/use-pump-test'
 import { cn } from '@/lib/utils'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -56,6 +57,8 @@ function NozzleBelumAda() {
 /** Operation > Totalizer: pilih shift (hijau lengkap, oranye belum/akhir shift belum, merah terlewat). */
 export function TotalizerMenu() {
   const app = useApp()
+  // Penjualan bersih = selisih totalisator − pump test shift yang sama.
+  const pumpTest = usePumpTestShift()
   const hariIni = todayIso()
   const { recs, error } = useCatatan<TotalizerData>('totalizer', todayIso(addDays(new Date(`${hariIni}T00:00:00`), -40)), todayIso(addDays(new Date(`${hariIni}T00:00:00`), 1)))
   if (!app.loaded || !recs) return <Loading />
@@ -65,7 +68,7 @@ export function TotalizerMenu() {
   return (
     <div className="flex flex-col gap-space-md">
       <InfoHalaman judul="Totalizer">
-        <p>Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan = akhir − awal.</p>
+        <p>Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan bersih = (akhir − awal) − pump test shift itu (uji kualitas, Q&Q, uji takaran).</p>
       </InfoHalaman>
       <ErrorBox text={error} />
       <PilihShift
@@ -75,7 +78,7 @@ export function TotalizerMenu() {
           const r = rec(k.tanggal, k.shift)
           if (!r) return undefined
           if (totalizerAwalSaja(r, nozzles)) return `Awal shift tercatat ${r.data.jamAwal || ''} · akhir shift belum`
-          const total = jualPerProduk([r]).reduce((n, x) => n + x.liter, 0)
+          const total = jualPerProduk([r], pumpTest).reduce((n, x) => n + x.liter, 0)
           return `Lengkap · ${formatLiter(total)} · ${r.data.petugas || '-'}`
         }}
       />
@@ -94,6 +97,8 @@ export function TotalizerMenu() {
  */
 export function TotalizerForm() {
   const app = useApp()
+  // Penjualan bersih = selisih totalisator − pump test shift yang sama.
+  const pumpTest = usePumpTestShift()
   const keTerkirim = useKeTerkirim()
   const konfirmasi = useKonfirmasi()
   const toast = useToast()
@@ -190,7 +195,7 @@ export function TotalizerForm() {
         keTerkirim({
           judul: `Totalizer ${namaShift} lengkap`,
           detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}`,
-          baris: [...jualPerProduk([baru]).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Petugas', baru.data.petugas]],
+          baris: [...jualPerProduk([baru], pumpTest).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Petugas', baru.data.petugas]],
           aksi: [{ to: '/totalizer', label: 'Pilih shift lain' }, ...(app.can('/laporan/totalizer') ? [{ to: '/laporan/totalizer', label: 'Riwayat totalizer' }] : [])],
         })
       } else toast(`${labelNozzle(n.nama)}: totalisator ${langkah} tersimpan${selesai ? ` · semua nozzle ${langkah} lengkap` : ''}`)
@@ -202,7 +207,7 @@ export function TotalizerForm() {
   }
 
   const jumlah = (l: LangkahTotalizer) => nozzles.filter((n) => terkirim(n.id, l)).length
-  const ringkas = lama ? jualPerProduk([lama]) : []
+  const ringkas = lama ? jualPerProduk([lama], pumpTest) : []
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -385,6 +390,8 @@ type BarisTot = { r: TotalizerRecord; jual: { produk: string; liter: number }[];
 /** Report > Riwayat Totalizer: per bulan, penjualan per produk per shift dan per nozzle. */
 export function RiwayatTotalizer() {
   const app = useApp()
+  // Penjualan bersih = selisih totalisator − pump test shift yang sama.
+  const pumpTest = usePumpTestShift()
   const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const [bulan, setBulan] = useState(todayIso().slice(0, 7))
@@ -397,8 +404,8 @@ export function RiwayatTotalizer() {
   const srcFoto = usePhotoSrc(fotoBuka.map((x) => x.p))
   if (!app.loaded) return <Loading />
   const nozzles = app.settings.nozzles ?? []
-  const rows: BarisTot[] = (recs ?? []).slice().reverse().map((r) => ({ r, jual: jualPerProduk([r]), lengkap: totalizerLengkap(r, nozzles) }))
-  const totalBulan = jualPerProduk(recs ?? [])
+  const rows: BarisTot[] = (recs ?? []).slice().reverse().map((r) => ({ r, jual: jualPerProduk([r], pumpTest), lengkap: totalizerLengkap(r, nozzles) }))
+  const totalBulan = jualPerProduk(recs ?? [], pumpTest)
   const perNozzle = new Map<string, { nama: string; produk: string; liter: number }>()
   for (const r of recs ?? []) for (const [nid, x] of Object.entries(r.data.nozzle)) {
     const j = jualNozzle(x)
@@ -437,6 +444,7 @@ export function RiwayatTotalizer() {
             <div key={x.produk} className="rounded-md bg-surface-container-low p-space-xs">
               <span className="tabular block text-body-md font-bold text-on-surface">{formatLiter(x.liter, 2)}</span>
               <span className="text-xs uppercase text-on-surface-variant">{x.produk}</span>
+              {x.pumpTest > 0 && <span className="tabular block text-xs text-on-surface-variant">bersih · pump test {formatLiter(x.pumpTest, 0)}</span>}
             </div>
           ))}
           {!totalBulan.length && <span className="col-span-2 text-body-sm text-on-surface-variant">Belum ada penjualan tercatat bulan ini.</span>}

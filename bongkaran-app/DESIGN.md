@@ -503,6 +503,16 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - WBS: Laporan masuk → Ditinjau … → Selesai (pop up status + catatan).
 - Tracking LO: tahap berjalan membuka Edit / update pengiriman.
 
+### 9.14h Pembaruan Delivery, penjualan, keuangan, APAR
+- **Plan & Tracking LO** satu halaman (`/plan`): permintaan MS2, status SO & LO per status, tabel LO; ketuk LO → detail stepper `/plan/lo/:planId/:loId` (edit/update dari tahap berjalan). `/laporan/lo` dialihkan ke `/plan`; Security melihat tanpa tombol buat permintaan.
+- **Penjualan bersih** = selisih totalisator − pump test shift yang sama (uji kualitas, Q&Q, uji takaran) di Totalizer, Closing, Dashboard Sales, dan Catatan Persediaan (`jualPerProduk(recs, pumpTest)`; Laporan SO sudah mengurangi tera sendiri).
+- **Kartu Pump test** di Dashboard Operation: total liter periode, jumlah uji per jenis, chip per produk, tautan Riwayat.
+- **Bar bawah Cleaning Service**: Dashboard, Operation, [Lapor], HSSE, **Keuangan** (ikon tangan-koin, paling kanan).
+- **Pasca penerimaan**: ringkasan atas (hijau semua diuji / amber / merah terlewat) lalu kartu per produk: garis & ikon warna produk, lencana jumlah belum diuji di ikon, pil status (Terlewat/Belum diuji/Lengkap), hasil uji terakhir, dan baris penerimaan menunggu uji (tombol Uji).
+- **Kategori pengajuan anggaran** (15 kategori, `KATEGORI_PETTY`) dengan saran akun COA; **PilihCari** (`components/ui/pilih-cari.tsx`): tombol seperti input → bottom sheet berisi kotak cari + daftar (label, keterangan, lencana Saran). Dipakai untuk kategori dan akun COA.
+- **E-sign realisasi**: tanda tangan Admin/Cashier (wajib) dan penerima dana (opsional) dengan SignaturePad layar penuh; tampil di stepper dan tercetak di voucher PDF (kolom KASIR & halaman lampiran Dibayar/Diterima).
+- **Inspeksi APAR & APAB**: kartu ringkasan merah bergradasi (bulan, cincin progres, Belum/Temuan/Lewat masa/≤ 30 hari, tombol putih Pindai QR), kotak kode manual, filter, lalu kartu unit (ikon status, kode & tipe, lokasi, pil status, inspeksi terakhir, chip temuan/isi ulang/instansi; ketuk → data unit).
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

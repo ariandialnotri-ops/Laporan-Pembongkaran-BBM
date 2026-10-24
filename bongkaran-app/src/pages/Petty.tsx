@@ -15,9 +15,10 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { InfoPop } from '@/components/ui/info-pop'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { PilihCari } from '@/components/ui/pilih-cari'
+import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { Sheet } from '@/components/ui/sheet'
 import { Stepper, type Langkah } from '@/components/ui/stepper'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
@@ -25,7 +26,7 @@ import { COA, coaByNo } from '@/lib/coa'
 import { formatBulanTahun, formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { compressImage, genId } from '@/lib/image'
-import { bolehLihatAnggaran, bolehLihatNominal, bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, namaModulPetty, nomorPetty, PERAN_PENGAJU, perluSettlement, pettyId, rekapCoa, rupiah, voucherBulan, voucherRentang, type JenisPetty, type PettyRecord, type Settlement, type StatusPetty, type Tanda } from '@/lib/petty'
+import { KATEGORI_PETTY, kategoriPetty, bolehLihatAnggaran, bolehLihatNominal, bolehLihatPetty, bolehRealisasi, coaPetty, JENIS_PETTY, jenisPetty, labelStatus, namaModulPetty, nomorPetty, PERAN_PENGAJU, perluSettlement, pettyId, rekapCoa, rupiah, voucherBulan, voucherRentang, type JenisPetty, type PettyRecord, type Settlement, type StatusPetty, type Tanda } from '@/lib/petty'
 import type { Photo } from '@/lib/sop'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
@@ -264,6 +265,7 @@ export function PengajuanPettyForm() {
   const app = useApp()
   const keTerkirim = useKeTerkirim()
   const [jenis, setJenis] = useState<JenisPetty>('pengadaan')
+  const [kategori, setKategori] = useState('')
   const [uraian, setUraian] = useState('')
   const [qty, setQty] = useState('1')
   const [satuan, setSatuan] = useState('pcs')
@@ -286,6 +288,7 @@ export function PengajuanPettyForm() {
   }
 
   const kirim = async () => {
+    if (!kategori) return setError('Pilih kategori pengajuan.')
     if (uraian.trim().length < 3) return setError('Isi barang/jasa yang diadakan.')
     if (nQty <= 0) return setError('Isi jumlah.')
     if (nHarga <= 0) return setError('Isi harga satuan.')
@@ -308,6 +311,7 @@ export function PengajuanPettyForm() {
         createdBy: app.session.user?.id ?? null,
         data: {
           jenis,
+          kategori,
           uraian: uraian.trim(),
           qty: nQty,
           satuan: satuan.trim() || 'pcs',
@@ -335,6 +339,7 @@ export function PengajuanPettyForm() {
         detail: `Status: ${rec!.status}. Akun COA dipilih Admin/Cashier saat realisasi.`,
         baris: [
           ['Jenis', reimburse ? 'Reimburse' : 'Pengadaan'],
+          ['Kategori', kategoriPetty(kategori)?.label ?? '-'],
           ['Barang/jasa', `${uraian.trim()} (${nQty} ${satuan})`],
           ['Total', rupiah(total)],
         ],
@@ -356,6 +361,17 @@ export function PengajuanPettyForm() {
           <Choice label="Jenis pengajuan" value={jenis} onChange={(v) => (setError(null), setJenis(v))} options={JENIS_PETTY.map((j) => ({ value: j.value, label: j.label }))} />
         </Field>
         <span className="rounded-md bg-surface-container-low p-space-sm text-body-sm text-on-surface-variant">{JENIS_PETTY.find((j) => j.value === jenis)?.desc}. Akun COA dipilih Admin/Cashier saat realisasi.</span>
+        <Field label="Kategori" htmlFor="pp-kategori">
+          <PilihCari
+            id="pp-kategori"
+            judul="Kategori pengajuan"
+            deskripsi="Pilih yang paling sesuai; Admin/Cashier memakai kategori ini sebagai saran akun COA."
+            placeholder="Pilih kategori"
+            value={kategori}
+            onChange={(v) => (setError(null), setKategori(v))}
+            options={KATEGORI_PETTY.map((k) => ({ value: k.value, label: k.label, sub: k.desc }))}
+          />
+        </Field>
         <Field label="Barang / jasa" htmlFor="pp-uraian">
           <Input id="pp-uraian" autoComplete="off" placeholder="Mis. Pasta air 2 tube, servis dispenser 2" value={uraian} onChange={(e) => set(setUraian)(e.target.value)} />
         </Field>
@@ -598,6 +614,25 @@ export function PengajuanPettyDetail() {
           </span>
           {catatanTanda(r)}
           <FotoList fotos={r.nota} alt="Nota realisasi" />
+          {r.ttd && (
+            <span className="flex flex-wrap gap-space-sm">
+              {(
+                [
+                  ['Dibayar', r.ttd.kasir],
+                  ['Diterima', r.ttd.penerima],
+                ] as [string, { img: string; nama: string } | undefined][]
+              )
+                .filter((x): x is [string, { img: string; nama: string }] => !!x[1])
+                .map(([k, t]) => (
+                <span key={k} className="flex flex-col items-center rounded-md border border-outline-variant/50 bg-white px-space-xs py-1">
+                  <img src={t.img} alt={`Tanda tangan ${t.nama}`} className="h-10 w-24 object-contain" />
+                  <span className="text-xs text-on-surface-variant">
+                    {k} · {t.nama}
+                  </span>
+                </span>
+              ))}
+            </span>
+          )}
         </>
       ) : undefined,
       aksi: siap && bolehRealisasi(app.role) ? { label: jenis === 'reimburse' ? 'Bayar reimburse' : 'Catat realisasi', icon: ReceiptText, onClick: () => navigate(`/finance/petty/realisasi/${encodeURIComponent(rec.id)}`) } : undefined,
@@ -619,6 +654,7 @@ export function PengajuanPettyDetail() {
         {lihatNominal && <span className="tabular text-headline-md font-bold text-primary">{rupiah(rec.total)}</span>}
         <div className="divide-y divide-outline-variant/40">
           <Baris k="Jenis" v={jenisPetty(rec) === 'reimburse' ? 'Reimburse (sudah dibayar pengaju)' : 'Pengadaan'} />
+          {d.kategori && <Baris k="Kategori" v={kategoriPetty(d.kategori)?.label ?? d.kategori} />}
           <Baris k="Akun COA" v={coaPetty(rec) ? `${coaPetty(rec)!.accountNo} · ${coaPetty(rec)!.activity}` : 'Dipilih Admin/Cashier saat realisasi'} />
           {coaPetty(rec) && <Baris k="Akun SAP / COA ID" v={`${coaPetty(rec)!.sapAccount} · ${coaPetty(rec)!.coaId}`} />}
           <Baris k="Jumlah" v={lihatNominal ? `${d.qty} ${d.satuan} × ${rupiah(d.harga)}` : `${d.qty} ${d.satuan}`} />
@@ -921,6 +957,10 @@ export function RealisasiPettyForm() {
   const [catatan, setCatatan] = useState('')
   const [nota, setNota] = useState<FotoLokal[]>([])
   const [coa, setCoa] = useState<string | null>(null)
+  // E-sign realisasi: Admin/Cashier yang membayar (wajib) & penerima dana (opsional).
+  const [ttdKasir, setTtdKasir] = useState('')
+  const [ttdPenerima, setTtdPenerima] = useState('')
+  const [namaPenerima, setNamaPenerima] = useState<string | null>(null)
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const guard = useLeaveGuard({ active: true, title: 'Keluar dari realisasi?', detail: 'Realisasi dan foto nota yang belum disimpan akan hilang.' })
@@ -944,11 +984,15 @@ export function RealisasiPettyForm() {
   const n = parseAngka(nilai) ?? 0
   const reimburse = jenisPetty(rec) === 'reimburse'
   // Pengajuan lama sudah punya COA; pengajuan baru: COA dipilih di sini.
-  const noCoa = coa ?? rec.data.coa?.accountNo ?? ''
+  // Saran COA dari kategori pengajuan (dapat diganti).
+  const kat = kategoriPetty(rec.data.kategori)
+  const noCoa = coa ?? rec.data.coa?.accountNo ?? kat?.coa ?? ''
   const akun = coaByNo(noCoa)
+  const penerima = namaPenerima ?? rec.data.diajukanNama
 
   const simpan = async () => {
     if (!akun) return setErr('Pilih akun COA.')
+    if (!ttdKasir) return setErr('Tanda tangan Admin/Cashier (e-sign) wajib.')
     if (n <= 0) return setErr(reimburse ? 'Isi nominal yang dibayarkan.' : 'Isi nominal realisasi.')
     // Reimburse: nota sudah dilampirkan pengaju; bukti bayar opsional.
     if (!reimburse && !st && !nota.length) return setErr('Foto nota/kuitansi wajib (pengaju belum membuat Settlement).')
@@ -962,6 +1006,7 @@ export function RealisasiPettyForm() {
         coa: { accountNo: akun.accountNo, activity: akun.activity, sapAccount: akun.sapAccount, coaId: akun.coaId },
         catatan: catatan.trim(),
         nota: foto,
+        ttd: { kasir: { img: ttdKasir, nama: app.displayName }, ...(ttdPenerima ? { penerima: { img: ttdPenerima, nama: penerima.trim() || rec.data.diajukanNama } } : {}) },
         by: app.session.user?.id ?? null,
         nama: app.displayName,
         at: new Date().toISOString(),
@@ -1007,18 +1052,16 @@ export function RealisasiPettyForm() {
       </GlassCard>
       <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
         <Field label="Akun COA (wajib)" htmlFor="rl-coa">
-          <Select value={noCoa} onValueChange={(v) => (setErr(null), setCoa(v))}>
-            <SelectTrigger id="rl-coa">
-              <SelectValue placeholder="Pilih akun COA" />
-            </SelectTrigger>
-            <SelectContent>
-              {COA.map((c) => (
-                <SelectItem key={c.accountNo} value={c.accountNo}>
-                  {c.activity} · {c.accountNo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PilihCari
+            id="rl-coa"
+            judul="Akun COA"
+            deskripsi={kat ? `Saran dari kategori ${kat.label}` : 'Cari nama aktivitas, nomor akun, atau keterangan'}
+            placeholder="Pilih akun COA"
+            value={noCoa}
+            invalid={!akun && !!err}
+            onChange={(v) => (setErr(null), setCoa(v))}
+            options={COA.map((c) => ({ value: c.accountNo, label: c.activity, sub: `${c.accountNo} · ${c.description}`, kunci: `${c.sapAccount} ${c.coaId}`, tanda: c.accountNo === kat?.coa ? 'Saran' : undefined }))}
+          />
         </Field>
         {akun && (
           <span className="rounded-md bg-surface-container-low p-space-sm text-body-sm text-on-surface-variant">
@@ -1073,6 +1116,19 @@ export function RealisasiPettyForm() {
         <Field label="Catatan (opsional)" htmlFor="rl-cat">
           <Input id="rl-cat" autoComplete="off" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
         </Field>
+        {/* E-sign: tanda tangan pembayar (wajib) dan penerima dana (opsional), tercetak di voucher. */}
+        <div className="flex flex-col gap-space-sm rounded-lg bg-surface-container-low p-space-sm">
+          <span className="text-tag uppercase text-on-surface-variant">E-sign realisasi</span>
+          <Field label={`Admin/Cashier · ${app.displayName}`}>
+            <SignaturePad label="Admin/Cashier" value={ttdKasir} onChange={(v) => (setErr(null), setTtdKasir(v))} />
+          </Field>
+          <Field label="Nama penerima dana" htmlFor="rl-penerima">
+            <Input id="rl-penerima" autoComplete="off" value={penerima} onChange={(e) => setNamaPenerima(e.target.value)} />
+          </Field>
+          <Field label="Tanda tangan penerima (opsional)">
+            <SignaturePad label="penerima dana" value={ttdPenerima} onChange={setTtdPenerima} />
+          </Field>
+        </div>
         <ErrorBox text={err} />
         <Button size="lg" disabled={busy !== null} onClick={() => void simpan()}>
           {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <HandCoins aria-hidden="true" />}

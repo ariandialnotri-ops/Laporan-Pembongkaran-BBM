@@ -264,19 +264,10 @@ export function useMenu(): GrupMenu[] {
           to: '/plan',
           path: '/plan',
           icon: ClipboardList,
-          title: 'Plan Pengiriman',
-          desc: 'Permintaan MS2, nomor SO, dan LO per produk',
-          status: besok ? 'Plan besok belum dibuat' : proses ? `${proses} LO belum terbit` : 'Semua LO terisi',
+          title: 'Plan & Tracking LO',
+          desc: 'Permintaan MS2, nomor SO & LO per produk, dan tahap pengiriman sampai closed',
+          status: besok ? 'Plan besok belum dibuat' : proses ? `${proses} LO belum terbit` : kirim ? `${kirim} LO sedang dikirim` : `${loAktif} LO aktif`,
           badge: (besok ? 1 : 0) + proses,
-        },
-        {
-          to: '/laporan/lo',
-          path: '/laporan/lo',
-          icon: Route,
-          title: 'Tracking LO',
-          desc: 'Status SO & LO dari plan sampai closed',
-          status: kirim ? `${kirim} LO sedang dikirim` : `${loAktif} LO aktif`,
-          info: kirim,
         },
       ],
     },
@@ -446,7 +437,7 @@ export function useRiwayatTerbuka(): Record<string, string> {
   const henti = hentiDari(app.daily).filter((x) => !x.h.selesai).length
   if (henti) out['/laporan/henti'] = `${henti} penyaluran masih berhenti`
   const lo = app.plans.flatMap((p) => p.los).filter((x) => !['closed', 'deleted'].includes(loStatus(x, app.usedLoIds))).length
-  if (lo) out['/laporan/lo'] = `${lo} LO belum closed`
+  if (lo) out['/plan'] = `${lo} LO belum closed`
   return out
 }
 
@@ -467,7 +458,7 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
   { path: '/laporan/henti', icon: Ban, title: 'Riwayat Stop Penyaluran', desc: 'Produk yang dihentikan sementara, jam berhenti sampai penyaluran kembali, lama berhenti' },
   { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
   { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
-  { path: '/laporan/lo', icon: Route, title: 'Riwayat Tracking LO', desc: 'Status SO & LO dari plan sampai closed' },
+  { path: '/plan', icon: Route, title: 'Plan & Tracking LO', desc: 'Status SO & LO dari permintaan MS2 sampai closed' },
   { path: '/grounding', icon: Zap, title: 'Riwayat Pengukuran Grounding', desc: 'Tahanan pentanahan per titik, titik di atas batas & tindak lanjut' },
 ]
 

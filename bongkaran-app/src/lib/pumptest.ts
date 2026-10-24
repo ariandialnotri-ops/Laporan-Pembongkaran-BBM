@@ -7,6 +7,7 @@ import { qqD15, type DailyRecord } from '@/lib/daily'
 import { formatDensity, parseAngka } from '@/lib/format'
 import { formatMl, opsiLabel, takarStatus } from '@/lib/takar'
 import type { Nozzle } from '@/lib/sop'
+import { kunciPumpTest, type PumpTestShift } from '@/lib/totalizer'
 
 export type JenisPumpTest = 'kualitas' | 'kuantitas' | 'takaran'
 export const LABEL_PUMP_TEST: Record<JenisPumpTest, string> = { kualitas: 'Uji kualitas', kuantitas: 'Uji kuantitas (Q&Q)', takaran: 'Uji takaran' }
@@ -65,4 +66,14 @@ export function rekapTeraNozzle(rows: BarisPumpTest[]) {
     m.set(k, x)
   }
   return [...m.values()].sort((a, b) => a.nozzle.localeCompare(b.nozzle, 'id', { numeric: true }) || a.produk.localeCompare(b.produk))
+}
+
+/** Liter pump test per tanggal, shift & produk: pengurang penjualan totalisator (penjualan bersih). */
+export function pumpTestPerShift(daily: DailyRecord[], nozzles: Nozzle[]): PumpTestShift {
+  const m: PumpTestShift = new Map()
+  for (const r of barisPumpTest(daily, nozzles)) {
+    const k = kunciPumpTest(r.tanggal, r.shift, r.produk)
+    m.set(k, (m.get(k) ?? 0) + r.liter)
+  }
+  return m
 }

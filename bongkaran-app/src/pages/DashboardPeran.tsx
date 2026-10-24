@@ -288,7 +288,7 @@ export function DashboardSecurity() {
         ))}
         {!bongkar.length && <span className="text-body-sm text-on-surface-variant">Belum ada pembongkaran.</span>}
       </Kartu>
-      <Kartu icon={Route} judul="Tracking LO" sub="Status SO & LO dari plan sampai closed" ke="/laporan/lo" aksi="Tracking">
+      <Kartu icon={Route} judul="Tracking LO" sub="Status SO & LO dari plan sampai closed" ke="/plan" aksi="Tracking">
         <div className="grid grid-cols-3 gap-space-xs">
           {LO_STATUS.filter((s) => !['deleted', 'alih'].includes(s.key)).map((s) => (
             <div key={s.key} className="rounded-md bg-surface-container-low p-space-xs text-center">
