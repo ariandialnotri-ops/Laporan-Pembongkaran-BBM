@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileSpreadsheet, FileText, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { DateFilter, useDateRange } from '@/components/bongkaran/date-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -12,8 +14,12 @@ import type { StokRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
 import { persediaanRows, ROWS_PER_PAGE } from '@/lib/report/persediaan'
+import { shiftId, type Shift } from '@/lib/shift'
+import { jualPerProduk, type TotalizerData } from '@/lib/totalizer'
+import { useCatatan } from '@/lib/use-catatan'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { tankForProduk, tankName } from '@/lib/tank'
+import { usePumpTestShift } from '@/lib/use-pump-test'
 import { cn } from '@/lib/utils'
 
 /** Laporan > Persediaan BBM: pilih produk & tanggal, lihat baris per shift, unduh sesuai template. */
@@ -23,11 +29,17 @@ export function Persediaan() {
   const [range, setRange] = useDateRange('month')
   const [produk, setProduk] = useState(PRODUK_OPTIONS[0])
   const [busy, setBusy] = useState<'xlsx' | 'pdf' | null>(null)
+  const baru = useSearchParams()[0].get('baru')
 
   const stok = useMemo(() => app.daily.filter((d): d is StokRecord => d.kind === 'stok'), [app.daily])
   const from = range.from || '0000-01-01'
   const to = range.to || todayIso()
-  const rows = useMemo(() => persediaanRows(produk, from, to, stok, app.reports), [produk, from, to, stok, app.reports])
+  // Pengeluaran dispenser per shift dari totalizer (bukan lagi isian stok awal).
+  const { recs: totalizer } = useCatatan<TotalizerData>('totalizer', from, to)
+  // Pengeluaran dispenser bersih: pump test dikembalikan ke tangki, bukan penjualan.
+  const pumpTest = usePumpTestShift()
+  const jual = useMemo(() => new Map((totalizer ?? []).map((t) => [shiftId({ tanggal: t.tanggal, shift: t.shift as Shift }), new Map(jualPerProduk([t], pumpTest).map((x) => [x.produk, x.liter]))])), [totalizer, pumpTest])
+  const rows = useMemo(() => persediaanRows(produk, from, to, stok, app.reports, jual), [produk, from, to, stok, app.reports, jual])
 
   if (!app.loaded) return <Loading />
 
@@ -50,6 +62,7 @@ export function Persediaan() {
 
   return (
     <div className="flex flex-col gap-space-md">
+      {baru && <BannerTerkirim teks="Stok shift tersimpan. Catatan persediaan di bawah sudah memuat data terbaru." />}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <Field label="Produk" htmlFor="persediaan-produk" hint={tank ? tankName(tank.tankNo) : undefined}>
           <Select value={produk} onValueChange={setProduk}>

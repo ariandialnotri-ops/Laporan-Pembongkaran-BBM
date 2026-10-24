@@ -4,6 +4,10 @@ import { ChevronRight } from 'lucide-react'
 import { GlassCard } from '@/components/ui/glass-card'
 import { cn } from '@/lib/utils'
 
+/** Sorotan baris: oranye = perlu perhatian (mis. SO/LO belum terbit), biru = data yang baru dikirim. */
+export const BARIS_ORANYE = 'bg-orange-50 shadow-[inset_4px_0_0_#f97316]'
+export const BARIS_BARU = 'bg-primary-fixed/50 shadow-[inset_4px_0_0_var(--primary)]'
+
 export type Col<T> = {
   header: string
   cell: (row: T) => ReactNode
@@ -30,6 +34,7 @@ export function RecordTable<T>({
   to,
   onRow,
   empty,
+  rowClass,
 }: {
   title: string
   rows: T[]
@@ -41,6 +46,8 @@ export function RecordTable<T>({
   /** Klik baris membuka pop up (mis. ubah data) alih-alih pindah halaman. */
   onRow?: (row: T) => void
   empty: string
+  /** Sorotan per baris, mis. oranye untuk SO/LO belum terbit atau biru untuk data yang baru dikirim. */
+  rowClass?: (row: T) => string | undefined
 }) {
   const navigate = useNavigate()
   const titleCols = cols.filter((c) => c.mobile === 'title')
@@ -87,7 +94,7 @@ export function RecordTable<T>({
                 </div>
               )
               return (
-                <li key={rowKey(row)}>
+                <li key={rowKey(row)} className={rowClass?.(row)}>
                   {to ? (
                     <Link to={to(row)}>{body}</Link>
                   ) : onRow ? (
@@ -124,7 +131,7 @@ export function RecordTable<T>({
                   <tr
                     key={rowKey(row)}
                     onClick={to ? () => navigate(to(row)) : onRow ? () => onRow(row) : undefined}
-                    className={cn((to || onRow) && 'cursor-pointer transition-colors hover:bg-primary-fixed/30')}
+                    className={cn((to || onRow) && 'cursor-pointer transition-colors hover:bg-primary-fixed/30', rowClass?.(row))}
                   >
                     {tableCols.map((c) => (
                       <td key={c.header} className={cn('px-space-sm py-space-sm text-on-surface first:pl-space-md', c.align === 'right' && 'tabular text-right', c.className)}>

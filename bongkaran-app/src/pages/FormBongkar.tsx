@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Beaker, Flag, Lock, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -16,6 +17,9 @@ import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib
 import { compressImage } from '@/lib/image'
 import { evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
+import { formatTanggalIso } from '@/lib/date'
+import { diam } from '@/lib/proses'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 type Phase = 'bongkaran' | 'quality' | 'quantity'
@@ -66,8 +70,10 @@ export function FormBongkar() {
 
 function BongkarEditor({ initial, restored }: { initial: Report; restored: boolean }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const [report, setReport] = useState(initial)
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
@@ -107,7 +113,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     upsertSummary(summary)
     chain.current = chain.current.then(async () => {
       try {
-        await backend.saveReport(r, summary)
+        await diam(() => backend.saveReport(r, summary))
         if (backend.mode === 'supabase') clearBackup(r.id, r.updatedAt)
         if (!pending.current) setSaveState('saved')
       } catch (e) {
@@ -136,6 +142,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     timer.current = setTimeout(() => void flush(), urgent.current ? 0 : 600)
     urgent.current = false
   }, [report, flush])
+
+  const [keRiwayat, setKeRiwayat] = useState(false)
 
   // Isian dari cadangan perangkat langsung dikirim ke server.
   useEffect(() => {
@@ -242,10 +250,10 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       updatedAt: Date.now(),
       data: { ...prev.data, noBA: prev.data.noBA || suggestNoBA(app.settings, prev) },
     }))
-    toast(status === 'anomali' ? 'Ditutup sebagai anomali' : 'Bongkaran selesai · Berita Acara siap')
+    setKeRiwayat(true)
   }
-  const reopen = () => {
-    if (!window.confirm('Buka kembali untuk koreksi? Status kembali menjadi draft.')) return
+  const reopen = async () => {
+    if (!(await konfirmasi({ jenis: 'ubah', judul: 'Ubah data bongkaran?', pesan: <>Laporan dibuka kembali untuk koreksi dan statusnya kembali menjadi <b>draft</b>. Berita Acara perlu ditandatangani ulang.</>, ya: 'Ya, buka & ubah' }))) return
     setReport((prev) => ({ ...prev, status: 'draft', finishedAt: null, updatedAt: Date.now() }))
   }
   const fileBase = `BA_Pembongkaran_${(report.data.nopol || 'MT').replace(/[^a-zA-Z0-9]/g, '')}_${report.data.tanggalDatang}`
@@ -278,11 +286,34 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     title: 'Keluar dari form bongkaran?',
     detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
     beforeLeave: flush,
+    // Halaman turunan (ubah nomor LO) bukan meninggalkan form.
+    izinkan: (path) => path.startsWith(`/input/${report.id}/`),
   })
+  // Setelah diselesaikan, pindah ke Riwayat Pembongkaran (penyimpanan terakhir dijalankan saat halaman ditutup).
+  useEffect(() => {
+    if (!keRiwayat || report.status === 'draft') return
+    guard.bypass()
+    const anomali = report.status === 'anomali'
+    keTerkirim({
+      judul: anomali ? 'Bongkaran ditutup sebagai anomali' : 'Bongkaran selesai terkirim',
+      detail: `${report.data.nopol || 'MT'}, ${formatTanggalIso(report.data.tanggalDatang)}. Berita Acara siap diunduh & ditandatangani.`,
+      peringatan: anomali ? 'Ditutup sebagai anomali: periksa catatan dan tindak lanjut.' : undefined,
+      baris: [
+        ['No. BA', report.data.noBA || '-'],
+        ['Langkah SOP', `${selesaiLangkah} dari ${evaluation.steps.length}`],
+      ],
+      aksi: [
+        ...(anomali ? [] : [{ to: `/sample/${encodeURIComponent(report.id)}`, label: 'Lanjut uji kualitas pasca penerimaan' }]),
+        { to: '/laporan/ba', label: 'Berita Acara' },
+        { to: `/laporan/bongkaran?baru=${encodeURIComponent(report.id)}`, label: 'Riwayat pembongkaran' },
+      ],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keRiwayat, report.status, report.id])
   const waText = useMemo(() => buildWaText(report, evaluation.derived, app.settings), [report, evaluation, app.settings])
 
   const hapus = async () => {
-    if (!window.confirm('Hapus data bongkaran ini beserta semua fotonya?')) return
+    if (!(await konfirmasi({ judul: 'Hapus data bongkaran?', pesan: <>Laporan bongkaran <b>{report.data.noBA || report.id}</b> beserta semua fotonya akan dihapus.</> }))) return
     if (timer.current) clearTimeout(timer.current)
     pending.current = null
     await chain.current
@@ -292,7 +323,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
       guard.bypass()
-      navigate('/input/bongkar')
+      navigate('/input/bongkar', { replace: true })
     } catch (e) {
       toast(pesan(e), TriangleAlert)
     }

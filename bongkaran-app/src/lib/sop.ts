@@ -2,12 +2,13 @@
  * Alur SOP pembongkaran BBM: tipe data, definisi tahapan, validasi tiap
  * tahap, dan perhitungan kuantitas/kualitas untuk Berita Acara.
  */
+import type { AbsensiSetting } from '@/lib/absen'
 import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { minutesBetween, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { shiftKey, type Shift } from '@/lib/shift'
-import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
+import { getTank, TANKS, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
 import type { AparUnit } from '@/lib/apar'
 
 export interface Photo {
@@ -161,13 +162,26 @@ export interface PlanLo {
   /** Nomor segel per produk sesuai dokumen LO. */
   segel: string[]
   /** Shift permintaan untuk produk ini (boleh beda antar produk dalam satu permintaan). */
-  shift?: '' | '1' | '2'
+  shift?: '' | '1' | '2' | '3'
   /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
   supplyPoint?: string
   noLOLama?: string
   supplyPointLama?: string
   /** Plan lama: jumlah DO. */
   jumlahDO?: number
+}
+
+/** Satu catatan perubahan plan/LO (waktu submit & perubahan, ditampilkan di detail Tracking LO). */
+export interface JejakPlan {
+  /** Epoch ms. */
+  waktu: number
+  oleh: string
+  jenis: 'buat' | 'so' | 'lo' | 'status' | 'ubah'
+  teks: string
+  /** LO yang berubah; kosong = berlaku untuk seluruh permintaan (SO, tanggal kirim). */
+  loId?: string
+  /** Status baru (jenis "status"). */
+  status?: LoStatus
 }
 
 export interface Plan {
@@ -178,7 +192,7 @@ export interface Plan {
   ms2Tanggal: string
   ms2Jam: string
   /** Shift permintaan minyak lewat MS2 (hanya shift 1 & 2). */
-  ms2Shift: '' | '1' | '2'
+  ms2Shift: '' | '1' | '2' | '3'
   poSap: string
   shipTo: string
   supplyPoint: string
@@ -189,6 +203,8 @@ export interface Plan {
   /** Plan lama: Sold To. */
   soldTo: string
   los: PlanLo[]
+  /** Riwayat submit & perubahan (terbaru di akhir). */
+  riwayat?: JejakPlan[]
 }
 
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']
@@ -289,10 +305,26 @@ export interface Settings {
   /** Data SPBU: jumlah pulau pompa (juga lokasi APAR) dan jumlah dispenser. */
   jumlahPulau: number
   jumlahDispenser: number
+  dispensers: Dispenser[]
+  /** Nomor Sold To SPBU (satu) dan Ship To per produk; mengisi otomatis form bongkaran & permintaan MS2. */
+  soldTo: string
+  shipTo: Record<string, string>
   /** Data utama area/lokasi APAR selain pulau pompa. */
   aparArea: string[]
   apar: AparUnit[]
   apab: AparUnit[]
+  /** Fasilitas SPBU (modul Operasional); undefined = semua fasilitas ada. */
+  fasilitas?: string[]
+  /** Daftar personil SPBU (termasuk yang tidak punya akun aplikasi): modul Personil & Jadwal Shift. */
+  personil?: Personil[]
+  /** Titik lokasi, radius, dan token QR absensi personil. */
+  absensi?: AbsensiSetting
+  /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
+  fotoSimpanBulan?: number
+  /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */
+  pettyPlafon?: number
+  /** Harga jual per liter per produk (closing shift: penjualan = liter totalizer × harga). */
+  hargaProduk?: Record<string, number>
   rules: Rules
 }
 
@@ -300,6 +332,34 @@ export interface Nozzle {
   id: string
   nama: string
   produk: string
+  /** Unit dispenser tempat nozzle ini terpasang. */
+  dispenserId?: string
+  /** Nomor sertifikat tera metrologi. */
+  teraNoSertifikat?: string
+  /** Tanggal keluar sertifikat tera metrologi; berlaku maks. 1 tahun. */
+  teraTanggal?: string
+}
+
+/** Unit dispenser (pompa) di SPBU. */
+/** Personil SPBU. `aktif` false = tidak lagi bertugas (tetap di riwayat jadwal). */
+export interface Personil {
+  id: string
+  nama: string
+  jabatan: string
+  hp: string
+  aktif: boolean
+  /** Akun FLOQ milik personil ini (absensi hanya untuk diri sendiri). */
+  akunId?: string
+}
+
+export interface Dispenser {
+  id: string
+  /** Nomor/nama unit, mis. "Dispenser 1". */
+  nama: string
+  merk: string
+  noSeri: string
+  /** Pulau pompa tempat dispenser dipasang. */
+  pulau: string
 }
 
 export const PRODUK_OPTIONS = ['Pertalite', 'Pertamax', 'Pertamax Turbo', 'Biosolar', 'Pertamina Dex']
@@ -405,7 +465,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'density',
     title: 'Kualitas Density',
-    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density 15°C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
+    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density std. 15 °C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
     photos: [{ key: 'density', label: 'Pembacaan hidrometer & termometer', optional: true }],
   },
   {
@@ -498,7 +558,8 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
       jamDatang: nowHm(),
       nopol: '',
       namaDriver: '',
-      soldTo: '',
+      // Sold To SPBU dari Profil > Sold To & Ship To.
+      soldTo: settings.soldTo ?? '',
       shipTo: '',
       produk: '',
       jumlahDO: '',
@@ -740,7 +801,8 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       }
       break
     case 'atg_before':
-      if (!d.tankId) issues.push('Pilih tangki pendam')
+      // SPBU tanpa database tangki: pilihan tangki belum ada, tahap tetap bisa diselesaikan.
+      if (!d.tankId && TANKS.length) issues.push('Pilih tangki pendam')
       if ([d.atgBefore.tinggi, d.atgBefore.volume, d.atgBefore.suhu].some((v) => num(v) === null)) {
         issues.push('Isi ketinggian, volume, dan suhu pembacaan ATG')
       }
@@ -775,7 +837,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!d.sampelSesuai) issues.push('Konfirmasi sampel atas & bawah sesuai')
       break
     case 'density':
-      if (x.d15Depot === null) issues.push('Density 15°C depot belum diisi (tahap Dokumen LO)')
+      if (x.d15Depot === null) issues.push('Density std. 15 °C depot belum diisi (tahap Dokumen LO)')
       if (x.densityResults.length === 0) issues.push('Tambahkan minimal satu pengukuran density')
       if (x.densityResults.some((r) => !r.kompartemenId || !r.d15)) issues.push('Lengkapi kompartemen, density, dan suhu pada setiap pengukuran')
       if (x.densityAnomaly) {

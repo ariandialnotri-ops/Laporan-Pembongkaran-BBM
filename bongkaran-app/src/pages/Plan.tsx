@@ -1,25 +1,25 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowRight, CalendarClock, ClipboardList, Lock, Plus, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowRight, CalendarClock, Lock, Plus, Send, Trash2 } from 'lucide-react'
 import { DateFilter, inRangeOrUpcoming, useDateRange } from '@/components/bongkaran/date-filter'
 import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, ProdukSelect, SupplySelect } from '@/components/bongkaran/lo-fields'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
-import { Button } from '@/components/ui/button'
+import { BARIS_BARU, BARIS_ORANYE, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Sheet } from '@/components/ui/sheet'
-import { useToast } from '@/components/ui/toast'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
-import { LO_MAX_LITER, LO_STATUS, loStatus, loStatusMeta, pecahVolume, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
+import { belumTerbit, LO_MAX_LITER, LO_STATUS, loStatus, loStatusMeta, pecahVolume, planBesokKurang, planSupply, SHIFT_PERMINTAAN, type LoDisplayStatus } from '@/lib/plan'
 import { PRODUK_OPTIONS, SUPPLY_POINTS, type Plan as PlanT, type PlanLo } from '@/lib/sop'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
-type Row = { id: string; produk: string; volume: string; shift: '' | '1' | '2' }
+type Row = { id: string; produk: string; volume: string; shift: '' | '1' | '2' | '3' }
 const blankRow = (shift: Row['shift'] = '', produk = PRODUK_OPTIONS[0]): Row => ({ id: genId('lo'), produk, volume: '8000', shift })
 
 type PlanForm = Pick<PlanT, 'tanggal' | 'ms2Tanggal' | 'ms2Jam' | 'ms2Shift' | 'poSap' | 'shipTo' | 'supplyPoint' | 'noSO'>
@@ -36,7 +36,7 @@ const blankPlanForm = (tanggal = todayIso()): PlanForm => ({
 
 type TRow = { plan: PlanT; lo: PlanLo; status: LoDisplayStatus }
 
-/** Tabel plan pengiriman: satu baris per LO, ketuk untuk membuka halaman Edit SO & LO. */
+/** Tabel Plan & Tracking LO: satu baris per LO, ketuk untuk membuka detail LO (stepper, riwayat, edit/update). */
 const COLS: Col<TRow>[] = [
   { header: 'Tgl kirim', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.plan.tanggal)}</span>, mobileCell: (x) => `Kirim ${formatTanggalIso(x.plan.tanggal)}`, mobile: 'sub' },
   { header: 'No SO', cell: (x) => <span className="tabular whitespace-nowrap">{x.plan.noSO || <span className="italic text-on-surface-variant">belum terbit</span>}</span>, mobile: 'hide' },
@@ -104,7 +104,7 @@ function PlanFields({ form, set, idp }: { form: PlanForm; set: (p: Partial<PlanF
         <Input id={`${idp}-ms2j`} type="time" value={form.ms2Jam} onChange={(e) => set({ ms2Jam: e.target.value })} />
       </Field>
       <Field label="No. Ship To" htmlFor={`${idp}-ship`}>
-        <Input id={`${idp}-ship`} autoComplete="off" inputMode="numeric" value={form.shipTo} onChange={(e) => set({ shipTo: e.target.value })} />
+        <Input id={`${idp}-ship`} autoComplete="off" inputMode="numeric" placeholder="otomatis dari Profil" value={form.shipTo} onChange={(e) => set({ shipTo: e.target.value })} />
       </Field>
       <Field label="No. PO SAP" htmlFor={`${idp}-po`}>
         <Input id={`${idp}-po`} autoComplete="off" placeholder="opsional" value={form.poSap} onChange={(e) => set({ poSap: e.target.value })} />
@@ -123,13 +123,10 @@ function validatePlan(f: PlanForm) {
 
 export function Plan() {
   const app = useApp()
-  const toast = useToast()
   const navigate = useNavigate()
-  const [form, setForm] = useState<PlanForm>(() => blankPlanForm())
-  const [rows, setRows] = useState<Row[]>(() => [blankRow()])
-  const [error, setError] = useState<string | null>(null)
-  const [baru, setBaru] = useState(false)
-  const [menyimpan, setMenyimpan] = useState(false)
+  // Permintaan yang baru disimpan / SO-LO yang baru diubah disorot biru.
+  const [params] = useSearchParams()
+  const sorot = params.get('baru')
   const [notifBisa, setNotifBisa] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'default')
   const [range, setRange] = useDateRange('7d')
   const [statusFilter, setStatusFilter] = useState<LoDisplayStatus | null>(null)
@@ -151,46 +148,9 @@ export function Plan() {
   const soTerbit = inDate.filter((p) => p.noSO.trim()).length
   const besok = planBesokKurang(app.plans)
 
-  const simpan = async () => {
-    if (menyimpan) return
-    const err = validatePlan(form)
-    if (err) return setError(err)
-    const valid = rows.filter((r) => (parseAngka(r.volume) ?? 0) > 0)
-    if (!valid.length) return setError('Isi minimal satu produk dengan volume lebih dari 0 liter.')
-    const tanpaShift = valid.findIndex((r) => !r.shift)
-    const volumeRow = (r: Row) => parseAngka(r.volume) ?? 0
-    if (tanpaShift >= 0) return setError(`Pilih shift permintaan untuk produk ${rows.indexOf(valid[tanpaShift]) + 1} (${valid[tanpaShift].produk}).`)
-    const plan: PlanT = {
-      id: genId('plan'),
-      createdAt: Date.now(),
-      ...form,
-      // Shift permintaan diisi per produk; shift plan = shift produk pertama (data lama/SLA).
-      ms2Shift: valid[0].shift,
-      shipTo: form.shipTo.trim(),
-      poSap: form.poSap.trim(),
-      noSO: '',
-      produk: '',
-      soldTo: '',
-      // Tiap 8.000 L = 1 LO: 16.000 L menjadi 2 LO, 20.000 L menjadi 8.000 + 8.000 + 4.000.
-      los: valid.flatMap((r) => pecahVolume(volumeRow(r)).map((volume, i) => ({ id: i ? genId('lo') : r.id, noLO: '', produk: r.produk, volume, shift: r.shift, status: 'os' as const, segel: [] }))),
-    }
-    setError(null)
-    setMenyimpan(true)
-    try {
-      await app.savePlan(plan)
-      setForm(blankPlanForm(form.tanggal))
-      setRows([blankRow()])
-      setBaru(false)
-      toast(`Permintaan tersimpan: ${plan.los.length} LO. Isi SO & LO di daftar saat sudah terbit.`)
-    } catch (e) {
-      setError(pesan(e))
-    } finally {
-      setMenyimpan(false)
-    }
-  }
-
-
-  const bukaLo = (plan: PlanT, lo: PlanLo) => navigate(`/plan/so/${encodeURIComponent(plan.id)}?lo=${encodeURIComponent(lo.id)}`)
+  // Plan & Tracking LO satu halaman: ketuk LO untuk stepper tahap pengiriman (edit/update dari sana).
+  const bukaLo = (plan: PlanT, lo: PlanLo) => navigate(`/plan/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(lo.id)}`)
+  const bolehBuat = app.can('/plan/baru')
 
 
   const visible = inDate
@@ -200,7 +160,7 @@ export function Plan() {
 
   return (
     <div className="flex flex-col gap-space-md">
-      {besok && (
+      {besok && bolehBuat && (
         <div role="status" className="animate-entrance-1 flex flex-col gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-md">
           <div className="flex items-start gap-space-sm">
             <CalendarClock aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
@@ -210,16 +170,10 @@ export function Plan() {
             </div>
           </div>
           <div className="flex flex-wrap gap-space-xs">
-            <Button
-              size="pill"
-              onClick={() => {
-                setForm(blankPlanForm(besok))
-                setBaru(true)
-              }}
-            >
+            <Link to={`/plan/baru?tanggal=${besok}`} className={buttonVariants({ size: 'pill' })}>
               <Plus aria-hidden="true" />
               Buat plan besok
-            </Button>
+            </Link>
             {notifBisa && (
               <Button variant="glass" size="pill" onClick={() => void Notification.requestPermission().then(() => setNotifBisa(false))}>
                 Aktifkan notifikasi
@@ -229,10 +183,12 @@ export function Plan() {
         </div>
       )}
 
-      <Button size="lg" className="animate-entrance-1 w-full" onClick={() => setBaru(true)}>
-        <Plus aria-hidden="true" />
-        Permintaan baru (MS2)
-      </Button>
+      {bolehBuat && (
+        <Link to="/plan/baru" className={cn(buttonVariants({ size: 'lg' }), 'animate-entrance-1 w-full')}>
+          <Plus aria-hidden="true" />
+          Permintaan baru (MS2)
+        </Link>
+      )}
 
       {/* Dashboard SO & LO per status */}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
@@ -270,33 +226,95 @@ export function Plan() {
             LO berstatus <b className="text-on-surface">{loStatusMeta(statusFilter).label}</b>: {loStatusMeta(statusFilter).desc.toLowerCase()}.
           </span>
         )}
+        <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+          <span aria-hidden="true" className="size-3 shrink-0 rounded-sm bg-orange-50 shadow-[inset_3px_0_0_#f97316] ring-1 ring-orange-200" />
+          Baris oranye: SO/LO belum terbit dari depot.
+        </span>
       </GlassCard>
 
       <div className="animate-entrance-2">
         <RecordTable
-          title="Plan Pengiriman"
+          title="Plan & Tracking LO"
           rows={tabel}
           total={app.plans.reduce((n, p) => n + p.los.length, 0)}
           cols={COLS}
           rowKey={(x) => x.lo.id}
           onRow={(x) => bukaLo(x.plan, x.lo)}
+          rowClass={(x) => (x.plan.id === sorot ? BARIS_BARU : belumTerbit(x.plan, x.lo) ? BARIS_ORANYE : undefined)}
           empty={statusFilter ? 'Tidak ada LO dengan status ini pada rentang tanggal terpilih.' : 'Belum ada plan pengiriman pada rentang tanggal ini.'}
         />
       </div>
 
-      {/* Permintaan baru lewat MS2 */}
-      <Sheet
-        open={baru}
-        onOpenChange={setBaru}
-        title="Permintaan baru (MS2)"
-        description="Nomor SO dan LO diisi dari daftar plan setelah terbit dari depot."
-        footer={
-          <Button size="lg" className="flex-1" disabled={menyimpan} onClick={simpan}>
-            <ClipboardList aria-hidden="true" />
-            {menyimpan ? 'Menyimpan…' : 'Simpan permintaan'}
-          </Button>
-        }
-      >
+    </div>
+  )
+}
+
+/** Delivery > Plan Pengiriman > Permintaan baru (MS2): halaman form tersendiri. */
+export function PlanBaru() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const [params] = useSearchParams()
+  const [form, setForm] = useState<PlanForm>(() => blankPlanForm(params.get('tanggal') || todayIso()))
+  const [rows, setRows] = useState<Row[]>(() => [blankRow()])
+  const [error, setError] = useState<string | null>(null)
+  const [menyimpan, setMenyimpan] = useState(false)
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari permintaan baru?', detail: 'Permintaan MS2 yang belum dikirim akan hilang.' })
+
+  const simpan = async () => {
+    if (menyimpan) return
+    const valid = rows.filter((r) => (parseAngka(r.volume) ?? 0) > 0)
+    // Ship To kosong: pakai Ship To produk pertama dari Profil > Sold To & Ship To.
+    const shipToProfil = valid[0] ? app.settings.shipTo?.[valid[0].produk] : ''
+    const f = { ...form, shipTo: form.shipTo.trim() || shipToProfil || '' }
+    const err = validatePlan(f)
+    if (err) return setError(err)
+    if (!valid.length) return setError('Isi minimal satu produk dengan volume lebih dari 0 liter.')
+    const tanpaShift = valid.findIndex((r) => !r.shift)
+    const volumeRow = (r: Row) => parseAngka(r.volume) ?? 0
+    if (tanpaShift >= 0) return setError(`Pilih shift permintaan untuk produk ${rows.indexOf(valid[tanpaShift]) + 1} (${valid[tanpaShift].produk}).`)
+    const plan: PlanT = {
+      id: genId('plan'),
+      createdAt: Date.now(),
+      ...f,
+      // Shift permintaan diisi per produk; shift plan = shift produk pertama (data lama/SLA).
+      ms2Shift: valid[0].shift,
+      shipTo: f.shipTo.trim(),
+      poSap: f.poSap.trim(),
+      soldTo: app.settings.soldTo ?? '',
+      noSO: '',
+      produk: '',
+      // Tiap 8.000 L = 1 LO: 16.000 L menjadi 2 LO, 20.000 L menjadi 8.000 + 8.000 + 4.000.
+      los: valid.flatMap((r) => pecahVolume(volumeRow(r)).map((volume, i) => ({ id: i ? genId('lo') : r.id, noLO: '', produk: r.produk, volume, shift: r.shift, status: 'os' as const, segel: [] }))),
+    }
+    setError(null)
+    setMenyimpan(true)
+    try {
+      await app.savePlan(plan)
+      guard.bypass()
+      keTerkirim({
+        judul: 'Permintaan MS2 terkirim',
+        detail: `Kirim ${formatTanggalIso(plan.tanggal)}, ${plan.supplyPoint}. Isi nomor SO & LO di Plan Pengiriman saat sudah terbit.`,
+        baris: [
+          ...valid.map((r): [string, string] => [r.produk, `${formatNumber(volumeRow(r))} L · shift ${r.shift}`]),
+          ['Jumlah LO', `${plan.los.length} LO`],
+          ['Permintaan MS2', `${formatTanggalIso(plan.ms2Tanggal)} ${plan.ms2Jam}`],
+        ],
+        aksi: [
+          { to: `/plan?baru=${encodeURIComponent(plan.id)}`, label: 'Lihat Plan Pengiriman' },
+          { to: '/plan/baru', label: 'Buat permintaan lain' },
+        ],
+      })
+    } catch (e) {
+      setError(pesan(e))
+      setMenyimpan(false)
+    }
+  }
+
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+        <span className="text-body-sm text-on-surface-variant">Nomor SO dan LO diisi dari daftar plan setelah terbit dari depot.</span>
         <PlanFields idp="plan" form={form} set={(p) => setForm({ ...form, ...p })} />
         <div className="flex flex-col gap-space-xs">
           <span className="text-tag uppercase text-on-surface-variant">Produk yang diminta</span>
@@ -322,8 +340,12 @@ export function Plan() {
           </Button>
         </div>
         <ErrorBox text={error} />
-      </Sheet>
-
+        <Button size="lg" disabled={menyimpan} onClick={simpan}>
+          <Send aria-hidden="true" />
+          {menyimpan ? 'Mengirim…' : 'Kirim permintaan'}
+        </Button>
+      </GlassCard>
+      {guard.dialog}
     </div>
   )
 }

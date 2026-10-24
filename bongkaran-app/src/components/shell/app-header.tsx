@@ -1,41 +1,50 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useApp } from '@/lib/app-state'
-import { parentOf, titleFor } from '@/lib/nav'
+import { roleLabel } from '@/lib/roles'
+import { titleFor } from '@/lib/nav'
+import { useKembali } from './kembali'
+import { PemilihSpbu } from './pemilih-spbu'
+import { useSidebar } from './sidebar-ctx'
+import { cn } from '@/lib/utils'
 
 export function AppHeader() {
   const { pathname } = useLocation()
   const app = useApp()
-  const parent = parentOf(pathname)
-  const navigate = useNavigate()
+  const kembali = useKembali()
+  const sidebar = useSidebar()
+  if (pathname === '/') return <HeaderBeranda />
 
   return (
-    <header data-glass-bar className="fixed inset-x-0 top-0 z-40 print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl">
+    <header data-glass-bar className={cn('fixed inset-x-0 top-0 z-40 transition-[left] duration-300 motion-reduce:transition-none', !sidebar.tertutup && 'lg:left-72', 'print:hidden bg-surface/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_4px_20px_rgba(0,80,203,0.04)] backdrop-blur-2xl')}>
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
         <div className="flex min-w-0 items-center gap-space-sm">
-          {/* Halaman turunan: tombol kembali ke menu induk menggantikan logo. */}
-          {parent ? (
+          {/* Menu: HP = buka laci sidebar; layar lebar = sembunyikan/tampilkan sidebar. */}
+          <button
+            type="button"
+            onClick={sidebar.toggle}
+            aria-label={sidebar.tertutup ? 'Buka menu' : 'Menu'}
+            aria-expanded={sidebar.laci}
+            className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
+          >
+            <Menu aria-hidden="true" className="size-5 lg:hidden" />
+            {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
+          </button>
+          {/* Panah kembali hanya di sub menu; menu utama (Dashboard, Operation, ..., Profil) tanpa panah. */}
+          {kembali && (
             <button
               type="button"
               aria-label="Kembali"
-              // Kembali ke halaman asal (mis. Riwayat), bukan ke form; tanpa riwayat, ke menu induk.
-              onClick={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate(parent, { replace: true }))}
+              onClick={kembali}
               className="glass-1 flex size-11 shrink-0 items-center justify-center rounded-full text-on-surface transition-transform duration-200 active:scale-95"
             >
               <ChevronLeft aria-hidden="true" className="size-6" />
             </button>
-          ) : (
-            <Link
-              to="/"
-              aria-label="FLOQ, buka Dashboard"
-              className="touch-44 shrink-0 rounded-md shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
-            >
-              <img src="/floq-icon.webp" alt="" width={128} height={128} className="size-9" />
-            </Link>
           )}
           <div className="flex min-w-0 flex-col">
-            <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname)}</h1>
-            <span className="truncate text-tag uppercase text-primary">{app.settings.namaSpbu || 'SPBU'}</span>
+            <h1 className="truncate text-headline-md font-bold text-on-surface">{titleFor(pathname, app.role)}</h1>
+            <PemilihSpbu />
           </div>
         </div>
 
@@ -45,6 +54,54 @@ export function AppHeader() {
           </span>
           <span className="hidden max-w-40 truncate text-body-sm font-semibold text-on-surface sm:inline">{app.displayName}</span>
           <span className="sr-only">Buka profil</span>
+        </Link>
+      </div>
+    </header>
+  )
+}
+
+/**
+ * Header biru halaman Dashboard (beranda aplikasi HP): tombol menu (sidebar) di kiri; nama, jabatan, nama SPBU, dan
+ * foto/inisial profil rata kanan,
+ * menyambung ke panel biru pemilih dashboard di bawahnya.
+ */
+function HeaderBeranda() {
+  const app = useApp()
+  // Bilah status HP (PWA/Chrome) ikut biru selama di Dashboard.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) return
+    const asal = meta.content
+    meta.content = '#0047b8'
+    return () => {
+      meta.content = asal
+    }
+  }, [])
+  const sidebar = useSidebar()
+  const nama = app.settings.namaSpbu || app.spbu?.nama || 'SPBU'
+  return (
+    <header className={cn('fixed inset-x-0 top-0 z-40 bg-[#0047b8] pt-[env(safe-area-inset-top,0px)] text-white transition-[left] duration-300 motion-reduce:transition-none print:hidden', !sidebar.tertutup && 'lg:left-72')}>
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-space-sm px-margin">
+        <button
+          type="button"
+          onClick={sidebar.toggle}
+          aria-label={sidebar.tertutup ? 'Buka menu' : 'Menu'}
+          aria-expanded={sidebar.laci}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/20 transition-transform duration-200 active:scale-95"
+        >
+          <Menu aria-hidden="true" className="size-5 lg:hidden" />
+          {sidebar.tertutup ? <PanelLeftOpen aria-hidden="true" className="hidden size-5 lg:block" /> : <PanelLeftClose aria-hidden="true" className="hidden size-5 lg:block" />}
+        </button>
+        <Link to="/profil" aria-label={`Profil ${app.displayName}, ${roleLabel(app.role)}, ${nama}`} className="flex min-w-0 items-center gap-space-sm rounded-full transition-transform duration-200 active:scale-[0.98]">
+          <span className="flex min-w-0 flex-col items-end text-right">
+            <span className="max-w-full truncate text-body-lg font-bold leading-tight">{app.displayName}</span>
+            <span className="max-w-full truncate text-xs font-medium text-white/80">
+              {roleLabel(app.role)} · {nama}
+            </span>
+          </span>
+          <span aria-hidden="true" className="tabular flex size-11 shrink-0 items-center justify-center rounded-full bg-white text-body-md font-bold text-[#0047b8] ring-2 ring-white/40 ring-offset-2 ring-offset-[#0047b8]">
+            {app.initials}
+          </span>
         </Link>
       </div>
     </header>

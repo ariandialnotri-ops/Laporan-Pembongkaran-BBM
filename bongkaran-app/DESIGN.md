@@ -1,6 +1,6 @@
 # FLOQ: Design Spec (untuk ganti desain UI)
 
-> **FLOQ (Fuel Logistic Quality & Quantity)**: aplikasi evidence pembongkaran BBM, Q&Q harian, dan proteksi kebakaran (APAR & APAB) di SPBU.
+> **FLOQ (Fuel Logistics Operations & Quality)**: aplikasi evidence pembongkaran BBM, Q&Q harian, dan proteksi kebakaran (APAR & APAB) di SPBU.
 > Dokumen ini menjelaskan **seluruh tampilan aplikasi saat ini**: token, komponen, setiap layar, dan aturan yang wajib dipertahankan.
 > Pakai sebagai brief untuk desainer atau tool desain AI (Google Stitch, Figma AI, v0, dan lain-lain). Setelah desain baru jadi, ikuti **bagian 12** untuk memasangnya ke kode.
 
@@ -69,11 +69,11 @@ Pertanyaan yang harus dijawab tiap layar dalam 3 detik:
 
 | Aset | File | Pakai di |
 |---|---|---|
-| Logo login (ikon FQ + tagline) | `public/floq-login.webp` | Halaman login, layar memuat |
+| Logo login (ikon FQ, tagline sebagai teks dari `src/lib/brand.ts`) | `public/floq-logo.webp` | Halaman login |
 | Ikon aplikasi | `public/floq-icon.webp` (36 px di header) | Header kiri atas |
 | Favicon / ikon layar utama | `public/favicon.png`, `public/apple-touch-icon.png`, `public/floq-icon-256.png` | Browser, PWA |
 
-- Nama: **FLOQ**, tagline *Fuel Logistic Quality & Quantity*.
+- Nama: **FLOQ**, tagline *Fuel Logistics Operations & Quality*.
 - Copyright di bawah form login: `© <tahun> FLOQ · Created by Ariandi Alnotri` (tahun otomatis).
 - Palet brand sheet: latar `#F5F5F7`, teks `#1D1D1F`, teks sekunder `#AAAAAA`, aksen `#007AFF`.
 
@@ -150,7 +150,7 @@ Ganti font cukup di `src/index.css`: `@import` font dan variabel `--font-jakarta
 | `numeric-md` | 16 / 22 | 500 | Angka di tile |
 | `numeric-sm` | 12 / 16 | 500 | Angka kecil, tanggal di kalender |
 | `tag` | 12 / 16 | 700, huruf besar, `+0.05em` | Label kecil, header tabel, pill |
-| (mikro) | 10-11 px | 600-700, huruf besar | Label kotak di kartu Dashboard (mis. "DITERIMA") |
+| (mikro) | **12 px minimum** (`text-xs`) | 600-700, huruf besar, warna `on-surface-variant` | Label kotak di kartu Dashboard (mis. "DITERIMA"). Tidak ada teks di bawah 12 px |
 
 ---
 
@@ -165,13 +165,15 @@ Ganti font cukup di `src/index.css`: `@import` font dan variabel `--font-jakarta
 | Jenis | Latar | Dipakai |
 |---|---|---|
 | Kartu Dashboard | putih padat `surface-container-lowest` + `shadow-sm`, radius 12 | Semua kartu di Dashboard (gaya referensi stitch) |
-| `glass-1` | putih 55%, blur 10 px (HP) | Kartu sekunder, chip, tombol bulat |
-| `glass-2` | putih 72%, blur 14 px (HP) | Kartu utama halaman Input/Laporan, dock |
-| `glass-3` | putih 88%, blur 18 px (HP) | Dropdown, toast |
+| `glass-1` | putih 82%, **tanpa blur** | Kartu sekunder, chip, tombol bulat |
+| `glass-2` | putih 90%, **tanpa blur** | Kartu utama halaman Input/Laporan |
+| `glass-3` | putih padat, **tanpa blur** | Dropdown, toast |
+| Header (`data-glass-bar`) | `surface` 70% + blur (laptop); padat di layar sentuh | Satu-satunya permukaan ber-blur |
+| Dock bawah | putih padat + garis atas | Navigasi HP |
 | Bottom sheet | **putih padat**, tanpa blur | Semua pop up / sheet (supaya tidak tembus di Android) |
 | `inset-field` | `rgba(235,242,250,.65)` + bayangan dalam | Kolom input, slot data |
 
-Mode **Kurangi Transparansi** (pengaturan HP): semua kaca jadi warna padat `#F7F9FD` / `#FBFCFE` / `#FFFFFF`.
+Kartu padat adalah **bawaan** (terbaca di bawah matahari, ringan untuk GPU HP murah). Mode **Kurangi Transparansi** (pengaturan HP) membuat kartu benar-benar padat `#F7F9FD` / `#FBFCFE` / `#FFFFFF` dan header tanpa blur.
 
 **Gerak**: masuk bertahap `fadeInUp` 0,5 s (`cubic-bezier(.16,1,.3,1)`, 5 tingkat jeda); tekan `scale(.95-.99)`; sheet geser dari bawah; titik shift berdenyut. Semua dimatikan saat **Kurangi Gerakan** aktif.
 
@@ -203,7 +205,7 @@ Mode **Kurangi Transparansi** (pengaturan HP): semua kaca jadi warna padat `#F7F
 | Peran | Dock | Kartu Input |
 |---|---|---|
 | ABH | Dashboard, Input, Laporan, Profil | semua |
-| Pengawas | Dashboard, Input, Laporan, Profil | Stok awal, Input Bongkaran, Kualitas Harian, Uji Pasca Penerimaan, APAR (lihat) |
+| Pengawas | Dashboard, Input, Laporan, Profil | Stok awal, Input Bongkaran, Plan Pengiriman, Kualitas Harian, Uji Pasca Penerimaan, APAR (data utama & area, label QR) |
 | Kepala Shift | Input, Laporan, Profil | Stok awal, Input Bongkaran, Plan Pengiriman, Kualitas Harian, APAR |
 | Security | Input, Profil | APAR & APAB saja |
 - **Konfirmasi keluar**: bila meninggalkan form bongkaran yang belum selesai atau Kualitas Harian dengan baris belum disimpan (lewat tombol kembali, dock, atau tautan), muncul sheet "Keluar dari form …?" dengan **Ya, keluar** (merah) dan **Tetap di sini**.
@@ -238,10 +240,12 @@ Peta halaman:
 | | Riwayat Pembongkaran MT | `/laporan/bongkaran` |
 | | Riwayat Tracking LO | `/laporan/lo` |
 | | Riwayat Kualitas Harian | `/laporan/kualitas` |
-| | Riwayat Tera | `/laporan/tera` |
+| | Riwayat Uji Takaran (+ BA PDF) | `/laporan/takaran` (`/laporan/tera` dialihkan) |
 | | Riwayat Inspeksi APAR | `/laporan/apar` |
 | Profil | Profil, Kalkulator, Pengaturan SPBU, Anggota | `/profil`, `/kalkulator`, `/pengaturan`, `/anggota` |
 | (tanpa dock) | Login | saat belum masuk |
+
+**Tarik untuk segarkan** (`shell/use-pull-segarkan.ts`, `shell/pull-segarkan.tsx`): di puncak halaman (HP, sentuh), tarik ke bawah ≥ 64 px lalu lepas. Indikator bulat putih dengan ikon `RefreshCw` muncul di bawah header, berputar mengikuti tarikan (abu-abu → biru primer saat siap), lalu berputar terus selama memuat. Data bersama dimuat ulang dari server dan isi halaman dipasang ulang agar setiap halaman mengambil datanya lagi. Bila isian di halaman sudah diubah, halaman **tidak** dipasang ulang (ketikan tidak hilang). Tidak aktif saat halaman sudah tergulir, keyboard terbuka, sheet/dialog terbuka, atau sentuhan dimulai di kanvas tanda tangan, slider, atau elemen `data-tanpa-tarik`.
 
 ---
 
@@ -251,7 +255,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 
 | Komponen | File | Anatomi & varian | Status |
 |---|---|---|---|
-| **Button** | `ui/button.tsx` | Varian: `primary` (biru padat + bayangan), `glass`, `soft`, `ghost`, `danger`. Ukuran: `default` 44 px, `lg` 56 px, `sm`/`pill` 44 px bulat, `icon` 44 × 44 | disabled 50% opasitas, tekan scale .97 |
+| **Button** | `ui/button.tsx` | Varian: `primary` (biru padat + bayangan), `glass`, `soft`, `ghost`, `danger`. Ukuran: `default` 44 px, `lg` 56 px, `sm`/`pill` 44 px bulat, `icon` 44 × 44 | disabled 50% opasitas, tekan scale .97. Tombol yang **dikunci karena syarat** (mis. stok awal) tidak boleh biru pudar: abu-abu netral `neutral-200`/`neutral-700`, ikon gembok, dan label berisi alasannya ("Isi stok awal dulu") |
 | **Input** | `ui/input.tsx` | Kotak `inset-field` 48 px, teks 16 px, satuan di kanan (`L`, `mm`, `°C`, `ml`, `L/mm`, `kg`) | fokus: latar putih + cincin biru |
 | **Select** | `ui/select.tsx` | Pemicu seperti Input + chevron; daftar kaca `glass-3` | daftar selalu di atas sheet |
 | **Choice** | `bongkaran/form-bits.tsx` | Segmented pill (Shift 1/2) di dalam `inset-field` | terpilih: putih + teks biru |
@@ -266,7 +270,7 @@ File di `src/components/ui/` (dasar), `src/components/bongkaran/` (khusus FLOQ),
 | **Tabs** | `ui/tabs.tsx` | Segmented dengan indikator geser (form: Bongkaran/Quality/Quantity/Finish) | |
 | **SectionHeader** | `section-header.tsx` | Judul bagian `headline-md` + aksi kanan | |
 | **StatTile** | `stat-tile.tsx` | Label tag + ikon + angka + hint | nada primary/error |
-| **MenuCard** | `menu-card.tsx` | Kartu menu Input/Laporan: ikon biru 44 px, judul, satu kalimat, baris status (biru = beres, merah = perlu dikerjakan) + lencana angka merah | |
+| **MenuCard** | `menu-card.tsx` | Kartu menu Input/Laporan: ikon biru 44 px, judul, satu kalimat, baris status dengan **tiga nada** (`nada`): biru `ok` = beres, amber `pengingat` = perlu dikerjakan/belum diatur, merah `anomali` = ada masalah (lewat batas, stop penyaluran, di luar toleransi, insiden terbuka). Lencana angka mengikuti nada | |
 | **RecordTable** | `record-table.tsx` | Riwayat: judul huruf besar + chip "n dari total"; **HP = daftar kartu** (judul, baris keterangan, lencana kanan, chevron); **≥ md = tabel** (header tag, kolom BBM berupa chip, kolom Aksi) | baris bisa membuka halaman atau pop up |
 | **ChipFilter** | `chip-filter.tsx` | Baris chip pilihan tunggal, bisa digeser | aktif: biru padat |
 | **DateFilter** | `date-filter.tsx` | Chip Hari ini / 7 hari / Bulan ini / Semua / Pilih tanggal (+ 2 kolom tanggal). Di Plan & Tracking LO, tanggal kirim mendatang selalu ikut tampil | |
@@ -296,7 +300,7 @@ Format tiap layar: **tujuan**, **isi berurutan**, **status khusus**.
 - Status: memuat, salah password (pesan merah), akun belum terdaftar sebagai anggota SPBU.
 
 ### 9.2 Dashboard (hanya data)
-Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
+Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib** (HP, satu kolom):
 
 1. **Kartu operasional**: ikon kalender dalam bulatan biru muda, label "OPERASIONAL SPBU", tanggal ("Kamis, 8 Okt 2026"), pill shift berjalan dengan titik hijau berdenyut ("Shift 1 (06:00 - 13:59)").
 2. **Status Bongkaran Pekan Ini** (Sen-Min), di kanan "W41 - Okt 2026" dengan panah pekan sebelum/berikut.
@@ -323,7 +327,13 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
      3. **Data Retensi Kaleng Sampel**: posisi kaleng, masa simpan, kondisi segel, petugas uji pasca penerimaan.
      - Footer: Berita Acara, Tutup.
 7. **LO Tracking**: 6 kotak status berwarna (Proses, OS, Planned, On Delivery, Delivered, Closed) + "Total n LO"; ketuk ke Riwayat Tracking LO.
-8. **Proteksi Kebakaran** (bila ada unit APAR): 4 kotak (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat) + "n unit"; ketuk ke dashboard APAR.
+8. **Proteksi Kebakaran** (bila ada unit APAR): strip jumlah unit (APAR terpasang | APAR cadangan | APAB), lalu 4 kotak (Baik, Ada temuan, Belum bulan ini, Isi ulang lewat) + "n unit"; ketuk ke dashboard APAR.
+
+**Di antara kartu operasional dan kalender**: pengingat amber **Plan pengiriman besok belum dibuat** (tautan ke Plan) dan kartu Status penyaluran. Pengingat tidak lagi muncul sebagai toast.
+
+**Laptop (≥ 1024 px, `lg`)**: kartu 3-8 dalam grid 2 kolom berpasangan: Bongkaran Hari Ini | Rencana vs Realisasi, Kualitas Harian | LO Tracking, Kaleng Sample selebar 2 kolom, Uji Takaran | Proteksi Kebakaran. Urutan HP tidak berubah (pakai `lg:order-*`, bukan memindah markup).
+
+**Keadaan kosong diringkas**: produk yang belum diuji (Kualitas Harian) atau belum punya sampel (Kaleng Sample) digabung jadi **satu baris** ("5 produk belum diuji: Pertalite, …"), diketuk untuk membuka rinciannya. Jangan menampilkan lima baris berisi "Belum".
 
 ### 9.3 Menu Input
 - **Bar wajib Stok Awal Shift** paling atas: merah "Isi stok awal Shift n" / netral "Stok awal Shift n terisi".
@@ -377,11 +387,16 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
   - LO lama di atas 8.000 L dipecah otomatis menjadi beberapa baris (latar kuning + catatan).
   - Tombol **Batal** dan **Simpan & kembali**; simpan otomatis kembali ke Tracking LO asal (`/plan` atau `?dari=/laporan/lo`). Keluar dengan perubahan belum disimpan memunculkan konfirmasi.
 
-### 9.7 Kualitas Harian
+### 9.7 Kualitas Harian (Density Harian, Water Content Harian, Kirim ke grup WA)
+- Menu **Kualitas Harian** (`/kualitas`) berisi dua submenu terpisah, masing-masing dengan form & laporan WhatsApp sendiri, sekali sehari di shift 1 paling lambat 10:00:
+  - **Density Harian** (`/kualitas/density` → form `/kualitas/:tanggal/1`): density, suhu, pump test per produk, foto hydrometer, foto struk pump test (disimpan di riwayat aplikasi, **tidak ikut kolase grup WA**), foto pengembalian minyak. Dikunci sampai stok awal shift diisi.
+  - **Water Content Harian** (`/air` → `/air/isi`): per tangki tinggi air (tombol Nihil), foto stik pasta air, tindakan wajib bila ada air.
+- **Kirim ke grup WA** (`/kualitas/kirim`): tombol hijau aktif setelah keduanya selesai hari ini (abu-abu bergembok + alasan bila belum). Satu kolase berisi foto density & water content (foto disimpan sementara 3 hari di HP pengisi) + satu laporan gabungan "Laporan Kualitas Harian BBM (Density & Water Content)".
+- **Setiap kartu input (produk & tangki) punya kotak Simpan sendiri**: amber bergaris tebal + tombol biru "Simpan" selama belum disimpan, hijau "Tersimpan jam" + "Simpan ulang" setelahnya (`components/bongkaran/simpan-baris.tsx`). Selesai ditolak bila ada kartu belum disimpan.
 - Kartu kepala: "Uji Q&Q Shift n", tanggal, pill Selesai/Sebagian tersimpan/Belum diuji, jam uji, shift, petugas.
 - **Uji kualitas (density)**: kartu per produk: Produk, Density, Suhu, Pump test, tangga (density observasi, D15, acuan D15 bongkaran, selisih), baris status + **tombol Simpan per baris** ("Tersimpan jam" / "Belum disimpan"). Uji produk lain.
   - **Langkah terakhir**: PhotoSlot wajib *Foto struk pump test* & *Foto pengembalian minyak ke tangki*.
-- **Tera takaran (bejana 20 L)**: baris per nozzle: Selisih bejana (ml), Pump test (L), **Simpan per nozzle**, merah bila < −60 ml. Langkah terakhir: 2 foto yang sama.
+- **Tera takaran** tidak lagi di form ini: kartu tautan "Tera takaran bejana 20 L, sekarang di menu Input > Uji Takaran". Ladder pump test hanya uji kualitas.
 - Ringkasan pump test + tombol **Selesaikan uji** (ditolak bila ada baris belum disimpan / foto belum ada). Riwayat + DateFilter.
 
 ### 9.8 Uji Kualitas Pasca Penerimaan
@@ -392,7 +407,7 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
 ### 9.9 APAR & APAB
 - **Dashboard** (`/apar`):
   - Kartu kepala: ikon pemadam merah, "Proteksi Kebakaran", jumlah pulau/APAR/cadangan/APAB; tombol **Mulai / Lanjutkan inspeksi (x/n) / Lihat inspeksi hari ini**, **Pindai QR**, **Label QR**, **Data utama**.
-  - 4 kotak: Kondisi baik (x/n, hijau), Ada temuan (merah bila > 0), Belum bulan ini (amber), Isi ulang (lewat / ≤ 30 hari).
+  - 3 kartu jumlah (APAR terpasang, APAR cadangan, APAB), lalu 5 kotak: Kondisi baik (x/n, hijau), Ada temuan (merah bila > 0), Belum bulan ini (amber), Isi ulang (lewat / ≤ 30 hari), **Uji instansi (12 bln)** (merah bila ada yang lewat, amber bila ≤ 30 hari/belum dicatat; selebar 2 kolom di HP). Chip saring tambahan **Uji instansi**; baris unit menampilkan "Uji instansi s/d …" bila lewat/≤ 30 hari.
   - **Per area**: ikon pin, nama area, kode unit, pill Baik / n temuan / n belum.
   - **Daftar unit** + chip saring (Semua, Temuan, Belum bulan ini, Isi ulang): kode, tipe, lokasi, tanggal diperiksa, peringatan isi ulang, pill status, chevron → halaman unit.
 - **Inspeksi** (`/apar/inspeksi`), per unit di lokasi, tanpa inspeksi massal:
@@ -400,16 +415,23 @@ Semua kartu putih padat, ikon + judul di dalam kartu. Urutan **wajib**:
   - Kartu kepala: ikon pemadam, "Inspeksi per unit di lokasi" + petunjuk; tombol utama **Pindai QR unit**; field "Label QR rusak? Ketik kode unit" + **Buka** (kode salah: pesan merah).
   - **Bulan ini: x dari n unit** + bar progres; chip Belum / Sudah / Semua; baris unit (kode, tipe, lokasi, tanggal & petugas) dengan pill Belum / Baik / Temuan. Baris tidak membuka form: inspeksi hanya dari QR atau kode.
 - **Inspeksi satu unit** (`/apar/inspeksi/:id`): kartu unit (kode besar, pill tipe, jenis, kapasitas, lokasi, isi ulang), tombol **Semua butir baik**, butir **Baik / Tidak**, catatan (wajib bila temuan), **foto wajib**; kartu bawah: Petugas, Tanggal (hari ini), **Kirim inspeksi APAR-01** → kembali ke pemindai. Unit yang sudah dikirim hari ini: ringkasan + **Koreksi inspeksi hari ini**. Keluar sebelum kirim memunculkan konfirmasi.
-- **Data utama** (`/apar/data`, ubah khusus ABH): 4 kotak ringkas (pulau pompa, APAR terpasang, cadangan, APAB); tombol **Tambah APAR / APAB**, Label QR, Jumlah pulau (ke Pengaturan), "Tambah 1 APAR di n pulau yang belum punya"; **Unit tersimpan** (chip saring + RecordTable: kode, tipe, jenis & kapasitas, lokasi, isi ulang, pill isi ulang lewat/≤ 30 hari) — ketuk baris membuka form; **Area / lokasi** (pulau otomatis dari jumlah pulau, area lain + hapus bila kosong; "Tambah area" membuka bottom sheet).
-- **Form unit** (`/apar/data/unit/:id`): tipe (APAR / APAB, hanya unit baru; kode & kapasitas awal ikut tipe), kode (unik), kapasitas, jenis media, lokasi, jadwal isi ulang, centang cadangan; **Batal / Simpan unit**; unit lama: Kondisi unit, Label QR, Hapus unit.
-- **Label QR** (`/apar/label`): chip saring (Semua/APAR/APAB), tombol **Cetak / simpan PDF (n label)**; label putih bergaris putus: QR 112 px, nama SPBU, kode besar, tipe/jenis/kapasitas, lokasi, "Pindai: data, kondisi & inspeksi". Saat cetak: 3 kolom.
-- **Unit** (`/apar/unit/:id`, tujuan QR): QR + kode besar, tipe, jenis/kapasitas, lokasi; chip isi ulang; tombol **Inspeksi unit ini**, Cetak label, Data utama; **Kondisi terakhir** (tanggal, petugas, temuan merah, catatan, foto); **Riwayat inspeksi**. Unit terhapus: "Unit tidak ditemukan".
-- **Pindai QR**: sheet kamera (bingkai bidik), atau ketik kode unit.
+- **Data utama** (`/apar/data`, ubah oleh ABH & Pengawas; jumlah pulau hanya ABH di Pengaturan): 4 kotak ringkas (pulau pompa, APAR terpasang, cadangan, APAB); tombol **Tambah APAR / APAB**, Label QR, Jumlah pulau (ke Pengaturan), "Tambah 1 APAR di n pulau yang belum punya"; **Unit tersimpan** (chip saring + RecordTable: kode, tipe, jenis & kapasitas, lokasi, isi ulang, pill isi ulang lewat/≤ 30 hari) — ketuk baris membuka form; **Area / lokasi** (pulau otomatis dari jumlah pulau, area lain + hapus bila kosong; "Tambah area" membuka bottom sheet).
+- **Form unit** (`/apar/data/unit/:id`, hanya ABH & pengawas; peran lain melihat keterangan): tipe (APAR / APAB, hanya unit baru; kode & kapasitas awal ikut tipe), bila jenis Powder (DCP) pilihan **Sistem DCP** Pressure System (PS) / Cartridge dengan keterangan efek ke checklist, kode (unik), kapasitas, jenis media, lokasi, jadwal isi ulang, **Pemeriksaan instansi terakhir** (tanggal, hint "Berlaku sampai …(maks. 12 bulan)") + **Instansi pemeriksa**, centang cadangan; **Batal / Simpan unit**; unit lama: Kondisi unit, Label QR, Hapus unit.
+- **Label QR** (`/apar/label`): chip saring (Semua/APAR/APAB), tombol **Cetak / simpan PDF (n label)**; label putih berbingkai hitam: pita merah di atas berisi ikon pemadam + nama SPBU utuh (boleh 2 baris), lalu QR 100 px + kode 22 px tebal, tipe (kotak bergaris), jenis & kapasitas, lokasi. Warna dicetak (print-color-adjust: exact). Saat cetak: 3 kolom.
+- **Unit** (`/apar/unit/:id`, tujuan QR): QR + kode besar, tipe, jenis/kapasitas, lokasi; chip isi ulang; tombol **Inspeksi unit ini**, Cetak label, Data utama; **Kondisi terakhir** (tanggal, petugas, temuan merah, catatan, foto); **Kalender kepatuhan inspeksi** (pemilih tahun, 12 kotak bulan 4/6 kolom: hijau ✓ baik, merah ⚠ temuan, merah putus-putus × terlewat, amber • bulan ini, abu bulan mendatang/sebelum terdaftar; ketuk bulan untuk detail; "Kepatuhan YYYY: x dari n bulan (%)"; catatan amber "Periksa setiap 30 hari…"); **Riwayat inspeksi**. Unit terhapus: "Unit tidak ditemukan".
+- **Pindai QR**: sheet kamera belakang (bingkai bidik + garis pindai bergerak, "Arahkan label QR ke dalam kotak", tombol senter bila didukung, getar saat terbaca). Dekoder: BarcodeDetector bila ada, jsQR untuk iPhone & browser lain. Kamera gagal: ikon kamera dicoret + pesan penyebab (izin ditolak / tidak ada kamera / dipakai aplikasi lain / bukan https) + **Coba lagi**. Cadangan: **Kamera tidak jalan? Ambil foto label** (foto dibaca jsQR) dan "Label rusak? Ketik kode unit". QR berisi kode unit saja juga dikenali.
+
+### 9.9b Pelaporan Insiden, Near miss & Kerusakan
+- **Form** (`/insiden/baru`, semua peran): 3 kartu jenis (Insiden / Near miss / Kerusakan, kartu terpilih biru), Kategori (Select per jenis), Tanggal & Jam kejadian, Lokasi (pulau + area APAR + Area lain), Peralatan (datalist dispenser/nozzle), Uraian, Dampak/korban (wajib untuk insiden), Dugaan penyebab, Tindakan yang sudah dilakukan, Tingkat risiko (Rendah/Sedang/Tinggi), Foto (wajib untuk insiden & kerusakan), Pelapor; tombol **Kirim laporan …** → Riwayat Insiden dengan banner hijau dan baris biru.
+- **Riwayat** (`/laporan/insiden`): kartu "n laporan belum selesai" + tombol Laporkan, DateFilter, chip Jenis & Status; RecordTable (Tanggal, Jenis, Kategori, Lokasi, Risiko, Pelapor, Status); baris terbuka oranye.
+- **Detail** (`/laporan/insiden/:id`): kartu ringkas (jenis, kategori, waktu, lokasi, risiko, status), uraian/dampak/penyebab/tindakan/pelapor/PIC, foto 96 px; **Tindak lanjut** (linimasa terbaru di atas); form **Tambah tindak lanjut** (status, PIC, target selesai, catatan) untuk ABH/Pengawas/Kashift.
 
 ### 9.10 Menu Laporan
 Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acara (merah bila menunggu tanda tangan), Riwayat Pembongkaran MT, Riwayat Tracking LO, Riwayat Kualitas Harian, Riwayat Tera (merah bila ada nozzle di bawah batas), Riwayat Inspeksi APAR (merah bila ada unit dengan temuan).
 
 ### 9.11 Halaman laporan (semua memakai RecordTable)
+
+Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan Persediaan, kualitas harian & pasca penerimaan → Riwayat Kualitas Harian, bongkaran selesai → Riwayat Pembongkaran dengan tombol "Laporan WA & unduh BA", insiden → Riwayat Insiden, MS2 / Edit SO & LO → Tracking LO, unit APAR → Data utama). Data baru: banner hijau + baris biru (`BARIS_BARU`); perlu perhatian (SO/LO belum terbit, insiden terbuka, tera lewat): baris oranye (`BARIS_ORANYE`).
 
 | Halaman | Penyaring | Kolom (urut) |
 |---|---|---|
@@ -418,16 +440,87 @@ Grid 2 kolom (3 di layar lebar), 7 MenuCard: Catatan Persediaan BBM, Berita Acar
 | **Riwayat Pembongkaran MT** | DateFilter, chip produk | **Produk, Tgl penerimaan, No SO, No LO, Nopol & supir**, Volume, Transport loss, Discharge loss (L & %), SLA (Req / Gate out), Keterangan (pill), Status, Progress tindakan |
 | **Riwayat Tracking LO** | DateFilter, chip status (dengan jumlah) | **Tgl permintaan kirim, No SO, No LO, Produk, Volume, Supply point, Nopol MT, Status** (Closed dengan ikon kunci). Ketuk baris → halaman **Edit SO & LO**, simpan kembali ke Riwayat Tracking LO |
 | **Riwayat Kualitas Harian** | DateFilter, chip jenis (Uji harian / Uji pasca penerimaan), chip produk | Tanggal, Waktu, Jenis, BBM, Density, Suhu, D15, Acuan, Selisih, Status |
-| **Riwayat Tera** | DateFilter, chip Semua / Di bawah batas | Tanggal, Shift, Nozzle, BBM, Selisih (ml), Pump test, Status |
+| **Riwayat Uji Takaran** | DateFilter, chip Semua / Melebihi toleransi / Sesuai, kartu Berita Acara Uji Takar | Tanggal, Nozzle, Produk, Opsi, Hasil, Petugas, Status |
 | **Riwayat Inspeksi APAR** | DateFilter, chip Semua / Ada temuan | Tanggal, Kode, Tipe, Jenis & kapasitas, Lokasi, Temuan, Tindak lanjut, Petugas, Hasil. Ketuk baris → halaman unit (data & riwayat) |
 
 ### 9.12 Profil, Kalkulator, Pengaturan, Anggota
+- **Tanda tangan**: tombol "Ketuk untuk tanda tangan" membuka **layar penuh** (area gambar sebesar layar, kotak panduan, putar HP untuk area lebar); **Simpan tanda tangan** → pratinjau "Gunakan tanda tangan ini?" dengan **Ulangi / Ya, simpan**. Tanda tangan tersimpan tampil ringkas (gambar 48 px + Ulangi).
+- **Dashboard**: kartu Kualitas Harian bisa diketuk → pop up highlight uji terakhir produk itu; banner amber bila sertifikat tera nozzle lewat / ≤ 30 hari.
 - **Profil**: kartu identitas (inisial, nama, pill peran, email, SPBU), 3 StatTile (bila punya bongkaran), grup **Alat bantu** (Kalkulator), grup **Akun & SPBU** (ABH: Pengaturan SPBU, Anggota & akun per peran, Data utama APAR & APAB, Data acuan; semua: **Ganti kata sandi** (bottom sheet), Keluar).
 - **Kalkulator**: Density observasi + Suhu → D15 (angka besar); Tangki + Ketinggian → volume dari tabel kalibrasi.
-- **Pengaturan SPBU** (ABH): Nama SPBU, Kode, Alamat, logo; **Jumlah pulau pompa** & **Jumlah dispenser** (+ jumlah nozzle); nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
+- **Pengaturan SPBU** (ABH) kini menu daftar ke halaman terpisah: Identitas SPBU, Data Dispenser (RecordTable + sheet form: unit, merk, nomor seri, pulau), Nozzle & Tera Metrologi (RecordTable: nozzle, produk, dispenser, no. sertifikat, tanggal tera, berlaku s/d, pill Tera lewat / ≤ 30 hari / Belum dicatat / Berlaku; baris oranye bila lewat/≤ 30 hari; sheet form dengan hint "Berlaku sampai …"), Sold To & Ship To (ABH & Pengawas), Data utama APAR, Aturan Pemeriksaan, Data Acuan. Isi lama (referensi): Nama SPBU, Kode, Alamat, logo; **Jumlah pulau pompa** & **Jumlah dispenser** (+ jumlah nozzle); nama default (Petugas penerima, Pengawas, Security, ABH, Perusahaan pengangkut); **Nozzle Dispenser**; **Proteksi Kebakaran** (ringkasan + tautan ke Data utama APAR & APAB); Aturan (Toleransi density 15°C, Batas kurang vs tera, Tunggu sebelum baca ATG, Liter per 1 DO, PIN penanggung jawab); Data acuan tabel.
 - **Anggota** (ABH, mode server): kartu **Buat akun baru** (Nama, Peran, Email, Kata sandi sementara + tombol acak, keterangan hak akses peran, tombol **Buat akun <peran>**, kotak hijau email & sandi yang dibuat); daftar anggota (nama/email, Select peran, ikon kunci = atur ulang kata sandi lewat bottom sheet, hapus); **Hak akses per peran**; lipatan "Daftarkan akun yang sudah ada".
 
+
+### 9.12b Uji Takaran (bejana 20 L)
+- **Dashboard > kartu Uji Takaran** (setelah Proteksi Kebakaran): ikon gelas ukur, sub "Bejana ukur 20 L, batas -60 ml", tautan Riwayat; 4 kotak: Hari ini (hijau / amber bila belum ada, teks merah bila ada yang lewat), Lewat toleransi bulan ini (merah bila > 0), Nozzle diuji x/total bulan ini, Uji terakhir (tanggal, jam, nozzle); daftar **Hasil terakhir per nozzle**: Nozzle n, produk, P nilai, M nilai (merah bila lewat; baris merah muda).
+- **Input > Uji Takaran** (`/takaran`): kartu kepala (ikon gelas ukur, "Uji takaran nozzle", toleransi -60 ml); Nomor nozzle & Produk (input teks + datalist); 2 tombol radio besar **P · Preset** / **M · Manual** (centang bila nozzle itu sudah diuji hari ini); Hasil (ml, sufiks ml); kotak status langsung "Nozzle 3 Pertalite, Preset = -40 ml" hijau (dalam toleransi) / merah (melebihi toleransi -60 ml). Kartu foto: **Dudukan bejana & water pass** dan **Hasil pengukuran**, masing-masing grid 3 kolom pratinjau + tombol "Ambil foto" (pill Belum / n foto); keterangan "Tanggal, jam, SPBU, nozzle, dan opsi tercetak otomatis pada foto"; Petugas, Catatan; tombol **Kirim hasil Nozzle n · Preset/Manual**. Daftar **Hasil uji hari ini (n)** bernomor, baris terbaru biru, melebihi toleransi oranye; ketuk → pop up detail (angka besar, pill, foto utuh, Hapus). Keluar saat ada isian → sheet "Keluar dari uji takaran?".
+- **Cap foto**: pita gelap di bawah foto; baris 1 kuning tebal "dd/mm/yyyy hh:mm:ss WIB", baris 2 "SPBU · Nozzle n Produk", baris 3 "Uji takaran 20 L · opsi · jenis foto".
+- **Berita Acara Uji Takar** (kartu di Riwayat Uji Takaran): ikon dokumen, keterangan, isian Tanggal uji + "n hasil, n lewat", tombol **BA saja (PDF)** (glass) dan **BA + Lampiran foto (PDF)** (utama). PDF A4: pita judul biru tua, nama SPBU, tabel info 4 kolom, tabel hasil per nozzle dengan kolom Tanggal & Jam (kepala biru, Sesuai hijau / Tidak Sesuai merah), catatan mode & batas tera, 2 kotak ringkasan, tanda tangan, kaki halaman abu.
+- **Laporan > Riwayat Uji Takaran**: DateFilter, chip Semua / Melebihi toleransi / Sesuai, RecordTable (Tanggal, Nozzle, Produk, Opsi, Hasil, Petugas, Status), baris oranye bila melebihi toleransi.
+
+### 9.13 Multi SPBU: Unit Bisnis, Siapkan SPBU, Database Tangki
+- **Pemilih SPBU** (ABH): nama SPBU di bawah judul header + chevron; ketuk → bottom sheet "Pilih SPBU" (cari bila > 6 unit, baris ikon gedung + nama + kode, centang SPBU aktif) dan tombol **Dashboard unit bisnis & tambah SPBU**. Peran lain: nama SPBU biasa.
+- **Unit Bisnis** (`/unit`, ABH; kartu "Unit bisnis: n SPBU" di atas Dashboard): kartu kepala (ikon gedung, "n unit bisnis", Sinkronkan, **Tambah SPBU**); 4 StatTile (Data siap x/n, Q&Q hari ini x/n, Bongkaran bulan ini + anomali, Insiden terbuka); cari + chip saring (Semua, Perlu perhatian, Belum siap, Siap); RecordTable **Unit bisnis**: SPBU (nama + kode), Data SPBU (pill Siap / Belum diisi / Identitas kurang / Tangki kosong), Q&Q 7 hari (7 kotak: hijau 3 shift, kuning sebagian, abu belum), Bongkar (bln) + anomali merah, APAR (bln) x/n, Insiden, Pengawas / akun, Terakhir aktif. Baris oranye = perlu perhatian. Ketuk baris → SPBU aktif berganti, buka Dashboard. Sheet **Tambah SPBU**: nama, kode.
+- **Database tangki kosong**: kartu kuning `TangkiBelumAda` (ikon tabung, "Database tangki belum diisi", keterangan, tombol **Isi database tangki** untuk pengawas/ABH) di Dashboard, menu Input (menggantikan kartu stok awal), halaman Stok Awal (menggantikan form), Input Bongkaran; tahap ATG sebelum bongkar menampilkan keterangan kuning sebagai ganti pilihan tangki.
+- **Siapkan Data SPBU** (`/siapkan`, wajib untuk pengawas & ABH bila identitas kosong; tangki boleh menyusul, tombol "Mulai pakai FLOQ, tangki diisi nanti"; tanpa tombol kembali): kartu "Lengkapi data SPBU dulu" + 2 langkah (amber = belum, hijau ✓ = lengkap); 1. Identitas (nama, kode, alamat, jumlah pulau pompa, jumlah dispenser); 2. Database tangki (daftar + **Tambah tangki**); tombol **Data lengkap, mulai pakai FLOQ** aktif bila keduanya lengkap. Kepala shift & security: kartu "Data SPBU belum lengkap" + Periksa lagi + Keluar.
+- **Database Tangki** (`/pengaturan/tangki`, ABH & pengawas): baris per tangki (ikon tabung warna produk, "Tangki n Produk", kapasitas, rentang mm, jumlah baris, tanggal kalibrasi, pill OK / n titik janggal). **Form tangki**: Produk, Nomor tangki, Tanggal kalibrasi; kartu **Tabel kalibrasi** (petunjuk salin dari Excel, pilihan satuan mm / cm, kotak tempel monospace, Pilih file CSV); pratinjau "Terbaca: n baris, tinggi a–b mm, kapasitas c L", peringatan merah titik volume turun, isian **Uji: tinggi (mm)** → volume; Catatan; Batal / Simpan tangki; Hapus tangki.
+
 ---
+
+### 9.14 Absensi Personil (Operation > Absensi)
+- Kartu status per personil (Belum masuk / Bekerja / Istirahat / Pulang) dengan jam masuk, total istirahat, dan jam kerja berjalan.
+- Tombol aksi sesuai status: **Absen masuk**, **Mulai istirahat**, **Selesai istirahat**, **Absen keluar**. Tiap aksi meminta izin lokasi (GPS) lalu membuka pemindai **QR absensi SPBU**; ditolak bila di luar radius atau QR bukan milik SPBU ini.
+- Personil hanya melihat dirinya sendiri (akun ditautkan di Daftar Personil); ABH/pengawas melihat semua dan boleh mengabsenkan.
+- **Rekap** bulanan per personil (hadir, terlambat, jam kerja, istirahat) + unduh Excel. **Pengaturan** (ABH/pengawas): titik lokasi, radius, unduh/ganti poster QR A4.
+
+### 9.14b Inbox & Housekeeping
+- **Inbox**: satu kartu dropdown per modul (ikon modul: Operation, Delivery, HSSE & Guard Patrol, Finance, plus **Perawatan** (kunci pas) dan **Housekeeping** (sapu)), lencana jumlah (merah bila ada yang lewat), ketuk untuk membuka rincian.
+- **Housekeeping** (`/ops/kalender?kategori=hk`): kalender progres sebulan (persen form lengkap, warna status, titik merah = temuan). Ketuk tanggal → pop up daftar area → ketuk area → **form checklist dalam pop up**; simpan menutup pop up dan memperbarui kalender. Menu Perawatan & Housekeeping terpisah.
+- **Riwayat**: baris riwayat yang punya data belum closing menampilkan lonceng amber + teks (mis. "2 bongkaran belum selesai", "3 LO belum closed"); menu Riwayat berlencana jumlahnya.
+- **Penjelasan fitur** tidak ditulis di halaman/kartu, tetapi lewat ikon **Information** (ⓘ, `components/ui/info-pop.tsx`) yang membuka pop up.
+
+### 9.14c Dashboard pilihan per peran
+- Chip pilihan di atas Dashboard: **ABH**: Operation, Sales/Finance, HSSE & Guard Patrol; **pengawas & kepala shift**: Operation, HSSE & Guard Patrol; **Admin/Cashier**: Sales/Finance; **Security**: Security, HSSE; **Cleaning Service**: Housekeeping. Pilihan terakhir diingat per perangkat.
+- **Sales/Finance**: penjualan BBM (totalizer × harga), closing shift (setoran & selisih), petty cash. **HSSE**: stop penyaluran, proteksi kebakaran (APAR), guard tour, insiden, grounding. Proteksi kebakaran pindah dari Dashboard Operation ke HSSE.
+
+### 9.14e Dashboard: pemilih, periode, KPI, grafik
+- **Header biru beranda** (hanya di Dashboard, `HeaderBeranda` di `shell/app-header.tsx`): latar `#0047b8`, tombol menu (sidebar) kaca di kiri; di kanan nama pengguna (tebal) dan jabatan · nama SPBU rata kanan, lalu avatar inisial putih bercincin paling kanan; bilah status HP (`theme-color`) ikut biru. Header menyambung ke **panel biru** (gradasi `#0047b8 → #1f6ad8`, sudut bawah 28 px, lingkaran dekoratif samar): label "Operasional SPBU" + tanggal (kiri) dan pil shift berjalan dengan titik hijau (kanan), lalu panel pemilih dashboard. Unit Bisnis (ABH) ada di Pengaturan SPBU, tidak di dashboard; nama SPBU cukup di header.
+- **Pemilih dashboard** (tab kartu gaya aplikasi Telkomsel, `PanelDashboard`): baris tab sama lebar (ikon + nama pendek: Operation, Sales, HSSE, Security, Housekeeping) di atas latar biru; tab aktif putih bersudut atas 16 px dan menyatu ke panel putih di bawahnya lewat lengkung cekung 12 px (sudut panel di sisi tab tepi menjadi siku). Panel berisi ikon bergradasi warna modul, nama & cakupan dashboard aktif. Tanpa geser horizontal; panah kiri/kanan berpindah tab. Satu pilihan saja (Admin, Cleaning Service) → panel tanpa baris tab.
+- **Filter Tanggal** (di bawah header biru, di atas kartu KPI): tombol selebar layar di HP (kanan, lebar menyesuaikan di layar lebar) dengan kotak ikon corong biru (membesar saat hover, mengecil saat ditekan; titik amber bila periode bukan bawaan), label "Filter Tanggal", periode + rentang ringkas ("Bulan ini · 1 – 23 Okt 2026"), chevron berputar saat terbuka; ketuk → bottom sheet preset (7 hari, 30 hari, bulan ini, bulan lalu, 3 bulan) dengan rentang tanggal tiap preset, dan rentang sendiri (dua tanggal + Terapkan). Periode berlaku untuk KPI & grafik.
+- **KPI** (gaya kartu referensi): kartu panel berisi ringkasan "n dari m KPI capai target" + cincin persentase, lalu **dropdown per modul** (titik status tiap KPI, n/m capai; modul pertama yang ada KPI merah terbuka). Kartu KPI putih 2 kolom: titik status + judul + chevron, angka 22 px, pil perubahan ↗/↙ terhadap periode sebelumnya (hijau membaik, merah memburuk), rincian kecil, lalu **garis tren** (area bergradasi + titik akhir, warna status) rata kanan di bawah kartu: nilai KPI per ≤ 6 bagian periode, satu titik data = garis datar. Ketuk → pop up definisi, rumus, target, sumber, periode sebelumnya, tombol Tindak lanjuti. Daftar KPI: [`docs/KPI.md`](docs/KPI.md).
+- **Grafik** (`components/dashboard/charts.tsx`, SVG tanpa pustaka): batang satu seri (≤ 32 px, ujung membulat 4 px, label nilai di atas batang bila ≤ 10 batang, sumbu bilangan bulat untuk data jumlah, grid putus-putus samar, ketuk/hover menampilkan nilai; per hari ≤ 14 hari, per pekan bila lebih panjang agar batang tetap lebar; kosong → "Belum ada data") batang horizontal per kategori (`HBarChart`: label + titik warna, nilai di kanan, jalur abu) dan donat (di HP donat di atas, legenda selebar kartu di bawah; celah 2 px antar-irisan, angka di tengah, legenda dengan persen; ketuk irisan/legenda menyorot). Palet kategori tervalidasi CVD; warna produk tetap per produk; kondisi APAR memakai warna status.
+  - Operation: kartu **Volume diterima** = angka besar total liter + pil perubahan vs periode sebelumnya, jumlah bongkaran/anomali, ubin angka per produk (titik warna produk, liter, jumlah bongkaran, %), lalu grafik batang volume per hari/pekan. Sales & Finance: penjualan BBM per hari, penjualan per produk, metode pembayaran (closing). HSSE: kondisi APAR & APAB, laporan insiden per hari/pekan, **lama stop penyaluran per produk** (batang horizontal; hanya bagian waktu yang jatuh di periode, yang masih berhenti dihitung sampai sekarang).
+- **Inbox**: grup **Persetujuan & Paraf** (ikon stempel) selalu paling atas: persetujuan 1 & akhir petty cash, Create Settlement (pengaju), realisasi (Admin/Cashier), tanda tangan Berita Acara sesuai peran, paraf kartu perawatan & housekeeping, dan insiden dengan PIC pengguna.
+
+### 9.14f Detail Tracking LO (`/laporan/lo/:planId/:loId`)
+Ketuk baris Tracking LO → halaman detail: kartu ringkas (No LO besar, SO, status, produk, volume, supply point, tanggal kirim) dengan tombol **Edit / update pengiriman** (ke Edit SO & LO; LO Closed terkunci), lalu **stepper vertikal** gaya timeline: kolom kiri bulan + bulatan tanggal (hijau selesai, biru berjalan dengan cincin, abu belum, merah dihapus, cyan alih supply) dihubungkan garis, kartu kanan berisi tahap (Permintaan MS2, SO terbit, LO terbit, Dalam pengiriman, Diterima di SPBU, Closed), jam, tag, dan rincian. Di bawahnya **Riwayat submit & perubahan** (terbaru di atas, waktu + pelaku); riwayat dicatat otomatis setiap plan disimpan (`denganJejak` di `lib/plan.ts`, disimpan di `meta.riwayat` bbm_plans).
+
+### 9.14g Stepper pengajuan & tindak lanjut (`components/ui/stepper.tsx`)
+Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal yang sama (Detail LO, detail insiden / near miss / kerusakan / stop penyaluran, detail Pengajuan Anggaran, detail WBS). Bulatan: hijau selesai, biru tahap terbaru (cincin), abu belum, merah ditolak/dihapus, cyan alih supply; kartu tahap berisi judul, tag status, waktu · pelaku, dan rincian (catatan, foto, BA). **Tahap terbaru dapat diketuk** (seluruh kartu + tombol biru) untuk membuka form di **pop up bottom sheet**:
+- Insiden & stop penyaluran: Tambah tindak lanjut (status bawaan Ditindaklanjuti, PIC, target, catatan, foto, BA, jam penyaluran kembali); tahap akhir "Selesai / closing" menampilkan target & PIC.
+- Pengajuan Anggaran: Pengajuan dibuat → Persetujuan 1 Admin/Cashier → Persetujuan akhir ABH (pop up Setujui/Tolak) → Settlement (pengadaan; ke Create Settlement) → Realisasi / Pembayaran reimburse (ke form realisasi). Ditolak = tahap merah, tahap berikutnya tidak ditampilkan.
+- WBS: Laporan masuk → Ditinjau … → Selesai (pop up status + catatan).
+- Tracking LO: tahap berjalan membuka Edit / update pengiriman.
+
+### 9.14h Pembaruan Delivery, penjualan, keuangan, APAR
+- **Plan & Tracking LO** satu halaman (`/plan`): permintaan MS2, status SO & LO per status, tabel LO; ketuk LO → detail stepper `/plan/lo/:planId/:loId` (edit/update dari tahap berjalan). `/laporan/lo` dialihkan ke `/plan`; Security melihat tanpa tombol buat permintaan.
+- **Penjualan bersih** = selisih totalisator − pump test shift yang sama (uji kualitas, Q&Q, uji takaran) di Totalizer, Closing, Dashboard Sales, dan Catatan Persediaan (`jualPerProduk(recs, pumpTest)`; Laporan SO sudah mengurangi tera sendiri).
+- **Kartu Pump test** di Dashboard Operation: total liter periode, jumlah uji per jenis, chip per produk, tautan Riwayat.
+- **Bar bawah Cleaning Service**: Dashboard, Operation, [Lapor], HSSE, **Keuangan** (ikon tangan-koin, paling kanan).
+- **Pasca penerimaan**: ringkasan atas (hijau semua diuji / amber / merah terlewat) lalu kartu per produk: garis & ikon warna produk, lencana jumlah belum diuji di ikon, pil status (Terlewat/Belum diuji/Lengkap), hasil uji terakhir, dan baris penerimaan menunggu uji (tombol Uji).
+- **Kategori pengajuan anggaran** (15 kategori, `KATEGORI_PETTY`) dengan saran akun COA; **PilihCari** (`components/ui/pilih-cari.tsx`): tombol seperti input → bottom sheet berisi kotak cari + daftar (label, keterangan, lencana Saran). Dipakai untuk kategori dan akun COA.
+- **E-sign realisasi**: tanda tangan Admin/Cashier (wajib) dan penerima dana (opsional) dengan SignaturePad layar penuh; tampil di stepper dan tercetak di voucher PDF (kolom KASIR & halaman lampiran Dibayar/Diterima).
+- **Inspeksi APAR & APAB**: kartu ringkasan merah bergradasi (bulan, cincin progres, Belum/Temuan/Lewat masa/≤ 30 hari, tombol putih Pindai QR), kotak kode manual, filter, lalu kartu unit (ikon status, kode & tipe, lokasi, pil status, inspeksi terakhir, chip temuan/isi ulang/instansi; ketuk → data unit).
+
+### 9.14d Pengajuan Anggaran (petty cash)
+- Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
+- Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.
+- **Stop penyaluran**: setelah memilih produk, centang **nozzle yang berhenti** per produk (otomatis tercentang semua, bisa dilepas); nozzle tampil di ringkasan & riwayat.
+
+### 9.15 Laporan SO Bulanan (Report > Stock Opname)
+- Pilih periode (tanggal 1 s.d. akhir bulan) lalu **Generate 1 klik**: PDF atau Excel sesuai format SO.
+- Sebelum generate tampil **cek kelengkapan**: daftar *wajib* (merah, harus dipenuhi dulu) dan *saran* (amber), masing-masing dengan tautan ke halaman pengisiannya, serta rangkuman data per tanggal tarikan.
 
 ## 10. Status & makna warna
 
@@ -455,12 +548,14 @@ Aturan: status **tidak pernah hanya warna**. Selalu ada teks dan, bila penting, 
 
 **Aksesibilitas**
 - Target sentuh ≥ 44 px; teks input 16 px; fokus terlihat (garis biru 2 px).
-- Kontras teks ≥ 4,5 : 1; teks di atas kaca harus tetap terbaca di bawah sinar matahari.
+- Kontras teks ≥ 4,5 : 1; teks di atas kaca harus tetap terbaca di bawah sinar matahari. Teks minimal **12 px**; label kecil memakai `on-surface-variant` (`#424656`), bukan `outline`.
+- Tautan kecil di kartu ("Dashboard ›", "Total 3 LO ›") memakai `touch-44` agar area sentuhnya tetap 44 px.
+- **Placeholder angka** tidak boleh mirip nilai asli (mis. `0,7450`): kosongkan kolom, contoh ditulis sebagai teks bantu di bawahnya ("Contoh: 0,7450 (4 desimal)").
 - Semua ikon tanpa teks punya `aria-label`; tabel punya header; meter punya nilai; pilihan Baik/Tidak berupa radiogroup.
 
 **HP spesifikasi rendah**
-- Blur kaca dikurangi di layar sentuh (10/14/18 px); bottom sheet tanpa blur. Orb latar diam, tanpa animasi.
-- Halaman selain Dashboard & menu Input dimuat saat dibuka (lazy). Foto dikompres (maks 1280 px, JPEG 0,72) sebelum diunggah.
+- Kartu tanpa blur; blur hanya di header laptop, dan header pun padat di layar sentuh. Bottom sheet tanpa blur. Orb latar diam, tanpa animasi.
+- Halaman selain Dashboard & menu Input dimuat saat dibuka (lazy). Pustaka vendor dipisah ke chunk sendiri (`react`, `radix`, `supabase` di `vite.config.ts`) agar tetap tercache antar rilis; jsPDF/JSZip/html2canvas hanya dimuat saat ekspor. Foto dikompres (maks 1280 px, JPEG 0,72) sebelum diunggah.
 - Data dari perangkat lain dimuat ulang saat aplikasi tampil lagi, saat online, saat halaman terkait dibuka, dan tiap 60 detik.
 - Hindari: video latar, animasi terus-menerus, bayangan berlapis banyak, gambar besar dekoratif.
 
@@ -494,7 +589,7 @@ Langkah aman:
 Salin, lalu ganti bagian `[GAYA BARU]`:
 
 ```
-Redesign aplikasi mobile web "FLOQ" (Fuel Logistic Quality & Quantity) untuk petugas SPBU Pertamina.
+Redesign aplikasi mobile web "FLOQ" (Fuel Logistics Operations & Quality) untuk petugas SPBU Pertamina.
 Bahasa Indonesia. Layar utama HP 390 px, juga layar laptop 1280 px. Font Inter, angka tabular.
 
 Gaya baru: [GAYA BARU, mis. "material modern, kartu putih solid, aksen biru Pertamina #0050CB,
@@ -511,11 +606,11 @@ Pertahankan struktur:
   6) Kaleng Sample (kartu per produk, 3 kaleng kiri terbaru kanan terlama, D15 sample mobil tangki vs D15 depot,
      waktu bongkar, No SO, No LO, mobil tangki; slot kosong; pop up detail uji);
   7) LO Tracking (6 status berwarna);
-  8) Proteksi Kebakaran (APAR baik, ada temuan, belum bulan ini, isi ulang lewat).
+  8) Proteksi Kebakaran (jumlah APAR terpasang/cadangan/APAB, APAR baik, ada temuan, belum bulan ini, isi ulang lewat).
 - Menu Input: bar wajib Stok Awal Shift + 5 kartu (Input Bongkaran, Plan Pengiriman, Kualitas Harian,
   Uji Kualitas Pasca Penerimaan, APAR & APAB) dengan status hidup dan lencana merah bila perlu dikerjakan.
 - Menu Laporan: 7 kartu (Catatan Persediaan BBM, Berita Acara, Riwayat Pembongkaran MT, Riwayat Tracking LO,
-  Riwayat Kualitas Harian, Riwayat Tera, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
+  Riwayat Kualitas Harian, Riwayat Uji Takaran, Riwayat Inspeksi APAR); riwayat = tabel di laptop, kartu di HP.
 - Form bongkaran 14 langkah dalam 3 fase (Bongkaran, Quality, Quantity) + Finish, setiap langkah ada foto wajib;
   buku tera: Tinggi T2, Kapasitas, Kepekaan (L/mm); tanda tangan lewat pop up dengan kotak panduan.
 - Plan Pengiriman: tabel LO (tgl kirim, SO, LO, produk, volume, shift, supply point, MS2, status); halaman Edit SO & LO berbentuk tabel (Nomor SO lalu Nomor LO & status tiap LO, tanpa segel, maks. 8.000 L per LO), simpan kembali ke Tracking LO. Langkah 2 bongkaran: tombol "Ubah nomor LO / pindah station" pada LO terpilih (bottom sheet: nomor LO baru, centang pindah station + supply point baru); tersimpan ke Plan sehingga Tracking LO ikut berubah.

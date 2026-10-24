@@ -55,8 +55,8 @@ export class Workbook {
     this.zip = zip
   }
 
-  static async loadTemplate() {
-    const res = await fetch('/templates/floq-template.xlsx')
+  static async loadTemplate(url = '/templates/floq-template.xlsx') {
+    const res = await fetch(url)
     if (!res.ok) throw new Error('Template laporan tidak ditemukan')
     return new Workbook(await JSZip.loadAsync(await res.arrayBuffer()))
   }
@@ -80,7 +80,9 @@ export class Workbook {
     if (!sheet) throw new Error(`Sheet ${name} tidak ada`)
     const rid = sheet.getAttributeNS(REL, 'id')
     const rel = [...rels.getElementsByTagNameNS(PKG, 'Relationship')].find((r) => r.getAttribute('Id') === rid)!
-    return `xl/${rel.getAttribute('Target')}`
+    // Target relatif ("worksheets/sheet1.xml") atau absolut dari akar paket ("/xl/worksheets/sheet1.xml").
+    const target = rel.getAttribute('Target')!
+    return target.startsWith('/') ? target.slice(1) : `xl/${target}`
   }
 
   async setCells(sheetPath: string, cells: Record<string, CellSpec>) {

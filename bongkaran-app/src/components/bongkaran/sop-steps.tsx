@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SupplySelect } from '@/components/bongkaran/lo-fields'
@@ -10,9 +11,7 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso, minutesBetween, nowHm } from '@/lib/date'
@@ -151,10 +150,10 @@ export function StepContent(props: StepProps) {
                     <Num id={`tera-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
                   <Field label="Kapasitas" htmlFor={`kap-${c.id}`}>
-                    <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
+                    <Num id={`kap-${c.id}`} suffix="L" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                   <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
-                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
+                    <Num id={`kpk-${c.id}`} suffix="L/mm" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
                   </Field>
                 </div>
               </div>
@@ -175,7 +174,14 @@ export function StepContent(props: StepProps) {
         <>
           {step.id === 'atg_after' && <SettleTimer d={d} setData={setData} rules={rules} />}
           <StepPhotos {...props} />
-          {step.id === 'atg_before' && (
+          {step.id === 'atg_before' && TANKS.length === 0 && (
+            <Section>
+              <span className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">
+                Database tangki SPBU ini belum diisi: pilihan tangki dan hitung volume dari tinggi deepstick belum tersedia. Isi data ATG seperti biasa.
+              </span>
+            </Section>
+          )}
+          {step.id === 'atg_before' && TANKS.length > 0 && (
             <Section>
               <Field label="Tangki pendam" htmlFor="tangki">
                 <Select value={d.tankId} onValueChange={(v) => setData({ tankId: v })}>
@@ -408,10 +414,14 @@ function LoStep(props: StepProps) {
     const picked = plan!.los.filter((l) => loIds.includes(l.id))
     const produk = picked[0]?.produk ?? ''
     const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    // Ship To per produk dari Profil (bila ada), selain itu dari permintaan MS2.
+    const shipTo = (produk && settings.shipTo?.[produk]) || plan!.shipTo || d.shipTo
     setData({
       loIds,
       noLOs: picked.map((l) => l.noLO),
       produk,
+      shipTo,
+      soldTo: d.soldTo || settings.soldTo || '',
       volumeDO: picked.length ? String(picked.reduce((s, l) => s + l.volume, 0)) : '',
       segelLO: [...new Set(picked.flatMap((l) => l.segel))],
       tankId: produk !== d.produk ? (tankForProduk(produk)?.id ?? '') : d.tankId,
@@ -425,7 +435,7 @@ function LoStep(props: StepProps) {
     if (!props.readOnly && noLOsPlan && kunciPlan !== d.noLOs.join('|')) setData({ noLOs: noLOsPlan })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kunciPlan])
-  const [ubahLo, setUbahLo] = useState<PlanLo | null>(null)
+  const navigate = useNavigate()
 
   const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
   const removeComp = (id: string) =>
@@ -433,9 +443,9 @@ function LoStep(props: StepProps) {
 
   const depotBanner = x.depotCalc
     ? x.d15Depot !== null && Math.abs(x.d15Depot - x.depotCalc.value) > 0.0005
-      ? { tone: 'error' as BannerTone, title: 'Density 15°C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
-      : { tone: 'success' as BannerTone, title: `Hitungan D15 depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
-    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek D15' }
+      ? { tone: 'error' as BannerTone, title: 'Density std. 15 °C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
+      : { tone: 'success' as BannerTone, title: `Hitungan Density std. 15 °C depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
+    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek Density std. 15 °C' }
 
   return (
     <>
@@ -443,7 +453,7 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
         {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
+          <StatusBanner tone="warn" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -484,7 +494,7 @@ function LoStep(props: StepProps) {
                     {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
                   </CheckRow>
                   {checked && !props.readOnly && (
-                    <Button variant="soft" size="sm" className="self-start" onClick={() => setUbahLo(lo)}>
+                    <Button variant="soft" size="sm" className="self-start" onClick={() => plan && navigate(`/input/${encodeURIComponent(props.report.id)}/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(lo.id)}`)}>
                       <Repeat aria-hidden="true" />
                       Ubah nomor LO / pindah station
                     </Button>
@@ -507,7 +517,6 @@ function LoStep(props: StepProps) {
         </span>
       </Section>
 
-      {plan && <UbahLoSheet plan={plan} lo={ubahLo} onClose={() => setUbahLo(null)} />}
 
       <Section>
         <span className="text-tag uppercase text-primary">Data LO mobil tangki</span>
@@ -519,8 +528,11 @@ function LoStep(props: StepProps) {
           <Input id="pengangkut" autoComplete="off" value={d.perusahaanPengangkut} onChange={(e) => setData({ perusahaanPengangkut: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="No. Sold To" htmlFor="soldto">
+            <Input id="soldto" autoComplete="off" inputMode="numeric" placeholder="dari Profil" value={d.soldTo} onChange={(e) => setData({ soldTo: e.target.value })} />
+          </Field>
           <Field label="No. Ship To" htmlFor="shipto">
-            <Input id="shipto" autoComplete="off" inputMode="numeric" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
+            <Input id="shipto" autoComplete="off" inputMode="numeric" placeholder="otomatis per produk" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
           </Field>
           <Field label="Produk" htmlFor="lo-produk">
             <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />
@@ -540,15 +552,15 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">Density depot & keberangkatan</span>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Density OBS depot" htmlFor="dobs-depot">
-            <Num id="dobs-depot" placeholder="0,7450" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
+          <Field label="Density OBS depot" htmlFor="dobs-depot" hint="Contoh: 0,7450">
+            <Num id="dobs-depot" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
           </Field>
-          <Field label="Suhu OBS depot" htmlFor="suhu-depot">
-            <Num id="suhu-depot" suffix="°C" placeholder="30,0" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
+          <Field label="Suhu OBS depot" htmlFor="suhu-depot" hint="Contoh: 30,0">
+            <Num id="suhu-depot" suffix="°C" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
           </Field>
         </div>
-        <Field label="Density at 15°C (dokumen DO)" htmlFor="d15-depot">
-          <Num id="d15-depot" placeholder="0,7567" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
+        <Field label="Density std. 15 °C (dokumen DO)" htmlFor="d15-depot" hint="Contoh: 0,7567 (4 desimal)">
+          <Num id="d15-depot" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
         </Field>
         <StatusBanner {...depotBanner} />
         <div className="grid grid-cols-2 gap-space-sm">
@@ -598,7 +610,7 @@ function DensityStep(props: StepProps) {
     <>
       <GlassCard level={2} className="flex flex-col gap-space-xs p-space-md">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-tag uppercase text-primary">D15 dokumen DO depot</span>
+          <span className="text-tag uppercase text-primary">Density std. 15 °C dokumen DO depot</span>
           <Pill tone="cyan">Toleransi ±{String(rules.densityTolerance).replace('.', ',')}</Pill>
         </div>
         <span className="tabular text-numeric-lg font-bold text-on-surface">{formatDensity(x.d15Depot)}</span>
@@ -630,17 +642,17 @@ function DensityStep(props: StepProps) {
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Density observasi" htmlFor={`dobs-${r.id}`}>
-              <Num id={`dobs-${r.id}`} placeholder="0,7452" value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
+            <Field label="Density observasi" htmlFor={`dobs-${r.id}`} hint="Contoh: 0,7452">
+              <Num id={`dobs-${r.id}`} value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
             </Field>
-            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`}>
-              <Num id={`dsuhu-${r.id}`} suffix="°C" placeholder="30,5" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
+            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`} hint="Contoh: 30,5">
+              <Num id={`dsuhu-${r.id}`} suffix="°C" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
             </Field>
           </div>
           <Ladder
             rows={[
-              ['Density @15°C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
-              ['D15 dokumen depot', formatDensity(x.d15Depot)],
+              ['Density std. 15 °C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
+              ['Density std. 15 °C dokumen depot', formatDensity(x.d15Depot)],
             ]}
             total={['Selisih', r.selisih !== null ? formatDensitySigned(r.selisih) : '-']}
           />
@@ -942,17 +954,9 @@ export function SignersSection({
  * Ubah nomor LO saat bongkar, mis. MT dialihkan ke station (supply point) lain dan LO terbit ulang.
  * Disimpan ke Plan sehingga Tracking LO dan laporan ikut berubah; LO lama tetap tercatat.
  */
-function UbahLoSheet({ plan, lo, onClose }: { plan: Plan; lo: PlanLo | null; onClose: () => void }) {
-  return (
-    <Sheet open={!!lo} onOpenChange={(o) => !o && onClose()} title="Ubah nomor LO" description={lo ? `${lo.produk}, ${formatLiter(lo.volume)}, SO ${plan.noSO || '-'}` : undefined}>
-      {lo && <UbahLoIsi key={lo.id} plan={plan} lo={lo} onClose={onClose} />}
-    </Sheet>
-  )
-}
-
-function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () => void }) {
+/** Isi halaman Ubah nomor LO (pages/UbahLo). `onClose(hasil)` dipanggil setelah tersimpan, tanpa hasil bila tidak ada perubahan. */
+export function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: (hasil?: { baru: string; pindah: boolean; sp: string }) => void }) {
   const app = useApp()
-  const toast = useToast()
   const asal = planSupply(plan, lo)
   const [no, setNo] = useState(lo.noLO)
   const [pindah, setPindah] = useState(false)
@@ -978,8 +982,7 @@ function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () 
     setSaving(true)
     try {
       await app.savePlan({ ...plan, los: plan.los.map((x) => (x.id === lo.id ? next : x)) })
-      toast(pindah ? `Pindah station: LO ${lo.noLO || '-'} menjadi ${baru}` : `Nomor LO menjadi ${baru}`)
-      onClose()
+      onClose({ baru, pindah, sp })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

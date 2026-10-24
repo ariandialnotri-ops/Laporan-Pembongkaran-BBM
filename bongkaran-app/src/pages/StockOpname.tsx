@@ -1,0 +1,622 @@
+import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { ChevronDown, ChevronRight, CircleAlert, CircleCheck, FileSpreadsheet, FileText, LoaderCircle, Save, Sparkles, TriangleAlert } from 'lucide-react'
+import { Field } from '@/components/bongkaran/form-bits'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { Loading } from '@/components/bongkaran/load-state'
+import { ErrorBox } from '@/components/bongkaran/lo-fields'
+import { Button } from '@/components/ui/button'
+import { GlassCard } from '@/components/ui/glass-card'
+import { Input } from '@/components/ui/input'
+import { Pill } from '@/components/ui/pill'
+import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast'
+import { useApp, useSyncOnOpen } from '@/lib/app-state'
+import { PECAHAN } from '@/lib/closing'
+import type { ClosingData } from '@/lib/closing'
+import { formatTanggalIso, todayIso } from '@/lib/date'
+import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
+import { barisPumpTest, rekapTeraNozzle } from '@/lib/pumptest'
+import { downloadBlob } from '@/lib/report/export'
+import {
+  CASH_SO,
+  hitungArus,
+  hitungCashSo,
+  hitungNozzle,
+  hitungTangki,
+  JABATAN_SO,
+  kosongCash,
+  NON_TUNAI_SO,
+  nozzleKosong,
+  penerimaanBulan,
+  soKosong,
+  tangkiKosong,
+  terbilang,
+  type JenisCash,
+  type SoArus,
+  type SoData,
+  type SoNozzle,
+  type SoRecord,
+  type SoTangki,
+} from '@/lib/so'
+import { akhirBulan, bulanDepan, cekSo, lengkapiOtomatis, type BagianSo, type ItemCek } from '@/lib/so-cek'
+import { TANKS, volumeTank, type Tank } from '@/lib/tank'
+import type { TotalizerData } from '@/lib/totalizer'
+import { useAir } from '@/lib/use-air'
+import { useCatatan } from '@/lib/use-catatan'
+import { cn } from '@/lib/utils'
+
+const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const stamp = () => Date.now()
+const bulanLalu = (bulan: string) => todayIso(new Date(Number(bulan.slice(0, 4)), Number(bulan.slice(5, 7)) - 2, 1)).slice(0, 7)
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+const labelBulan = (b: string) => `${BULAN[Number(b.slice(5, 7)) - 1]} ${b.slice(0, 4)}`
+const fmt = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? '-' : formatNumber(v, d))
+const rp = (v: number) => `Rp ${Math.round(v).toLocaleString('id-ID')}`
+/** Volume (L) dari tinggi cm lewat tabel kalibrasi tangki (mm). */
+const literDariCm = (t: Tank, cm: string) => {
+  const v = parseAngka(cm)
+  if (v === null) return ''
+  const r = volumeTank(t, v * 10)
+  return r.error === undefined ? String(Math.round(r.volume)) : ''
+}
+
+/** Kartu bagian yang dapat dilipat. */
+function Bagian({ no, judul, ringkas, children, buka, onBuka }: { no: number; judul: string; ringkas?: string; children: ReactNode; buka: boolean; onBuka: (v: boolean) => void }) {
+  return (
+    <GlassCard level={2} id={`so-bagian-${no}`} className="flex scroll-mt-24 flex-col">
+      <button type="button" aria-expanded={buka} onClick={() => onBuka(!buka)} className="flex min-h-14 items-center gap-space-sm px-space-md py-space-sm text-left">
+        <span className="tabular flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-body-sm font-bold text-primary">{no}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-md font-bold text-on-surface">{judul}</span>
+          {ringkas && <span className="truncate text-body-sm text-on-surface-variant">{ringkas}</span>}
+        </span>
+        <ChevronDown aria-hidden="true" className={cn('size-5 shrink-0 text-on-surface-variant transition-transform', buka && 'rotate-180')} />
+      </button>
+      {buka && <div className="flex flex-col gap-space-sm px-space-md pb-space-md">{children}</div>}
+    </GlassCard>
+  )
+}
+
+function Nilai({ k, v, tebal, merah }: { k: string; v: string; tebal?: boolean; merah?: boolean }) {
+  return (
+    <span className="flex justify-between gap-space-sm text-body-sm">
+      <span className="text-on-surface-variant">{k}</span>
+      <span className={cn('tabular text-right text-on-surface', tebal && 'font-bold', merah && 'font-bold text-error')}>{v}</span>
+    </span>
+  )
+}
+
+type CekSo = ReturnType<typeof cekSo>
+
+/** Satu baris daftar periksa: hijau = lengkap, merah = wajib kosong, kuning = disarankan. */
+function BarisCek({ x, wajib, keBagian }: { x: ItemCek; wajib: boolean; keBagian: (no: BagianSo) => void }) {
+  const [semua, setSemua] = useState(false)
+  const Ikon = x.ok ? CircleCheck : wajib ? CircleAlert : TriangleAlert
+  const tampil = semua ? x.kurang : x.kurang.slice(0, 8)
+  const aksi = 'inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-primary px-3 text-body-sm font-semibold text-on-primary'
+  return (
+    <li className="flex items-start gap-space-sm py-space-sm">
+      <Ikon aria-hidden="true" className={cn('mt-0.5 size-5 shrink-0', x.ok ? 'text-tertiary' : wajib ? 'text-error' : 'text-amber-600')} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-body-md font-semibold text-on-surface">{x.judul}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {x.detail} · untuk {x.untuk}
+        </span>
+        {!x.ok && x.kurang.length > 0 && (
+          <span className="flex flex-wrap gap-1 pt-1">
+            {tampil.map((k) => (
+              <span key={k} className={cn('tabular rounded-md px-1.5 py-0.5 text-xs font-semibold', wajib ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
+                {k}
+              </span>
+            ))}
+            {x.kurang.length > 8 && (
+              <button type="button" onClick={() => setSemua(!semua)} className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-primary">
+                {semua ? 'Ringkas' : `+${x.kurang.length - 8} lainnya`}
+              </button>
+            )}
+          </span>
+        )}
+      </span>
+      {!x.ok && x.to && (
+        <Link to={x.to} className={aksi}>
+          Isi <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      )}
+      {!x.ok && !x.to && x.bagian && (
+        <button type="button" onClick={() => keBagian(x.bagian!)} className={aksi}>
+          Isi <ChevronRight aria-hidden="true" className="size-4" />
+        </button>
+      )}
+    </li>
+  )
+}
+
+/**
+ * Generate Laporan SO 1 klik: periode tarikan (tgl 1 s.d. akhir bulan), rangkuman angka BA, daftar data
+ * wajib yang masih kosong (menahan generate) dan yang disarankan, lalu unduh PDF / Excel format SO.
+ */
+function PanelGenerate({
+  bulan,
+  setBulan,
+  cek,
+  otomatis,
+  jamSo,
+  busy,
+  bolehDraf,
+  keBagian,
+  generate,
+  error,
+}: {
+  bulan: string
+  setBulan: (b: string) => void
+  cek: CekSo
+  otomatis: string[]
+  jamSo: string
+  busy: string | null
+  bolehDraf: boolean
+  keBagian: (no: BagianSo) => void
+  generate: (jenis: 'excel' | 'pdf', draf?: boolean) => void
+  error: string | null
+}) {
+  const r = cek.rangkuman
+  const siap = cek.kurangWajib === 0
+  const saranKurang = cek.saran.filter((x) => !x.ok).length
+  const tile = (label: string, nilai: string, sub: string, ok: boolean) => (
+    <div className="flex flex-col gap-0.5 rounded-md bg-surface-container-low p-space-sm">
+      <span className="text-tag uppercase text-on-surface-variant">{label}</span>
+      <span className={cn('tabular text-headline-md font-bold', ok ? 'text-on-surface' : 'text-error')}>{nilai}</span>
+      <span className="text-body-sm text-on-surface-variant">{sub}</span>
+    </div>
+  )
+  const persen = (a: number, b: number) => (b ? `${a}/${b}` : '-')
+  return (
+    <>
+      <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <div className="flex items-start gap-space-sm">
+          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary">
+            <Sparkles className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-tag uppercase text-primary">Report · BA Laporan Bulanan</span>
+            <span className="text-headline-md font-bold text-on-surface">Generate Laporan SO</span>
+            <span className="text-body-sm text-on-surface-variant">Data ditarik otomatis dari semua modul FLOQ. Lengkapi data wajib, lalu unduh PDF atau Excel sesuai format SO.</span>
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Periode SO" htmlFor="so-bulan">
+            <Input id="so-bulan" type="month" value={bulan} onChange={(e) => e.target.value && setBulan(e.target.value)} />
+          </Field>
+          <div className="flex flex-col justify-end gap-0.5 pb-1 text-body-sm">
+            <span className="text-on-surface-variant">Tarikan data</span>
+            <b className="tabular text-on-surface">
+              {formatTanggalIso(r.dari)} – {formatTanggalIso(r.sampai)}
+            </b>
+            <span className="text-on-surface-variant">
+              SO {formatTanggalIso(r.tanggalSo)} {jamSo}
+            </span>
+          </div>
+        </div>
+        {!r.selesai && (
+          <div className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">Periode ini belum berakhir. Kelengkapan dinilai sampai shift yang sedang berjalan; generate laporan final di awal bulan berikutnya.</div>
+        )}
+        <div className={cn('flex items-center gap-space-sm rounded-md p-space-sm', siap ? 'bg-emerald-50 text-emerald-900' : 'bg-error-container text-on-error-container')}>
+          {siap ? <CircleCheck aria-hidden="true" className="size-5 shrink-0" /> : <CircleAlert aria-hidden="true" className="size-5 shrink-0" />}
+          <span className="text-body-sm font-semibold">
+            {siap ? `Data wajib lengkap. Siap generate${saranKurang ? ` (${saranKurang} data disarankan belum lengkap)` : ''}.` : `${cek.kurangWajib} data wajib belum lengkap. Lengkapi terlebih dahulu sebelum generate.`}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Button size="lg" disabled={!siap || busy !== null} onClick={() => generate('pdf')}>
+            {busy === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
+            PDF
+          </Button>
+          <Button size="lg" disabled={!siap || busy !== null} onClick={() => generate('excel')}>
+            {busy === 'excel' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
+            Excel
+          </Button>
+        </div>
+        {!siap && bolehDraf && (
+          <div className="flex flex-wrap items-center gap-x-space-sm text-body-sm text-on-surface-variant">
+            <span>Periksa dulu hasilnya:</span>
+            <button type="button" disabled={busy !== null} onClick={() => generate('pdf', true)} className="font-semibold text-primary underline-offset-2 hover:underline">
+              Unduh draf PDF
+            </button>
+            <button type="button" disabled={busy !== null} onClick={() => generate('excel', true)} className="font-semibold text-primary underline-offset-2 hover:underline">
+              Unduh draf Excel
+            </button>
+          </div>
+        )}
+        <ErrorBox text={error} />
+      </GlassCard>
+
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="text-tag uppercase text-primary">Rangkuman data tarikan</span>
+        <div className="grid grid-cols-2 gap-space-sm sm:grid-cols-3">
+          {tile('Totalizer lengkap', persen(r.shift.totalizer, r.shift.total), 'shift (awal & akhir)', r.shift.totalizer === r.shift.total)}
+          {tile('Stok awal shift', persen(r.shift.stok, r.shift.total), 'shift', r.shift.stok === r.shift.total)}
+          {tile('Closing shift', persen(r.shift.closing, r.shift.total), 'shift', r.shift.closing === r.shift.total)}
+          {tile('Penerimaan BBM', String(r.penerimaan.jumlah), `order ${formatLiter(r.penerimaan.order)}`, true)}
+          {tile('Pump test / tera', formatLiter(r.pumpTest, 1), 'dikurangkan dari penjualan', true)}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="tabular w-full min-w-[520px] text-body-sm">
+            <thead>
+              <tr className="text-left text-on-surface-variant">
+                <th className="py-1 pr-2 font-semibold">Produk</th>
+                <th className="py-1 pr-2 text-right font-semibold">Stok awal</th>
+                <th className="py-1 pr-2 text-right font-semibold">Penerimaan</th>
+                <th className="py-1 pr-2 text-right font-semibold">Penjualan bersih</th>
+                <th className="py-1 pr-2 text-right font-semibold">Stok akhir real</th>
+                <th className="py-1 text-right font-semibold">Losses</th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.arus.map((a) => (
+                <tr key={a.produk} className="border-t border-outline-variant/40">
+                  <td className="py-1.5 pr-2 font-semibold text-on-surface">{a.produk}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.a, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.b, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.d, 0)}</td>
+                  <td className="py-1.5 pr-2 text-right">{fmt(a.f, 0)}</td>
+                  <td className={cn('py-1.5 text-right font-semibold', (a.g ?? 0) < 0 && 'text-error')}>
+                    {a.g === null ? '-' : `${fmt(a.g, 0)} (${fmt(a.h)}%)`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <span className="text-body-sm text-on-surface-variant">Liter. "-" = data belum lengkap untuk dihitung.</span>
+        {otomatis.length > 0 && (
+          <div className="flex flex-col gap-1 rounded-md bg-primary-fixed/40 p-space-sm text-body-sm text-on-surface">
+            <b>Tarikan otomatis (mengisi kolom yang masih kosong)</b>
+            {otomatis.map((o) => (
+              <span key={o}>• {o}</span>
+            ))}
+          </div>
+        )}
+      </GlassCard>
+
+      <GlassCard level={2} className="flex flex-col p-space-md">
+        <span className="text-tag uppercase text-error">Wajib dipenuhi ({cek.kurangWajib} belum)</span>
+        <ul className="flex flex-col divide-y divide-outline-variant/40">
+          {[...cek.wajib].sort((a, b) => Number(a.ok) - Number(b.ok)).map((x) => (
+            <BarisCek key={x.key} x={x} wajib keBagian={keBagian} />
+          ))}
+        </ul>
+        <span className="mt-space-sm text-tag uppercase text-amber-700">Disarankan ({saranKurang} belum)</span>
+        <ul className="flex flex-col divide-y divide-outline-variant/40">
+          {[...cek.saran].sort((a, b) => Number(a.ok) - Number(b.ok)).map((x) => (
+            <BarisCek key={x.key} x={x} wajib={false} keBagian={keBagian} />
+          ))}
+        </ul>
+      </GlassCard>
+    </>
+  )
+}
+
+/** Report > Laporan Stock Opname: BA Laporan Bulanan SPBU per bulan (isian + tarikan data FLOQ), unduh Excel. */
+export function LaporanStockOpname() {
+  const app = useApp()
+  const toast = useToast()
+  useSyncOnOpen()
+  const [bulan, setBulan] = useState(() => {
+    // Sebelum tanggal 10, bawaan bulan lalu (SO dilakukan awal bulan berikutnya).
+    const t = todayIso()
+    return Number(t.slice(8, 10)) < 10 ? bulanLalu(t.slice(0, 7)) : t.slice(0, 7)
+  })
+  const lalu = bulanLalu(bulan)
+  const so = useCatatan<SoData>('so', `${lalu}-01`, `${bulan}-01`)
+  const tot = useCatatan<TotalizerData>('totalizer', `${bulan}-01`, akhirBulan(bulan))
+  const closing = useCatatan<ClosingData>('closing', `${bulan}-01`, akhirBulan(bulan))
+  const air = useAir(`${bulan}-01`, bulanDepan(bulan))
+  const [draft, setDraft] = useState<{ bulan: string; data: SoData } | null>(null)
+  const [busy, setBusy] = useState<'simpan' | 'excel' | 'pdf' | null>(null)
+  const [buka, setBuka] = useState<Set<number>>(() => new Set())
+  const bg = (no: number) => ({ buka: buka.has(no), onBuka: (v: boolean) => setBuka((b) => { const n = new Set(b); if (v) n.add(no); else n.delete(no); return n }) })
+  const keBagian = (no: BagianSo) => {
+    setBuka((b) => new Set(b).add(no))
+    requestAnimationFrame(() => document.getElementById(`so-bagian-${no}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+  const [error, setError] = useState<string | null>(null)
+  const bolehUbah = ['abh', 'pengawas', 'admin'].includes(app.role ?? '')
+  const guard = useLeaveGuard({ active: !!draft, title: 'Keluar tanpa menyimpan?', detail: 'Isian stock opname yang belum disimpan akan hilang.' })
+
+  if (!app.loaded || !so.recs || !tot.recs || !closing.recs || !air.recs) return <Loading />
+  const rec = so.recs.find((r) => r.id === bulan)
+  const recLalu = so.recs.find((r) => r.id === lalu)?.data ?? null
+  const s = app.settings
+  const nozzles = s.nozzles ?? []
+  const dispensers = s.dispensers ?? []
+
+  // Data efektif: isian tersimpan/draf + nilai otomatis dari SO bulan lalu.
+  const dasar: SoData = draft?.bulan === bulan ? draft.data : { ...soKosong(), ...rec?.data, cash: { ...soKosong().cash, ...rec?.data.cash }, ttd: { ...soKosong().ttd, ...rec?.data.ttd } }
+  // Isian efektif: tersimpan/draf + tarikan otomatis (SO bulan lalu, water content, closing shift, personil).
+  const sumber = { bulan, settings: s, tanks: TANKS, nozzles, lalu: recLalu, totalizer: tot.recs, closing: closing.recs, air: air.recs, daily: app.daily, reports: app.reports }
+  const { data } = lengkapiOtomatis(dasar, sumber)
+  // Sumber tarikan otomatis yang tersedia (dipakai untuk kolom yang belum diisi).
+  const otomatis = lengkapiOtomatis(soKosong(), sumber).otomatis
+  const ubah = (patch: Partial<SoData>) => {
+    setError(null)
+    setDraft({ bulan, data: { ...data, ...patch } })
+  }
+  const ubahTangki = (id: string, p: Partial<SoTangki>) => ubah({ tangki: { ...data.tangki, [id]: { ...(data.tangki[id] ?? tangkiKosong()), ...p } } })
+  const ubahNozzle = (id: string, p: Partial<SoNozzle>) => ubah({ nozzle: { ...data.nozzle, [id]: { ...(data.nozzle[id] ?? nozzleKosong()), ...p } } })
+  const ubahArus = (produk: string, p: Partial<SoArus>) => ubah({ arus: { ...data.arus, [produk]: { ...{ stokAwal: '', penerimaan: '', penjualan: '' }, ...data.arus[produk], ...p } } })
+  const ubahCash = (k: JenisCash, p: Partial<SoData['cash'][JenisCash]>) => ubah({ cash: { ...data.cash, [k]: { ...kosongCash(), ...data.cash[k], ...p } } })
+
+  const pumpTest = barisPumpTest(app.daily, nozzles).filter((r) => r.tanggal.startsWith(bulan))
+  const penerimaan = penerimaanBulan(app.reports, bulan)
+  const produk = [...new Set([...TANKS.map((t) => t.produk), ...nozzles.map((n) => n.produk)])]
+  const arus = produk.map((p) => hitungArus(p, { tanks: TANKS, data, lalu: recLalu, totalizer: tot.recs!, nozzles, penerimaan, pumpTest }))
+  const rekapTera = rekapTeraNozzle(pumpTest)
+  const cek = cekSo(data, sumber, pumpTest)
+
+  const tulis = async () => {
+    const r: SoRecord = { id: bulan, tanggal: `${bulan}-01`, shift: 0, data, createdAt: rec?.createdAt ?? stamp(), updatedAt: stamp(), createdBy: rec?.createdBy ?? app.session.user?.id ?? null }
+    await app.backend.saveCatatan('so', r)
+    setDraft(null)
+    await so.muat()
+  }
+  const simpan = async () => {
+    setBusy('simpan')
+    try {
+      await tulis()
+      toast(`Stock opname ${labelBulan(bulan)} tersimpan`)
+    } catch (e) {
+      setError(pesan(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  /** Generate 1 klik: simpan isian (termasuk tarikan otomatis) lalu unduh BA Laporan Bulanan. */
+  const generate = async (jenis: 'excel' | 'pdf', drafSaja = false) => {
+    setBusy(jenis)
+    setError(null)
+    try {
+      if (bolehUbah && !drafSaja) await tulis()
+      const { soXlsx, soPdf } = await import('@/lib/report/so-xlsx')
+      const x = { bulan, settings: s, data, lalu: recLalu, tanks: TANKS, nozzles, dispensers, totalizer: tot.recs!, reports: app.reports, pumpTest }
+      const blob = jenis === 'pdf' ? await soPdf(x) : await soXlsx(x)
+      downloadBlob(blob, `${drafSaja ? 'DRAF ' : ''}BA Laporan Bulanan ${s.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.${jenis === 'pdf' ? 'pdf' : 'xlsx'}`)
+      toast(`Laporan SO ${labelBulan(bulan)} ${jenis === 'pdf' ? 'PDF' : 'Excel'} terunduh`)
+    } catch (e) {
+      setError(`Gagal membuat laporan: ${pesan(e)}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const angkaInput = (id: string, label: string, value: string, onChange: (v: string) => void, o: { suffix?: string; placeholder?: string } = {}) => (
+    <Field label={label} htmlFor={id}>
+      <Input id={id} numeric inputMode="decimal" suffix={o.suffix} placeholder={o.placeholder} disabled={!bolehUbah} value={value} onChange={(e) => onChange(e.target.value)} />
+    </Field>
+  )
+
+  return (
+    <div className="flex flex-col gap-space-md">
+      <PanelGenerate
+        bulan={bulan}
+        setBulan={(b) => (setDraft(null), setBulan(b))}
+        cek={cek}
+        otomatis={otomatis}
+        jamSo={data.jamSo}
+        busy={busy}
+        bolehDraf={app.canManage || app.role === 'admin'}
+        keBagian={keBagian}
+        generate={(j, d) => void generate(j, d)}
+        error={error}
+      />
+
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="flex items-center justify-between gap-2">
+          <span className="text-tag uppercase text-primary">Isian hari SO · {labelBulan(bulan)}</span>
+          {rec ? <Pill tone="success">Tersimpan {new Date(rec.updatedAt).toLocaleDateString('id-ID')}</Pill> : <Pill>Belum disimpan</Pill>}
+        </span>
+        <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="Tanggal SO" htmlFor="so-tgl">
+            <Input id="so-tgl" type="date" disabled={!bolehUbah} value={data.tanggalSo} onChange={(e) => ubah({ tanggalSo: e.target.value })} />
+          </Field>
+          <Field label="Jam SO" htmlFor="so-jam">
+            <Input id="so-jam" type="time" disabled={!bolehUbah} value={data.jamSo} onChange={(e) => ubah({ jamSo: e.target.value })} />
+          </Field>
+        </div>
+        <span className="text-body-sm text-on-surface-variant">
+          BA Laporan Bulanan sesuai dokumen SPBU. Ditarik otomatis: totalisator digital (Totalizer), penerimaan (Input Bongkaran), pump test/tera (Kualitas Harian & Uji Takaran), stok awal & D t-1 (SO {labelBulan(lalu)}{recLalu ? '' : ', belum ada'}).
+        </span>
+        {!bolehUbah && <span className="text-body-sm font-semibold text-on-surface-variant">Hanya dapat dilihat. Isian diisi ABH, pengawas, atau admin.</span>}
+      </GlassCard>
+
+      <Bagian no={1} {...bg(1)} judul="Stock Opname Tangki Pendam & Meter Listrik" ringkas={`${TANKS.length} tangki · konsistensi maks. 2,5 cm`}>
+        {TANKS.map((t) => {
+          const x = data.tangki[t.id] ?? tangkiKosong()
+          const h = hitungTangki(x)
+          return (
+            <div key={t.id} className="flex flex-col gap-space-xs rounded-md bg-surface-container-low p-space-sm">
+              <span className="flex items-center justify-between gap-2">
+                <b className="text-body-md text-on-surface">
+                  {t.label} · {t.produk}
+                </b>
+                {h.konsisten !== null && <Pill tone={h.konsisten ? 'success' : 'error'}>{h.konsisten ? 'Konsisten · ATG' : 'Tidak · dipping'}</Pill>}
+              </span>
+              <div className="grid grid-cols-3 gap-space-xs">
+                {angkaInput(`so-air-${t.id}`, 'Air (cm)', x.airCm, (v) => ubahTangki(t.id, { airCm: v }))}
+                {angkaInput(`so-dip-${t.id}`, 'Dipping (cm)', x.dipCm, (v) => ubahTangki(t.id, { dipCm: v, dipL: literDariCm(t, v) || x.dipL }))}
+                {angkaInput(`so-dipl-${t.id}`, 'Vol. dipping', x.dipL, (v) => ubahTangki(t.id, { dipL: v }), { suffix: 'L' })}
+                <span />
+                {angkaInput(`so-atg-${t.id}`, 'ATG (cm)', x.atgCm, (v) => ubahTangki(t.id, { atgCm: v, atgL: literDariCm(t, v) || x.atgL }))}
+                {angkaInput(`so-atgl-${t.id}`, 'Vol. ATG', x.atgL, (v) => ubahTangki(t.id, { atgL: v }), { suffix: 'L' })}
+                <span className="self-center text-body-sm text-on-surface-variant">SO lalu</span>
+                {angkaInput(`so-ld-${t.id}`, 'Dipping lalu (cm)', x.laluDipCm, (v) => ubahTangki(t.id, { laluDipCm: v }))}
+                {angkaInput(`so-la-${t.id}`, 'ATG lalu (cm)', x.laluAtgCm, (v) => ubahTangki(t.id, { laluAtgCm: v }))}
+              </div>
+              <Nilai k="Selisih Dt (dipping − ATG)" v={`${fmt(h.selisih)} cm`} />
+              <Nilai k="Konsistensi (Dt) − (Dt-1)" v={`${fmt(h.konsistensiCm)} cm`} merah={h.konsisten === false} />
+              <Nilai k="Volume SO dipakai" v={h.volume === null ? '-' : formatLiter(h.volume)} tebal />
+            </div>
+          )
+        })}
+        <Field label="Catatan ATG (mis. ATG rusak / belum adjusting)" htmlFor="so-catatg">
+          <Input id="so-catatg" disabled={!bolehUbah} value={data.catatanAtg} onChange={(e) => ubah({ catatanAtg: e.target.value })} />
+        </Field>
+        <div className="grid grid-cols-2 gap-space-sm">
+          {angkaInput('so-la', 'Meter listrik awal bulan', data.listrikAwal, (v) => ubah({ listrikAwal: v }), { suffix: 'kWh' })}
+          {angkaInput('so-lb', 'Meter listrik akhir bulan', data.listrikAkhir, (v) => ubah({ listrikAkhir: v }), { suffix: 'kWh' })}
+        </div>
+        <Nilai k="Total pemakaian listrik" v={(() => { const a = parseAngka(data.listrikAwal); const b = parseAngka(data.listrikAkhir); return a !== null && b !== null ? `${formatNumber(b - a, 2)} kWh` : '-' })()} tebal />
+      </Bagian>
+
+      <Bagian no={2} {...bg(2)} judul="Totalisator" ringkas={`${nozzles.length} nozzle · digital dari Totalizer (${tot.recs.length} catatan shift)`}>
+        {nozzles.map((nz) => {
+          const x = data.nozzle[nz.id] ?? nozzleKosong()
+          const h = hitungNozzle(nz, x, tot.recs!)
+          return (
+            <div key={nz.id} className="flex flex-col gap-space-xs rounded-md bg-surface-container-low p-space-sm">
+              <span className="flex items-center justify-between gap-2">
+                <b className="text-body-md text-on-surface">
+                  Nozzle {nz.nama} · {nz.produk}
+                </b>
+                <span className="text-body-sm text-on-surface-variant">{dispensers.find((d) => d.id === nz.dispenserId)?.nama ?? ''}</span>
+              </span>
+              <div className="grid grid-cols-3 gap-space-xs">
+                <Field label="Ket. R2/R4" htmlFor={`so-k-${nz.id}`}>
+                  <Input id={`so-k-${nz.id}`} disabled={!bolehUbah} placeholder="R4" value={x.keterangan} onChange={(e) => ubahNozzle(nz.id, { keterangan: e.target.value })} />
+                </Field>
+                {angkaInput(`so-ma-${nz.id}`, 'Manual awal', x.manualAwal, (v) => ubahNozzle(nz.id, { manualAwal: v }))}
+                {angkaInput(`so-mb-${nz.id}`, 'Manual akhir', x.manualAkhir, (v) => ubahNozzle(nz.id, { manualAkhir: v }))}
+                <span className="self-center text-body-sm text-on-surface-variant">Digital {h.otomatis ? '(otomatis)' : ''}</span>
+                {angkaInput(`so-da-${nz.id}`, 'Digital awal', x.digitalAwal, (v) => ubahNozzle(nz.id, { digitalAwal: v }), { placeholder: fmt(h.dAwal) })}
+                {angkaInput(`so-db-${nz.id}`, 'Digital akhir', x.digitalAkhir, (v) => ubahNozzle(nz.id, { digitalAkhir: v }), { placeholder: fmt(h.dAkhir) })}
+              </div>
+              <Nilai k="Sales manual (c)" v={fmt(h.manual)} />
+              <Nilai k="Sales digital (f)" v={fmt(h.digital)} />
+              <Nilai k="Selisih (f − c)" v={fmt(h.selisih)} tebal />
+            </div>
+          )
+        })}
+        {!nozzles.length && <span className="text-body-sm text-on-surface-variant">Database nozzle belum diisi.</span>}
+        <Field label="Catatan totalisator" htmlFor="so-cattot">
+          <Input id="so-cattot" disabled={!bolehUbah} value={data.catatanTotalisator} onChange={(e) => ubah({ catatanTotalisator: e.target.value })} />
+        </Field>
+      </Bagian>
+
+      <Bagian no={3} {...bg(3)} judul="Arus Minyak" ringkas={arus.map((a) => `${a.produk} ${a.h === null ? '-' : `${formatNumber(a.h, 2)}%`}`).join(' · ')}>
+        {arus.map((a) => (
+          <div key={a.produk} className="flex flex-col gap-space-xs rounded-md bg-surface-container-low p-space-sm">
+            <b className="text-body-md text-on-surface">{a.produk}</b>
+            <div className="grid grid-cols-3 gap-space-xs">
+              {angkaInput(`so-aa-${a.produk}`, 'Stok awal (a)', data.arus[a.produk]?.stokAwal ?? '', (v) => ubahArus(a.produk, { stokAwal: v }), { placeholder: fmt(a.otomatisA ? a.a : null, 0) })}
+              {angkaInput(`so-ab-${a.produk}`, 'Penerimaan (b)', data.arus[a.produk]?.penerimaan ?? '', (v) => ubahArus(a.produk, { penerimaan: v }), { placeholder: fmt(a.otomatisB ? a.b : null, 0) })}
+              {angkaInput(`so-ad-${a.produk}`, 'Penjualan bersih (d)', data.arus[a.produk]?.penjualan ?? '', (v) => ubahArus(a.produk, { penjualan: v }), { placeholder: fmt(a.otomatisD ? a.d : null, 0) })}
+            </div>
+            <Nilai k="Jumlah (c = a + b)" v={fmt(a.c)} />
+            <Nilai k={`Pump test/tera dikurangkan`} v={formatNumber(a.tera, 1)} />
+            <Nilai k="Stok akhir teoritis (e)" v={fmt(a.e)} />
+            <Nilai k="Stok akhir real (f)" v={fmt(a.f)} />
+            <Nilai k="Losses (g = f − e)" v={fmt(a.g)} tebal merah={(a.g ?? 0) < 0} />
+            <Nilai k="% Losses" v={a.h === null ? '-' : `${formatNumber(a.h, 2)}%`} tebal />
+          </div>
+        ))}
+        <span className="text-body-sm text-on-surface-variant">Kosongkan isian untuk memakai nilai otomatis (abu-abu).</span>
+      </Bagian>
+
+      <Bagian no={4} {...bg(4)} judul="Penerimaan BBM & BBK" ringkas={`${penerimaan.length} penerimaan dari Input Bongkaran`}>
+        {penerimaan.map(({ r, order, real }) => (
+          <span key={r.id} className="tabular flex flex-col border-b border-outline-variant/40 pb-1 text-body-sm">
+            <b>
+              {formatTanggalIso(r.tanggal)} · {r.produk} · {r.nopol}
+            </b>
+            <span className="text-on-surface-variant">
+              SO {r.noSO || '-'} · LO {r.noLOs.join(', ') || '-'} · order {formatLiter(order)} · real {real === null ? '-' : formatLiter(real, 2)} · losses {real === null ? '-' : formatNumber(real - order, 2)}
+            </span>
+          </span>
+        ))}
+        {!penerimaan.length && <span className="text-body-sm text-on-surface-variant">Belum ada penerimaan bulan ini.</span>}
+      </Bagian>
+
+      <Bagian no={5} {...bg(5)} judul="Rekap Tera Nozzle" ringkas={`${formatLiter(pumpTest.reduce((n, r) => n + r.liter, 0), 1)} pump test bulan ini`}>
+        {rekapTera.map((x) => (
+          <Nilai key={`${x.nozzle}|${x.produk}`} k={`${x.nozzle ? `Nozzle ${x.nozzle}` : 'Nozzle -'} · ${x.produk} · ${x.perHari.size} hari`} v={formatLiter(x.total, 1)} />
+        ))}
+        {!rekapTera.length && <span className="text-body-sm text-on-surface-variant">Belum ada pump test bulan ini.</span>}
+      </Bagian>
+
+      {CASH_SO.map((c, i) => {
+        const x = data.cash[c.key] ?? kosongCash()
+        const h = hitungCashSo(x, c.key)
+        return (
+          <Bagian key={c.key} no={6 + i} {...bg(6 + i)} judul={c.judul.replace('Berita Acara ', '')} ringkas={`Fisik ${rp(h.fisik)} · selisih ${rp(h.selisih)}`}>
+            <div className="grid grid-cols-2 gap-space-xs">
+              <Field label="Tanggal transaksi" htmlFor={`so-ct-${c.key}`}>
+                <Input id={`so-ct-${c.key}`} type="date" disabled={!bolehUbah} value={x.tanggal} onChange={(e) => ubahCash(c.key, { tanggal: e.target.value })} />
+              </Field>
+              {angkaInput(`so-cj-${c.key}`, c.key === 'petty' ? 'Saldo per book (Rp)' : 'Transaksi penjualan (Rp)', x.penjualan, (v) => ubahCash(c.key, { penjualan: v }))}
+              {c.key === 'bbm'
+                ? NON_TUNAI_SO.map((k) => <div key={k}>{angkaInput(`so-cn-${c.key}-${k}`, `${k} (Rp)`, x.nonTunai[k] ?? '', (v) => ubahCash(c.key, { nonTunai: { ...x.nonTunai, [k]: v } }))}</div>)
+                : c.key !== 'petty' && angkaInput(`so-cn-${c.key}`, 'Non tunai (Rp)', x.nonTunai.non_tunai ?? '', (v) => ubahCash(c.key, { nonTunai: { ...x.nonTunai, non_tunai: v } }))}
+            </div>
+            <span className="text-tag uppercase text-on-surface-variant">Rincian uang (lembar/keping)</span>
+            <div className="grid grid-cols-3 gap-space-xs">
+              {PECAHAN.map(([k, l, , t]) => (
+                <div key={k}>{angkaInput(`so-cp-${c.key}-${k}`, `${l}${t === 'l' ? ' logam' : ''}`, x.pecahan[k] ?? '', (v) => ubahCash(c.key, { pecahan: { ...x.pecahan, [k]: v } }))}</div>
+              ))}
+            </div>
+            {c.key !== 'petty' && <Nilai k="Total penjualan tunai" v={rp(h.seharusnya)} />}
+            <Nilai k="Hasil cash opname" v={rp(h.fisik)} tebal />
+            <Nilai k="Selisih lebih/(kurang)" v={rp(h.selisih)} tebal merah={h.selisih < 0} />
+            <span className="text-body-sm italic text-on-surface-variant">Terbilang: {terbilang(h.fisik)}</span>
+          </Bagian>
+        )
+      })}
+
+      <Bagian no={10} {...bg(10)} judul="Justifikasi Sales, Losses & Pertamina Way">
+        {(
+          [
+            ['justifikasiSales', 'a. Justifikasi sales (kenaikan/penurunan)'],
+            ['justifikasiLosses', 'b. Justifikasi losses & action'],
+            ['justifikasiPw', 'c. Justifikasi Pertamina Way'],
+          ] as const
+        ).map(([k, l]) => (
+          <Field key={k} label={l} htmlFor={`so-${k}`}>
+            <Textarea id={`so-${k}`} className="min-h-[88px]" disabled={!bolehUbah} value={data[k]} onChange={(e) => ubah({ [k]: e.target.value })} />
+          </Field>
+        ))}
+      </Bagian>
+
+      <Bagian no={11} {...bg(11)} judul="Update Pekerja SPBU" ringkas={`${JABATAN_SO.reduce((n, j) => n + (parseAngka(data.pekerja[j] ?? '') ?? 0), 0)} orang`}>
+        <div className="grid grid-cols-2 gap-space-xs">
+          {JABATAN_SO.map((j) => (
+            <div key={j}>{angkaInput(`so-pk-${j}`, j, data.pekerja[j] ?? '', (v) => ubah({ pekerja: { ...data.pekerja, [j]: v } }))}</div>
+          ))}
+        </div>
+      </Bagian>
+
+      <GlassCard level={2} id="so-bagian-12" className="flex scroll-mt-24 flex-col gap-space-sm p-space-md">
+        <span className="text-tag uppercase text-primary">Penanda tangan BA</span>
+        <div className="grid grid-cols-2 gap-space-xs">
+          {(
+            [
+              ['pengawas', 'Pengawas BBM'],
+              ['admin', 'Administrasi'],
+              ['abh', 'ABH'],
+              ['kasir', 'Kasir (cash opname)'],
+            ] as const
+          ).map(([k, l]) => (
+            <Field key={k} label={l} htmlFor={`so-ttd-${k}`}>
+              <Input id={`so-ttd-${k}`} disabled={!bolehUbah} value={data.ttd[k]} onChange={(e) => ubah({ ttd: { ...data.ttd, [k]: e.target.value } })} />
+            </Field>
+          ))}
+        </div>
+        <ErrorBox text={error} />
+        {bolehUbah && (
+          <Button size="lg" disabled={busy !== null} onClick={() => void simpan()}>
+            {busy === 'simpan' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
+            Simpan stock opname {labelBulan(bulan)}
+          </Button>
+        )}
+      </GlassCard>
+      {guard.dialog}
+    </div>
+  )
+}
