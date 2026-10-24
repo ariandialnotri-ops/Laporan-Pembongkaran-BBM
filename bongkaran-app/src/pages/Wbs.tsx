@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Sheet } from '@/components/ui/sheet'
+import { Stepper, type Langkah } from '@/components/ui/stepper'
 import { Textarea } from '@/components/ui/textarea'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
@@ -272,7 +274,8 @@ export function WbsDetail() {
   const [catatan, setCatatan] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const guard = useLeaveGuard({ active: true, title: 'Keluar dari tindak lanjut WBS?', detail: 'Catatan tindak lanjut yang belum disimpan akan hilang.' })
+  const [buka, setBuka] = useState(false)
+  const guard = useLeaveGuard({ active: !!catatan.trim(), title: 'Keluar dari tindak lanjut WBS?', detail: 'Catatan tindak lanjut yang belum disimpan akan hilang.' })
   if (!app.loaded || !recs) return <Loading />
   if (app.role !== 'abh') return <GlassCard className="p-space-md">Laporan WBS hanya dapat dibaca ABH.</GlassCard>
   if (!r) return <GlassCard className="p-space-md">Laporan tidak ditemukan.</GlassCard>
@@ -297,6 +300,25 @@ export function WbsDetail() {
       setBusy(false)
     }
   }
+
+  // Tahap: laporan masuk, setiap tindak lanjut, lalu selesai (belum). Tahap terbaru membuka form tindak lanjut.
+  const rw = d.riwayat ?? []
+  const bisaTL = r.status !== 'selesai'
+  const aksiTL = { label: 'Tambah tindak lanjut', icon: Send, onClick: () => (setError(null), setBuka(true)) }
+  const langkah: Langkah[] = [
+    { key: 'masuk', judul: 'Laporan masuk', waktu: r.createdAt, oleh: d.anonim ? 'Anonim' : 'Pelapor teridentifikasi', tag: 'Baru', nada: !rw.length && bisaTL ? 'aktif' : 'selesai', isi: <span>{kategoriWbs(d.kategori)?.label ?? d.kategori}</span>, aksi: !rw.length && bisaTL ? aksiTL : undefined },
+    ...rw.map((l, i): Langkah => ({
+      key: `${l.at}_${i}`,
+      judul: l.status === 'selesai' ? 'Selesai' : 'Ditinjau',
+      waktu: l.at,
+      oleh: l.oleh,
+      tag: statusWbs(l.status).label,
+      nada: i === rw.length - 1 && bisaTL ? 'aktif' : 'selesai',
+      isi: <span className="whitespace-pre-line text-on-surface">{l.catatan}</span>,
+      aksi: i === rw.length - 1 && bisaTL ? aksiTL : undefined,
+    })),
+    ...(bisaTL ? [{ key: 'selesai', judul: 'Selesai', nada: 'nanti' as const }] : []),
+  ]
 
   const baris: [string, string][] = [
     ['Jenis', kategoriWbs(d.kategori)?.label ?? d.kategori],
@@ -329,34 +351,33 @@ export function WbsDetail() {
         )}
       </GlassCard>
 
-      {(d.riwayat ?? []).length > 0 && (
-        <section aria-labelledby="wbs-riwayat" className="flex flex-col gap-space-sm">
-          <SectionHeader id="wbs-riwayat" title="Riwayat tindak lanjut" />
-          <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
-            {d.riwayat.map((l, i) => (
-              <div key={i} className="flex flex-col px-space-md py-space-sm text-body-sm">
-                <span className="text-on-surface-variant">
-                  {new Date(l.at).toLocaleString('id-ID')} · {l.oleh} · {statusWbs(l.status).label}
-                </span>
-                <span className="text-on-surface">{l.catatan}</span>
-              </div>
-            ))}
-          </GlassCard>
-        </section>
-      )}
-
-      <GlassCard level={2} className="flex flex-col gap-space-md p-space-md">
-        <span className="text-body-md font-bold text-on-surface">Tindak lanjut</span>
-        <Choice label="Status" value={statusBaru} onChange={(v) => setStatus(v)} options={STATUS_WBS.filter((s) => s.value !== 'baru').map((s) => ({ value: s.value, label: s.label }))} />
-        <Field label="Catatan" htmlFor="wbs-tl">
-          <Textarea id="wbs-tl" className="min-h-[88px]" placeholder="Mis. klarifikasi ke pihak terkait, hasil investigasi, sanksi" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
-        </Field>
-        <ErrorBox text={error} />
-        <Button size="lg" disabled={busy} onClick={() => void simpan()}>
-          {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-          Simpan tindak lanjut
-        </Button>
+      {/* Laporan & tindak lanjut sebagai stepper; tahap terbaru diketuk untuk membuka form tindak lanjut. */}
+      <GlassCard level={2} className="animate-entrance-2 flex flex-col p-space-md">
+        <Stepper judul="Laporan & tindak lanjut" langkah={langkah} />
       </GlassCard>
+
+      <Sheet
+        open={buka}
+        onOpenChange={setBuka}
+        title="Tindak lanjut WBS"
+        description={`${r.id} · status saat ini ${statusWbs(r.status).label}`}
+        footer={
+          <div className="flex flex-col gap-space-xs">
+            <ErrorBox text={error} />
+            <Button size="lg" disabled={busy} onClick={() => void simpan()}>
+              {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+              Simpan tindak lanjut
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-space-md pb-space-sm">
+          <Choice label="Status" value={statusBaru} onChange={(v) => setStatus(v)} options={STATUS_WBS.filter((s) => s.value !== 'baru').map((s) => ({ value: s.value, label: s.label }))} />
+          <Field label="Catatan" htmlFor="wbs-tl">
+            <Textarea id="wbs-tl" className="min-h-[88px]" placeholder="Mis. klarifikasi ke pihak terkait, hasil investigasi, sanksi" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
+          </Field>
+        </div>
+      </Sheet>
       {guard.dialog}
     </div>
   )

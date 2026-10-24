@@ -13,11 +13,12 @@ import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { KartuPilih } from '@/components/bongkaran/pilih-status'
 import { BARIS_BARU, BARIS_ORANYE, RecordTable, type Col } from '@/components/bongkaran/record-table'
-import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Sheet } from '@/components/ui/sheet'
+import { Stepper, type Langkah } from '@/components/ui/stepper'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
@@ -41,6 +42,7 @@ import {
   TINGKAT_INSIDEN,
   type HentiPenyaluran,
   type InsidenData,
+  type InsidenLangkah,
   type JenisInsiden,
   type StatusInsiden,
   type TingkatInsiden,
@@ -472,6 +474,8 @@ export function InsidenDetail() {
   const [jamKembali, setJamKembali] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Form tindak lanjut sebagai pop up dari tahap terbaru stepper.
+  const [buka, setBuka] = useState(false)
   if (!app.loaded) return <Loading />
   if (!rec)
     return (
@@ -485,7 +489,8 @@ export function InsidenDetail() {
   const d = rec.data
   // Semua anggota SPBU (termasuk security, cleaning service, Admin/Cashier) dapat menindaklanjuti dan menutup laporan.
   const bolehTL = !!app.role
-  const statusBaru = status || d.status
+  // Bawaan form: laporan terbuka → ditindaklanjuti.
+  const statusBaru = status || (d.status === 'terbuka' ? 'proses' : d.status)
   const hentiAktif = !!d.henti && !d.henti.selesai
   // Penyaluran dibuka kembali bila jam kembali diisi (bisa saat progress), wajib saat selesai.
   const bukaKembali = hentiAktif && (!!jamKembali || statusBaru === 'selesai')
@@ -530,6 +535,7 @@ export function InsidenDetail() {
       setTlFoto([])
       setTlBa([])
       setError(null)
+      setBuka(false)
       toast('Tindak lanjut tersimpan')
     } catch (e) {
       setError(pesan(e))
@@ -537,6 +543,60 @@ export function InsidenDetail() {
       setBusy(false)
     }
   }
+
+  const bisaTL = bolehTL && d.status !== 'selesai'
+  const aksiTL = { label: 'Tambah tindak lanjut', icon: Send, onClick: () => (setError(null), setBuka(true)) }
+  const lampiran = (l: InsidenLangkah) =>
+    !!(l.foto?.length || l.ba?.length) && (
+      <div className="mt-1 flex flex-wrap gap-space-xs">
+        {(l.foto ?? []).map((p) =>
+          srcOf(p) ? (
+            <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              <img src={srcOf(p)} alt="Foto tindak lanjut" className="size-16 rounded-md object-cover" />
+            </a>
+          ) : (
+            <span key={p.id} className="size-16 animate-pulse rounded-md bg-surface-container" />
+          ),
+        )}
+        {(l.ba ?? []).map((p) => (
+          <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="flex h-16 items-center gap-1.5 rounded-md bg-primary/10 px-space-sm font-semibold text-primary">
+            <FileText aria-hidden="true" className="size-4" />
+            <span className="max-w-36 truncate">{p.name || 'Berita acara'}</span>
+          </a>
+        ))}
+      </div>
+    )
+  // Laporan lama tanpa catatan awal: tahap "dilaporkan" dibuat dari data laporan.
+  const riwayat: InsidenLangkah[] = d.riwayat.length ? d.riwayat : [{ at: `${rec.tanggal}T${d.jam || '00:00'}`, oleh: d.pelapor, status: 'terbuka', catatan: 'Laporan dibuat' }]
+  const akhir = riwayat.length - 1
+  const langkah: Langkah[] = [
+    ...riwayat.map((l, i): Langkah => ({
+      key: `${l.at}_${i}`,
+      judul: i === 0 ? (d.jenis === 'henti' ? 'Stop penyaluran dilaporkan' : `${jenisLabel(d.jenis)} dilaporkan`) : l.status === 'selesai' ? 'Selesai' : l.status === 'terbuka' ? 'Dibuka kembali' : 'Tindak lanjut',
+      waktu: l.at,
+      oleh: l.oleh || '-',
+      tag: statusMeta(l.status).label,
+      nada: i === akhir && bisaTL ? 'aktif' : 'selesai',
+      isi: (
+        <>
+          <span className="whitespace-pre-line text-on-surface">{l.catatan}</span>
+          {lampiran(l)}
+        </>
+      ),
+      aksi: i === akhir && bisaTL ? aksiTL : undefined,
+    })),
+    ...(d.status !== 'selesai'
+      ? [
+          {
+            key: 'selesai',
+            judul: 'Selesai / closing',
+            nada: 'nanti' as const,
+            kosong: d.targetSelesai ? `Target ${formatTanggalIso(d.targetSelesai)}` : 'Belum',
+            isi: d.pic ? <span>PIC {d.pic}</span> : undefined,
+          },
+        ]
+      : []),
+  ]
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -581,164 +641,141 @@ export function InsidenDetail() {
       {(d.video ?? []).map((v) =>
         srcOf(v) ? <video key={v.id} src={srcOf(v)} controls playsInline aria-label="Video kejadian" className="animate-entrance-1 max-h-80 w-full rounded-md bg-black" /> : null,
       )}
-      <section aria-labelledby="ins-riwayat" className="animate-entrance-2 flex flex-col gap-space-xs">
-        <SectionHeader id="ins-riwayat" title="Tindak lanjut" />
-        <GlassCard level={1} className="flex flex-col divide-y divide-outline-variant/40">
-          {[...d.riwayat].reverse().map((l, i) => (
-            <div key={`${l.at}_${i}`} className="flex flex-col gap-0.5 px-space-sm py-space-xs text-body-sm">
-              <span className="flex items-center justify-between gap-space-xs">
-                <span className="tabular text-on-surface-variant">
-                  {formatTanggalIso(l.at.slice(0, 10))} {new Date(l.at).toTimeString().slice(0, 5)}, {l.oleh || '-'}
-                </span>
-                <StatusPill s={l.status} />
-              </span>
-              <span className="text-on-surface">{l.catatan}</span>
-              {!!(l.foto?.length || l.ba?.length) && (
-                <div className="mt-1 flex flex-wrap gap-space-xs">
-                  {(l.foto ?? []).map((p) =>
-                    srcOf(p) ? (
-                      <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer">
-                        <img src={srcOf(p)} alt="Foto tindak lanjut" className="size-16 rounded-md object-cover" />
-                      </a>
-                    ) : (
-                      <span key={p.id} className="size-16 animate-pulse rounded-md bg-surface-container" />
-                    ),
-                  )}
-                  {(l.ba ?? []).map((p) => (
-                    <a key={p.id} href={srcOf(p)} target="_blank" rel="noreferrer" className="flex h-16 items-center gap-1.5 rounded-md bg-primary/10 px-space-sm font-semibold text-primary">
-                      <FileText aria-hidden="true" className="size-4" />
-                      <span className="max-w-36 truncate">{p.name || 'Berita acara'}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </GlassCard>
-      </section>
+      {/* Pelaporan & tindak lanjut sebagai stepper; tahap terbaru diketuk untuk membuka form tindak lanjut. */}
+      <GlassCard level={2} className="animate-entrance-2 flex flex-col p-space-md">
+        <Stepper judul="Pelaporan & tindak lanjut" langkah={langkah} />
+      </GlassCard>
 
-      {bolehTL && d.status !== 'selesai' && (
-        <GlassCard level={2} className="animate-entrance-3 flex flex-col gap-space-sm p-space-md">
-          <span className="text-tag uppercase text-primary">Tambah tindak lanjut</span>
-          <Field label="Status">
-            <Choice label="Status tindak lanjut" value={statusBaru} onChange={(v) => setStatus(v)} options={STATUS_INSIDEN.map((x) => ({ value: x.value, label: x.label }))} />
-          </Field>
-          <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="PIC" htmlFor="ins-pic">
-              <Input id="ins-pic" autoComplete="off" placeholder={d.pic || 'Nama penanggung jawab'} value={pic} onChange={(e) => setPic(e.target.value)} />
-            </Field>
-            <Field label="Target selesai" htmlFor="ins-target">
-              <Input id="ins-target" type="date" value={target || d.targetSelesai} onChange={(e) => setTarget(e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Catatan" htmlFor="ins-catatan">
-            <Textarea id="ins-catatan" className="min-h-[64px]" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
-          </Field>
-          <FotoWajib
-            label="Foto tindak lanjut"
-            hint="Kondisi setelah ditangani, perbaikan, atau penggantian komponen (maks. 4)."
-            wajib={false}
-            kamera={false}
-            fotos={tlFoto}
-            busy={olahFoto}
-            disabled={busy}
-            onAdd={(files) => {
-              setOlahFoto(true)
-              void (async () => {
-                try {
-                  const baru: FotoLokal[] = []
-                  for (const f of files.slice(0, 4 - tlFoto.length)) {
-                    const blob = await compressImage(f)
-                    baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
-                  }
-                  setTlFoto((x) => [...x, ...baru].slice(0, 4))
-                } catch (e) {
-                  setError(`Gagal memproses foto: ${pesan(e)}`)
-                } finally {
-                  setOlahFoto(false)
-                }
-              })()
-            }}
-            onRemove={(fid) => setTlFoto((x) => x.filter((f) => f.id !== fid))}
-          />
+      <Sheet
+        open={buka}
+        onOpenChange={setBuka}
+        title="Tambah tindak lanjut"
+        description={`Status saat ini: ${statusMeta(d.status).label}`}
+        footer={
           <div className="flex flex-col gap-space-xs">
-            <span className="text-tag uppercase text-on-surface-variant">Berita acara / dokumen (opsional)</span>
-            <span className="text-body-sm text-on-surface-variant">BA perbaikan, BA serah terima, laporan vendor: PDF (maks. 8 MB) atau foto dokumen.</span>
-            {tlBa.map((f) => (
-              <span key={f.id} className="flex items-center gap-space-xs rounded-md bg-surface-container-low px-space-sm py-space-xs text-body-sm">
-                <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1 truncate">{f.nama}</span>
-                <button type="button" aria-label={`Hapus ${f.nama}`} onClick={() => setTlBa((x) => x.filter((y) => y.id !== f.id))} className="flex size-8 items-center justify-center rounded-full text-on-surface-variant">
-                  <X aria-hidden="true" className="size-4" />
-                </button>
-              </span>
-            ))}
-            <input
-              ref={baRef}
-              type="file"
-              accept="application/pdf,image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const files = [...(e.target.files ?? [])]
-                e.target.value = ''
-                void (async () => {
-                  const baru: (FotoLokal & { nama: string; pdf: boolean })[] = []
-                  for (const f of files.slice(0, 3 - tlBa.length)) {
-                    const pdf = f.type === 'application/pdf'
-                    if (pdf && f.size > 8 * 1024 * 1024) {
-                      setError(`${f.name} lebih dari 8 MB.`)
-                      continue
-                    }
-                    const blob = pdf ? f : await compressImage(f)
-                    baru.push({ id: genId('b'), blob, url: URL.createObjectURL(blob), nama: f.name || (pdf ? 'berita-acara.pdf' : 'berita-acara.jpg'), pdf })
-                  }
-                  setTlBa((x) => [...x, ...baru].slice(0, 3))
-                })()
-              }}
-            />
-            <Button variant="soft" className="self-start" disabled={busy || tlBa.length >= 3} onClick={() => baRef.current?.click()}>
-              <Paperclip aria-hidden="true" />
-              Lampirkan berita acara
+            <ErrorBox text={error} />
+            <Button size="lg" disabled={busy} onClick={simpanTL}>
+              {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+              Simpan tindak lanjut
             </Button>
           </div>
-          {hentiAktif && (
-            <div className={cn('flex flex-col gap-space-sm rounded-md p-space-sm', jamKembali ? 'bg-emerald-50 ring-1 ring-emerald-300' : 'bg-error-container/50')}>
-              <span className="text-body-sm font-semibold text-on-surface">
-                Penyaluran {d.henti!.produk.join(', ')} masih berhenti sejak {labelWaktu(d.henti!.mulai, formatTanggalIso)}
-              </span>
-              <Field
-                label={statusBaru === 'selesai' ? 'Jam penyaluran kembali (wajib)' : 'Jam penyaluran kembali (isi bila sudah disalurkan lagi)'}
-                htmlFor="ins-kembali"
-              >
-                <Input id="ins-kembali" type="datetime-local" min={d.henti!.mulai} max={waktuLokal()} value={jamKembali} onChange={(e) => (setError(null), setJamKembali(e.target.value))} />
+        }
+      >
+        <div className="flex flex-col gap-space-sm pb-space-sm">
+            <Field label="Status">
+              <Choice label="Status tindak lanjut" value={statusBaru} onChange={(v) => setStatus(v)} options={STATUS_INSIDEN.map((x) => ({ value: x.value, label: x.label }))} />
+            </Field>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <Field label="PIC" htmlFor="ins-pic">
+                <Input id="ins-pic" autoComplete="off" placeholder={d.pic || 'Nama penanggung jawab'} value={pic} onChange={(e) => setPic(e.target.value)} />
               </Field>
-              <div className="flex flex-wrap items-center gap-space-xs">
-                <Button variant="soft" size="sm" onClick={() => (setError(null), setJamKembali(waktuLokal()))}>
-                  Isi waktu sekarang
-                </Button>
-                {jamKembali && (
-                  <Button variant="ghost" size="sm" onClick={() => setJamKembali('')}>
-                    Kosongkan
-                  </Button>
-                )}
-              </div>
-              <span className="tabular text-body-sm text-on-surface-variant">
-                {jamKembali && jamKembali >= d.henti!.mulai
-                  ? `Penyaluran kembali ${labelWaktu(jamKembali, formatTanggalIso)} · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}`
-                  : statusBaru === 'selesai'
-                    ? 'Laporan selesai: isi jam penyaluran kembali.'
-                    : 'Biarkan kosong bila penyaluran masih berhenti; laporan tetap dapat ditindaklanjuti.'}
-              </span>
+              <Field label="Target selesai" htmlFor="ins-target">
+                <Input id="ins-target" type="date" value={target || d.targetSelesai} onChange={(e) => setTarget(e.target.value)} />
+              </Field>
             </div>
-          )}
-          <ErrorBox text={error} />
-          <Button size="lg" disabled={busy} onClick={simpanTL}>
-            <Send aria-hidden="true" />
-            Simpan tindak lanjut
-          </Button>
-        </GlassCard>
-      )}
+            <Field label="Catatan" htmlFor="ins-catatan">
+              <Textarea id="ins-catatan" className="min-h-[64px]" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
+            </Field>
+            <FotoWajib
+              label="Foto tindak lanjut"
+              hint="Kondisi setelah ditangani, perbaikan, atau penggantian komponen (maks. 4)."
+              wajib={false}
+              kamera={false}
+              fotos={tlFoto}
+              busy={olahFoto}
+              disabled={busy}
+              onAdd={(files) => {
+                setOlahFoto(true)
+                void (async () => {
+                  try {
+                    const baru: FotoLokal[] = []
+                    for (const f of files.slice(0, 4 - tlFoto.length)) {
+                      const blob = await compressImage(f)
+                      baru.push({ id: genId('f'), blob, url: URL.createObjectURL(blob) })
+                    }
+                    setTlFoto((x) => [...x, ...baru].slice(0, 4))
+                  } catch (e) {
+                    setError(`Gagal memproses foto: ${pesan(e)}`)
+                  } finally {
+                    setOlahFoto(false)
+                  }
+                })()
+              }}
+              onRemove={(fid) => setTlFoto((x) => x.filter((f) => f.id !== fid))}
+            />
+            <div className="flex flex-col gap-space-xs">
+              <span className="text-tag uppercase text-on-surface-variant">Berita acara / dokumen (opsional)</span>
+              <span className="text-body-sm text-on-surface-variant">BA perbaikan, BA serah terima, laporan vendor: PDF (maks. 8 MB) atau foto dokumen.</span>
+              {tlBa.map((f) => (
+                <span key={f.id} className="flex items-center gap-space-xs rounded-md bg-surface-container-low px-space-sm py-space-xs text-body-sm">
+                  <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1 truncate">{f.nama}</span>
+                  <button type="button" aria-label={`Hapus ${f.nama}`} onClick={() => setTlBa((x) => x.filter((y) => y.id !== f.id))} className="flex size-8 items-center justify-center rounded-full text-on-surface-variant">
+                    <X aria-hidden="true" className="size-4" />
+                  </button>
+                </span>
+              ))}
+              <input
+                ref={baRef}
+                type="file"
+                accept="application/pdf,image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = [...(e.target.files ?? [])]
+                  e.target.value = ''
+                  void (async () => {
+                    const baru: (FotoLokal & { nama: string; pdf: boolean })[] = []
+                    for (const f of files.slice(0, 3 - tlBa.length)) {
+                      const pdf = f.type === 'application/pdf'
+                      if (pdf && f.size > 8 * 1024 * 1024) {
+                        setError(`${f.name} lebih dari 8 MB.`)
+                        continue
+                      }
+                      const blob = pdf ? f : await compressImage(f)
+                      baru.push({ id: genId('b'), blob, url: URL.createObjectURL(blob), nama: f.name || (pdf ? 'berita-acara.pdf' : 'berita-acara.jpg'), pdf })
+                    }
+                    setTlBa((x) => [...x, ...baru].slice(0, 3))
+                  })()
+                }}
+              />
+              <Button variant="soft" className="self-start" disabled={busy || tlBa.length >= 3} onClick={() => baRef.current?.click()}>
+                <Paperclip aria-hidden="true" />
+                Lampirkan berita acara
+              </Button>
+            </div>
+            {hentiAktif && (
+              <div className={cn('flex flex-col gap-space-sm rounded-md p-space-sm', jamKembali ? 'bg-emerald-50 ring-1 ring-emerald-300' : 'bg-error-container/50')}>
+                <span className="text-body-sm font-semibold text-on-surface">
+                  Penyaluran {d.henti!.produk.join(', ')} masih berhenti sejak {labelWaktu(d.henti!.mulai, formatTanggalIso)}
+                </span>
+                <Field
+                  label={statusBaru === 'selesai' ? 'Jam penyaluran kembali (wajib)' : 'Jam penyaluran kembali (isi bila sudah disalurkan lagi)'}
+                  htmlFor="ins-kembali"
+                >
+                  <Input id="ins-kembali" type="datetime-local" min={d.henti!.mulai} max={waktuLokal()} value={jamKembali} onChange={(e) => (setError(null), setJamKembali(e.target.value))} />
+                </Field>
+                <div className="flex flex-wrap items-center gap-space-xs">
+                  <Button variant="soft" size="sm" onClick={() => (setError(null), setJamKembali(waktuLokal()))}>
+                    Isi waktu sekarang
+                  </Button>
+                  {jamKembali && (
+                    <Button variant="ghost" size="sm" onClick={() => setJamKembali('')}>
+                      Kosongkan
+                    </Button>
+                  )}
+                </div>
+                <span className="tabular text-body-sm text-on-surface-variant">
+                  {jamKembali && jamKembali >= d.henti!.mulai
+                    ? `Penyaluran kembali ${labelWaktu(jamKembali, formatTanggalIso)} · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}`
+                    : statusBaru === 'selesai'
+                      ? 'Laporan selesai: isi jam penyaluran kembali.'
+                      : 'Biarkan kosong bila penyaluran masih berhenti; laporan tetap dapat ditindaklanjuti.'}
+                </span>
+              </div>
+            )}
+        </div>
+      </Sheet>
     </div>
   )
 }

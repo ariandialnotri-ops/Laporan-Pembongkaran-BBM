@@ -15,6 +15,8 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { InfoPop } from '@/components/ui/info-pop'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Sheet } from '@/components/ui/sheet'
+import { Stepper, type Langkah } from '@/components/ui/stepper'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
@@ -458,8 +460,6 @@ function FotoList({ fotos, alt }: { fotos: Photo[]; alt: string }) {
   )
 }
 
-const tandaLabel = (t?: Tanda) => (t ? `${t.nama} · ${new Date(t.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}${t.catatan ? ` · ${t.catatan}` : ''}` : '-')
-
 /** Detail pengajuan + persetujuan 1 Admin/Cashier / persetujuan akhir ABH + hapus. */
 export function PengajuanPettyDetail() {
   const app = useApp()
@@ -471,6 +471,8 @@ export function PengajuanPettyDetail() {
   const [catatan, setCatatan] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // Form persetujuan sebagai pop up dari tahap terbaru stepper.
+  const [bukaSetuju, setBukaSetuju] = useState(false)
   if (loading) return <Loading />
   if (!rec) return <GlassCard className="p-space-md">{error ?? 'Pengajuan tidak ditemukan.'}</GlassCard>
   const uid = app.session.user?.id ?? null
@@ -492,6 +494,7 @@ export function PengajuanPettyDetail() {
       await app.backend.savePetty({ ...rec, status, data }, false)
       toast(status === 'Menunggu ABH' ? 'Disetujui, diteruskan ke ABH' : status === 'Disetujui' ? 'Pengajuan disetujui' : 'Pengajuan ditolak')
       setCatatan('')
+      setBukaSetuju(false)
       void muat()
     } catch (e) {
       setErr(pesan(e))
@@ -509,6 +512,96 @@ export function PengajuanPettyDetail() {
     } catch (e) {
       setErr(pesan(e))
     }
+  }
+
+  const jenis = jenisPetty(rec)
+  const ditolak = rec.status === 'Ditolak'
+  // Ditolak di persetujuan 1 bila ABH belum memberi keputusan.
+  const tolakAdmin = ditolak && !d.keputusan
+  const aksiSetuju = { label: 'Beri persetujuan', icon: Check, onClick: () => (setErr(null), setBukaSetuju(true)) }
+  const catatanTanda = (t?: Tanda) => (t?.catatan ? <span className="text-on-surface">“{t.catatan}”</span> : undefined)
+  const langkah: Langkah[] = [
+    {
+      key: 'aju',
+      judul: jenis === 'reimburse' ? 'Reimburse diajukan' : 'Pengajuan dibuat',
+      waktu: rec.createdAt,
+      oleh: d.diajukanNama,
+      tag: 'Submit',
+      nada: 'selesai',
+      isi: <span>{d.alasan}</span>,
+    },
+    {
+      key: 'p1',
+      judul: 'Persetujuan 1 Admin/Cashier',
+      waktu: d.review?.at,
+      oleh: d.review?.nama,
+      tag: d.review ? (tolakAdmin ? 'Ditolak' : 'Disetujui') : d.keputusan ? 'Dilewati' : undefined,
+      nada: d.review ? (tolakAdmin ? 'error' : 'selesai') : rec.status === 'Menunggu Admin' ? 'aktif' : d.keputusan ? 'selesai' : 'nanti',
+      kosong: rec.status === 'Menunggu Admin' ? 'Menunggu Admin/Cashier' : d.keputusan ? 'Diputuskan langsung oleh ABH' : undefined,
+      isi: catatanTanda(d.review),
+      aksi: bisaPeriksa ? aksiSetuju : undefined,
+    },
+  ]
+  if (!tolakAdmin)
+    langkah.push({
+      key: 'p2',
+      judul: 'Persetujuan akhir ABH',
+      waktu: d.keputusan?.at,
+      oleh: d.keputusan?.nama,
+      tag: d.keputusan ? (ditolak ? 'Ditolak' : 'Disetujui') : undefined,
+      nada: d.keputusan ? (ditolak ? 'error' : 'selesai') : rec.status === 'Menunggu ABH' ? 'aktif' : 'nanti',
+      kosong: rec.status === 'Menunggu ABH' ? 'Menunggu ABH' : undefined,
+      isi: catatanTanda(d.keputusan),
+      aksi: bisaPutus ? aksiSetuju : undefined,
+    })
+  if (!ditolak && jenis === 'pengadaan') {
+    const s = d.settlement
+    const bisaSettle = rec.status === 'Disetujui' && !s && (milikSendiri(rec, uid) || bolehRealisasi(app.role))
+    langkah.push({
+      key: 'settle',
+      judul: 'Settlement',
+      waktu: s?.at,
+      oleh: s?.nama,
+      tag: s ? 'Struk & barang' : undefined,
+      nada: s ? 'selesai' : rec.status === 'Disetujui' ? 'aktif' : 'nanti',
+      kosong: rec.status === 'Disetujui' && !s ? 'Menunggu pengaju (foto struk & barang)' : undefined,
+      isi: s ? (
+        <>
+          <span>
+            Belanja {formatTanggalIso(s.tanggal)}
+            {lihatNominal ? ` · ${rupiah(s.nominal)} (sisa ${rupiah(rec.total - s.nominal)})` : ''}
+          </span>
+          {catatanTanda(s)}
+          <FotoList fotos={[...s.struk, ...s.barang]} alt="Struk / barang yang dibeli" />
+        </>
+      ) : undefined,
+      aksi: bisaSettle ? { label: 'Create Settlement', icon: PackageCheck, onClick: () => navigate(`/finance/petty/settlement/${encodeURIComponent(rec.id)}`) } : undefined,
+    })
+  }
+  if (!ditolak) {
+    const r = d.realisasi
+    const siap = rec.status === 'Disetujui' && !r && !perluSettlement(rec)
+    langkah.push({
+      key: 'real',
+      judul: jenis === 'reimburse' ? 'Pembayaran reimburse' : 'Realisasi',
+      waktu: r?.at,
+      oleh: r?.nama,
+      tag: r ? 'Selesai' : undefined,
+      nada: r ? 'selesai' : siap ? 'aktif' : 'nanti',
+      kosong: siap ? 'Menunggu Admin/Cashier' : undefined,
+      isi: r ? (
+        <>
+          <span>
+            {formatTanggalIso(r.tanggal)}
+            {r.coa ? ` · COA ${r.coa.accountNo} ${r.coa.activity}` : ''}
+            {lihatNominal ? ` · ${rupiah(r.nominal)}` : ''}
+          </span>
+          {catatanTanda(r)}
+          <FotoList fotos={r.nota} alt="Nota realisasi" />
+        </>
+      ) : undefined,
+      aksi: siap && bolehRealisasi(app.role) ? { label: jenis === 'reimburse' ? 'Bayar reimburse' : 'Catat realisasi', icon: ReceiptText, onClick: () => navigate(`/finance/petty/realisasi/${encodeURIComponent(rec.id)}`) } : undefined,
+    })
   }
 
   return (
@@ -532,93 +625,43 @@ export function PengajuanPettyDetail() {
           {d.vendor && <Baris k="Vendor" v={d.vendor} />}
           <Baris k="Keperluan" v={d.alasan} />
           <Baris k="Diajukan" v={d.diajukanNama} />
-          <Baris k="Persetujuan 1 Admin/Cashier" v={tandaLabel(d.review)} />
-          <Baris k="Persetujuan akhir ABH" v={tandaLabel(d.keputusan)} />
         </div>
         <FotoList fotos={d.lampiran} alt={jenisPetty(rec) === 'reimburse' ? 'Nota reimburse' : 'Lampiran pengajuan'} />
       </GlassCard>
 
-      {(bisaPeriksa || bisaPutus) && (
-        <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-          <SectionHeader id="pp-tindak" title={bisaPutus || app.role === 'abh' ? 'Persetujuan akhir ABH' : 'Persetujuan 1 Admin/Cashier'} />
+      {/* Pengajuan → persetujuan → settlement → realisasi sebagai stepper; tahap terbaru diketuk untuk bertindak. */}
+      <GlassCard level={2} className="animate-entrance-2 flex flex-col p-space-md">
+        <Stepper judul="Alur pengajuan" langkah={langkah} />
+      </GlassCard>
+
+      <Sheet
+        open={bukaSetuju}
+        onOpenChange={setBukaSetuju}
+        title={bisaPutus || app.role === 'abh' ? 'Persetujuan akhir ABH' : 'Persetujuan 1 Admin/Cashier'}
+        description={`${rec.no} · ${d.uraian}${lihatNominal ? ` · ${rupiah(rec.total)}` : ''}`}
+        footer={
+          <div className="flex flex-col gap-space-xs">
+            <ErrorBox text={err} />
+            <div className="grid grid-cols-2 gap-space-xs">
+              <Button disabled={!!busy} onClick={() => void putuskan(app.role === 'admin' ? 'Menunggu ABH' : 'Disetujui')}>
+                <Check aria-hidden="true" />
+                Setujui
+              </Button>
+              <Button variant="danger" disabled={!!busy} onClick={() => void putuskan('Ditolak')}>
+                <X aria-hidden="true" />
+                Tolak
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-space-sm pb-space-sm">
           <Field label="Catatan (wajib bila ditolak)" htmlFor="pp-catatan">
             <Input id="pp-catatan" autoComplete="off" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
           </Field>
-          <ErrorBox text={err} />
-          <div className="grid grid-cols-2 gap-space-xs">
-            {app.role === 'admin' ? (
-              <Button disabled={!!busy} onClick={() => void putuskan('Menunggu ABH')}>
-                <Check aria-hidden="true" />
-                Setujui
-              </Button>
-            ) : (
-              <Button disabled={!!busy} onClick={() => void putuskan('Disetujui')}>
-                <Check aria-hidden="true" />
-                Setujui
-              </Button>
-            )}
-            <Button variant="danger" disabled={!!busy} onClick={() => void putuskan('Ditolak')}>
-              <X aria-hidden="true" />
-              Tolak
-            </Button>
-          </div>
           {app.role === 'admin' && <span className="text-body-sm text-on-surface-variant">Setelah disetujui, pengajuan diteruskan ke ABH untuk persetujuan akhir.</span>}
-        </GlassCard>
-      )}
-
-      {rec.status === 'Disetujui' && jenisPetty(rec) === 'pengadaan' && (
-        <GlassCard level={2} className={cn('flex flex-col gap-space-sm p-space-md', perluSettlement(rec) && 'border-2 border-amber-400')}>
-          <SectionHeader id="pp-settle" title="Settlement" />
-          {d.settlement ? (
-            <>
-              <div className="divide-y divide-outline-variant/40">
-                <Baris k="Tanggal belanja" v={formatTanggalIso(d.settlement.tanggal)} />
-                {lihatNominal && <Baris k="Nominal dibelanjakan" v={rupiah(d.settlement.nominal)} />}
-                {lihatNominal && <Baris k="Sisa dari pengajuan" v={rupiah(rec.total - d.settlement.nominal)} />}
-                <Baris k="Dibuat" v={tandaLabel({ ...d.settlement, catatan: d.settlement.catatan })} />
-              </div>
-              <span className="text-body-sm font-semibold text-on-surface">Struk pembelian</span>
-              <FotoList fotos={d.settlement.struk} alt="Struk pembelian" />
-              <span className="text-body-sm font-semibold text-on-surface">Barang yang dibeli</span>
-              <FotoList fotos={d.settlement.barang} alt="Barang yang dibeli" />
-            </>
-          ) : milikSendiri(rec, uid) || bolehRealisasi(app.role) ? (
-            <Link to={`/finance/petty/settlement/${encodeURIComponent(rec.id)}`} className={buttonVariants({ size: 'lg' })}>
-              <PackageCheck aria-hidden="true" />
-              Create Settlement
-            </Link>
-          ) : (
-            <span className="text-body-sm text-on-surface-variant">Menunggu pengaju membuat Settlement (foto struk & barang).</span>
-          )}
-        </GlassCard>
-      )}
-
-      {rec.status === 'Disetujui' && (
-        <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-          <SectionHeader id="pp-real" title={jenisPetty(rec) === 'reimburse' ? 'Pembayaran reimburse' : 'Realisasi'} />
-          {d.realisasi ? (
-            <>
-              <div className="divide-y divide-outline-variant/40">
-                <Baris k="Tanggal" v={formatTanggalIso(d.realisasi.tanggal)} />
-                {d.realisasi.coa && <Baris k="Akun COA" v={`${d.realisasi.coa.accountNo} · ${d.realisasi.coa.activity}`} />}
-                {lihatNominal && <Baris k="Nominal" v={rupiah(d.realisasi.nominal)} />}
-                {lihatNominal && <Baris k="Selisih dari pengajuan" v={rupiah(rec.total - d.realisasi.nominal)} />}
-                <Baris k="Dicatat" v={tandaLabel({ ...d.realisasi, catatan: d.realisasi.catatan })} />
-              </div>
-              <FotoList fotos={d.realisasi.nota} alt="Nota realisasi" />
-            </>
-          ) : perluSettlement(rec) ? (
-            <span className="text-body-sm text-on-surface-variant">Realisasi Admin/Cashier dilakukan setelah Settlement dibuat.</span>
-          ) : bolehRealisasi(app.role) ? (
-            <Link to={`/finance/petty/realisasi/${encodeURIComponent(rec.id)}`} className={buttonVariants({ size: 'lg' })}>
-              <ReceiptText aria-hidden="true" />
-              {jenisPetty(rec) === 'reimburse' ? 'Bayar reimburse' : 'Catat realisasi'}
-            </Link>
-          ) : (
-            <span className="text-body-sm text-on-surface-variant">Menunggu {jenisPetty(rec) === 'reimburse' ? 'pembayaran' : 'realisasi'} oleh Admin/Cashier.</span>
-          )}
-        </GlassCard>
-      )}
+        </div>
+      </Sheet>
 
       {bisaHapus && (
         <Button variant="ghost" className="self-center text-error" onClick={() => void hapus()}>

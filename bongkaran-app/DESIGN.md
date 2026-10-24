@@ -496,6 +496,13 @@ Aturan umum: setelah **submit**, aplikasi pindah ke riwayatnya (stok → Catatan
 ### 9.14f Detail Tracking LO (`/laporan/lo/:planId/:loId`)
 Ketuk baris Tracking LO → halaman detail: kartu ringkas (No LO besar, SO, status, produk, volume, supply point, tanggal kirim) dengan tombol **Edit / update pengiriman** (ke Edit SO & LO; LO Closed terkunci), lalu **stepper vertikal** gaya timeline: kolom kiri bulan + bulatan tanggal (hijau selesai, biru berjalan dengan cincin, abu belum, merah dihapus, cyan alih supply) dihubungkan garis, kartu kanan berisi tahap (Permintaan MS2, SO terbit, LO terbit, Dalam pengiriman, Diterima di SPBU, Closed), jam, tag, dan rincian. Di bawahnya **Riwayat submit & perubahan** (terbaru di atas, waktu + pelaku); riwayat dicatat otomatis setiap plan disimpan (`denganJejak` di `lib/plan.ts`, disimpan di `meta.riwayat` bbm_plans).
 
+### 9.14g Stepper pengajuan & tindak lanjut (`components/ui/stepper.tsx`)
+Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal yang sama (Detail LO, detail insiden / near miss / kerusakan / stop penyaluran, detail Pengajuan Anggaran, detail WBS). Bulatan: hijau selesai, biru tahap terbaru (cincin), abu belum, merah ditolak/dihapus, cyan alih supply; kartu tahap berisi judul, tag status, waktu · pelaku, dan rincian (catatan, foto, BA). **Tahap terbaru dapat diketuk** (seluruh kartu + tombol biru) untuk membuka form di **pop up bottom sheet**:
+- Insiden & stop penyaluran: Tambah tindak lanjut (status bawaan Ditindaklanjuti, PIC, target, catatan, foto, BA, jam penyaluran kembali); tahap akhir "Selesai / closing" menampilkan target & PIC.
+- Pengajuan Anggaran: Pengajuan dibuat → Persetujuan 1 Admin/Cashier → Persetujuan akhir ABH (pop up Setujui/Tolak) → Settlement (pengadaan; ke Create Settlement) → Realisasi / Pembayaran reimburse (ke form realisasi). Ditolak = tahap merah, tahap berikutnya tidak ditampilkan.
+- WBS: Laporan masuk → Ditinjau … → Selesai (pop up status + catatan).
+- Tracking LO: tahap berjalan membuka Edit / update pengiriman.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

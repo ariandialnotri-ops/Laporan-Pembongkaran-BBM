@@ -1,18 +1,17 @@
-import { Link, useParams } from 'react-router-dom'
-import { Check, Clock, History, Lock, MapPin, PencilLine, Truck } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { History, Lock, MapPin, PencilLine, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ProdukChip } from '@/components/bongkaran/record-table'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
+import { Stepper } from '@/components/ui/stepper'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
 import { loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import type { JejakPlan, Plan, PlanLo, ReportSummary } from '@/lib/sop'
-import { cn } from '@/lib/utils'
 
-const BLN = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES']
 const jam = (d: Date) => `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
 const waktuLengkap = (ms: number) => {
   const d = new Date(ms)
@@ -94,6 +93,7 @@ function tahapLo(plan: Plan, lo: PlanLo, report: ReportSummary | undefined, stat
 /** Laporan > Tracking LO > detail satu LO: stepper tahap pengiriman, tombol edit/update, dan riwayat perubahan. */
 export function DetailLo() {
   const app = useApp()
+  const navigate = useNavigate()
   const { planId = '', loId = '' } = useParams()
   useSyncOnOpen()
   if (!app.loaded) return <Loading />
@@ -162,50 +162,23 @@ export function DetailLo() {
 
       {/* Stepper tahap pengiriman */}
       <GlassCard level={2} className="animate-entrance-2 flex flex-col p-space-md">
-        <h2 className="mb-space-sm flex items-center gap-2 text-body-md font-bold text-on-surface">
-          <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-          Tahap pengiriman
-          <span className="text-body-sm font-medium text-on-surface-variant">
-            ({tahap.filter((t) => t.selesai).length}/{tahap.length})
-          </span>
-        </h2>
-        <ol className="flex flex-col">
-          {tahap.map((t, i) => {
-            const aktif = i === kini
-            const ada = t.waktu !== undefined && Number.isFinite(t.waktu)
-            const d = ada ? new Date(t.waktu!) : null
-            const warna = t.nada === 'error' ? 'bg-error text-on-error' : t.nada === 'cyan' ? 'bg-cyan-600 text-white' : t.selesai ? 'bg-emerald-600 text-white' : aktif ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant'
-            const garis = t.selesai ? (t.nada === 'error' ? 'bg-error/50' : 'bg-emerald-500') : 'bg-outline-variant/60'
-            return (
-              <li key={t.judul} className="flex gap-space-sm" aria-current={aktif ? 'step' : undefined}>
-                {/* Kolom tanggal + bulatan + garis */}
-                <div className="flex w-11 shrink-0 flex-col items-center">
-                  <span className={cn('h-4 text-[11px] font-bold leading-4 tracking-wide', t.selesai || aktif ? 'text-primary' : 'text-transparent')}>{d ? BLN[d.getMonth()] : '·'}</span>
-                  <span className={cn('tabular relative flex size-9 shrink-0 items-center justify-center rounded-full text-body-sm font-bold shadow-sm', warna, aktif && 'ring-4 ring-primary/20')}>
-                    {d ? String(d.getDate()).padStart(2, '0') : t.selesai ? <Check aria-hidden="true" className="size-4" /> : i + 1}
-                  </span>
-                  {i < tahap.length - 1 && <span aria-hidden="true" className={cn('my-1 w-0.5 flex-1 rounded-full', garis)} />}
-                </div>
-                {/* Kartu tahap */}
-                <div className={cn('mb-space-sm mt-4 flex min-w-0 flex-1 flex-col gap-0.5 rounded-lg border p-space-sm', aktif ? 'border-primary/40 bg-primary/5' : 'border-outline-variant/40 bg-surface-container-lowest', !t.selesai && !aktif && 'opacity-70')}>
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-body-md font-bold text-on-surface">{t.judul}</span>
-                    {t.tag && <span className={cn('shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] font-bold tracking-wide', t.nada === 'error' ? 'bg-error-container text-on-error-container' : 'bg-primary/10 text-primary')}>{t.tag}</span>}
-                  </span>
-                  <span className="tabular flex items-center gap-1 text-xs font-semibold text-on-surface-variant">
-                    <Clock aria-hidden="true" className="size-3.5" />
-                    {ada ? waktuLengkap(t.waktu!) : aktif ? 'Sedang berjalan' : t.selesai ? 'Waktu tidak tercatat' : 'Belum'}
-                  </span>
-                  {t.rinci.map((r) => (
-                    <span key={r} className="tabular text-body-sm text-on-surface-variant">
-                      {r}
-                    </span>
-                  ))}
-                </div>
-              </li>
-            )
-          })}
-        </ol>
+        <Stepper
+          judul="Tahap pengiriman"
+          langkah={tahap.map((t, i) => ({
+            key: t.judul,
+            judul: t.judul,
+            waktu: t.waktu !== undefined && Number.isFinite(t.waktu) ? t.waktu : null,
+            tag: t.tag,
+            nada: t.nada === 'error' ? 'error' : t.nada === 'cyan' ? 'info' : t.selesai ? 'selesai' : i === kini ? 'aktif' : 'nanti',
+            isi: t.rinci.map((r) => (
+              <span key={r} className="tabular">
+                {r}
+              </span>
+            )),
+            // Tahap berjalan: ketuk untuk update pengiriman (LO Closed terkunci).
+            aksi: i === kini && bolehUbah && !terkunci ? { label: 'Update pengiriman', icon: PencilLine, onClick: () => navigate(keEdit) } : undefined,
+          }))}
+        />
       </GlassCard>
 
       {/* Riwayat submit & perubahan */}
