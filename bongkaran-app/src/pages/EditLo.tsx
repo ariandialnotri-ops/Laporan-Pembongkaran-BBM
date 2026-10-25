@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Lock, Repeat, Save, Scissors, Trash2 } from 'lucide-react'
+import { Lock, PencilLine, Repeat, Save, Scissors, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -107,6 +107,9 @@ function Form({ plan }: { plan: Plan }) {
     setRows((rs) => rs.map((r) => (r.id === rid ? { ...r, ...p } : r)))
   }
   const semuaTerkunci = plan.los.every(terpakai)
+  // Kepala shift ikut memperbarui SO/LO yang sedang berjalan (tidak menghapus); pengawas & ABH juga menghapus.
+  const bolehUpdate = app.canManage || app.role === 'kashift'
+  const adaClosed = plan.los.some((lo) => loStatus(lo, app.usedLoIds) === 'closed')
 
   const simpan = async () => {
     const aktif = rows.filter((r) => !r.hapus)
@@ -150,7 +153,7 @@ function Form({ plan }: { plan: Plan }) {
     // Nomor SO berubah: laporan bongkaran (BA) yang memakai LO permintaan ini ikut diperbarui.
     const soBaru = noSO.trim()
     const laporanSo = soBaru !== plan.noSO.trim() ? [...new Map(plan.los.flatMap((lo) => (app.usedLoIds.get(lo.id) ? [[app.usedLoIds.get(lo.id)!.id, app.usedLoIds.get(lo.id)!] as const] : []))).values()] : []
-    if (laporanSo.length && !app.canManage) return setError('Nomor SO pada laporan bongkaran yang sudah ditutup hanya dapat diubah pengawas atau ABH.')
+    if (laporanSo.some((r) => r.status !== 'draft') && !app.canManage) return setError('Nomor SO pada laporan bongkaran yang sudah ditutup hanya dapat diubah pengawas atau ABH.')
     if (
       laporanSo.length &&
       !(await konfirmasi({
@@ -217,13 +220,13 @@ function Form({ plan }: { plan: Plan }) {
           htmlFor="lo-so-edit"
           hint={
             plan.los.some(terpakai)
-              ? app.canManage
+              ? app.canManage || !adaClosed
                 ? 'Satu SO untuk semua LO di permintaan ini. LO sudah dipakai laporan bongkaran: perubahan SO ikut memperbarui laporan bongkaran (BA) terkait.'
-                : 'LO sudah dipakai laporan bongkaran: nomor SO hanya dapat dikoreksi pengawas atau ABH.'
+                : 'Ada LO yang sudah Closed: nomor SO hanya dapat dikoreksi pengawas atau ABH.'
               : `Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`
           }
         >
-          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={plan.los.some(terpakai) && !app.canManage} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
+          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={adaClosed && !app.canManage} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
         </Field>
       </GlassCard>
 
@@ -319,9 +322,19 @@ function Form({ plan }: { plan: Plan }) {
             </span>
             {r.asal.noLOLama && <span className="tabular block text-on-surface-variant">dari LO {r.asal.noLOLama}</span>}
             <span className="block text-on-surface-variant">MT {used.nopol || '-'}</span>
-            <span className="mt-1 inline-block">
+            <span className="mt-1 flex flex-wrap items-center gap-space-xs">
               <Pill tone={m.tone}>{m.label}</Pill>
+              {/* Bongkaran belum selesai (Delivered): nomor LO masih dapat diubah lewat bongkarannya; Closed terkunci. */}
+              {st === 'delivered' && bolehUpdate ? (
+                <Link to={`/input/${encodeURIComponent(used.id)}/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(r.asal.id)}`} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-primary/10 px-3 text-body-sm font-semibold text-primary">
+                  <PencilLine aria-hidden="true" className="size-3.5" />
+                  Ubah nomor LO
+                </Link>
+              ) : st === 'closed' ? (
+                <span className="text-xs text-on-surface-variant">Closed, terkunci</span>
+              ) : null}
             </span>
+            {st === 'delivered' && <span className="mt-1 block text-xs text-on-surface-variant">Sedang dibongkar: hapus LO lewat bongkarannya bila batal.</span>}
           </td>
         </tr>
       )

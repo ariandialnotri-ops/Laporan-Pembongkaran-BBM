@@ -40,6 +40,7 @@ const AKSES: Record<Exclude<Role, 'abh'>, string[]> = {
     '/plan',
     '/plan/baru',
     '/plan/so/',
+    '/plan/lo/',
     '/apar',
     '/apar/inspeksi',
     '/apar/inspeksi/',

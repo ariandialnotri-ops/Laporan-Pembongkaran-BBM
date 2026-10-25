@@ -504,7 +504,7 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Tracking LO: tahap berjalan membuka Edit / update pengiriman.
 
 ### 9.14h Pembaruan Delivery, penjualan, keuangan, APAR
-- **Plan & Tracking LO** satu halaman (`/plan`): permintaan MS2, status SO & LO per status, tabel LO; ketuk LO → detail stepper `/plan/lo/:planId/:loId` (edit/update dari tahap berjalan). `/laporan/lo` dialihkan ke `/plan`; Security melihat tanpa tombol buat permintaan.
+- **Plan & Tracking LO** satu halaman (`/plan`): permintaan MS2, status SO & LO per status, tabel LO; ketuk LO → detail stepper `/plan/lo/:planId/:loId` (edit/update dari tahap berjalan). `/laporan/lo` dialihkan ke `/plan`; Security melihat tanpa tombol buat permintaan. Hak ubah: ABH & Pengawas mengubah dan menghapus SO/LO yang belum Closed; Kepala Shift mengubah (tanpa hapus). LO Delivered (sedang dibongkar) diubah nomornya lewat "Ubah nomor LO" agar bongkaran ikut berubah; LO Closed terkunci.
 - **Penjualan bersih** = selisih totalisator − pump test shift yang sama (uji kualitas, Q&Q, uji takaran) di Totalizer, Closing, Dashboard Sales, dan Catatan Persediaan (`jualPerProduk(recs, pumpTest)`; Laporan SO sudah mengurangi tera sendiri).
 - **Kartu Pump test** di Dashboard Operation: total liter periode, jumlah uji per jenis, chip per produk, tautan Riwayat.
 - **Bar bawah Cleaning Service**: Dashboard, Operation, [Lapor], HSSE, **Keuangan** (ikon tangan-koin, paling kanan).
