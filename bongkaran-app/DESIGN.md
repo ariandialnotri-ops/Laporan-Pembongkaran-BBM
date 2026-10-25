@@ -536,6 +536,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Lama proses bongkaran** = mulai tahap 1 (laporan dibuat, `createdAt`) sampai laporan ditutup (`finishedAt`; `lamaProses()` di `sop.ts`). Tampil di kartu Finish (mulai → selesai, durasi; draf: "Berjalan sejak tahap 1"), kolom "SLA & proses" Riwayat Bongkaran, dan teks WA. Ringkasan lama memakai kolom `finished_at`.
 - **Dashboard Kualitas Harian**: tiap produk yang sudah diuji menampilkan garis waktu "Pasca penerimaan {tgl jam} → uji harian {tgl jam}" dan lencana "selang {durasi}" antara uji pasca penerimaan acuan dan uji kualitas harian terakhir.
 
+### 9.14l Kartu Status Pengiriman LO dengan logo produk
+- Daftar LO di Plan & Tracking LO berupa kartu (gaya "Status Pengiriman Terakhir"): kotak logo produk putih di kiri (`LogoProduk`, SVG di `src/assets/produk/`, dipangkas ke gambar & dioptimasi svgo), nomor LO + volume (KL), "Planning {tanggal}" + chip shift, SO · supply point, status (titik berdenyut untuk Planned / On Delivery) dan "Realisasi {tanggal, jam}" hijau bila sudah dibongkar. Kartu oranye = SO/LO belum terbit; biru = baru disimpan. Laptop: 2 kolom.
+- Motion ringan: kartu muncul berurutan (`.kartu-lo`, fade + naik 8 px, jeda 45 ms per kartu), angkat 2 px saat hover, mengecil sedikit saat ditekan, logo membesar 4% saat hover, panah bergeser; semuanya mati saat reduced motion.
+- Logo yang sama dipakai di kepala Detail LO. Produk tanpa logo memakai kode produk berwarna.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.
