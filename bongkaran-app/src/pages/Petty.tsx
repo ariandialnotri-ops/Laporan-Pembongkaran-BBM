@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronRight, ClipboardList, FilePlus2, FileSpreadsheet, FileText, HandCoins, LoaderCircle, PackageCheck, ReceiptText, Send, Trash2, X } from 'lucide-react'
@@ -643,6 +644,7 @@ export function PengajuanPettyDetail() {
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-xs p-space-md">
+        <TandaRevisi dari={rec} />
         <div className="flex items-start justify-between gap-space-sm">
           <span className="flex flex-col">
             <span className="tabular text-tag uppercase text-on-surface-variant">

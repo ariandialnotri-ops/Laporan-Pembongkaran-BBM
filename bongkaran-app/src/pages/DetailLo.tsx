@@ -3,6 +3,7 @@ import { History, Lock, MapPin, PencilLine, Truck } from 'lucide-react'
 import { Loading } from '@/components/bongkaran/load-state'
 import { LogoProduk } from '@/components/bongkaran/logo-produk'
 import { ProdukChip } from '@/components/bongkaran/record-table'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -124,11 +125,12 @@ export function DetailLo() {
     <div className="flex flex-col gap-space-md lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
       {/* Ringkasan LO + aksi */}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md lg:col-span-2">
+        <TandaRevisi dari={plan} />
         <div className="flex items-start justify-between gap-space-sm">
           <LogoProduk produk={lo.produk} className="h-16 w-24" />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Loading Order</span>
-            <span className="tabular truncate text-headline-md font-bold text-on-surface">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>
+            <span className="tabular break-all text-headline-md font-bold leading-tight text-on-surface">{lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit'}</span>
             <span className="tabular text-body-sm text-on-surface-variant">SO {plan.noSO || 'belum terbit'}</span>
           </span>
           <Pill tone={meta.tone}>

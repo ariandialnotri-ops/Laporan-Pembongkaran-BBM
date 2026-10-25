@@ -8,6 +8,7 @@ import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { SectionHeader } from '@/components/bongkaran/section-header'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -331,6 +332,7 @@ export function WbsDetail() {
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+        <TandaRevisi dari={r} />
         <div className="flex items-start justify-between gap-2">
           <span className="tabular text-tag uppercase text-primary">{r.id}</span>
           <Pill tone={statusWbs(r.status).tone}>{statusWbs(r.status).label}</Pill>

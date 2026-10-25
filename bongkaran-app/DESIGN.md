@@ -549,6 +549,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Pembanding**: penjualan digital (akhir − awal) vs penjualan manual (manual shift ini − manual shift sebelumnya) per nozzle; selisih > `rules.batasTotalisatorL` (default 5 L, diatur Admin Aplikasi) → kartu bercincin merah "Periksa ulang angka & foto". Riwayat Totalizer menampilkan kolom Manual & Selisih vs manual serta foto manual.
 - Catatan lama (awal/akhir digital + foto opsional) tetap terbaca.
 
+### 9.14n Tanda "Revised by Developer"
+- Setiap UPDATE oleh super admin (Admin Aplikasi) yang mengubah isi data riwayat dicap database: trigger `bbm_0_revisi_dev` (fungsi `bbm_private.bbm_revisi_dev`) menulis `revisiDev = { at, oleh: 'Developer', kali }` ke kolom `data` (absen, air, closing, daily, grounding, gts, jadwal, ops, petty, so, takar, totalizer, wbs), `data` + `summary` (reports), atau `meta` (plans). Peran lain tidak dapat menghapus/memalsukan tanda (selalu dikembalikan ke nilai lama). Nama `bbm_0_…` agar berjalan sebelum trigger penjaga lain; kunci laporan tertutup mengabaikan `revisiDev`.
+- Tampilan: lencana ungu "Revised by Developer" di setiap daftar riwayat `RecordTable` (otomatis lewat `revisiDari`), kartu LO; baris keterangan lengkap (waktu revisi & jumlah) di Detail LO, Finish bongkaran, detail insiden, petty cash, WBS, dan totalizer.
+- Migrasi: `supabase/migrations/20261025120000_bbm_revisi_dev_dan_jaga_aturan.sql` (juga berisi kunci Aturan Pemeriksaan).
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

@@ -6,6 +6,7 @@ import { Choice, Field } from '@/components/bongkaran/form-bits'
 import { ErrorBox, ProdukSelect, SupplySelect } from '@/components/bongkaran/lo-fields'
 import { LogoProduk } from '@/components/bongkaran/logo-produk'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -71,6 +72,7 @@ function KartuLo({ x, urut, sorot, onBuka }: { x: TRow; urut: number; sorot: boo
             )}
             <span className="tabular whitespace-nowrap text-body-sm font-semibold text-on-surface-variant">({formatNumber(x.lo.volume / 1000)} KL)</span>
           </span>
+          <TandaRevisi dari={x.plan} ringkas className="self-start" />
           {x.lo.noLOLama && (
             <span className="tabular inline-flex items-center gap-1 text-xs text-on-surface-variant">
               dari <s>{x.lo.noLOLama}</s>

@@ -13,6 +13,7 @@ import { ErrorBox } from '@/components/bongkaran/lo-fields'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { KartuPilih } from '@/components/bongkaran/pilih-status'
 import { BARIS_BARU, BARIS_ORANYE, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -601,6 +602,7 @@ export function InsidenDetail() {
   return (
     <div className="flex flex-col gap-space-md">
       <GlassCard level={2} className={cn('animate-entrance-1 flex flex-col gap-space-sm p-space-md', d.jenis === 'insiden' && 'ring-1 ring-error/40')}>
+        <TandaRevisi dari={rec} />
         <div className="flex items-start gap-space-sm">
           <div className="flex min-w-0 flex-1 flex-col">
             <span className={cn('text-tag uppercase', d.jenis === 'henti' ? 'text-error' : 'text-primary')}>{d.jenis === 'henti' ? `${JENIS_HENTI.label} · alasan` : jenisLabel(d.jenis)}</span>

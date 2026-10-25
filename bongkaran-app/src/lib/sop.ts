@@ -2,6 +2,7 @@
  * Alur SOP pembongkaran BBM: tipe data, definisi tahapan, validasi tiap
  * tahap, dan perhitungan kuantitas/kualitas untuk Berita Acara.
  */
+import type { RevisiDev } from '@/lib/revisi'
 import type { AbsensiSetting } from '@/lib/absen'
 import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { minutesBetween, nowHm, todayIso } from '@/lib/date'
@@ -207,6 +208,8 @@ export interface Plan {
   los: PlanLo[]
   /** Riwayat submit & perubahan (terbaru di akhir). */
   riwayat?: JejakPlan[]
+  /** Tanda revisi oleh super admin, dicap database (lihat lib/revisi). */
+  revisiDev?: RevisiDev
 }
 
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']

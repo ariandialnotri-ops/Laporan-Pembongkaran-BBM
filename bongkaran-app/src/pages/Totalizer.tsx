@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Camera, CircleCheck, Gauge, LoaderCircle, Lock, Send, Trash2 } from 'lucide-react'
@@ -305,6 +306,7 @@ export function TotalizerForm() {
           </div>
           {digitalSelesai ? <Pill tone="success">Lengkap</Pill> : manualSelesai ? <Pill>Digital belum</Pill> : <Pill tone="error">Manual belum</Pill>}
         </div>
+        <TandaRevisi dari={lama} />
         <div role="tablist" aria-label="Langkah pengisian" className="inset-field grid grid-cols-2 gap-1 rounded-md p-1">
           {(['manual', 'digital'] as const).map((l, i) => (
             <button
@@ -580,6 +582,7 @@ export function RiwayatTotalizer() {
       {terbuka && (
         <GlassCard level={2} className="flex flex-col gap-space-xs p-space-md">
           <SectionHeader id="tot-detail" title={`${formatTanggalIso(terbuka.r.tanggal)} · ${shiftLabel(terbuka.r.shift as Shift)}`} />
+          <TandaRevisi dari={terbuka.r} />
           <div className="overflow-x-auto">
             <table className="w-full text-body-sm">
               <thead>

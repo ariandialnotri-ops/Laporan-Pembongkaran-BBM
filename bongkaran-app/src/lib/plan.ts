@@ -79,6 +79,7 @@ export function normalizePlan(p: Partial<Plan> & { id: string; los?: Partial<Pla
     noSO: p.noSO ?? '',
     produk: p.produk ?? '',
     soldTo: p.soldTo ?? '',
+    ...(p.revisiDev ? { revisiDev: p.revisiDev } : {}),
     los: (p.los ?? []).map((lo) => ({
       id: lo.id ?? '',
       noLO: lo.noLO ?? '',

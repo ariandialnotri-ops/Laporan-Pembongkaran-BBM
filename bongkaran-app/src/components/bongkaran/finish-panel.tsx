@@ -4,6 +4,7 @@ import type { ExportKind } from '@/lib/report/export'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SignersSection } from '@/components/bongkaran/sop-steps'
 import { StatusBanner } from '@/components/bongkaran/status-banner'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
@@ -141,6 +142,7 @@ export function FinishPanel({
           {d.nopol || 'MT'}, {d.produk || '-'}
         </span>
         <span className="text-body-sm text-on-surface-variant">Bongkaran {shiftLabel(x.shift)}</span>
+        <TandaRevisi dari={report} />
         {lama !== null && (
           <div className="flex items-center gap-space-sm rounded-lg bg-primary/5 px-space-sm py-space-xs">
             <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
