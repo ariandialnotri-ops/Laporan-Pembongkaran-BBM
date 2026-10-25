@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, Images, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Clock, Copy, Download, FileSpreadsheet, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type { ExportKind } from '@/lib/report/export'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SignersSection } from '@/components/bongkaran/sop-steps'
@@ -8,12 +8,40 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { formatTanggalIso } from '@/lib/date'
 import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { effectiveRules, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
+import { formatDurasi } from '@/lib/sla'
+import { effectiveRules, lamaProses, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
+
+/** Pilihan format unduhan Berita Acara (dropdown). PDF BA saja & PDF + foto memakai ikon yang sama. */
+const FORMAT_BA: { kind: ExportKind; label: string; desc: string; icon: LucideIcon }[] = [
+  { kind: 'xlsx', label: 'Excel (template BA)', desc: 'File Excel sesuai template', icon: FileSpreadsheet },
+  { kind: 'pdf-ba', label: 'PDF BA saja', desc: 'Cepat, tanpa lampiran foto', icon: FileText },
+  { kind: 'pdf', label: 'PDF BA + foto', desc: 'Dengan lampiran foto evidence', icon: FileText },
+  { kind: 'jpg', label: 'JPG', desc: 'Gambar BA untuk dibagikan', icon: ImageIcon },
+]
+const KUNCI_FORMAT = 'floq-format-ba'
+const formatAwal = (): ExportKind => {
+  try {
+    const v = localStorage.getItem(KUNCI_FORMAT)
+    return FORMAT_BA.some((f) => f.kind === v) ? (v as ExportKind) : 'pdf'
+  } catch {
+    return 'pdf'
+  }
+}
+const jamMenit = (ms: number) => {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+}
+const tglIso = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export function FinishPanel({
   report,
@@ -49,6 +77,20 @@ export function FinishPanel({
 }) {
   const toast = useToast()
   const [copied, setCopied] = useState(false)
+  const [format, setFormat] = useState<ExportKind>(formatAwal)
+  const pilihFormat = (v: string) => {
+    setFormat(v as ExportKind)
+    try {
+      localStorage.setItem(KUNCI_FORMAT, v)
+    } catch {
+      // abaikan
+    }
+  }
+  const unduh: Record<ExportKind, () => void> = { xlsx: onXlsx, 'pdf-ba': onPdfBa, pdf: onPdf, jpg: onJpg }
+  const fmt = FORMAT_BA.find((f) => f.kind === format)!
+  // Lama proses: mulai tahap 1 (laporan dibuat) sampai laporan ditutup; draf dihitung sampai saat ini.
+  const [sekarang] = useState(() => Date.now())
+  const lama = lamaProses({ createdAt: report.createdAt, finishedAt: report.finishedAt, status: report.status }, sekarang)
   const d = report.data
   const x = evaluation.derived
   const anomaly = evaluation.densityAnomaly || report.status === 'anomali'
@@ -100,6 +142,21 @@ export function FinishPanel({
           {d.nopol || 'MT'}, {d.produk || '-'}
         </span>
         <span className="text-body-sm text-on-surface-variant">Bongkaran {shiftLabel(x.shift)}</span>
+        {lama !== null && (
+          <div className="flex items-center gap-space-sm rounded-lg bg-primary/5 px-space-sm py-space-xs">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Clock className="size-5" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{finished ? 'Lama proses bongkaran' : 'Berjalan sejak tahap 1'}</span>
+              <span className="tabular text-body-sm text-on-surface-variant">
+                Mulai {formatTanggalIso(tglIso(report.createdAt))}, {jamMenit(report.createdAt)}
+                {report.finishedAt ? ` → selesai ${tglIso(report.finishedAt) === tglIso(report.createdAt) ? '' : `${formatTanggalIso(tglIso(report.finishedAt))}, `}${jamMenit(report.finishedAt)}` : ''}
+              </span>
+            </span>
+            <span className="tabular shrink-0 text-numeric-md font-bold text-primary">{formatDurasi(lama)}</span>
+          </div>
+        )}
         <StatusBanner
           tone={anomaly ? 'error' : densityOk ? 'success' : 'idle'}
           title={anomaly ? 'Anomali density, pembongkaran dihentikan' : 'Quality & quantity lengkap'}
@@ -187,25 +244,31 @@ export function FinishPanel({
         <>
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
             <span className="text-tag uppercase text-primary">Berita Acara Pembongkaran (Q&Q)</span>
-            <Button size="pill" disabled={generating !== null} onClick={onXlsx}>
-              {generating === 'xlsx' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
-              Excel (template BA)
+            <Field label="Pilih format unduhan" htmlFor="format-ba">
+              <Select value={format} onValueChange={pilihFormat} disabled={generating !== null}>
+                <SelectTrigger id="format-ba" className="[&_.fmt-desc]:hidden">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAT_BA.map((f) => (
+                    <SelectItem key={f.kind} value={f.kind}>
+                      <span className="flex items-center gap-2.5">
+                        <f.icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
+                        <span className="flex flex-col">
+                          <span className="font-semibold">{f.label}</span>
+                          <span className="fmt-desc text-xs text-on-surface-variant">{f.desc}</span>
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Button size="pill" disabled={generating !== null} onClick={unduh[format]}>
+              {generating !== null ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
+              Unduh {fmt.label}
             </Button>
-            <div className="grid grid-cols-2 gap-space-xs">
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdfBa}>
-                {generating === 'pdf-ba' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
-                PDF BA saja
-              </Button>
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
-                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Images aria-hidden="true" />}
-                PDF + foto
-              </Button>
-              <Button variant="glass" size="pill" className="col-span-2" disabled={generating !== null} onClick={onJpg}>
-                {generating === 'jpg' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <ImageIcon aria-hidden="true" />}
-                JPG
-              </Button>
-            </div>
-            <span className="text-body-sm text-on-surface-variant">PDF BA saja lebih cepat, tanpa lampiran foto evidence.</span>
+            <span className="text-body-sm text-on-surface-variant">Pilihan format diingat untuk unduhan berikutnya.</span>
           </GlassCard>
 
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">

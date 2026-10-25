@@ -13,7 +13,7 @@ import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, formatSigned } from '@/lib/format'
 import { formatDurasi, slaOf } from '@/lib/sla'
-import { PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
+import { lamaProses, PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Keterangan hasil bongkar, seperti kolom keterangan pada rekap transaksi. */
@@ -89,16 +89,19 @@ const COLS: Col<Row>[] = [
     desktop: false,
   },
   {
-    header: 'SLA',
+    header: 'SLA & proses',
     cell: (r) => (
       <span className="flex flex-col whitespace-nowrap text-body-sm">
         <span title="Request MS2 sampai selesai bongkar">Req: {formatDurasi(r.sla.permintaan)}</span>
         <span className="text-on-surface-variant" title="Gate out depot sampai selesai bongkar">
           Gate out: {formatDurasi(r.sla.perjalanan)}
         </span>
+        <span className="font-semibold text-primary" title="Mulai tahap 1 sampai laporan bongkaran ditutup">
+          Proses: {formatDurasi(lamaProses(r))}
+        </span>
       </span>
     ),
-    mobileCell: (r) => `SLA request ${formatDurasi(r.sla.permintaan)}, gate out ${formatDurasi(r.sla.perjalanan)}`,
+    mobileCell: (r) => `Proses ${formatDurasi(lamaProses(r))}, SLA request ${formatDurasi(r.sla.permintaan)}, gate out ${formatDurasi(r.sla.perjalanan)}`,
     mobile: 'sub',
   },
   {

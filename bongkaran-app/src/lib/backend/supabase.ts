@@ -290,9 +290,10 @@ export function createSupabaseBackend(sb: SupabaseClient): Backend {
 
     async listReports() {
       const rows = check(
-        await sb.from('bbm_reports').select('id,status,summary,created_by').eq('spbu_id', aktif()).order('created_at', { ascending: false }).limit(500),
-      ) as Pick<ReportRow, 'id' | 'status' | 'summary' | 'created_by'>[]
-      return rows.map((r) => ({ ...SUMMARY_DEFAULTS, ...r.summary, id: r.id, status: r.status, createdBy: r.created_by }))
+        await sb.from('bbm_reports').select('id,status,summary,created_by,finished_at').eq('spbu_id', aktif()).order('created_at', { ascending: false }).limit(500),
+      ) as Pick<ReportRow, 'id' | 'status' | 'summary' | 'created_by' | 'finished_at'>[]
+      // Ringkasan lama belum menyimpan finishedAt: diambil dari kolom finished_at.
+      return rows.map((r) => ({ ...SUMMARY_DEFAULTS, ...r.summary, id: r.id, status: r.status, createdBy: r.created_by, finishedAt: r.summary.finishedAt ?? (r.finished_at ? Date.parse(r.finished_at) : null) }))
     },
     async getReport(id) {
       const r = check(await sb.from('bbm_reports').select('*').eq('spbu_id', aktif()).eq('id', id).maybeSingle()) as ReportRow | null

@@ -2,12 +2,14 @@ import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownLeft,
+  ArrowRight,
   ArrowUpRight,
   Beaker,
   BrushCleaning,
   CalendarClock,
   ChevronDown,
   ChevronLeft,
+  Clock,
   ChevronRight,
   CircleCheck,
   ClipboardCheck,
@@ -170,6 +172,16 @@ const LENGKUNG_KANAN = { background: 'radial-gradient(circle at 100% 0, transpar
  * di atas latar biru; tab aktif berwarna putih dan menyatu ke panel di bawahnya lewat lengkung cekung. Panel
  * berisi ikon, nama & cakupan dashboard aktif. Satu pilihan saja → tanpa baris tab.
  */
+/** Menit dari (tanggal, jam) a ke b; jam "HH:MM". */
+function menitAntara(t1: string, j1: string, t2: string, j2: string) {
+  const a = Date.parse(`${t1}T${(j1 || '00:00').slice(0, 5)}:00`)
+  const b = Date.parse(`${t2}T${(j2 || '00:00').slice(0, 5)}:00`)
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.round((b - a) / 60000) : null
+}
+const BLN_SINGKAT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+/** "24 Okt 08.30" */
+const waktuSingkat = (tanggal: string, jam: string) => `${Number(tanggal.slice(8, 10))} ${BLN_SINGKAT[Number(tanggal.slice(5, 7)) - 1] ?? ''} ${(jam || '').slice(0, 5).replace(':', '.')}`.trim()
+
 function PanelDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
   const i = Math.max(0, pilihan.findIndex((p) => p.value === value))
   const p = pilihan[i]
@@ -589,6 +601,8 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
           const ref = h ? acuanD15(app.reports, p, h.rec.tanggal) : null
           const selisih = d15 !== null && ref ? Math.round((d15 - ref.d15) * 10000) / 10000 : null
           const ok = selisih !== null ? Math.abs(selisih) <= tol : null
+          // Rentang waktu: uji pasca penerimaan (acuan) → uji kualitas harian terakhir produk ini.
+          const selang = h && ref ? menitAntara(ref.tanggal, ref.jam, h.rec.tanggal, h.rec.data.jam) : null
           const isi = (
             <>
               <span aria-hidden="true" className={cn('h-8 w-1.5 shrink-0 rounded-full', h ? produkMeta(p).dot : 'bg-outline-variant')} />
@@ -609,6 +623,19 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
               {ok === null ? <Pill>{h ? 'Tanpa acuan' : 'Belum'}</Pill> : ok ? <Pill tone="success">Sesuai</Pill> : <Pill tone="error">Tidak sesuai</Pill>}
             </>
           )
+          const garisWaktu = h && ref && (
+            <span className="tabular flex w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 border-t border-outline-variant/40 pt-1.5 pl-4 text-xs text-on-surface-variant">
+              <Clock aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+              <span>
+                Pasca penerimaan <b className="font-semibold text-on-surface">{waktuSingkat(ref.tanggal, ref.jam)}</b>
+              </span>
+              <ArrowRight aria-hidden="true" className="size-3 shrink-0" />
+              <span>
+                uji harian <b className="font-semibold text-on-surface">{waktuSingkat(h.rec.tanggal, h.rec.data.jam)}</b>
+              </span>
+              <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary">{selang !== null && selang >= 0 ? `selang ${formatDurasi(selang)}` : 'selang -'}</span>
+            </span>
+          )
           // Ketuk produk yang sudah diuji: pop up highlight hasil uji terakhir.
           return h ? (
             <button
@@ -616,9 +643,10 @@ function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard })
               type="button"
               aria-label={`Lihat hasil uji ${p}`}
               onClick={() => setUjiKunci(kunciHarian(h.rec.id, h.k.id))}
-              className="flex min-h-14 w-full items-center gap-2.5 rounded-md bg-surface-container-low p-3 text-left transition-colors hover:bg-primary-fixed/30 active:scale-[0.99]"
+              className="flex min-h-14 w-full flex-col gap-1.5 rounded-md bg-surface-container-low p-3 text-left transition-colors hover:bg-primary-fixed/30 active:scale-[0.99]"
             >
-              {isi}
+              <span className="flex w-full items-center gap-2.5">{isi}</span>
+              {garisWaktu}
             </button>
           ) : (
             <div key={p} className="flex min-h-14 items-center gap-2.5 rounded-md bg-surface-container-low p-3">

@@ -531,6 +531,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Persentase memakai laporan nyata (foto dimuat `muatFoto` 4 sekaligus, tiap foto lampiran, tiap halaman, progres ZIP); di antara laporan merambat pelan menuju batas di bawah tahap berikutnya (maks. 97%), tidak pernah mundur. Selesai: 100% hijau "… berhasil dibuat", tertutup sendiri 1,8 detik. Gagal: merah dengan pesan galat + tombol Tutup.
 - Simpan otomatis sebelum ekspor tidak memunculkan lembar "Berhasil!" kedua.
 
+### 9.14k Unduhan BA dropdown, lama proses bongkaran, selang uji kualitas
+- **Unduhan Berita Acara** (Finish): satu dropdown "Pilih format unduhan" (Excel template BA, PDF BA saja, PDF BA + foto, JPG; ikon + keterangan, PDF BA saja & PDF BA + foto berikon sama) lalu satu tombol "Unduh …". Pilihan terakhir diingat per perangkat (`floq-format-ba`).
+- **Lama proses bongkaran** = mulai tahap 1 (laporan dibuat, `createdAt`) sampai laporan ditutup (`finishedAt`; `lamaProses()` di `sop.ts`). Tampil di kartu Finish (mulai → selesai, durasi; draf: "Berjalan sejak tahap 1"), kolom "SLA & proses" Riwayat Bongkaran, dan teks WA. Ringkasan lama memakai kolom `finished_at`.
+- **Dashboard Kualitas Harian**: tiap produk yang sudah diuji menampilkan garis waktu "Pasca penerimaan {tgl jam} → uji harian {tgl jam}" dan lencana "selang {durasi}" antara uji pasca penerimaan acuan dan uji kualitas harian terakhir.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

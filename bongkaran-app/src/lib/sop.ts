@@ -283,6 +283,15 @@ export interface ReportSummary {
   /** Gate out depot (ISO tanggal + jam). */
   tanggalKeluar?: string
   jamKeluar?: string
+  /** Waktu laporan ditutup (selesai/anomali); durasi proses = finishedAt − createdAt (mulai tahap 1). */
+  finishedAt?: number | null
+}
+
+/** Lama proses input bongkaran (menit) dari mulai tahap 1 sampai ditutup; draf dihitung sampai `sekarang`. */
+export function lamaProses(r: Pick<ReportSummary, 'createdAt' | 'finishedAt' | 'status'>, sekarang?: number): number | null {
+  const akhir = r.finishedAt ?? (r.status === 'draft' ? sekarang : undefined)
+  if (!akhir || !r.createdAt || akhir < r.createdAt) return null
+  return Math.round((akhir - r.createdAt) / 60000)
 }
 
 export interface Rules {
@@ -985,6 +994,7 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     id: report.id,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt,
+    finishedAt: report.finishedAt,
     status: report.status,
     createdBy: report.createdBy,
     tanggal: d.tanggalDatang,

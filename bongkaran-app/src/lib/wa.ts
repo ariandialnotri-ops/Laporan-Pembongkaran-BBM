@@ -3,7 +3,8 @@ import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatMaybe, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { effectiveRules, type Derived, type Report, type Settings } from '@/lib/sop'
+import { formatDurasi } from '@/lib/sla'
+import { effectiveRules, lamaProses, type Derived, type Report, type Settings } from '@/lib/sop'
 import type { Tank } from '@/lib/tank'
 
 const ok = (b: boolean) => (b ? '✅' : '❌')
@@ -20,6 +21,8 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   L.push('')
   L.push(`📅 ${formatTanggalIso(d.tanggalDatang)} | Datang ${d.jamDatang || '-'} | Keluar depot ${formatTanggalIso(d.tanggalKeluar)} ${d.jamKeluar}`.trim())
   L.push(`🕒 ${shiftLabel(x.shift)}`)
+  const lama = lamaProses(report)
+  if (lama !== null) L.push(`⏱️ Lama proses bongkaran (tahap 1 s/d selesai): ${formatDurasi(lama)}`)
   L.push(`🚚 MT ${d.nopol || '-'} | Driver: ${d.namaDriver || '-'}`)
   L.push(`⛽ ${d.produk || '-'} | ${x.tank ? x.tank.label : '-'}`)
   L.push(`SO: ${d.noSO || '-'} | LO: ${d.noLOs.join(', ') || '-'} | Sold to: ${d.soldTo || '-'} | Ship to: ${d.shipTo || '-'}`)
