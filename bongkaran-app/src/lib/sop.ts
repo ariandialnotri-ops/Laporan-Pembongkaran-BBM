@@ -290,6 +290,17 @@ export interface Rules {
   teraToleranceMm: number
   atgSettleMinutes: number
   literPerDO: number
+  /** Batas pemeriksaan silang input bongkaran; melewati batas = peringatan (tidak memblokir). */
+  /** Deepstick tangki pendam vs tinggi ATG (mm). */
+  batasDipAtgMm: number
+  /** Volume layar ATG vs volume tabel kalibrasi dari tinggi ATG (L). */
+  batasAtgTabelL: number
+  /** Volume deepstick vs volume ATG setelah bongkar (L). */
+  batasDipAtgL: number
+  /** Transport / discharge gain-loss yang perlu diperiksa ulang (L). */
+  batasLossL: number
+  /** Penerimaan P-Insyst vs penerimaan ATG (L); 0,5 = beda ≥ 1 L setelah dibulatkan. */
+  batasPinsystL: number
 }
 
 export interface Settings {
@@ -371,6 +382,11 @@ export const DEFAULT_RULES: Rules = {
   teraToleranceMm: 10,
   atgSettleMinutes: 10,
   literPerDO: 8000,
+  batasDipAtgMm: 10,
+  batasAtgTabelL: 2,
+  batasDipAtgL: 20,
+  batasLossL: 50,
+  batasPinsystL: 0.5,
 }
 
 export type PhotoSlotDef = { key: string; label: string; optional?: boolean }
@@ -673,25 +689,11 @@ export interface Derived {
   atgAfterTable: VolumeResult | null
   diterimaDip: number | null
   gainLossDip: number | null
-  /** Pemeriksaan silang untuk mencegah salah baca/salah ketik (lihat BATAS_CEK). */
+  /** Pemeriksaan silang untuk mencegah salah baca/salah ketik (batas di Rules). */
   cek: CekSilang
   settleMinutes: number | null
   sample2Jam: Sample2JamResult | null
 }
-
-/** Batas pemeriksaan silang input bongkaran; melewati batas = peringatan (tidak memblokir). */
-export const BATAS_CEK = {
-  /** Deepstick tangki pendam vs tinggi ATG (mm). */
-  dipAtgMm: 10,
-  /** Volume layar ATG vs volume tabel kalibrasi dari tinggi ATG (L). */
-  atgTabelL: 2,
-  /** Volume deepstick vs volume ATG setelah bongkar (L). */
-  dipAtgL: 20,
-  /** Transport / discharge gain-loss yang perlu diperiksa ulang (L). */
-  lossL: 50,
-  /** Penerimaan P-Insyst vs penerimaan ATG (L, pembulatan). */
-  pinsystL: 1,
-} as const
 
 export interface CekSilang {
   /** Volume ATG − volume tabel dari tinggi ATG. */

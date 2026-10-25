@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, LayoutGrid, Receipt, SlidersHorizontal, Warehouse, X } from 'lucide-react'
+import { BookOpen, Building2, ChevronRight, Cylinder, FireExtinguisher, Fuel, Gauge, ImagePlus, LayoutGrid, Lock, Receipt, SlidersHorizontal, Warehouse, X } from 'lucide-react'
 import { Field, JumlahField } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { SectionHeader } from '@/components/bongkaran/section-header'
@@ -44,7 +44,7 @@ export function Pengaturan() {
     },
     { to: '/pengaturan/sold-ship-to', icon: Receipt, title: 'Sold To & Ship To', desc: s.soldTo ? `Sold To ${s.soldTo}, Ship To per produk` : 'Belum diisi; dipakai otomatis di form bongkaran' },
     { to: '/apar/data', icon: FireExtinguisher, title: 'Data utama APAR & APAB', desc: `${(s.apar ?? []).length + (s.apab ?? []).length} unit, ${(s.aparArea ?? []).length} area` },
-    { to: '/pengaturan/aturan', icon: SlidersHorizontal, title: 'Aturan Pemeriksaan', desc: 'Toleransi density, batas tera, tunggu ATG, PIN' },
+    { to: '/pengaturan/aturan', icon: SlidersHorizontal, title: 'Aturan Pemeriksaan', desc: 'Toleransi density, batas tera, tunggu ATG, batas peringatan bongkaran, PIN (Admin Aplikasi)' },
     { to: '/pengaturan/acuan', icon: BookOpen, title: 'Data Acuan', desc: 'Tabel ASTM 53 dan ringkasan kalibrasi tangki' },
   ]
   return (
@@ -178,30 +178,54 @@ export function IdentitasSpbu() {
   )
 }
 
-/** Pengaturan > Aturan Pemeriksaan. */
+/** Pengaturan > Aturan Pemeriksaan: hanya Admin Aplikasi (super admin) yang dapat mengubah; dijaga juga di database. */
 export function AturanPemeriksaan() {
   const app = useApp()
   if (!app.loaded) return <Loading />
   const s = app.settings
-  const readOnly = !app.isAdmin
-  const setRule = (key: keyof Rules, n: number) => app.updateSettings({ rules: { ...s.rules, [key]: n } })
+  const r = app.rules
+  const readOnly = !app.superadmin
+  const setRule = (key: keyof Rules, n: number) => app.updateSettings({ rules: { ...r, [key]: n } })
   return (
     <div className="flex flex-col gap-space-md">
-      {readOnly && <HanyaAbh />}
+      {readOnly && (
+        <GlassCard level={1} className="animate-entrance-1 flex items-center gap-space-sm p-space-md text-body-sm text-on-surface-variant">
+          <Lock aria-hidden="true" className="size-4 shrink-0 text-primary" />
+          Aturan pemeriksaan hanya dapat diubah oleh Admin Aplikasi. ABH dan peran lain hanya dapat melihat.
+        </GlassCard>
+      )}
       <fieldset disabled={readOnly} className="min-w-0">
         <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Toleransi density 15°C" htmlFor="set-dens" hint="Di atasnya bongkar dihentikan">
-              <RuleInput id="set-dens" value={s.rules.densityTolerance} onChange={(n) => setRule('densityTolerance', n)} />
+              <RuleInput id="set-dens" value={r.densityTolerance} onChange={(n) => setRule('densityTolerance', n)} />
             </Field>
             <Field label="Batas kurang vs tera" htmlFor="set-tera" hint="Di atasnya butuh izin">
-              <RuleInput id="set-tera" suffix="mm" value={s.rules.teraToleranceMm} onChange={(n) => setRule('teraToleranceMm', n)} />
+              <RuleInput id="set-tera" suffix="mm" value={r.teraToleranceMm} onChange={(n) => setRule('teraToleranceMm', n)} />
             </Field>
             <Field label="Tunggu sebelum baca ATG" htmlFor="set-atg">
-              <RuleInput id="set-atg" suffix="menit" value={s.rules.atgSettleMinutes} onChange={(n) => setRule('atgSettleMinutes', n)} />
+              <RuleInput id="set-atg" suffix="menit" value={r.atgSettleMinutes} onChange={(n) => setRule('atgSettleMinutes', n)} />
             </Field>
             <Field label="Liter per 1 DO" htmlFor="set-do">
-              <RuleInput id="set-do" suffix="L" value={s.rules.literPerDO} onChange={(n) => setRule('literPerDO', n)} />
+              <RuleInput id="set-do" suffix="L" value={r.literPerDO} onChange={(n) => setRule('literPerDO', n)} />
+            </Field>
+          </div>
+          <span className="text-tag uppercase text-primary">Batas peringatan input bongkaran</span>
+          <div className="grid grid-cols-2 gap-space-sm">
+            <Field label="Deepstick vs ATG (langkah 7)" htmlFor="set-dip-mm">
+              <RuleInput id="set-dip-mm" suffix="mm" value={r.batasDipAtgMm} onChange={(n) => setRule('batasDipAtgMm', n)} />
+            </Field>
+            <Field label="ATG vs tabel kalibrasi (4 & 13)" htmlFor="set-atg-tabel">
+              <RuleInput id="set-atg-tabel" suffix="L" value={r.batasAtgTabelL} onChange={(n) => setRule('batasAtgTabelL', n)} />
+            </Field>
+            <Field label="Deepstick vs ATG (langkah 14)" htmlFor="set-dip-l">
+              <RuleInput id="set-dip-l" suffix="L" value={r.batasDipAtgL} onChange={(n) => setRule('batasDipAtgL', n)} />
+            </Field>
+            <Field label="Gain/loss transport & discharge" htmlFor="set-loss">
+              <RuleInput id="set-loss" suffix="L" value={r.batasLossL} onChange={(n) => setRule('batasLossL', n)} />
+            </Field>
+            <Field label="P-Insyst vs ATG" htmlFor="set-pinsyst" hint="0,5 = beda ≥ 1 L">
+              <RuleInput id="set-pinsyst" suffix="L" value={r.batasPinsystL} onChange={(n) => setRule('batasPinsystL', n)} />
             </Field>
           </div>
           <Field label="PIN penanggung jawab (opsional)" htmlFor="set-pin" hint="Bila diisi, izin lanjut saat selisih tera di luar batas wajib memasukkan PIN ini.">

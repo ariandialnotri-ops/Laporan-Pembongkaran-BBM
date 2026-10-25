@@ -21,7 +21,6 @@ import { genId } from '@/lib/image'
 import { loPickable, loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import { shiftLabel } from '@/lib/shift'
 import {
-  BATAS_CEK,
   SIGNERS,
   newCompartment,
   KEPEKAAN_MAKS,
@@ -228,7 +227,7 @@ export function StepContent(props: StepProps) {
       const setReading = (patch: Partial<AtgReading>) => setData({ [key]: { ...reading, ...patch } })
       const tableResult = step.id === 'atg_before' ? x.atgBeforeTable : x.atgAfterTable
       const selisihTabel = step.id === 'atg_before' ? x.cek.atgTabelBefore : x.cek.atgTabelAfter
-      const atgLebih = lewat(selisihTabel, BATAS_CEK.atgTabelL)
+      const atgLebih = lewat(selisihTabel, rules.batasAtgTabelL)
       const mismatch = x.tank && d.produk && x.tank.produk.toLowerCase() !== d.produk.toLowerCase()
       return (
         <>
@@ -287,7 +286,7 @@ export function StepContent(props: StepProps) {
                 <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', null)} />
                 <CekSilang
                   nilai={selisihTabel}
-                  batas={BATAS_CEK.atgTabelL}
+                  batas={rules.batasAtgTabelL}
                   satuan=" L"
                   digit={1}
                   judulOk="Volume ATG sesuai tabel kalibrasi"
@@ -313,10 +312,10 @@ export function StepContent(props: StepProps) {
               />
               <CekSilang
                 nilai={x.gainLoss}
-                batas={BATAS_CEK.lossL}
+                batas={rules.batasLossL}
                 satuan=" L"
                 judulOk="Discharge gain/loss wajar"
-                judulLebih={`Discharge gain/loss di atas ${BATAS_CEK.lossL} L`}
+                judulLebih={`Discharge gain/loss di atas ${rules.batasLossL} L`}
                 saran="Periksa kembali pembacaan ATG awal/akhir, volume DO, dan totalisator"
               />
             </Section>
@@ -329,7 +328,7 @@ export function StepContent(props: StepProps) {
               </div>
               <div className="grid grid-cols-2 gap-space-sm">
                 <Field label="Penerimaan P-Insyst" htmlFor="pinsyst">
-                  <Num id="pinsyst" suffix="L" bahaya={lewat(x.cek.pinsyst, BATAS_CEK.pinsystL)} value={d.penerimaanPinsyst ?? ''} onChange={(v) => setData({ penerimaanPinsyst: v })} />
+                  <Num id="pinsyst" suffix="L" bahaya={lewat(x.cek.pinsyst, rules.batasPinsystL)} value={d.penerimaanPinsyst ?? ''} onChange={(v) => setData({ penerimaanPinsyst: v })} />
                 </Field>
                 <Field label="Penerimaan ATG" htmlFor="terima-atg">
                   <Fixed id="terima-atg" value={x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : ''} placeholder="isi ATG dulu" />
@@ -337,7 +336,7 @@ export function StepContent(props: StepProps) {
               </div>
               <CekSilang
                 nilai={x.cek.pinsyst}
-                batas={BATAS_CEK.pinsystL}
+                batas={rules.batasPinsystL}
                 satuan=" L"
                 judulOk="Penerimaan P-Insyst sama dengan ATG"
                 judulLebih="Penerimaan P-Insyst berbeda dengan ATG"
@@ -378,7 +377,7 @@ export function StepContent(props: StepProps) {
       const atgTinggi = parseAngka(step.id === 'dip_before' ? d.atgBefore.tinggi : d.atgAfter.tinggi)
       const selMm = step.id === 'dip_before' ? x.cek.dipAtgMmBefore : x.cek.dipAtgMmAfter
       const selL = step.id === 'dip_before' ? x.cek.dipAtgLBefore : x.cek.dipAtgLAfter
-      const lebih = step.id === 'dip_before' ? lewat(selMm, BATAS_CEK.dipAtgMm) : lewat(selL, BATAS_CEK.dipAtgL)
+      const lebih = step.id === 'dip_before' ? lewat(selMm, rules.batasDipAtgMm) : lewat(selL, rules.batasDipAtgL)
       return (
         <>
           <StepPhotos {...props} />
@@ -395,20 +394,20 @@ export function StepContent(props: StepProps) {
             {step.id === 'dip_before' ? (
               <CekSilang
                 nilai={selMm}
-                batas={BATAS_CEK.dipAtgMm}
+                batas={rules.batasDipAtgMm}
                 satuan=" mm"
                 judulOk="Deepstick sesuai tinggi ATG"
-                judulLebih={`Deepstick selisih lebih dari ${BATAS_CEK.dipAtgMm} mm dengan ATG`}
+                judulLebih={`Deepstick selisih lebih dari ${rules.batasDipAtgMm} mm dengan ATG`}
                 saran="Ulangi deepstick tangki pendam dan periksa tinggi ATG"
               />
             ) : (
               <CekSilang
                 nilai={selL}
-                batas={BATAS_CEK.dipAtgL}
+                batas={rules.batasDipAtgL}
                 satuan=" L"
                 digit={1}
                 judulOk="Volume deepstick sesuai ATG"
-                judulLebih={`Volume deepstick selisih lebih dari ${BATAS_CEK.dipAtgL} L dengan ATG`}
+                judulLebih={`Volume deepstick selisih lebih dari ${rules.batasDipAtgL} L dengan ATG`}
                 saran="Ulangi deepstick tangki pendam dan periksa pembacaan ATG"
                 detail={`Selisih ${formatSigned(selL ?? 0, 1, ' L')}${selMm !== null ? ` (${formatSigned(selMm, 0, ' mm')})` : ''}`}
               />
@@ -486,18 +485,18 @@ export function StepContent(props: StepProps) {
                   />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
-                  <Num id={`dip-${c.id}`} suffix="mm" bahaya={c.outOfLimit || lewat(c.estLiter, BATAS_CEK.lossL)} value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
+                  <Num id={`dip-${c.id}`} suffix="mm" bahaya={c.outOfLimit || lewat(c.estLiter, rules.batasLossL)} value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
                 </Field>
               </div>
               <StatusBanner
                 {...(c.selisihMm === null
                   ? IDLE
                   : {
-                      tone: (c.outOfLimit || lewat(c.estLiter, BATAS_CEK.lossL) ? 'error' : 'success') as BannerTone,
+                      tone: (c.outOfLimit || lewat(c.estLiter, rules.batasLossL) ? 'error' : 'success') as BannerTone,
                       title: c.outOfLimit
                         ? `Kurang lebih dari ${rules.teraToleranceMm} mm`
-                        : lewat(c.estLiter, BATAS_CEK.lossL)
-                          ? `Selisih di atas ${BATAS_CEK.lossL} L, periksa kembali deepstick & kepekaan`
+                        : lewat(c.estLiter, rules.batasLossL)
+                          ? `Selisih di atas ${rules.batasLossL} L, periksa kembali deepstick & kepekaan`
                           : 'Sesuai tinggi T2 buku tera',
                       detail: `Selisih ${formatSigned(c.selisihMm, 0, ' mm')}${c.estLiter !== null ? ` ≈ ${formatSigned(c.estLiter, 1, ' L')}` : ''}`,
                     })}
@@ -508,11 +507,11 @@ export function StepContent(props: StepProps) {
             <Section>
               <CekSilang
                 nilai={x.transportLoss}
-                batas={BATAS_CEK.lossL}
+                batas={rules.batasLossL}
                 satuan=" L"
                 digit={1}
                 judulOk="Total transport gain/loss wajar"
-                judulLebih={`Transport gain/loss di atas ${BATAS_CEK.lossL} L`}
+                judulLebih={`Transport gain/loss di atas ${rules.batasLossL} L`}
                 saran="Periksa kembali deepstick kompartemen, tinggi T2, dan kepekaan buku tera"
                 detail={`Total ${formatSigned(x.transportLoss, 1, ' L')}`}
               />

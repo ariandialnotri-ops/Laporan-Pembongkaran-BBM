@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { BATAS_CEK, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
+import { effectiveRules, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 export function FinishPanel({
@@ -54,9 +54,10 @@ export function FinishPanel({
   const anomaly = evaluation.densityAnomaly || report.status === 'anomali'
   const finished = report.status !== 'draft'
   const densityOk = x.densityResults.length > 0 && x.densityResults.every((r) => r.ok)
+  const rules = effectiveRules(settings.rules)
   const lewat = (v: number | null, batas: number) => v !== null && Math.abs(v) > batas
-  const transportLebih = lewat(x.transportLoss, BATAS_CEK.lossL)
-  const dischargeLebih = lewat(x.gainLoss, BATAS_CEK.lossL)
+  const transportLebih = lewat(x.transportLoss, rules.batasLossL)
+  const dischargeLebih = lewat(x.gainLoss, rules.batasLossL)
   const c = x.cek
   const mm = (v: string) => {
     const n = parseAngka(v)
@@ -64,7 +65,7 @@ export function FinishPanel({
   }
   // Satu baris rekap: nilai ATG vs deepstick dan selisihnya; merah bila melewati batas.
   const selisih = (selMm: number | null, selL: number | null) => (
-    <span className={cn((lewat(selMm, BATAS_CEK.dipAtgMm) || lewat(selL, BATAS_CEK.dipAtgL)) && 'font-bold text-error')}>
+    <span className={cn((lewat(selMm, rules.batasDipAtgMm) || lewat(selL, rules.batasDipAtgL)) && 'font-bold text-error')}>
       {selMm !== null ? formatSigned(selMm, 0, ' mm') : '-'} · {selL !== null ? formatSigned(selL, 1, ' L') : '-'}
     </span>
   )
@@ -111,7 +112,7 @@ export function FinishPanel({
         {(transportLebih || dischargeLebih) && (
           <StatusBanner
             tone="error"
-            title={`Gain/loss di atas ${BATAS_CEK.lossL} L, lakukan pemeriksaan kembali`}
+            title={`Gain/loss di atas ${rules.batasLossL} L, lakukan pemeriksaan kembali`}
             detail={[
               transportLebih ? `Transport ${formatSigned(x.transportLoss ?? 0, 1, ' L')}: cek deepstick kompartemen & kepekaan buku tera` : null,
               dischargeLebih ? `Discharge ${formatSigned(x.gainLoss ?? 0, 0, ' L')}: cek pembacaan ATG, volume DO & totalisator` : null,
@@ -154,7 +155,7 @@ export function FinishPanel({
             ['Penerimaan ATG', x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : '-'],
             ['Penerimaan P-Insyst', parseAngka(d.penerimaanPinsyst ?? '') !== null ? formatLiter(parseAngka(d.penerimaanPinsyst ?? '') ?? 0, 0) : '-'],
           ]}
-          total={['Selisih P-Insyst − ATG', c.pinsyst !== null ? <span className={cn(lewat(c.pinsyst, BATAS_CEK.pinsystL) && 'text-error')}>{formatSigned(c.pinsyst, 0, ' L')}</span> : '-']}
+          total={['Selisih P-Insyst − ATG', c.pinsyst !== null ? <span className={cn(lewat(c.pinsyst, rules.batasPinsystL) && 'text-error')}>{formatSigned(c.pinsyst, 0, ' L')}</span> : '-']}
         />
         <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>

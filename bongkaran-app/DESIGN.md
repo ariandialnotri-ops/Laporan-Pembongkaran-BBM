@@ -514,7 +514,7 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Inspeksi APAR & APAB**: kartu ringkasan merah bergradasi (bulan, cincin progres, Belum/Temuan/Lewat masa/≤ 30 hari, tombol putih Pindai QR), kotak kode manual, filter, lalu kartu unit (ikon status, kode & tipe, lokasi, pil status, inspeksi terakhir, chip temuan/isi ulang/instansi; ketuk → data unit).
 
 ### 9.14i Pemeriksaan silang bongkaran & lampiran foto BA
-- **Batas pemeriksaan silang** (`BATAS_CEK` di `sop.ts`, hasil di `Derived.cek`), tidak memblokir tahap; melewati batas = banner merah, kotak input bercincin merah, dan toast setelah berhenti mengetik ±1 detik:
+- **Batas pemeriksaan silang** (`Rules.batas*`, diatur di Pengaturan > Aturan Pemeriksaan; hasil di `Derived.cek`), tidak memblokir tahap; melewati batas = banner merah, kotak input bercincin merah, dan toast setelah berhenti mengetik ±1 detik:
   - Langkah 4 & 13: volume layar ATG vs volume tabel kalibrasi dari tinggi ATG, batas ±2 L.
   - Langkah 7: tinggi deepstick tangki pendam vs tinggi ATG sebelum bongkar, batas ±10 mm (kolom "Pembanding ATG" di sebelah input).
   - Langkah 9: per kompartemen bila selisih > 50 L; total transport gain/loss > 50 L. Tinggi T2 acuan buku tera tampil sebagai kotak biru muda bergaris putus (baca saja), berbeda dari input deepstick.
@@ -522,6 +522,7 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
   - Langkah 14: volume deepstick vs volume ATG sesudah bongkar, batas ±20 L (mm ikut ditampilkan).
 - **Finish**: transport atau discharge gain/loss > 50 L → banner merah "lakukan pemeriksaan kembali" + kotak rekap bercincin merah. Rekap quantity menambah **Selisih ATG vs deepstick** (sebelum/sesudah, mm & L) dan **P-Insyst vs ATG**; baris yang sama masuk teks WA.
 - **Lampiran foto BA (PDF)**: grid 4 kolom bingkai 3:4, foto dimuat utuh sesuai rasio asli (tidak gepeng/terpotong) di latar abu muda; dikelompokkan per tahap dengan pita bernomor, tahap kecil berbagi satu baris (12 foto/halaman), keterangan slot + jam foto, kepala halaman (BA, MT, produk, tanggal) dan nomor halaman.
+- **Aturan Pemeriksaan hanya Admin Aplikasi** (super admin, `app.superadmin`): ABH dan peran lain hanya melihat. Database menjaga lewat trigger `bbm_settings_jaga_aturan`: simpanan pengaturan dari selain super admin tetap tersimpan, tetapi `rules` dan `pinPenanggungJawab` dikembalikan ke nilai lama.
 - **Panduan foto vertikal**: slot foto kosong menampilkan ikon HP yang berputar dari mendatar ke tegak (`.hp-tegak`, mati saat reduced motion); pratinjau foto berbingkai 3:4.
 
 ### 9.14d Pengajuan Anggaran (petty cash)

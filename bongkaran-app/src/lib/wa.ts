@@ -3,7 +3,7 @@ import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatMaybe, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { BATAS_CEK, type Derived, type Report, type Settings } from '@/lib/sop'
+import { effectiveRules, type Derived, type Report, type Settings } from '@/lib/sop'
 import type { Tank } from '@/lib/tank'
 
 const ok = (b: boolean) => (b ? '✅' : '❌')
@@ -58,12 +58,13 @@ export function buildWaText(report: Report, x: Derived, settings: Settings) {
   )
   if (x.gainLossDip !== null) L.push(`Gain/Loss (deepstick): ${formatSigned(x.gainLossDip, 0, ' L')}`)
   const c = x.cek
+  const rules = effectiveRules(settings.rules)
   const sel = (mm: number | null, l: number | null) => `${mm === null ? '-' : formatSigned(mm, 0, ' mm')} / ${l === null ? '-' : formatSigned(l, 1, ' L')}`
   if (c.dipAtgMmBefore !== null || c.dipAtgMmAfter !== null) {
-    L.push(`Selisih ATG vs deepstick sebelum: ${sel(c.dipAtgMmBefore, c.dipAtgLBefore)} ${ok(!(Math.abs(c.dipAtgMmBefore ?? 0) > BATAS_CEK.dipAtgMm))}`)
-    L.push(`Selisih ATG vs deepstick sesudah: ${sel(c.dipAtgMmAfter, c.dipAtgLAfter)} ${ok(!(Math.abs(c.dipAtgLAfter ?? 0) > BATAS_CEK.dipAtgL))}`)
+    L.push(`Selisih ATG vs deepstick sebelum: ${sel(c.dipAtgMmBefore, c.dipAtgLBefore)} ${ok(!(Math.abs(c.dipAtgMmBefore ?? 0) > rules.batasDipAtgMm))}`)
+    L.push(`Selisih ATG vs deepstick sesudah: ${sel(c.dipAtgMmAfter, c.dipAtgLAfter)} ${ok(!(Math.abs(c.dipAtgLAfter ?? 0) > rules.batasDipAtgL))}`)
   }
-  if (c.pinsyst !== null) L.push(`Penerimaan P-Insyst: ${formatMaybe(parseAngka(d.penerimaanPinsyst ?? ''))} L (selisih vs ATG ${formatSigned(c.pinsyst, 0, ' L')}) ${ok(!(Math.abs(c.pinsyst) > BATAS_CEK.pinsystL))}`)
+  if (c.pinsyst !== null) L.push(`Penerimaan P-Insyst: ${formatMaybe(parseAngka(d.penerimaanPinsyst ?? ''))} L (selisih vs ATG ${formatSigned(c.pinsyst, 0, ' L')}) ${ok(!(Math.abs(c.pinsyst) > rules.batasPinsystL))}`)
   L.push('')
   L.push('*SAFETY & KELENGKAPAN*')
   L.push(`APAR ${ok(d.safetyApar)} | Arde ${ok(d.safetyArde)} | Atribut safety ${ok(d.safetyAtribut)}`)
