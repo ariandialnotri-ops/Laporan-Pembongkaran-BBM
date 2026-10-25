@@ -19,6 +19,7 @@ import { Pill } from '@/components/ui/pill'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import { InfoHalaman } from '@/components/ui/info-pop'
+import { ekspor, muatFoto } from '@/lib/ekspor'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { TakarRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
@@ -510,14 +511,15 @@ function CetakBaTakar({ semua }: { semua: TakarRecord[] }) {
   const cetak = async (lampiran: boolean) => {
     setBusy(lampiran ? 'lampiran' : 'ba')
     try {
-      const { exportBaTakarPdf } = await import('@/lib/report/ba-takar')
-      const fotoData: Record<string, string> = {}
-      if (lampiran) {
-        const fotos = records.flatMap((r) => [...r.data.foto.dudukan, ...r.data.foto.hasil])
-        await Promise.all(fotos.map(async (p) => (fotoData[p.id] = await app.backend.photoDataUrl(p).catch(() => ''))))
-      }
-      const kode = app.settings.kodeSpbu?.trim() || 'SPBU'
-      await exportBaTakarPdf({ tanggal, records, settings: app.settings, fotoData }, lampiran, `BA_Uji_Takar_SPBU_${kode}_${tanggal}${lampiran ? '_Lampiran' : ''}.pdf`)
+      await ekspor(lampiran ? 'Membuat PDF BA Uji Takar + lampiran' : 'Membuat PDF BA Uji Takar', async (lapor) => {
+        lapor(8, 'Memuat modul laporan')
+        const { exportBaTakarPdf } = await import('@/lib/report/ba-takar')
+        const fotos = lampiran ? records.flatMap((r) => [...r.data.foto.dudukan, ...r.data.foto.hasil]) : []
+        const fotoData = await muatFoto(fotos, (p) => app.backend.photoDataUrl(p), lapor, 15, 70)
+        lapor(lampiran ? 75 : 40, 'Menyusun halaman PDF')
+        const kode = app.settings.kodeSpbu?.trim() || 'SPBU'
+        await exportBaTakarPdf({ tanggal, records, settings: app.settings, fotoData }, lampiran, `BA_Uji_Takar_SPBU_${kode}_${tanggal}${lampiran ? '_Lampiran' : ''}.pdf`)
+      })
       toast(lampiran ? 'BA + lampiran foto diunduh' : 'Berita Acara diunduh')
     } catch (e) {
       toast(`Gagal membuat PDF: ${pesan(e)}`, TriangleAlert)

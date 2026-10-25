@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { ekspor, tahap } from '@/lib/ekspor'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { PECAHAN } from '@/lib/closing'
 import type { ClosingData } from '@/lib/closing'
@@ -375,11 +376,19 @@ export function LaporanStockOpname() {
     setBusy(jenis)
     setError(null)
     try {
-      if (bolehUbah && !drafSaja) await tulis()
-      const { soXlsx, soPdf } = await import('@/lib/report/so-xlsx')
-      const x = { bulan, settings: s, data, lalu: recLalu, tanks: TANKS, nozzles, dispensers, totalizer: tot.recs!, reports: app.reports, pumpTest }
-      const blob = jenis === 'pdf' ? await soPdf(x) : await soXlsx(x)
-      downloadBlob(blob, `${drafSaja ? 'DRAF ' : ''}BA Laporan Bulanan ${s.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.${jenis === 'pdf' ? 'pdf' : 'xlsx'}`)
+      await ekspor(`Membuat ${jenis === 'pdf' ? 'PDF' : 'Excel'} BA Laporan Bulanan`, async (lapor) => {
+        if (bolehUbah && !drafSaja) {
+          lapor(6, 'Menyimpan isian stock opname')
+          await tulis()
+        }
+        lapor(15, 'Memuat modul laporan')
+        const { soXlsx, soPdf } = await import('@/lib/report/so-xlsx')
+        const x = { bulan, settings: s, data, lalu: recLalu, tanks: TANKS, nozzles, dispensers, totalizer: tot.recs!, reports: app.reports, pumpTest }
+        await tahap(lapor, 30, 'Menghitung stok, penjualan & losses')
+        const blob = jenis === 'pdf' ? await soPdf(x) : await soXlsx(x)
+        lapor(95, 'Menyimpan file')
+        downloadBlob(blob, `${drafSaja ? 'DRAF ' : ''}BA Laporan Bulanan ${s.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.${jenis === 'pdf' ? 'pdf' : 'xlsx'}`)
+      })
       toast(`Laporan SO ${labelBulan(bulan)} ${jenis === 'pdf' ? 'PDF' : 'Excel'} terunduh`)
     } catch (e) {
       setError(`Gagal membuat laporan: ${pesan(e)}`)

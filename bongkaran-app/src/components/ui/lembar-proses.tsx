@@ -3,12 +3,15 @@ import { useLocation } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { BadgeCheck, CloudUpload, Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { eksporStore } from '@/lib/ekspor'
 import { prosesStore, type KeadaanProses } from '@/lib/proses'
 import { cn } from '@/lib/utils'
 
 /** Lembar bawah global: "Memproses…" selama data dikirim / diunggah / dihapus, lalu "Berhasil!". */
 export function LembarProses() {
   const k = useSyncExternalStore(prosesStore.subscribe, prosesStore.get)
+  // Saat lembar ekspor tampil, simpan otomatis sebelum ekspor tidak memunculkan lembar kedua.
+  const sedangEkspor = useSyncExternalStore(eksporStore.subscribe, () => eksporStore.get().fase !== 'diam')
   const { pathname } = useLocation()
   // Halaman Terkirim sudah menjadi tanda berhasil; jangan tumpuk dengan lembar sukses.
   const keTerkirim = k.fase === 'sukses' && pathname === '/terkirim'
@@ -25,7 +28,7 @@ export function LembarProses() {
   }, [k.fase, hanyaUnggah])
 
   // Proses singkat (<0,4 detik) tidak perlu menampilkan animasi pesawat: langsung sukses.
-  const buka = (k.fase === 'proses' && k.tampil) || (k.fase === 'sukses' && !keTerkirim)
+  const buka = !sedangEkspor && ((k.fase === 'proses' && k.tampil) || (k.fase === 'sukses' && !keTerkirim))
   const teks = teksProses(k)
 
   return (

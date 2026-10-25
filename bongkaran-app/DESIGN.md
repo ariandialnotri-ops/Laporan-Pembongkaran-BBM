@@ -525,6 +525,12 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Aturan Pemeriksaan hanya Admin Aplikasi** (super admin, `app.superadmin`): ABH dan peran lain hanya melihat. Database menjaga lewat trigger `bbm_settings_jaga_aturan`: simpanan pengaturan dari selain super admin tetap tersimpan, tetapi `rules` dan `pinPenanggungJawab` dikembalikan ke nilai lama.
 - **Panduan foto vertikal**: slot foto kosong menampilkan ikon HP yang berputar dari mendatar ke tegak (`.hp-tegak`, mati saat reduced motion); pratinjau foto berbingkai 3:4.
 
+### 9.14j Lembar progres ekspor / unduh file
+- Semua pembuatan file (BA bongkaran Excel/PDF/PDF + foto/JPG, BA Uji Takar, label APAR PDF/JPG, Laporan Operasional Excel/PDF, Catatan Persediaan, BA Laporan Bulanan, voucher petty cash PDF/Excel, absensi Excel & poster QR, arsip ZIP foto) dibungkus `ekspor(judul, async (lapor) => …)` (`src/lib/ekspor.ts`).
+- `LembarEkspor` (lembar bawah global, di atas lembar proses): cincin persentase besar, bilah progres bergradasi dengan kilau, teks tahap nyata ("Memuat foto 12/28", "Menyusun lampiran foto 8/28", "Menggambar halaman 2/3"), lama berjalan, dan "jangan tutup aplikasi". Tidak dapat ditutup selama proses.
+- Persentase memakai laporan nyata (foto dimuat `muatFoto` 4 sekaligus, tiap foto lampiran, tiap halaman, progres ZIP); di antara laporan merambat pelan menuju batas di bawah tahap berikutnya (maks. 97%), tidak pernah mundur. Selesai: 100% hijau "… berhasil dibuat", tertutup sendiri 1,8 detik. Gagal: merah dengan pesan galat + tombol Tutup.
+- Simpan otomatis sebelum ekspor tidak memunculkan lembar "Berhasil!" kedua.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

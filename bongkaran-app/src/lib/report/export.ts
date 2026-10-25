@@ -5,6 +5,7 @@
  *   ke gambar; PDF Berita Acara ditambah lampiran foto evidence.
  */
 import { jsPDF } from 'jspdf'
+import type { Lapor } from '@/lib/ekspor'
 import { LEGACY_PHOTO_SLOTS, STEPS, type Derived, type Report, type Settings } from '@/lib/sop'
 import { buildBa } from './ba'
 import { paginate, persediaanCells, type PersediaanRow } from './persediaan'
@@ -25,6 +26,10 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
+
+const diam: Lapor = () => {}
+/** Beri kesempatan lembar progres tergambar di antara pekerjaan berat. */
+const jeda = () => new Promise<void>((r) => setTimeout(r, 0))
 
 const valuesOf = (cells: Record<string, CellSpec>) => Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.value]))
 
@@ -56,13 +61,16 @@ function imageSize(src: string) {
   })
 }
 
-export async function exportBaXlsx(report: Report, x: Derived, settings: Settings, filename: string) {
+export async function exportBaXlsx(report: Report, x: Derived, settings: Settings, filename: string, lapor: Lapor = diam) {
+  lapor(30, 'Mengisi data Berita Acara')
   const ba = buildBa(report, x, settings)
+  lapor(40, 'Memuat template Excel')
   const wb = await Workbook.loadTemplate()
   await wb.removeSheet(PERSEDIAAN_SHEET)
   const path = await wb.sheetPath(BA_SHEET)
   await wb.setCells(path, ba.cells)
   const images: ImageSpec[] = []
+  lapor(55, 'Menempel tanda tangan')
   for (const s of ba.signatures) {
     const img = await trimSignature(s.img)
     const { w, h } = await imageSize(img)
@@ -91,6 +99,7 @@ export async function exportBaXlsx(report: Report, x: Derived, settings: Setting
     for (const f of [...d.getElementsByTagNameNS(NS, 'formula')]) if (f.textContent === '$K$31') f.textContent = '$K$30'
   })
   await wb.cleanup()
+  lapor(85, 'Menyusun file Excel')
   downloadBlob(await wb.toBlob(), filename)
 }
 
@@ -119,8 +128,11 @@ async function baRender(report: Report, x: Derived, settings: Settings) {
   return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays, formats })
 }
 
-export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string) {
+export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string, lapor: Lapor = diam) {
+  lapor(35, 'Menggambar Berita Acara')
   const canvas = await baRender(report, x, settings)
+  lapor(85, 'Menyimpan gambar JPG')
+  await jeda()
   const a = document.createElement('a')
   a.href = canvas.toDataURL('image/jpeg', 0.92)
   a.download = filename
@@ -150,7 +162,7 @@ const jamFoto = (iso: string) => {
  * berbingkai 3:4 (12 foto per halaman); kelompok kecil berbagi baris. Foto dimuat utuh sesuai rasio aslinya (tidak gepeng / tidak
  * terpotong), sisa bingkai berwarna abu muda. Tiap foto diberi keterangan slot dan jam pengambilan.
  */
-function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, string>) {
+async function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, string>, lapor: Lapor, dari: number, sampai: number) {
   const groups = STEPS.map((step, si) => ({
     no: si + 1,
     title: step.title,
@@ -224,6 +236,7 @@ function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, stri
     doc.setFontSize(7.5)
     doc.text(doc.splitTextToSize(`${g.title}${lanjut ? ' (lanjutan)' : ''}`, w - 20)[0] as string, x + 16, y + 9.6)
   }
+  let ke = 0
   for (const g of groups) {
     if (col > 0 && col + g.items.length > KOLOM) barisBaru()
     let mulai = 0
@@ -233,6 +246,8 @@ function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, stri
       pita(g, col, n, mulai > 0)
       for (let i = 0; i < n; i++) {
         const it = g.items[mulai + i]
+        lapor(dari + ((sampai - dari) * ke++) / total, `Menyusun lampiran foto ${ke}/${total}`)
+        if (ke % 4 === 0) await jeda()
         const x = M + (col + i) * (cw + GAP)
         const yy = y + HEAD
         doc.setFillColor(244, 245, 247)
@@ -274,23 +289,24 @@ function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, stri
 export type ExportKind = 'pdf' | 'pdf-ba' | 'jpg' | 'xlsx'
 
 /** PDF Berita Acara; `photoData` null = tanpa lampiran foto evidence. */
-export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string> | null, filename: string) {
+export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string> | null, filename: string, lapor: Lapor = diam) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
+  lapor(photoData ? 52 : 30, 'Menggambar Berita Acara')
+  await jeda()
   placeCanvas(doc, await baRender(report, x, settings))
-  if (!photoData) {
-    doc.save(filename)
-    return
-  }
-
-  lampiranFoto(doc, report, photoData)
+  if (photoData) await lampiranFoto(doc, report, photoData, lapor, 62, 92)
+  lapor(95, 'Menyimpan file PDF')
+  await jeda()
   doc.save(filename)
 }
 
-export async function exportPersediaanPdf(data: PersediaanExport, filename: string) {
+export async function exportPersediaanPdf(data: PersediaanExport, filename: string, lapor: Lapor = diam) {
   // Template: kertas Legal landscape.
   const doc = new jsPDF({ unit: 'pt', format: 'legal', orientation: 'landscape' })
   const pages = paginate(data.rows)
   for (let i = 0; i < pages.length; i++) {
+    lapor(20 + (70 * i) / pages.length, `Menggambar halaman ${i + 1}/${pages.length}`)
+    await jeda()
     if (i) doc.addPage()
     placeCanvas(doc, await drawSheet('persediaan', valuesOf(persediaanCells(pages[i], data.header))), 18)
   }

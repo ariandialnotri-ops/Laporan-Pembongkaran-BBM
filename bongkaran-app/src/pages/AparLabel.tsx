@@ -7,6 +7,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { useToast } from '@/components/ui/toast'
+import { ekspor } from '@/lib/ekspor'
 import { aparUnitUrl, jenisLengkap, tipeLabel, warnaLabel, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { cn } from '@/lib/utils'
@@ -47,8 +48,12 @@ export function AparLabel() {
   const unduh = async () => {
     setBusy('pdf')
     try {
-      const { exportLabelAparPdf } = await import('@/lib/report/label-apar')
-      await exportLabelAparPdf(labels, s.namaSpbu?.trim() || 'SPBU', `${dasar}.pdf`)
+      await ekspor('Membuat PDF label APAR', async (lapor) => {
+        lapor(15, 'Memuat modul label')
+        const { exportLabelAparPdf } = await import('@/lib/report/label-apar')
+        lapor(35, `Menyusun ${labels.length} label & kode QR`)
+        await exportLabelAparPdf(labels, s.namaSpbu?.trim() || 'SPBU', `${dasar}.pdf`)
+      })
       toast('PDF label diunduh')
     } catch (e) {
       toast(`Gagal membuat PDF: ${e instanceof Error ? e.message : String(e)}`, TriangleAlert)
@@ -60,8 +65,12 @@ export function AparLabel() {
   const unduhJpg = async (mode: 'label' | 'a4') => {
     setBusy(mode)
     try {
-      const { exportLabelAparJpg } = await import('@/lib/report/label-apar-jpg')
-      const n = await exportLabelAparJpg(labels, s.namaSpbu?.trim() || 'SPBU', mode, dasar)
+      const n = await ekspor('Membuat JPG label APAR', async (lapor) => {
+        lapor(15, 'Memuat modul label')
+        const { exportLabelAparJpg } = await import('@/lib/report/label-apar-jpg')
+        lapor(35, `Menggambar ${labels.length} label & kode QR`)
+        return exportLabelAparJpg(labels, s.namaSpbu?.trim() || 'SPBU', mode, dasar)
+      })
       toast(n > 1 ? `${n} gambar JPG diunduh (ZIP)` : 'JPG label diunduh')
     } catch (e) {
       toast(`Gagal membuat JPG: ${e instanceof Error ? e.message : String(e)}`, TriangleAlert)

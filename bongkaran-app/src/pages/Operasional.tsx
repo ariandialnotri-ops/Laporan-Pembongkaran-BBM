@@ -17,6 +17,7 @@ import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { KartuPilih, LegendaStatus } from '@/components/bongkaran/pilih-status'
+import { ekspor, muatFoto } from '@/lib/ekspor'
 import type { StatusIsi } from '@/lib/status-isi'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { useApp } from '@/lib/app-state'
@@ -679,9 +680,13 @@ export function LaporanOps() {
     if (!recs) return
     setBusy('xlsx')
     try {
-      const { exportOpsXlsx } = await import('@/lib/report/ops')
-      const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
-      await exportOpsXlsx({ tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings, filename: `Laporan_Operasional_SPBU_${kode}_${bulan}.xlsx` })
+      await ekspor('Membuat Excel Laporan Operasional', async (lapor) => {
+        lapor(12, 'Memuat modul laporan')
+        const { exportOpsXlsx } = await import('@/lib/report/ops')
+        lapor(30, `Mengisi ${recs.length} catatan ke 14 format`)
+        const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
+        await exportOpsXlsx({ tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings, filename: `Laporan_Operasional_SPBU_${kode}_${bulan}.xlsx` })
+      })
     } catch (e) {
       toast(`Gagal membuat Excel: ${pesan(e)}`)
     } finally {
@@ -693,15 +698,16 @@ export function LaporanOps() {
     if (!recs) return
     setBusy('pdf')
     try {
-      const [{ exportOpsPdf }, fotoData] = await Promise.all([
-        import('@/lib/report/ops-pdf'),
+      await ekspor('Membuat PDF Laporan Operasional', async (lapor) => {
+        lapor(6, 'Memuat modul laporan')
+        const [{ exportOpsPdf }, { isiOps }] = await Promise.all([import('@/lib/report/ops-pdf'), import('@/lib/report/ops')])
         // Foto temuan disisipkan di PDF; foto yang sudah dipangkas cut-off dilewati.
-        Promise.all(temuanFoto.map(async (p) => [p.id, await app.backend.photoDataUrl(p).catch(() => '')] as const)).then((x) => Object.fromEntries(x)),
-      ])
-      const { isiOps } = await import('@/lib/report/ops')
-      const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
-      const dasar = { tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings }
-      await exportOpsPdf({ ...dasar, grup, fotoData, hariIni, lembar: isiOps(dasar).lembar }, `Laporan_Operasional_SPBU_${kode}_${bulan}.pdf`)
+        const fotoData = await muatFoto(temuanFoto, (p) => app.backend.photoDataUrl(p), lapor, 10, 50)
+        lapor(55, 'Menyusun halaman PDF')
+        const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
+        const dasar = { tahun: Number(tahun), bulan: Number(bulan.slice(5)), recs, kerusakan, settings: app.settings }
+        await exportOpsPdf({ ...dasar, grup, fotoData, hariIni, lembar: isiOps(dasar).lembar }, `Laporan_Operasional_SPBU_${kode}_${bulan}.pdf`)
+      })
     } catch (e) {
       toast(`Gagal membuat PDF: ${pesan(e)}`)
     } finally {

@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { KonfirmasiProvider } from '@/components/ui/konfirmasi'
 import { LembarProses } from '@/components/ui/lembar-proses'
+import { LembarEkspor } from '@/components/ui/lembar-ekspor'
 import { ToastProvider } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { titleFor } from '@/lib/nav'
@@ -296,6 +297,7 @@ function App() {
           <Gate />
         </AppProvider>
         <LembarProses />
+        <LembarEkspor />
       </KonfirmasiProvider>
     </ToastProvider>
   )

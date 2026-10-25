@@ -21,6 +21,7 @@ import { Sheet } from '@/components/ui/sheet'
 import { Stepper, type Langkah } from '@/components/ui/stepper'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { ekspor, muatFoto, tahap } from '@/lib/ekspor'
 import { useApp } from '@/lib/app-state'
 import { COA, coaByNo } from '@/lib/coa'
 import { formatBulanTahun, formatTanggalIso, todayIso } from '@/lib/date'
@@ -732,29 +733,32 @@ export function RealisasiPetty() {
   const cetakVoucher = async () => {
     setCetak(true)
     try {
-      const fotos = barisCetak.flatMap((b) => [...b.struk, ...b.barang])
-      const fotoData: Record<string, string> = {}
-      await Promise.all(fotos.map(async (p) => (fotoData[p.id] = await app.backend.photoDataUrl(p).catch(() => ''))))
-      const { voucherPdf } = await import('@/lib/report/voucher-pdf')
-      const hari = todayIso()
-      const blob = voucherPdf({
-        nomor: `${Number(hari.slice(8))}/COCO/${hari.slice(5, 7)}/${hari.slice(0, 4)}`,
-        tanggal: hari,
-        dari: vDari,
-        sampai: vSampai,
-        baris: barisCetak,
-        settings: app.settings,
-        ttd: { buh: app.settings.namaPengawasDefault ?? '', admin: app.role === 'admin' ? app.displayName : '', kasir: '' },
-        fotoData,
+      await ekspor('Membuat PDF voucher petty cash', async (lapor) => {
+        const fotos = barisCetak.flatMap((b) => [...b.struk, ...b.barang])
+        const fotoData = await muatFoto(fotos, (p) => app.backend.photoDataUrl(p), lapor, 5, 55)
+        lapor(60, 'Memuat modul voucher')
+        const { voucherPdf } = await import('@/lib/report/voucher-pdf')
+        await tahap(lapor, 65, `Menyusun ${barisCetak.length} voucher`)
+        const hari = todayIso()
+        const blob = voucherPdf({
+          nomor: `${Number(hari.slice(8))}/COCO/${hari.slice(5, 7)}/${hari.slice(0, 4)}`,
+          tanggal: hari,
+          dari: vDari,
+          sampai: vSampai,
+          baris: barisCetak,
+          settings: app.settings,
+          ttd: { buh: app.settings.namaPengawasDefault ?? '', admin: app.role === 'admin' ? app.displayName : '', kasir: '' },
+          fotoData,
+        })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Voucher_Petty_Cash_${(app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')}_${vDari}_sd_${vSampai}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 2000)
       })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Voucher_Petty_Cash_${(app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')}_${vDari}_sd_${vSampai}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 2000)
     } catch (e) {
       toast(`Gagal mencetak voucher: ${pesan(e)}`)
     } finally {
@@ -764,12 +768,16 @@ export function RealisasiPetty() {
   const unduhVoucher = async () => {
     setBusy(true)
     try {
-      const { exportVoucherXlsx } = await import('@/lib/report/voucher')
-      const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
-      await exportVoucherXlsx(
-        { bulan, vouchers, settings: app.settings, ttd: { buh: app.settings.namaPengawasDefault ?? '', admin: app.role === 'admin' ? app.displayName : '', kasir: '' } },
-        `Voucher_Realisasi_Petty_Cash_${kode}_${bulan}.xlsx`,
-      )
+      await ekspor('Membuat Excel voucher realisasi', async (lapor) => {
+        lapor(15, 'Memuat modul voucher')
+        const { exportVoucherXlsx } = await import('@/lib/report/voucher')
+        lapor(35, `Mengisi ${vouchers.length} voucher realisasi`)
+        const kode = (app.settings.kodeSpbu || 'SPBU').replace(/[^0-9A-Za-z]/g, '')
+        await exportVoucherXlsx(
+          { bulan, vouchers, settings: app.settings, ttd: { buh: app.settings.namaPengawasDefault ?? '', admin: app.role === 'admin' ? app.displayName : '', kasir: '' } },
+          `Voucher_Realisasi_Petty_Cash_${kode}_${bulan}.xlsx`,
+        )
+      })
     } catch (e) {
       toast(`Gagal membuat voucher: ${pesan(e)}`)
     } finally {

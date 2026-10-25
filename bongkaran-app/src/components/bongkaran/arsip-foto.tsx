@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Archive, Download, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ekspor } from '@/lib/ekspor'
 import { useApp } from '@/lib/app-state'
 import type { FotoArsip } from '@/lib/backend'
 import { formatTanggalIso } from '@/lib/date'
@@ -41,34 +42,38 @@ export function ArsipFotoBanner({ className }: { className?: string }) {
     setError(null)
     setProses('Menyiapkan…')
     try {
-      const { default: JSZip } = await import('jszip')
-      const zip = new JSZip()
-      let selesai = 0
-      let hilang = 0
-      const antre = [...daftar]
-      // Empat unduhan sekaligus.
-      await Promise.all(
-        Array.from({ length: 4 }, async () => {
-          for (let f = antre.shift(); f; f = antre.shift()) {
-            const blob = await app.backend.unduhFoto(f.path)
-            if (blob) zip.file(f.path, blob)
-            else hilang++
-            selesai++
-            setProses(`Mengunduh ${selesai}/${daftar.length} foto`)
-          }
-        }),
-      )
-      setProses('Membuat ZIP…')
-      const isi = await zip.generateAsync({ type: 'blob', compression: 'STORE' })
-      const url = URL.createObjectURL(isi)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Arsip_Foto_${(app.spbu?.kode || app.spbu?.nama || 'SPBU').replace(/[^a-zA-Z0-9]/g, '')}_sebelum_${batas}.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 5000)
-      if (hilang) setError(`${hilang} foto sudah tidak ada di server dan tidak ikut diarsipkan.`)
+      await ekspor('Membuat arsip ZIP foto', async (lapor) => {
+        lapor(4, 'Memuat modul ZIP')
+        const { default: JSZip } = await import('jszip')
+        const zip = new JSZip()
+        let selesai = 0
+        let hilang = 0
+        const antre = [...daftar]
+        // Empat unduhan sekaligus.
+        await Promise.all(
+          Array.from({ length: 4 }, async () => {
+            for (let f = antre.shift(); f; f = antre.shift()) {
+              const blob = await app.backend.unduhFoto(f.path)
+              if (blob) zip.file(f.path, blob)
+              else hilang++
+              selesai++
+              setProses(`Mengunduh ${selesai}/${daftar.length} foto`)
+              lapor(5 + (80 * selesai) / Math.max(1, daftar.length), `Mengunduh foto ${selesai}/${daftar.length}`)
+            }
+          }),
+        )
+        setProses('Membuat ZIP…')
+        const isi = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, (m) => lapor(85 + m.percent * 0.12, 'Menyusun file ZIP'))
+        const url = URL.createObjectURL(isi)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Arsip_Foto_${(app.spbu?.kode || app.spbu?.nama || 'SPBU').replace(/[^a-zA-Z0-9]/g, '')}_sebelum_${batas}.zip`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 5000)
+        if (hilang) setError(`${hilang} foto sudah tidak ada di server dan tidak ikut diarsipkan.`)
+      })
     } catch (e) {
       setError(`Gagal membuat arsip: ${e instanceof Error ? e.message : String(e)}`)
     } finally {

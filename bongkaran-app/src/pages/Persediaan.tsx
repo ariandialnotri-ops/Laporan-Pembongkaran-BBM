@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
+import { ekspor } from '@/lib/ekspor'
 import { useApp } from '@/lib/app-state'
 import type { StokRecord } from '@/lib/daily'
 import { formatTanggalIso, todayIso } from '@/lib/date'
@@ -48,11 +49,15 @@ export function Persediaan() {
     if (!rows.length) return toast('Belum ada data stok shift atau bongkaran untuk produk & tanggal ini', TriangleAlert)
     setBusy(kind)
     try {
-      const ex = await import('@/lib/report/export')
-      const data = { rows, header: { noSpbu: app.settings.kodeSpbu, produk, tangki: tank ? String(tank.tankNo) : '' } }
-      const name = `Catatan_Persediaan_${produk.replace(/\s+/g, '')}_${from}_${to}`
-      if (kind === 'xlsx') await ex.exportPersediaanXlsx(data, `${name}.xlsx`)
-      else await ex.exportPersediaanPdf(data, `${name}.pdf`)
+      await ekspor(kind === 'xlsx' ? 'Membuat Excel Catatan Persediaan' : 'Membuat PDF Catatan Persediaan', async (lapor) => {
+        lapor(10, 'Memuat modul laporan')
+        const ex = await import('@/lib/report/export')
+        const data = { rows, header: { noSpbu: app.settings.kodeSpbu, produk, tangki: tank ? String(tank.tankNo) : '' } }
+        const name = `Catatan_Persediaan_${produk.replace(/\s+/g, '')}_${from}_${to}`
+        lapor(25, `Mengisi ${rows.length} baris persediaan`)
+        if (kind === 'xlsx') await ex.exportPersediaanXlsx(data, `${name}.xlsx`)
+        else await ex.exportPersediaanPdf(data, `${name}.pdf`, lapor)
+      })
     } catch (e) {
       toast(`Gagal membuat laporan: ${e instanceof Error ? e.message : String(e)}`, TriangleAlert)
     } finally {

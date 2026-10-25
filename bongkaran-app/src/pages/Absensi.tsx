@@ -34,6 +34,7 @@ import {
   type JenisAbsen,
   type StatusAbsen,
 } from '@/lib/absen'
+import { ekspor } from '@/lib/ekspor'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, todayIso } from '@/lib/date'
 import { kodeInfo, personilAktif } from '@/lib/personil'
@@ -397,9 +398,14 @@ export function AbsensiRekap() {
   const unduh = async () => {
     setBusy(true)
     try {
-      const { absenXlsx } = await import('@/lib/report/absen-xlsx')
-      const blob = await absenXlsx({ bulan, label: labelBulan(bulan), spbu: app.settings.namaSpbu || app.spbu?.nama || 'SPBU', rekap, detail: [...recs].sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.data.nama.localeCompare(b.data.nama)), roster: jadwal?.data.roster })
-      downloadBlob(blob, `Absensi ${app.settings.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.xlsx`)
+      await ekspor('Membuat Excel Absensi', async (lapor) => {
+        lapor(15, 'Memuat modul laporan')
+        const { absenXlsx } = await import('@/lib/report/absen-xlsx')
+        lapor(35, `Menyusun rekap ${recs.length} catatan absen`)
+        const blob = await absenXlsx({ bulan, label: labelBulan(bulan), spbu: app.settings.namaSpbu || app.spbu?.nama || 'SPBU', rekap, detail: [...recs].sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.data.nama.localeCompare(b.data.nama)), roster: jadwal?.data.roster })
+        lapor(95, 'Menyimpan file')
+        downloadBlob(blob, `Absensi ${app.settings.namaSpbu || 'SPBU'} ${labelBulan(bulan)}.xlsx`)
+      })
     } catch (e) {
       toast(`Gagal membuat Excel: ${pesan(e)}`)
     } finally {
@@ -573,8 +579,14 @@ export function AbsensiPengaturan() {
     if (!teksQr) return
     setBusy('pdf')
     try {
-      const { posterAbsenPdf } = await import('@/lib/report/absen-xlsx')
-      downloadBlob(await posterAbsenPdf(teksQr, app.settings.namaSpbu || app.spbu?.nama || 'SPBU', app.settings.kodeSpbu || ''), `QR Absensi ${app.settings.namaSpbu || 'SPBU'}.pdf`)
+      await ekspor('Membuat PDF poster QR absensi', async (lapor) => {
+        lapor(20, 'Memuat modul laporan')
+        const { posterAbsenPdf } = await import('@/lib/report/absen-xlsx')
+        lapor(45, 'Menggambar poster & kode QR')
+        const blob = await posterAbsenPdf(teksQr, app.settings.namaSpbu || app.spbu?.nama || 'SPBU', app.settings.kodeSpbu || '')
+        lapor(95, 'Menyimpan file')
+        downloadBlob(blob, `QR Absensi ${app.settings.namaSpbu || 'SPBU'}.pdf`)
+      })
     } catch (e) {
       setError(pesan(e))
     } finally {

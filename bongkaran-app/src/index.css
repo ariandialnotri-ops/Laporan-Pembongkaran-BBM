@@ -662,3 +662,10 @@ html[data-keyboard='open'] [data-dock] {
 }
 .hp-tegak { animation: hpTegak 2.6s ease-in-out infinite; transform-origin: center; }
 @media (prefers-reduced-motion: reduce) { .hp-tegak { animation: none; } }
+
+/* Lembar ekspor: ikon unduh mengangguk, kilau bergerak di bilah progres. */
+@keyframes eksporIkon { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(2px); } }
+.ekspor-ikon { animation: eksporIkon 1.1s ease-in-out infinite; }
+@keyframes eksporKilau { from { left: -4rem; } to { left: 100%; } }
+.ekspor-kilau { background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent); animation: eksporKilau 1.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ekspor-ikon, .ekspor-kilau { animation: none; } }

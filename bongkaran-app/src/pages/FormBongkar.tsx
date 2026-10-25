@@ -3,6 +3,7 @@ import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Beaker, Flag, Lock, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { ekspor, muatFoto, type Lapor } from '@/lib/ekspor'
 import type { ExportKind } from '@/lib/report/export'
 import { FinishPanel } from '@/components/bongkaran/finish-panel'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
@@ -257,23 +258,29 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     setReport((prev) => ({ ...prev, status: 'draft', finishedAt: null, updatedAt: Date.now() }))
   }
   const fileBase = `BA_Pembongkaran_${(report.data.nopol || 'MT').replace(/[^a-zA-Z0-9]/g, '')}_${report.data.tanggalDatang}`
-  const photoData = async () => {
-    const out: Record<string, string> = {}
-    for (const p of Object.values(report.photos).flat()) out[p.id] = await app.backend.photoDataUrl(p)
-    return out
+  const photoData = (lapor: Lapor) => muatFoto(Object.values(report.photos).flat(), (p) => app.backend.photoDataUrl(p), lapor, 12, 50)
+  const JUDUL_EKSPOR: Record<ExportKind, string> = {
+    xlsx: 'Membuat Excel Berita Acara',
+    jpg: 'Membuat JPG Berita Acara',
+    'pdf-ba': 'Membuat PDF Berita Acara',
+    pdf: 'Membuat PDF BA + lampiran foto',
   }
   // Laporan mengikuti template Excel referensi; modul dimuat saat dibutuhkan.
   const runExport = async (kind: ExportKind) => {
     setGenerating(kind)
     try {
-      await flush()
-      const ex = await import('@/lib/report/export')
-      const x = evaluation.derived
-      if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`)
-      else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`)
-      // PDF BA saja: tanpa memuat foto, jauh lebih cepat.
-      else if (kind === 'pdf-ba') await ex.exportBaPdf(report, x, app.settings, null, `${fileBase}.pdf`)
-      else await ex.exportBaPdf(report, x, app.settings, await photoData(), `${fileBase}_lampiran.pdf`)
+      await ekspor(JUDUL_EKSPOR[kind], async (lapor) => {
+        lapor(4, 'Menyimpan data terakhir')
+        await flush()
+        lapor(9, 'Memuat modul laporan')
+        const ex = await import('@/lib/report/export')
+        const x = evaluation.derived
+        if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`, lapor)
+        else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`, lapor)
+        // PDF BA saja: tanpa memuat foto, jauh lebih cepat.
+        else if (kind === 'pdf-ba') await ex.exportBaPdf(report, x, app.settings, null, `${fileBase}.pdf`, lapor)
+        else await ex.exportBaPdf(report, x, app.settings, await photoData(lapor), `${fileBase}_lampiran.pdf`, lapor)
+      })
     } catch (e) {
       toast(`Gagal membuat ${kind === 'xlsx' ? 'Excel' : kind === 'jpg' ? 'JPG' : 'PDF'}: ${pesan(e)}`, TriangleAlert)
     } finally {
