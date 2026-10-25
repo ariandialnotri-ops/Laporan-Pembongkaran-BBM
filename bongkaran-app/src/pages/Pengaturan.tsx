@@ -227,6 +227,9 @@ export function AturanPemeriksaan() {
             <Field label="P-Insyst vs ATG" htmlFor="set-pinsyst" hint="0,5 = beda ≥ 1 L">
               <RuleInput id="set-pinsyst" suffix="L" value={r.batasPinsystL} onChange={(n) => setRule('batasPinsystL', n)} />
             </Field>
+            <Field label="Totalisator digital vs manual" htmlFor="set-totalisator" hint="Selisih penjualan per nozzle per shift">
+              <RuleInput id="set-totalisator" suffix="L" value={r.batasTotalisatorL} onChange={(n) => setRule('batasTotalisatorL', n)} />
+            </Field>
           </div>
           <Field label="PIN penanggung jawab (opsional)" htmlFor="set-pin" hint="Bila diisi, izin lanjut saat selisih tera di luar batas wajib memasukkan PIN ini.">
             <Input id="set-pin" type="password" inputMode="numeric" value={s.pinPenanggungJawab} onChange={(e) => app.updateSettings({ pinPenanggungJawab: e.target.value })} />

@@ -310,6 +310,8 @@ export interface Rules {
   batasLossL: number
   /** Penerimaan P-Insyst vs penerimaan ATG (L); 0,5 = beda ≥ 1 L setelah dibulatkan. */
   batasPinsystL: number
+  /** Penjualan totalisator digital vs manual per nozzle per shift (L). */
+  batasTotalisatorL: number
 }
 
 export interface Settings {
@@ -396,6 +398,7 @@ export const DEFAULT_RULES: Rules = {
   batasDipAtgL: 20,
   batasLossL: 50,
   batasPinsystL: 0.5,
+  batasTotalisatorL: 5,
 }
 
 export type PhotoSlotDef = { key: string; label: string; optional?: boolean }

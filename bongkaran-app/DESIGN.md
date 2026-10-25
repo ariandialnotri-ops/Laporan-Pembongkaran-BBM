@@ -541,6 +541,14 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Motion ringan: kartu muncul berurutan (`.kartu-lo`, fade + naik 8 px, jeda 45 ms per kartu), angkat 2 px saat hover, mengecil sedikit saat ditekan, logo membesar 4% saat hover, panah bergeser; semuanya mati saat reduced motion.
 - Logo yang sama dipakai di kepala Detail LO. Produk tanpa logo memakai kode produk berwarna.
 
+### 9.14m Totalizer: manual (security) + digital akhir shift (kepala shift)
+- Form per shift dua langkah, disubmit per nozzle:
+  1. **Totalisator manual** (security; pengawas/ABH sebagai cadangan): angka meter mekanik + **foto wajib** yang dicap tanggal-jam, nama SPBU, nozzle & produk (`compressImage({ cap })`); waktu submit (`manualAt`) dan nama (`manualOleh`) tercatat.
+  2. **Digital akhir shift** (kepala shift; pengawas/ABH cadangan): hanya angka akhir. Awal = akhir digital shift sebelumnya (terkunci, ikon gembok); bila shift sebelumnya kosong, awal diisi sendiri. Saat akhir disubmit dan catatan shift berikutnya sudah ada, awal shift berikutnya ikut diperbarui.
+- Tab awal mengikuti peran (security → manual, kepala shift → digital); peran lain melihat dengan keterangan siapa yang mengisi.
+- **Pembanding**: penjualan digital (akhir − awal) vs penjualan manual (manual shift ini − manual shift sebelumnya) per nozzle; selisih > `rules.batasTotalisatorL` (default 5 L, diatur Admin Aplikasi) → kartu bercincin merah "Periksa ulang angka & foto". Riwayat Totalizer menampilkan kolom Manual & Selisih vs manual serta foto manual.
+- Catatan lama (awal/akhir digital + foto opsional) tetap terbaca.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

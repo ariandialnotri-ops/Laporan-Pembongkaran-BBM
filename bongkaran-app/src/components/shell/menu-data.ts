@@ -195,8 +195,8 @@ export function useMenu(): GrupMenu[] {
           path: '/totalizer',
           icon: Gauge,
           title: 'Totalizer',
-          desc: 'Totalisator digital awal & akhir shift per nozzle dan produk',
-          status: (s.nozzles ?? []).length ? `${(s.nozzles ?? []).length} nozzle · awal & akhir shift` : 'Database nozzle belum diisi',
+          desc: 'Totalisator manual + foto (security) dan digital akhir shift (kepala shift) per nozzle',
+          status: (s.nozzles ?? []).length ? `${(s.nozzles ?? []).length} nozzle · manual & digital akhir shift` : 'Database nozzle belum diisi',
           nada: (s.nozzles ?? []).length ? 'ok' : 'pengingat',
         },
         {
@@ -449,7 +449,7 @@ export function riwayatItems(can: (p: string) => boolean) {
 const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[] = [
   { path: '/laporan/bongkaran', icon: Truck, title: 'Riwayat Pembongkaran MT', desc: 'Nopol, volume, gain/loss, status' },
   { path: '/laporan/kualitas', icon: FlaskConical, title: 'Riwayat Kualitas Harian', desc: 'Uji harian dan uji pasca penerimaan' },
-  { path: '/laporan/totalizer', icon: Gauge, title: 'Riwayat Totalizer', desc: 'Totalisator digital per shift, penjualan per produk & nozzle' },
+  { path: '/laporan/totalizer', icon: Gauge, title: 'Riwayat Totalizer', desc: 'Totalisator digital & manual per shift, penjualan per produk & nozzle, selisih digital vs manual' },
   { path: '/laporan/air', icon: Droplet, title: 'Riwayat Water Content', desc: 'Air di dasar tangki pendam, sekali sehari (shift 1, maks. 10:00), tindakan' },
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
   { path: '/laporan/pump-test', icon: TestTubes, title: 'Riwayat Pump Test', desc: 'Pump test uji kualitas, uji kuantitas & uji takaran per nozzle dan produk' },

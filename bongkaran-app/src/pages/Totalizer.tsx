@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Camera, CircleCheck, Gauge, LoaderCircle, Send, Trash2 } from 'lucide-react'
+import { Camera, CircleCheck, Gauge, LoaderCircle, Lock, Send, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import type { FotoLokal } from '@/components/bongkaran/foto-lokal'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
@@ -22,9 +22,9 @@ import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatLiter, formatNumber, parseAngka } from '@/lib/format'
 import { shiftLabel, type Shift } from '@/lib/shift'
 import { statusShift } from '@/lib/status-isi'
-import { compressImage, genId } from '@/lib/image'
+import { capWaktu, compressImage, genId } from '@/lib/image'
 import type { Photo } from '@/lib/sop'
-import { catatanLama, jualNozzle, jualPerProduk, nozzlePerDispenser, nozzleTerkirim, prevShift, totalizerAwalSaja, totalizerLengkap, type LangkahTotalizer, type TotalizerData, type TotalizerNozzle, type TotalizerRecord } from '@/lib/totalizer'
+import { catatanLama, jualManual, jualNozzle, jualPerProduk, manualTerkirim, nextShift, nozzlePerDispenser, nozzleTerkirim, prevShift, totalizerLengkap, type LangkahForm, type TotalizerData, type TotalizerNozzle, type TotalizerRecord } from '@/lib/totalizer'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 import { useCatatan } from '@/lib/use-catatan'
 import { useKeTerkirim } from '@/lib/terkirim'
@@ -68,7 +68,9 @@ export function TotalizerMenu() {
   return (
     <div className="flex flex-col gap-space-md">
       <InfoHalaman judul="Totalizer">
-        <p>Dua langkah per shift: (1) totalizer awal dan (2) totalizer akhir, setiap nozzle disubmit sendiri dengan foto totalisator manual bila perlu. Awal terisi dari akhir shift sebelumnya; penjualan bersih = (akhir − awal) − pump test shift itu (uji kualitas, Q&Q, uji takaran).</p>
+        <p>
+          Dua langkah per shift, disubmit per nozzle: (1) <b>totalisator manual</b> oleh security, dengan foto wajib yang tercap tanggal & jam; (2) <b>totalisator digital akhir shift</b> oleh kepala shift. Awal digital otomatis dari akhir shift sebelumnya, dan akhir shift ini menjadi awal shift berikutnya. Penjualan bersih = (akhir − awal) − pump test shift itu. Penjualan digital dibandingkan dengan penjualan manual tiap nozzle.
+        </p>
       </InfoHalaman>
       <ErrorBox text={error} />
       <PilihShift
@@ -77,9 +79,13 @@ export function TotalizerMenu() {
         keterangan={(k) => {
           const r = rec(k.tanggal, k.shift)
           if (!r) return undefined
-          if (totalizerAwalSaja(r, nozzles)) return `Awal shift tercatat ${r.data.jamAwal || ''} · akhir shift belum`
+          const manual = nozzles.filter((n) => manualTerkirim(r.data.nozzle[n.id])).length
+          if (!totalizerLengkap(r, nozzles)) {
+            const digital = nozzles.filter((n) => nozzleTerkirim(r.data.nozzle[n.id], 'akhir', catatanLama(r))).length
+            return `Manual ${manual}/${nozzles.length} · digital akhir ${digital}/${nozzles.length}`
+          }
           const total = jualPerProduk([r], pumpTest).reduce((n, x) => n + x.liter, 0)
-          return `Lengkap · ${formatLiter(total)} · ${r.data.petugas || '-'}`
+          return `Lengkap · ${formatLiter(total)} · ${r.data.petugas || '-'}${manual < nozzles.length ? ` · manual ${manual}/${nozzles.length}` : ''}`
         }}
       />
       {app.can('/laporan/totalizer') && (
@@ -91,9 +97,21 @@ export function TotalizerMenu() {
   )
 }
 
+/** Peran yang mengisi tiap langkah (pengawas & ABH dapat mengisi keduanya bila petugas berhalangan). */
+const PERAN_LANGKAH: Record<LangkahForm, string[]> = {
+  manual: ['security', 'pengawas', 'abh'],
+  digital: ['kashift', 'pengawas', 'abh'],
+}
+const JUDUL_LANGKAH: Record<LangkahForm, { judul: string; oleh: string }> = {
+  manual: { judul: 'Totalisator manual', oleh: 'Security' },
+  digital: { judul: 'Digital akhir shift', oleh: 'Kepala shift' },
+}
+
 /**
- * Form totalizer satu shift dalam 2 langkah: (1) totalizer awal, (2) totalizer akhir. Setiap nozzle
- * disubmit sendiri (angka + foto totalisator manual opsional), dikelompokkan per dispenser / pulau pompa.
+ * Form totalizer satu shift dalam 2 langkah per nozzle:
+ * (1) totalisator manual/mekanik oleh security: angka + foto wajib yang dicap tanggal-jam, waktu submit tercatat;
+ * (2) totalisator digital akhir shift oleh kepala shift: awal otomatis dari akhir shift sebelumnya.
+ * Penjualan digital dibandingkan dengan penjualan manual (selisih manual antarshift) per nozzle.
  */
 export function TotalizerForm() {
   const app = useApp()
@@ -106,19 +124,22 @@ export function TotalizerForm() {
   const { tanggal, shift, valid } = useKunciShift()
   const id = idShift(tanggal, shift)
   const sebelum = valid ? prevShift({ tanggal, shift }) : { tanggal, shift }
-  const { recs } = useCatatan<TotalizerData>('totalizer', sebelum.tanggal, tanggal)
+  const sesudah = valid ? nextShift({ tanggal, shift }) : { tanggal, shift }
+  const { recs } = useCatatan<TotalizerData>('totalizer', sebelum.tanggal, sesudah.tanggal)
   const prev = recs?.find((r) => r.id === idShift(sebelum.tanggal, sebelum.shift))
-  // Catatan terbaru shift ini (diperbarui setiap submit nozzle).
+  // Catatan terbaru shift ini dan shift berikutnya (diperbarui setiap submit nozzle).
   const [rec, setRec] = useState<TotalizerRecord | null>(null)
+  const [recNext, setRecNext] = useState<TotalizerRecord | null>(null)
   const [isian, setIsian] = useState<Record<string, string>>({})
   const [foto, setFoto] = useState<Record<string, FotoLokal | undefined>>({})
-  const [petugas, setPetugas] = useState<string | null>(null)
+  const [petugas, setPetugas] = useState<Record<LangkahForm, string | null>>({ manual: null, digital: null })
   const [catatan, setCatatan] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<{ nid: string; teks: string } | null>(null)
   const namaShift = shiftLabel(shift).split(' (')[0]
   const lama = rec ?? recs?.find((r) => r.id === id)
-  const srcOf = usePhotoSrc(Object.values(lama?.data.nozzle ?? {}).flatMap((n) => [...(n.fotoAwal ?? []), ...(n.fotoAkhir ?? [])]))
+  const lanjut = recNext ?? recs?.find((r) => r.id === idShift(sesudah.tanggal, sesudah.shift))
+  const srcOf = usePhotoSrc(Object.values(lama?.data.nozzle ?? {}).flatMap((n) => [...(n.fotoManual ?? []), ...(n.fotoAwal ?? []), ...(n.fotoAkhir ?? [])]))
   const adaIsian = Object.keys(isian).length > 0 || Object.values(foto).some(Boolean)
   const guard = useLeaveGuard({ active: adaIsian, title: `Keluar dari totalizer ${namaShift}?`, detail: 'Angka nozzle yang belum disubmit akan hilang.' })
 
@@ -126,79 +147,107 @@ export function TotalizerForm() {
   if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
   const nozzles = app.settings.nozzles ?? []
   if (!nozzles.length) return <NozzleBelumAda />
-  const bolehUbah = ['abh', 'pengawas', 'kashift', 'security'].includes(app.role ?? '')
+  const peran = app.role ?? ''
+  const boleh = (l: LangkahForm) => PERAN_LANGKAH[l].includes(peran)
   const lamaFormat = catatanLama(lama)
-  const terkirim = (nid: string, l: LangkahTotalizer) => nozzleTerkirim(lama?.data.nozzle[nid], l, lamaFormat)
-  const awalSelesai = nozzles.every((n) => terkirim(n.id, 'awal'))
-  const akhirSelesai = nozzles.every((n) => terkirim(n.id, 'akhir'))
-  const langkah: LangkahTotalizer = params.get('langkah') === 'akhir' || (params.get('langkah') !== 'awal' && awalSelesai) ? 'akhir' : 'awal'
-  const pilihLangkah = (l: LangkahTotalizer) => setParams({ langkah: l }, { replace: true })
-  const kunci = (nid: string) => `${langkah}:${nid}`
+  const digitalSudah = (nid: string) => nozzleTerkirim(lama?.data.nozzle[nid], 'akhir', lamaFormat)
+  const manualSudah = (nid: string) => manualTerkirim(lama?.data.nozzle[nid])
+  const sudahPada = (nid: string, l: LangkahForm) => (l === 'manual' ? manualSudah(nid) : digitalSudah(nid))
+  const manualSelesai = nozzles.every((n) => manualSudah(n.id))
+  const digitalSelesai = nozzles.every((n) => digitalSudah(n.id))
+  // Langkah awal: dari tautan, atau sesuai peran (security → manual, kepala shift → digital).
+  const minta = params.get('langkah')
+  const langkah: LangkahForm =
+    minta === 'manual' || minta === 'digital' ? minta : peran === 'kashift' ? 'digital' : peran === 'security' ? 'manual' : manualSelesai ? 'digital' : 'manual'
+  const bolehUbah = boleh(langkah)
+  const pilihLangkah = (l: LangkahForm) => setParams({ langkah: l }, { replace: true })
+  const kunci = (nid: string, k: string = langkah) => `${k}:${nid}`
+  const prevAkhir = (nid: string) => {
+    const v = prev?.data.nozzle[nid]?.akhir ?? ''
+    return parseAngka(v) !== null ? v : ''
+  }
   const tersimpan = (nid: string): TotalizerNozzle => {
     const n = nozzles.find((x) => x.id === nid)!
-    return lama?.data.nozzle[nid] ?? { nama: n.nama, produk: n.produk, awal: prev?.data.nozzle[nid]?.akhir ?? '', akhir: '' }
+    return lama?.data.nozzle[nid] ?? { nama: n.nama, produk: n.produk, awal: prevAkhir(nid), akhir: '' }
   }
-  const nilai = (nid: string) => isian[kunci(nid)] ?? tersimpan(nid)[langkah]
-  const namaPetugas = petugas ?? lama?.data.petugas ?? (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName)
+  // Awal digital: akhir shift sebelumnya (dikunci); diisi sendiri hanya bila shift sebelumnya kosong.
+  const awalDariPrev = (nid: string) => prevAkhir(nid) !== ''
+  const nilaiAwal = (nid: string) => (awalDariPrev(nid) ? prevAkhir(nid) : (isian[kunci(nid, 'awal')] ?? tersimpan(nid).awal))
+  const nilai = (nid: string) => isian[kunci(nid)] ?? (langkah === 'manual' ? (tersimpan(nid).manual ?? '') : tersimpan(nid).akhir)
+  const namaDefault = app.displayName === 'Mode lokal' ? '' : app.displayName
+  const namaPetugas = (l: LangkahForm) =>
+    petugas[l] ?? (l === 'manual' ? lama?.data.petugasManual : lama?.data.petugas) ?? (boleh(l) ? namaDefault || (l === 'digital' ? app.settings.namaPetugasDefault : '') : '')
   const isiCatatan = catatan ?? lama?.data.catatan ?? ''
+  const batas = app.rules.batasTotalisatorL
 
-  const submit = async (nid: string) => {
+  /** Selisih penjualan digital − manual satu nozzle (null bila salah satu belum lengkap). */
+  const banding = (nid: string, akhirDigital = tersimpan(nid).akhir, manualIni = tersimpan(nid).manual) => {
+    const d = jualNozzle({ awal: nilaiAwal(nid), akhir: akhirDigital })
+    const m = jualManual(prev?.data.nozzle[nid], { ...tersimpan(nid), manual: manualIni })
+    return d === null || m === null ? null : { digital: d, manual: m, selisih: d - m }
+  }
+
+  const simpan = async (nid: string, patch: Partial<TotalizerNozzle>, l: LangkahForm) => {
     const n = nozzles.find((x) => x.id === nid)!
-    const sekarang = tersimpan(nid)
-    const v = nilai(nid).trim()
-    const angkaV = parseAngka(v)
-    const salah = (teks: string) => setError({ nid, teks })
-    if (angkaV === null) return salah(`Isi totalisator ${langkah} ${labelNozzle(n.nama).toLowerCase()}.`)
-    if (langkah === 'akhir') {
-      const a = parseAngka(sekarang.awal)
-      if (a === null || !terkirim(nid, 'awal')) return salah('Submit totalisator awal nozzle ini terlebih dahulu (langkah 1).')
-      if (angkaV < a) return salah('Totalisator akhir lebih kecil dari awal.')
-    } else {
-      const b = parseAngka(sekarang.akhir)
-      if (b !== null && angkaV > b) return salah('Totalisator awal lebih besar dari akhir yang sudah tercatat.')
+    const jam = nowHm()
+    const isiNozzle: TotalizerNozzle = { ...tersimpan(nid), nama: n.nama, produk: n.produk, ...patch }
+    const semua: TotalizerData['nozzle'] = { ...(lama?.data.nozzle ?? {}), [nid]: isiNozzle }
+    const akhirLengkap = nozzles.every((x) => nozzleTerkirim(semua[x.id], 'akhir', lamaFormat))
+    const baru: TotalizerRecord = {
+      id,
+      tanggal,
+      shift,
+      data: {
+        nozzle: semua,
+        petugas: (l === 'digital' ? namaPetugas('digital') : lama?.data.petugas ?? '').trim(),
+        petugasManual: (l === 'manual' ? namaPetugas('manual') : lama?.data.petugasManual ?? '').trim(),
+        jamAwal: lama?.data.jamAwal || jam,
+        jamAkhir: akhirLengkap ? lama?.data.jamAkhir || jam : '',
+        catatan: isiCatatan.trim(),
+      },
+      createdAt: lama?.createdAt ?? stamp(),
+      updatedAt: stamp(),
+      createdBy: lama?.createdBy ?? app.session.user?.id ?? null,
     }
-    if (!namaPetugas.trim()) return salah('Isi nama petugas di atas.')
-    if (terkirim(nid, langkah) && v !== sekarang[langkah].trim() && !(await konfirmasi({ jenis: 'ubah', judul: `Ubah totalisator ${langkah} ${labelNozzle(n.nama).toLowerCase()}?`, pesan: <>Angka yang sudah disubmit akan diganti dan memengaruhi penjualan shift ini.</>, ya: 'Ya, ubah' }))) return
+    await app.backend.saveCatatan('totalizer', baru)
+    setRec(baru)
+    // Akhir shift ini menjadi awal shift berikutnya: bila catatan shift berikutnya sudah ada, awalnya ikut diperbarui.
+    if (l === 'digital' && lanjut?.data.nozzle[nid] && lanjut.data.nozzle[nid].awal !== isiNozzle.akhir) {
+      const nx: TotalizerRecord = { ...lanjut, data: { ...lanjut.data, nozzle: { ...lanjut.data.nozzle, [nid]: { ...lanjut.data.nozzle[nid], awal: isiNozzle.akhir } } }, updatedAt: stamp() }
+      await app.backend.saveCatatan('totalizer', nx)
+      setRecNext(nx)
+    }
+    return baru
+  }
+
+  const bersihkan = (nid: string) => {
+    const f = foto[kunci(nid)]
+    if (f) URL.revokeObjectURL(f.url)
+    setIsian((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== kunci(nid) && k !== kunci(nid, 'awal'))))
+    setFoto((x) => ({ ...x, [kunci(nid)]: undefined }))
+  }
+
+  const submitManual = async (nid: string) => {
+    const n = nozzles.find((x) => x.id === nid)!
+    const t = tersimpan(nid)
+    const v = nilai(nid).trim()
+    const salah = (teks: string) => setError({ nid, teks })
+    const angkaV = parseAngka(v)
+    if (angkaV === null) return salah(`Isi angka totalisator manual ${labelNozzle(n.nama).toLowerCase()}.`)
+    const pm = parseAngka(prev?.data.nozzle[nid]?.manual ?? '')
+    if (pm !== null && angkaV < pm) return salah(`Totalisator manual lebih kecil dari ${shiftLabel(sebelum.shift).split(' (')[0]} (${angka(prev!.data.nozzle[nid].manual!)}).`)
+    const f = foto[kunci(nid)]
+    if (!f && !(t.fotoManual ?? []).length) return salah('Foto totalisator manual wajib dilampirkan.')
+    if (!namaPetugas('manual').trim()) return salah('Isi nama security di atas.')
+    if (manualSudah(nid) && v !== (t.manual ?? '').trim() && !(await konfirmasi({ jenis: 'ubah', judul: `Ubah totalisator manual ${labelNozzle(n.nama).toLowerCase()}?`, pesan: <>Angka manual yang sudah disubmit akan diganti.</>, ya: 'Ya, ubah' }))) return
     setBusy(nid)
     setError(null)
     try {
-      const f = foto[kunci(nid)]
-      const fotoBaru: Photo[] = f ? [await app.backend.uploadPhoto(`totalizer-${id}`, f.blob, `totalisator-${langkah}-${n.nama}.jpg`)] : []
-      const jam = nowHm()
-      const at = new Date().toISOString()
-      const isiNozzle: TotalizerNozzle = {
-        ...sekarang,
-        nama: n.nama,
-        produk: n.produk,
-        [langkah]: v,
-        ...(langkah === 'awal' ? { awalAt: at, ...(fotoBaru.length ? { fotoAwal: fotoBaru } : {}) } : { akhirAt: at, ...(fotoBaru.length ? { fotoAkhir: fotoBaru } : {}) }),
-      }
-      const semua: TotalizerData['nozzle'] = { ...(lama?.data.nozzle ?? {}), [nid]: isiNozzle }
-      const akhirLengkap = nozzles.every((x) => x.id === nid ? langkah === 'akhir' || terkirim(x.id, 'akhir') : nozzleTerkirim(semua[x.id], 'akhir', lamaFormat))
-      const baru: TotalizerRecord = {
-        id,
-        tanggal,
-        shift,
-        data: { nozzle: semua, petugas: namaPetugas.trim(), jamAwal: lama?.data.jamAwal || jam, jamAkhir: akhirLengkap ? lama?.data.jamAkhir || jam : '', catatan: isiCatatan.trim() },
-        createdAt: lama?.createdAt ?? stamp(),
-        updatedAt: stamp(),
-        createdBy: lama?.createdBy ?? app.session.user?.id ?? null,
-      }
-      await app.backend.saveCatatan('totalizer', baru)
-      if (f) URL.revokeObjectURL(f.url)
-      setRec(baru)
-      setIsian((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== kunci(nid))))
-      setFoto((x) => ({ ...x, [kunci(nid)]: undefined }))
-      const selesai = nozzles.every((x) => nozzleTerkirim(baru.data.nozzle[x.id], langkah, false) || (lamaFormat && terkirim(x.id, langkah)))
-      if (langkah === 'akhir' && selesai) {
-        guard.bypass()
-        keTerkirim({
-          judul: `Totalizer ${namaShift} lengkap`,
-          detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)}`,
-          baris: [...jualPerProduk([baru], pumpTest).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Petugas', baru.data.petugas]],
-          aksi: [{ to: '/totalizer', label: 'Pilih shift lain' }, ...(app.can('/laporan/totalizer') ? [{ to: '/laporan/totalizer', label: 'Riwayat totalizer' }] : [])],
-        })
-      } else toast(`${labelNozzle(n.nama)}: totalisator ${langkah} tersimpan${selesai ? ` · semua nozzle ${langkah} lengkap` : ''}`)
+      const fotoBaru: Photo[] = f ? [await app.backend.uploadPhoto(`totalizer-${id}`, f.blob, `totalisator-manual-${n.nama}.jpg`)] : (t.fotoManual ?? [])
+      const baru = await simpan(nid, { manual: v, manualAt: new Date().toISOString(), manualOleh: namaPetugas('manual').trim(), fotoManual: fotoBaru }, 'manual')
+      bersihkan(nid)
+      const selesai = nozzles.every((x) => manualTerkirim(baru.data.nozzle[x.id]))
+      toast(`${labelNozzle(n.nama)}: totalisator manual tersimpan${selesai ? ' · semua nozzle manual lengkap' : ''}`)
     } catch (e) {
       setError({ nid, teks: pesan(e) })
     } finally {
@@ -206,8 +255,45 @@ export function TotalizerForm() {
     }
   }
 
-  const jumlah = (l: LangkahTotalizer) => nozzles.filter((n) => terkirim(n.id, l)).length
+  const submitDigital = async (nid: string) => {
+    const n = nozzles.find((x) => x.id === nid)!
+    const t = tersimpan(nid)
+    const v = nilai(nid).trim()
+    const awal = nilaiAwal(nid).trim()
+    const salah = (teks: string) => setError({ nid, teks })
+    const a = parseAngka(awal)
+    const b = parseAngka(v)
+    if (a === null) return salah(`Isi totalisator awal ${labelNozzle(n.nama).toLowerCase()} (shift sebelumnya belum tercatat).`)
+    if (b === null) return salah(`Isi totalisator digital akhir ${labelNozzle(n.nama).toLowerCase()}.`)
+    if (b < a) return salah('Totalisator akhir lebih kecil dari awal.')
+    if (!namaPetugas('digital').trim()) return salah('Isi nama kepala shift di atas.')
+    if (digitalSudah(nid) && (v !== t.akhir.trim() || awal !== t.awal.trim()) && !(await konfirmasi({ jenis: 'ubah', judul: `Ubah totalisator digital ${labelNozzle(n.nama).toLowerCase()}?`, pesan: <>Angka yang sudah disubmit akan diganti dan memengaruhi penjualan shift ini{lanjut ? ' serta awal shift berikutnya' : ''}.</>, ya: 'Ya, ubah' }))) return
+    setBusy(nid)
+    setError(null)
+    try {
+      const at = new Date().toISOString()
+      const baru = await simpan(nid, { awal, akhir: v, awalAt: t.awalAt ?? at, akhirAt: at, akhirOleh: namaPetugas('digital').trim() }, 'digital')
+      bersihkan(nid)
+      const selesai = nozzles.every((x) => nozzleTerkirim(baru.data.nozzle[x.id], 'akhir', false) || (lamaFormat && digitalSudah(x.id)))
+      if (selesai) {
+        guard.bypass()
+        keTerkirim({
+          judul: `Totalizer ${namaShift} lengkap`,
+          detail: `${formatTanggalIso(tanggal)}, ${shiftLabel(shift)} · akhir shift ini menjadi awal ${shiftLabel(sesudah.shift).split(' (')[0]}`,
+          baris: [...jualPerProduk([baru], pumpTest).map((x): [string, string] => [x.produk, formatLiter(x.liter, 2)]), ['Kepala shift', baru.data.petugas], ['Security (manual)', baru.data.petugasManual || '-']],
+          aksi: [{ to: '/totalizer', label: 'Pilih shift lain' }, ...(app.can('/laporan/totalizer') ? [{ to: '/laporan/totalizer', label: 'Riwayat totalizer' }] : [])],
+        })
+      } else toast(`${labelNozzle(n.nama)}: totalisator digital akhir tersimpan`)
+    } catch (e) {
+      setError({ nid, teks: pesan(e) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const jumlah = (l: LangkahForm) => nozzles.filter((n) => sudahPada(n.id, l)).length
   const ringkas = lama ? jualPerProduk([lama], pumpTest) : []
+  const namaSpbu = app.settings.namaSpbu || app.spbu?.nama || 'SPBU'
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -215,15 +301,12 @@ export function TotalizerForm() {
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
             <h2 className="text-headline-md font-bold text-on-surface">{shiftLabel(shift)}</h2>
-            <span className="text-body-sm text-on-surface-variant">
-              {formatTanggalIso(tanggal)}
-              {prev ? ` · awal terisi dari akhir ${shiftLabel(sebelum.shift).split(' (')[0]}` : ''}
-            </span>
+            <span className="text-body-sm text-on-surface-variant">{formatTanggalIso(tanggal)}</span>
           </div>
-          {akhirSelesai ? <Pill tone="success">Lengkap</Pill> : awalSelesai ? <Pill>Akhir belum</Pill> : <Pill tone="error">Awal belum</Pill>}
+          {digitalSelesai ? <Pill tone="success">Lengkap</Pill> : manualSelesai ? <Pill>Digital belum</Pill> : <Pill tone="error">Manual belum</Pill>}
         </div>
         <div role="tablist" aria-label="Langkah pengisian" className="inset-field grid grid-cols-2 gap-1 rounded-md p-1">
-          {(['awal', 'akhir'] as const).map((l, i) => (
+          {(['manual', 'digital'] as const).map((l, i) => (
             <button
               key={l}
               type="button"
@@ -233,22 +316,27 @@ export function TotalizerForm() {
               className={cn('flex flex-col items-center rounded py-1.5 text-body-sm font-semibold transition-colors', langkah === l ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-on-surface-variant')}
             >
               <span>
-                {i + 1} · Totalizer {l}
+                {i + 1} · {JUDUL_LANGKAH[l].judul}
               </span>
               <span className="tabular text-xs font-normal">
-                {jumlah(l)}/{nozzles.length} nozzle
+                {JUDUL_LANGKAH[l].oleh} · {jumlah(l)}/{nozzles.length} nozzle
               </span>
             </button>
           ))}
         </div>
-        <Field label="Petugas" htmlFor="tot-petugas">
-          <Input id="tot-petugas" value={namaPetugas} disabled={!bolehUbah} onChange={(e) => setPetugas(e.target.value)} />
+        <Field label={langkah === 'manual' ? 'Nama security' : 'Nama kepala shift'} htmlFor="tot-petugas">
+          <Input id="tot-petugas" value={namaPetugas(langkah)} disabled={!bolehUbah} onChange={(e) => setPetugas((x) => ({ ...x, [langkah]: e.target.value }))} />
         </Field>
         <span className="text-body-sm text-on-surface-variant">
-          {langkah === 'awal'
-            ? 'Langkah 1 di awal shift: periksa angka totalisator digital tiap nozzle (terisi dari akhir shift sebelumnya), foto totalisator manual bila perlu, lalu Submit per nozzle.'
-            : 'Langkah 2 di akhir shift: isi totalisator akhir tiap nozzle, foto totalisator manual bila perlu, lalu Submit per nozzle. Penjualan = akhir − awal.'}
+          {langkah === 'manual'
+            ? 'Security: baca totalisator manual (mekanik) tiap nozzle saat pergantian shift, foto angkanya (tanggal & jam otomatis tercetak di foto), lalu Submit per nozzle.'
+            : `Kepala shift: cukup isi totalisator digital akhir shift tiap nozzle. Awal otomatis dari akhir ${shiftLabel(sebelum.shift).split(' (')[0]}, dan akhir shift ini otomatis menjadi awal ${shiftLabel(sesudah.shift).split(' (')[0]}.`}
         </span>
+        {!bolehUbah && (
+          <span className="rounded-md bg-amber-50 px-space-sm py-space-xs text-body-sm text-amber-900">
+            Langkah ini diisi oleh {JUDUL_LANGKAH[langkah].oleh.toLowerCase()} (atau pengawas/ABH). Anda dapat melihat datanya.
+          </span>
+        )}
       </GlassCard>
 
       {nozzlePerDispenser(nozzles, app.settings.dispensers ?? []).map((g, gi) => (
@@ -256,37 +344,60 @@ export function TotalizerForm() {
           <SectionHeader id={`tot-${gi}`} title={g.judul} />
           {g.nozzles.map((n) => {
             const t = tersimpan(n.id)
-            const sudah = terkirim(n.id, langkah)
-            const berubah = isian[kunci(n.id)] !== undefined && isian[kunci(n.id)].trim() !== t[langkah].trim()
+            const sudah = sudahPada(n.id, langkah)
+            const asli = langkah === 'manual' ? (t.manual ?? '') : t.akhir
+            const berubah = (isian[kunci(n.id)] !== undefined && isian[kunci(n.id)].trim() !== asli.trim()) || (isian[kunci(n.id, 'awal')] !== undefined && isian[kunci(n.id, 'awal')].trim() !== t.awal.trim())
             const v = nilai(n.id)
-            const j = langkah === 'akhir' ? jualNozzle({ awal: t.awal, akhir: v }) : null
-            const fotoTersimpan = (langkah === 'awal' ? t.fotoAwal : t.fotoAkhir) ?? []
             const fl = foto[kunci(n.id)]
-            const at = langkah === 'awal' ? t.awalAt : t.akhirAt
+            const at = langkah === 'manual' ? t.manualAt : t.akhirAt
+            const oleh = langkah === 'manual' ? t.manualOleh : t.akhirOleh
+            const cek = langkah === 'digital' ? banding(n.id, v) : banding(n.id, undefined, v)
+            const lebih = cek !== null && Math.abs(cek.selisih) > batas
+            const jm = langkah === 'manual' ? jualManual(prev?.data.nozzle[n.id], { ...t, manual: v }) : null
+            const jd = langkah === 'digital' ? jualNozzle({ awal: nilaiAwal(n.id), akhir: v }) : null
+            const fotoTersimpan = langkah === 'manual' ? (t.fotoManual ?? []) : [...(t.fotoAwal ?? []), ...(t.fotoAkhir ?? [])]
             return (
-              <GlassCard key={n.id} level={2} className={cn('flex flex-col gap-space-sm p-space-md', sudah && !berubah && 'ring-1 ring-emerald-300')}>
+              <GlassCard key={n.id} level={2} className={cn('flex flex-col gap-space-sm p-space-md', sudah && !berubah && !fl && 'ring-1 ring-emerald-300', lebih && 'ring-2 ring-error')}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <span className="text-body-md font-bold text-on-surface">{labelNozzle(n.nama)}</span>
                     <ProdukChip produk={n.produk} />
                   </span>
-                  {sudah && !berubah ? (
-                    <span className="flex items-center gap-1 text-body-sm font-semibold text-emerald-700">
-                      <CircleCheck aria-hidden="true" className="size-4" />
-                      {at ? `Terkirim ${new Date(at).toTimeString().slice(0, 5)}` : 'Terkirim'}
+                  {sudah && !berubah && !fl ? (
+                    <span className="flex items-center gap-1 text-right text-body-sm font-semibold text-emerald-700">
+                      <CircleCheck aria-hidden="true" className="size-4 shrink-0" />
+                      {at ? `${new Date(at).toTimeString().slice(0, 5)}${oleh ? ` · ${oleh}` : ''}` : 'Terkirim'}
                     </span>
                   ) : (
                     <span className="text-body-sm font-semibold text-orange-700">{berubah && sudah ? 'Diubah, belum disubmit' : 'Belum disubmit'}</span>
                   )}
                 </div>
-                {langkah === 'akhir' && (
-                  <span className="tabular text-body-sm text-on-surface-variant">
-                    Awal {angka(t.awal)}
-                    {terkirim(n.id, 'awal') ? '' : ' · awal belum disubmit'}
-                  </span>
-                )}
+
+                {langkah === 'digital' &&
+                  (awalDariPrev(n.id) ? (
+                    <span className="tabular flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+                      <Lock aria-hidden="true" className="size-3.5" />
+                      Awal {angka(nilaiAwal(n.id))} · akhir {shiftLabel(sebelum.shift).split(' (')[0]}
+                    </span>
+                  ) : (
+                    <Field label="Totalisator awal (shift sebelumnya belum tercatat)" htmlFor={`tot-awal-${n.id}`}>
+                      <Input
+                        id={`tot-awal-${n.id}`}
+                        numeric
+                        inputMode="decimal"
+                        suffix="L"
+                        disabled={!bolehUbah || busy === n.id}
+                        value={nilaiAwal(n.id)}
+                        onChange={(e) => {
+                          setError(null)
+                          setIsian((x) => ({ ...x, [kunci(n.id, 'awal')]: e.target.value }))
+                        }}
+                      />
+                    </Field>
+                  ))}
+
                 <div className="flex items-end gap-space-sm">
-                  <Field label={`Totalisator ${langkah} (digital)`} htmlFor={`tot-${langkah}-${n.id}`} className="min-w-0 flex-1">
+                  <Field label={langkah === 'manual' ? 'Totalisator manual (mekanik)' : 'Totalisator digital akhir'} htmlFor={`tot-${langkah}-${n.id}`} className="min-w-0 flex-1">
                     <Input
                       id={`tot-${langkah}-${n.id}`}
                       numeric
@@ -300,27 +411,31 @@ export function TotalizerForm() {
                       }}
                     />
                   </Field>
-                  <label className={cn(buttonVariants({ variant: 'soft' }), 'h-12 shrink-0 cursor-pointer', (!bolehUbah || busy === n.id) && 'pointer-events-none opacity-50')}>
-                    <Camera aria-hidden="true" />
-                    <span className="sr-only sm:not-sr-only">Foto manual</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="sr-only"
-                      aria-label={`Foto totalisator manual ${labelNozzle(n.nama).toLowerCase()}`}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        e.target.value = ''
-                        if (!file) return
-                        void compressImage(file).then((blob) => {
-                          if (fl) URL.revokeObjectURL(fl.url)
-                          setFoto((x) => ({ ...x, [kunci(n.id)]: { id: genId('f'), blob, url: URL.createObjectURL(blob) } }))
-                        })
-                      }}
-                    />
-                  </label>
+                  {langkah === 'manual' && (
+                    <label className={cn(buttonVariants({ variant: fl || fotoTersimpan.length ? 'soft' : 'primary' }), 'h-12 shrink-0 cursor-pointer', (!bolehUbah || busy === n.id) && 'pointer-events-none opacity-50')}>
+                      <Camera aria-hidden="true" />
+                      <span>{fl || fotoTersimpan.length ? 'Ganti foto' : 'Foto'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="sr-only"
+                        aria-label={`Foto totalisator manual ${labelNozzle(n.nama).toLowerCase()}`}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          e.target.value = ''
+                          if (!file) return
+                          // Tanggal & jam dicap ke foto sebagai bukti waktu pembacaan.
+                          void compressImage(file, { cap: [capWaktu(), namaSpbu, `${labelNozzle(n.nama)} · ${n.produk} · totalisator manual`] }).then((blob) => {
+                            if (fl) URL.revokeObjectURL(fl.url)
+                            setFoto((x) => ({ ...x, [kunci(n.id)]: { id: genId('f'), blob, url: URL.createObjectURL(blob) } }))
+                          })
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
+
                 {(fl || fotoTersimpan.length > 0) && (
                   <div className="flex items-center gap-space-xs">
                     {fl ? (
@@ -341,15 +456,21 @@ export function TotalizerForm() {
                         ),
                       )
                     )}
-                    <span className="text-body-sm text-on-surface-variant">Foto totalisator manual</span>
+                    <span className="text-body-sm text-on-surface-variant">{fl ? 'Foto bercap waktu, belum disubmit' : 'Foto totalisator manual'}</span>
                   </div>
                 )}
-                {j !== null && (
-                  <span className={cn('tabular text-body-sm', j < 0 ? 'font-semibold text-error' : 'text-on-surface-variant')}>Penjualan: {formatLiter(j, 2)}</span>
+
+                {jm !== null && <span className={cn('tabular text-body-sm', jm < 0 ? 'font-semibold text-error' : 'text-on-surface-variant')}>Penjualan menurut manual: {formatLiter(jm, 0)}</span>}
+                {jd !== null && <span className={cn('tabular text-body-sm', jd < 0 ? 'font-semibold text-error' : 'text-on-surface-variant')}>Penjualan digital: {formatLiter(jd, 2)}</span>}
+                {cek !== null && (
+                  <span className={cn('tabular rounded-md px-space-sm py-1.5 text-body-sm', lebih ? 'bg-error-container/50 font-semibold text-on-error-container' : 'bg-emerald-50 text-emerald-800')}>
+                    {lebih ? 'Selisih digital vs manual ' : 'Digital vs manual sesuai · selisih '}
+                    {formatNumber(cek.selisih, 1)} L{lebih ? ` (batas ±${formatNumber(batas)} L). Periksa ulang angka & foto.` : ''}
+                  </span>
                 )}
                 {error?.nid === n.id && <ErrorBox text={error.teks} />}
                 {bolehUbah && (
-                  <Button variant={sudah && !berubah && !fl ? 'glass' : 'primary'} disabled={busy !== null} onClick={() => void submit(n.id)}>
+                  <Button variant={sudah && !berubah && !fl ? 'glass' : 'primary'} disabled={busy !== null} onClick={() => void (langkah === 'manual' ? submitManual(n.id) : submitDigital(n.id))}>
                     {busy === n.id ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
                     {sudah && !berubah && !fl ? `Submit ulang ${labelNozzle(n.nama).toLowerCase()}` : `Submit ${labelNozzle(n.nama).toLowerCase()}`}
                   </Button>
@@ -361,12 +482,10 @@ export function TotalizerForm() {
       ))}
 
       <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-        {langkah === 'awal' && awalSelesai && !akhirSelesai && (
-          <Button onClick={() => pilihLangkah('akhir')}>Lanjut ke langkah 2 · Totalizer akhir</Button>
-        )}
+        {langkah === 'manual' && manualSelesai && !digitalSelesai && boleh('digital') && <Button onClick={() => pilihLangkah('digital')}>Lanjut ke langkah 2 · Digital akhir shift</Button>}
         {ringkas.length > 0 && (
           <div className="flex flex-col gap-1 rounded-md bg-surface-container-low p-space-sm">
-            <span className="text-tag uppercase text-on-surface-variant">Penjualan tercatat</span>
+            <span className="text-tag uppercase text-on-surface-variant">Penjualan tercatat (digital)</span>
             {ringkas.map((x) => (
               <span key={x.produk} className="tabular flex justify-between text-body-sm">
                 <span className="text-on-surface-variant">{x.produk}</span>
@@ -376,9 +495,8 @@ export function TotalizerForm() {
           </div>
         )}
         <Field label="Catatan shift (opsional, ikut tersimpan saat submit nozzle)" htmlFor="tot-catatan">
-          <Input id="tot-catatan" autoComplete="off" value={isiCatatan} disabled={!bolehUbah} placeholder="Mis. display nozzle 3 mati" onChange={(e) => setCatatan(e.target.value)} />
+          <Input id="tot-catatan" autoComplete="off" value={isiCatatan} disabled={!boleh('manual') && !boleh('digital')} placeholder="Mis. display nozzle 3 mati" onChange={(e) => setCatatan(e.target.value)} />
         </Field>
-        {!bolehUbah && <span className="text-body-sm text-on-surface-variant">Totalizer diisi security, kepala shift, pengawas, atau ABH.</span>}
       </GlassCard>
       {guard.dialog}
     </div>
@@ -398,6 +516,7 @@ export function RiwayatTotalizer() {
   const [buka, setBuka] = useState<string | null>(null)
   const { recs, error, muat } = useCatatan<TotalizerData>('totalizer', `${bulan}-01`, akhirBulan(bulan))
   const fotoBuka = Object.values(recs?.find((r) => r.id === buka)?.data.nozzle ?? {}).flatMap((n) => [
+    ...(n.fotoManual ?? []).map((p) => ({ p, label: `${n.nama}${n.manualAt ? ` ${new Date(n.manualAt).toTimeString().slice(0, 5)}` : ''}` })),
     ...(n.fotoAwal ?? []).map((p) => ({ p, label: `${n.nama} awal` })),
     ...(n.fotoAkhir ?? []).map((p) => ({ p, label: `${n.nama} akhir` })),
   ])
@@ -469,19 +588,26 @@ export function RiwayatTotalizer() {
                   <th className="py-1 pr-2">Produk</th>
                   <th className="py-1 pr-2 text-right">Awal</th>
                   <th className="py-1 pr-2 text-right">Akhir</th>
-                  <th className="py-1 text-right">Penjualan</th>
+                  <th className="py-1 pr-2 text-right">Penjualan</th>
+                  <th className="py-1 pr-2 text-right">Manual</th>
+                  <th className="py-1 text-right">Selisih vs manual</th>
                 </tr>
               </thead>
               <tbody>
-                {Object.values(terbuka.r.data.nozzle).map((x) => {
+                {Object.entries(terbuka.r.data.nozzle).map(([nid, x]) => {
                   const j = jualNozzle(x)
+                  const sb = prevShift({ tanggal: terbuka.r.tanggal, shift: terbuka.r.shift as Shift })
+                  const jm = jualManual(recs?.find((r) => r.id === idShift(sb.tanggal, sb.shift))?.data.nozzle[nid], x)
+                  const sel = j !== null && jm !== null ? j - jm : null
                   return (
                     <tr key={x.nama} className="border-t border-outline-variant/40">
                       <td className="py-1 pr-2 font-semibold">{x.nama}</td>
                       <td className="py-1 pr-2">{x.produk}</td>
                       <td className="tabular py-1 pr-2 text-right">{angka(x.awal)}</td>
                       <td className="tabular py-1 pr-2 text-right">{angka(x.akhir)}</td>
-                      <td className="tabular py-1 text-right font-semibold">{j === null ? '-' : formatNumber(j, 2)}</td>
+                      <td className="tabular py-1 pr-2 text-right font-semibold">{j === null ? '-' : formatNumber(j, 2)}</td>
+                      <td className="tabular py-1 pr-2 text-right">{x.manual ? angka(x.manual) : '-'}</td>
+                      <td className={cn('tabular py-1 text-right', sel !== null && Math.abs(sel) > app.rules.batasTotalisatorL && 'font-bold text-error')}>{sel === null ? '-' : formatNumber(sel, 1)}</td>
                     </tr>
                   )
                 })}
@@ -506,7 +632,8 @@ export function RiwayatTotalizer() {
             </div>
           )}
           <span className="text-body-sm text-on-surface-variant">
-            Awal {terbuka.r.data.jamAwal || '-'} · akhir {terbuka.r.data.jamAkhir || '-'} · {terbuka.r.data.petugas || '-'}
+            Awal {terbuka.r.data.jamAwal || '-'} · akhir {terbuka.r.data.jamAkhir || '-'} · kepala shift {terbuka.r.data.petugas || '-'}
+            {terbuka.r.data.petugasManual ? ` · security ${terbuka.r.data.petugasManual}` : ''}
             {terbuka.r.data.catatan ? ` · ${terbuka.r.data.catatan}` : ''}
           </span>
           {app.canManage && (

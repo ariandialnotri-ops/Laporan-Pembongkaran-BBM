@@ -1,7 +1,9 @@
 /**
- * Operation > Totalizer: totalisator digital setiap nozzle di awal dan akhir shift. Satu catatan per
- * tanggal & shift (tabel bbm_totalizer). Penjualan nozzle = akhir − awal; awal shift diisi otomatis
- * dari akhir shift sebelumnya. Dipakai juga untuk closing shift dan BA Totalisator stock opname.
+ * Operation > Totalizer: satu catatan per tanggal & shift (tabel bbm_totalizer), dua langkah per nozzle:
+ * (1) totalisator manual/mekanik oleh security (angka + foto wajib bercap waktu), (2) totalisator digital
+ * akhir shift oleh kepala shift. Awal digital = akhir digital shift sebelumnya (otomatis). Penjualan
+ * nozzle = akhir − awal; penjualan manual (selisih manual antarshift) menjadi pembanding.
+ * Dipakai juga untuk closing shift dan BA Totalisator stock opname.
  */
 import { parseAngka } from '@/lib/format'
 import type { Catatan } from '@/lib/catatan'
@@ -17,12 +19,23 @@ export interface TotalizerNozzle {
   /** Waktu submit per nozzle (ISO); diisi saat tombol Submit nozzle ditekan. */
   awalAt?: string
   akhirAt?: string
-  /** Foto totalisator manual (mekanik) saat awal / akhir shift. */
+  /** Foto totalisator manual (mekanik) saat awal / akhir shift (catatan lama). */
   fotoAwal?: Photo[]
   fotoAkhir?: Photo[]
+  /** Totalisator manual (mekanik) akhir shift oleh security: angka, waktu submit, foto bercap waktu. */
+  manual?: string
+  manualAt?: string
+  manualOleh?: string
+  fotoManual?: Photo[]
+  /** Penginput totalisator digital akhir (kepala shift). */
+  akhirOleh?: string
 }
 
 export type LangkahTotalizer = 'awal' | 'akhir'
+/** Langkah form: totalisator manual (security) lalu digital akhir shift (kepala shift). */
+export type LangkahForm = 'manual' | 'digital'
+
+export const manualTerkirim = (n: TotalizerNozzle | undefined) => !!n?.manualAt && parseAngka(n.manual ?? '') !== null
 
 /** Catatan lama (sebelum submit per nozzle): angka yang terisi dianggap sudah terkirim. */
 export const catatanLama = (r: TotalizerRecord | undefined) => !!r && !Object.values(r.data.nozzle).some((n) => n.awalAt || n.akhirAt)
@@ -34,7 +47,10 @@ export const nozzleTerkirim = (n: TotalizerNozzle | undefined, langkah: LangkahT
 export interface TotalizerData {
   /** Per id nozzle (data utama nozzle). */
   nozzle: Record<string, TotalizerNozzle>
+  /** Kepala shift (totalisator digital). */
   petugas: string
+  /** Security (totalisator manual). */
+  petugasManual?: string
   jamAwal: string
   jamAkhir: string
   catatan: string
@@ -45,6 +61,18 @@ export type TotalizerRecord = Catatan<TotalizerData>
 export function prevShift(k: { tanggal: string; shift: Shift }): { tanggal: string; shift: Shift } {
   if (k.shift > 1) return { tanggal: k.tanggal, shift: (k.shift - 1) as Shift }
   return { tanggal: todayIso(addDays(new Date(`${k.tanggal}T00:00:00`), -1)), shift: 3 }
+}
+
+export function nextShift(k: { tanggal: string; shift: Shift }): { tanggal: string; shift: Shift } {
+  if (k.shift < 3) return { tanggal: k.tanggal, shift: (k.shift + 1) as Shift }
+  return { tanggal: todayIso(addDays(new Date(`${k.tanggal}T00:00:00`), 1)), shift: 1 }
+}
+
+/** Penjualan menurut totalisator manual: manual shift ini − manual shift sebelumnya (liter). */
+export function jualManual(prev: TotalizerNozzle | undefined, n: TotalizerNozzle | undefined) {
+  const a = parseAngka(prev?.manual ?? '')
+  const b = parseAngka(n?.manual ?? '')
+  return a === null || b === null ? null : b - a
 }
 
 /** Penjualan satu nozzle (liter); null bila awal/akhir belum diisi. */

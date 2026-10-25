@@ -388,7 +388,7 @@ export function kpiFinance(d: DataFinance): Kpi[] {
       rincian: `${lengkap} dari ${sh.length} shift`,
       target: '100%',
       status: statusMin(p, 100, 10),
-      definisi: 'Persentase shift selesai yang totalizer awal & akhir semua nozzle sudah dicatat (dasar penjualan BBM).',
+      definisi: 'Persentase shift selesai yang totalisator digital akhir semua nozzle sudah dicatat kepala shift (awal = akhir shift sebelumnya; dasar penjualan BBM).',
       rumus: 'shift totalizer lengkap ÷ shift selesai × 100%',
       sumber: 'Operation › Totalizer',
       ke: '/laporan/totalizer',
