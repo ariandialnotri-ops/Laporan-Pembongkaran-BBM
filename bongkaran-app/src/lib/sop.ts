@@ -127,6 +127,8 @@ export interface ReportData {
   jamBacaAtg: string
   atgAfter: AtgReading
   penjualanSelamaBongkar: string
+  /** Penerimaan real menurut P-Insyst (L), pembanding penerimaan ATG. */
+  penerimaanPinsyst?: string
   totalisator: Totalisator[]
   dipAfterMm: string
   ttd: Partial<Record<SignerKey, Signature>>
@@ -671,8 +673,38 @@ export interface Derived {
   atgAfterTable: VolumeResult | null
   diterimaDip: number | null
   gainLossDip: number | null
+  /** Pemeriksaan silang untuk mencegah salah baca/salah ketik (lihat BATAS_CEK). */
+  cek: CekSilang
   settleMinutes: number | null
   sample2Jam: Sample2JamResult | null
+}
+
+/** Batas pemeriksaan silang input bongkaran; melewati batas = peringatan (tidak memblokir). */
+export const BATAS_CEK = {
+  /** Deepstick tangki pendam vs tinggi ATG (mm). */
+  dipAtgMm: 10,
+  /** Volume layar ATG vs volume tabel kalibrasi dari tinggi ATG (L). */
+  atgTabelL: 2,
+  /** Volume deepstick vs volume ATG setelah bongkar (L). */
+  dipAtgL: 20,
+  /** Transport / discharge gain-loss yang perlu diperiksa ulang (L). */
+  lossL: 50,
+  /** Penerimaan P-Insyst vs penerimaan ATG (L, pembulatan). */
+  pinsystL: 1,
+} as const
+
+export interface CekSilang {
+  /** Volume ATG − volume tabel dari tinggi ATG. */
+  atgTabelBefore: number | null
+  atgTabelAfter: number | null
+  /** Tinggi deepstick − tinggi ATG (mm). */
+  dipAtgMmBefore: number | null
+  dipAtgMmAfter: number | null
+  /** Volume deepstick − volume ATG (L). */
+  dipAtgLBefore: number | null
+  dipAtgLAfter: number | null
+  /** Penerimaan P-Insyst − penerimaan ATG (L). */
+  pinsyst: number | null
 }
 
 /** Menit dari bongkar selesai sampai sampel diambil (melewati tengah malam bila jam selesai < jam datang). */
@@ -732,6 +764,21 @@ export function deriveReport(report: Report, rules: Rules): Derived {
   const diterimaDip =
     dipBefore?.volume !== undefined && dipAfter?.volume !== undefined ? dipAfter.volume - dipBefore.volume + penjualan : null
 
+  const atgBeforeTable = volumeFromLevel(d.tankId, d.atgBefore.tinggi)
+  const atgAfterTable = volumeFromLevel(d.tankId, d.atgAfter.tinggi)
+  const terimaAktual = realStok !== null && stokAwal !== null ? realStok - stokAwal + penjualan : null
+  const kurang = (a: number | null | undefined, b: number | null | undefined) => (a !== null && a !== undefined && b !== null && b !== undefined ? a - b : null)
+  const vol = (r: VolumeResult | null) => (r && r.error === undefined ? r.volume : null)
+  const cek: CekSilang = {
+    atgTabelBefore: kurang(stokAwal, vol(atgBeforeTable)),
+    atgTabelAfter: kurang(realStok, vol(atgAfterTable)),
+    dipAtgMmBefore: kurang(num(d.dipBeforeMm), num(d.atgBefore.tinggi)),
+    dipAtgMmAfter: kurang(num(d.dipAfterMm), num(d.atgAfter.tinggi)),
+    dipAtgLBefore: kurang(vol(dipBefore), stokAwal),
+    dipAtgLAfter: kurang(vol(dipAfter), realStok),
+    pinsyst: kurang(num(d.penerimaanPinsyst ?? ''), terimaAktual),
+  }
+
   const literComps = compartments.filter((c) => c.estLiter !== null)
   const kapasitasTotal = d.compartments.reduce((n, c) => n + (num(c.kapasitas) ?? 0), 0)
   const sk = shiftKey(d.tanggalDatang, d.jamDatang)
@@ -741,7 +788,7 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     transportLoss: literComps.length ? literComps.reduce((n, c) => n + (c.estLiter ?? 0), 0) : null,
     transportLossLimit: kapasitasTotal ? kapasitasTotal * -0.0015 : null,
     totalisator,
-    terimaAktual: realStok !== null && stokAwal !== null ? realStok - stokAwal + penjualan : null,
+    terimaAktual,
     shift: sk?.shift ?? null,
     tanggalShift: sk?.tanggal ?? d.tanggalDatang,
     d15Depot,
@@ -759,8 +806,9 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     gainLossPct,
     dipBefore,
     dipAfter,
-    atgBeforeTable: volumeFromLevel(d.tankId, d.atgBefore.tinggi),
-    atgAfterTable: volumeFromLevel(d.tankId, d.atgAfter.tinggi),
+    atgBeforeTable,
+    atgAfterTable,
+    cek,
     diterimaDip,
     gainLossDip: diterimaDip !== null && volumeDO !== null ? diterimaDip - volumeDO : null,
     settleMinutes: minutesBetween(d.jamSelesaiBongkar, d.jamBacaAtg),

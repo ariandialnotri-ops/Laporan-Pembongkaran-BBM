@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { METHOD_LABEL } from '@/lib/density'
 import { formatTanggalIso, minutesBetween, nowHm } from '@/lib/date'
@@ -20,6 +21,7 @@ import { genId } from '@/lib/image'
 import { loPickable, loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import { shiftLabel } from '@/lib/shift'
 import {
+  BATAS_CEK,
   SIGNERS,
   newCompartment,
   KEPEKAAN_MAKS,
@@ -70,8 +72,55 @@ function Section({ children, className }: { children: ReactNode; className?: str
   )
 }
 
-function Num({ id, value, onChange, placeholder, suffix }: { id?: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string }) {
-  return <Input id={id} numeric inputMode="decimal" autoComplete="off" value={value} placeholder={placeholder} suffix={suffix} onChange={(e) => onChange(e.target.value)} />
+function Num({ id, value, onChange, placeholder, suffix, bahaya }: { id?: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string; bahaya?: boolean }) {
+  return (
+    <Input
+      id={id}
+      numeric
+      inputMode="decimal"
+      autoComplete="off"
+      value={value}
+      placeholder={placeholder}
+      suffix={suffix}
+      aria-invalid={bahaya || undefined}
+      className={cn(bahaya && 'bg-error-container/40 ring-2 ring-error')}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+const lewat = (nilai: number | null, batas: number) => nilai !== null && Math.abs(nilai) > batas
+
+/**
+ * Pemeriksaan silang saat input (mis. deepstick vs ATG): hijau bila dalam batas, merah bila melewati batas.
+ * Saat nilai baru melewati batas dan berhenti diketik ±1 detik, muncul notifikasi toast agar petugas
+ * memeriksa ulang sebelum lanjut ke tahap berikutnya.
+ */
+function CekSilang({ nilai, batas, satuan, digit = 0, judulOk, judulLebih, saran, detail }: { nilai: number | null; batas: number; satuan: string; digit?: number; judulOk: string; judulLebih: string; saran: string; detail?: string }) {
+  const toast = useToast()
+  const lebih = lewat(nilai, batas)
+  const tadi = useRef(lebih)
+  useEffect(() => {
+    if (!lebih) {
+      tadi.current = false
+      return
+    }
+    if (tadi.current) return
+    const t = setTimeout(() => {
+      tadi.current = true
+      toast(`${judulLebih}. ${saran}`, TriangleAlert)
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [lebih, judulLebih, saran, toast])
+  if (nilai === null) return null
+  const angka = formatSigned(nilai, digit, satuan)
+  return (
+    <StatusBanner
+      tone={lebih ? 'error' : 'success'}
+      title={lebih ? judulLebih : judulOk}
+      detail={`${detail ?? `Selisih ${angka}`} · batas ±${formatNumber(batas)}${satuan}${lebih ? `. ${saran}` : ''}`}
+    />
+  )
 }
 
 function Fixed({ id, value, placeholder }: { id?: string; value: string; placeholder?: string }) {
@@ -178,6 +227,8 @@ export function StepContent(props: StepProps) {
       const reading = d[key]
       const setReading = (patch: Partial<AtgReading>) => setData({ [key]: { ...reading, ...patch } })
       const tableResult = step.id === 'atg_before' ? x.atgBeforeTable : x.atgAfterTable
+      const selisihTabel = step.id === 'atg_before' ? x.cek.atgTabelBefore : x.cek.atgTabelAfter
+      const atgLebih = lewat(selisihTabel, BATAS_CEK.atgTabelL)
       const mismatch = x.tank && d.produk && x.tank.produk.toLowerCase() !== d.produk.toLowerCase()
       return (
         <>
@@ -215,10 +266,10 @@ export function StepContent(props: StepProps) {
             </div>
             <div className="grid grid-cols-3 gap-space-sm">
               <Field label="Tinggi" htmlFor={`${key}-t`}>
-                <Num id={`${key}-t`} suffix="mm" value={reading.tinggi} onChange={(v) => setReading({ tinggi: v })} />
+                <Num id={`${key}-t`} suffix="mm" bahaya={atgLebih} value={reading.tinggi} onChange={(v) => setReading({ tinggi: v })} />
               </Field>
               <Field label="Volume" htmlFor={`${key}-v`}>
-                <Num id={`${key}-v`} suffix="L" value={reading.volume} onChange={(v) => setReading({ volume: v })} />
+                <Num id={`${key}-v`} suffix="L" bahaya={atgLebih} value={reading.volume} onChange={(v) => setReading({ volume: v })} />
               </Field>
               <Field label="Suhu" htmlFor={`${key}-s`}>
                 <Num id={`${key}-s`} suffix="°C" value={reading.suhu} onChange={(v) => setReading({ suhu: v })} />
@@ -232,7 +283,19 @@ export function StepContent(props: StepProps) {
             {mismatch && step.id === 'atg_before' ? (
               <StatusBanner tone="error" title="Tangki tidak sesuai produk" detail={`${x.tank!.produk} ≠ ${d.produk}`} />
             ) : (
-              <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', parseAngka(reading.volume), 'ATG vs tabel')} />
+              <>
+                <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', null)} />
+                <CekSilang
+                  nilai={selisihTabel}
+                  batas={BATAS_CEK.atgTabelL}
+                  satuan=" L"
+                  digit={1}
+                  judulOk="Volume ATG sesuai tabel kalibrasi"
+                  judulLebih="Volume ATG tidak sesuai tinggi ATG"
+                  saran="Periksa kembali tinggi & volume yang disalin dari layar ATG"
+                  detail={`ATG ${formatLiter(parseAngka(reading.volume) ?? 0, 1)} vs tabel, selisih ${formatSigned(selisihTabel ?? 0, 1, ' L')}`}
+                />
+              </>
             )}
           </Section>
           <TotalisatorSection {...props} fase={step.id === 'atg_before' ? 'awal' : 'akhir'} />
@@ -247,6 +310,38 @@ export function StepContent(props: StepProps) {
                   ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
                 ]}
                 total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
+              />
+              <CekSilang
+                nilai={x.gainLoss}
+                batas={BATAS_CEK.lossL}
+                satuan=" L"
+                judulOk="Discharge gain/loss wajar"
+                judulLebih={`Discharge gain/loss di atas ${BATAS_CEK.lossL} L`}
+                saran="Periksa kembali pembacaan ATG awal/akhir, volume DO, dan totalisator"
+              />
+            </Section>
+          )}
+          {step.id === 'atg_after' && (
+            <Section>
+              <div className="flex flex-col">
+                <h3 className="text-body-lg font-bold text-on-surface">Penerimaan real P-Insyst</h3>
+                <span className="text-body-sm text-on-surface-variant">Salin angka penerimaan dari P-Insyst, langsung dibandingkan dengan penerimaan ATG.</span>
+              </div>
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Field label="Penerimaan P-Insyst" htmlFor="pinsyst">
+                  <Num id="pinsyst" suffix="L" bahaya={lewat(x.cek.pinsyst, BATAS_CEK.pinsystL)} value={d.penerimaanPinsyst ?? ''} onChange={(v) => setData({ penerimaanPinsyst: v })} />
+                </Field>
+                <Field label="Penerimaan ATG" htmlFor="terima-atg">
+                  <Fixed id="terima-atg" value={x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : ''} placeholder="isi ATG dulu" />
+                </Field>
+              </div>
+              <CekSilang
+                nilai={x.cek.pinsyst}
+                batas={BATAS_CEK.pinsystL}
+                satuan=" L"
+                judulOk="Penerimaan P-Insyst sama dengan ATG"
+                judulLebih="Penerimaan P-Insyst berbeda dengan ATG"
+                saran="Cocokkan kembali input P-Insyst dengan pembacaan ATG"
               />
             </Section>
           )}
@@ -280,14 +375,44 @@ export function StepContent(props: StepProps) {
       const key = step.id === 'dip_before' ? 'dipBeforeMm' : 'dipAfterMm'
       const result = step.id === 'dip_before' ? x.dipBefore : x.dipAfter
       const atgVol = step.id === 'dip_before' ? x.stokAwal : x.realStok
+      const atgTinggi = parseAngka(step.id === 'dip_before' ? d.atgBefore.tinggi : d.atgAfter.tinggi)
+      const selMm = step.id === 'dip_before' ? x.cek.dipAtgMmBefore : x.cek.dipAtgMmAfter
+      const selL = step.id === 'dip_before' ? x.cek.dipAtgLBefore : x.cek.dipAtgLAfter
+      const lebih = step.id === 'dip_before' ? lewat(selMm, BATAS_CEK.dipAtgMm) : lewat(selL, BATAS_CEK.dipAtgL)
       return (
         <>
           <StepPhotos {...props} />
           <Section>
-            <Field label={`Ketinggian deepstick · ${x.tank ? x.tank.label : 'tangki belum dipilih'}`} htmlFor={key}>
-              <Num id={key} suffix="mm" value={d[key]} onChange={(v) => setData({ [key]: v })} />
-            </Field>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <Field label={`Deepstick · ${x.tank ? x.tank.label : 'tangki belum dipilih'}`} htmlFor={key}>
+                <Num id={key} suffix="mm" bahaya={lebih} value={d[key]} onChange={(v) => setData({ [key]: v })} />
+              </Field>
+              <Field label="Pembanding ATG" htmlFor={`${key}-atg`}>
+                <Fixed id={`${key}-atg`} value={atgTinggi !== null ? `${formatNumber(atgTinggi)} mm · ${atgVol !== null ? formatLiter(atgVol, 0) : '-'}` : ''} placeholder="isi tahap ATG" />
+              </Field>
+            </div>
             <StatusBanner {...volumeBanner(result, 'Volume dari tabel kalibrasi', atgVol, 'dengan ATG')} />
+            {step.id === 'dip_before' ? (
+              <CekSilang
+                nilai={selMm}
+                batas={BATAS_CEK.dipAtgMm}
+                satuan=" mm"
+                judulOk="Deepstick sesuai tinggi ATG"
+                judulLebih={`Deepstick selisih lebih dari ${BATAS_CEK.dipAtgMm} mm dengan ATG`}
+                saran="Ulangi deepstick tangki pendam dan periksa tinggi ATG"
+              />
+            ) : (
+              <CekSilang
+                nilai={selL}
+                batas={BATAS_CEK.dipAtgL}
+                satuan=" L"
+                digit={1}
+                judulOk="Volume deepstick sesuai ATG"
+                judulLebih={`Volume deepstick selisih lebih dari ${BATAS_CEK.dipAtgL} L dengan ATG`}
+                saran="Ulangi deepstick tangki pendam dan periksa pembacaan ATG"
+                detail={`Selisih ${formatSigned(selL ?? 0, 1, ' L')}${selMm !== null ? ` (${formatSigned(selMm, 0, ' mm')})` : ''}`}
+              />
+            )}
             {step.id === 'dip_after' && (
               <Ladder
                 rows={[
@@ -348,24 +473,51 @@ export function StepContent(props: StepProps) {
             <Section key={c.id}>
               <span className="text-tag uppercase text-primary">Kompartemen {c.no}</span>
               <div className="grid grid-cols-2 gap-space-sm">
-                <Field label="Tinggi T2" htmlFor={`tera-fix-${c.id}`}>
-                  <Fixed id={`tera-fix-${c.id}`} value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
+                <Field label="Acuan T2 buku tera" htmlFor={`tera-fix-${c.id}`}>
+                  <Input
+                    id={`tera-fix-${c.id}`}
+                    numeric
+                    readOnly
+                    tabIndex={-1}
+                    suffix="mm"
+                    value={c.tinggiTera}
+                    placeholder="dari buku tera"
+                    className="border border-dashed border-sky-300 bg-sky-50 shadow-none [&_input]:text-sky-900"
+                  />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
-                  <Num id={`dip-${c.id}`} suffix="mm" value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
+                  <Num id={`dip-${c.id}`} suffix="mm" bahaya={c.outOfLimit || lewat(c.estLiter, BATAS_CEK.lossL)} value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
                 </Field>
               </div>
               <StatusBanner
                 {...(c.selisihMm === null
                   ? IDLE
                   : {
-                      tone: (c.outOfLimit ? 'error' : 'success') as BannerTone,
-                      title: c.outOfLimit ? `Kurang lebih dari ${rules.teraToleranceMm} mm` : 'Sesuai tinggi T2 buku tera',
+                      tone: (c.outOfLimit || lewat(c.estLiter, BATAS_CEK.lossL) ? 'error' : 'success') as BannerTone,
+                      title: c.outOfLimit
+                        ? `Kurang lebih dari ${rules.teraToleranceMm} mm`
+                        : lewat(c.estLiter, BATAS_CEK.lossL)
+                          ? `Selisih di atas ${BATAS_CEK.lossL} L, periksa kembali deepstick & kepekaan`
+                          : 'Sesuai tinggi T2 buku tera',
                       detail: `Selisih ${formatSigned(c.selisihMm, 0, ' mm')}${c.estLiter !== null ? ` ≈ ${formatSigned(c.estLiter, 1, ' L')}` : ''}`,
                     })}
               />
             </Section>
           ))}
+          {x.transportLoss !== null && (
+            <Section>
+              <CekSilang
+                nilai={x.transportLoss}
+                batas={BATAS_CEK.lossL}
+                satuan=" L"
+                digit={1}
+                judulOk="Total transport gain/loss wajar"
+                judulLebih={`Transport gain/loss di atas ${BATAS_CEK.lossL} L`}
+                saran="Periksa kembali deepstick kompartemen, tinggi T2, dan kepekaan buku tera"
+                detail={`Total ${formatSigned(x.transportLoss, 1, ' L')}`}
+              />
+            </Section>
+          )}
           {x.teraOutOfLimit && <ApprovalCard {...props} />}
         </>
       )

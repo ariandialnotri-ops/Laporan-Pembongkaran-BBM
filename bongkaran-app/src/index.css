@@ -651,3 +651,14 @@ html[data-keyboard='open'] [data-dock] {
 @media (prefers-reduced-motion: reduce) {
   .ikon-proses, .garis-proses, .ikon-sukses, .modal-konfirmasi[data-state] { animation: none; }
 }
+
+/* Panduan foto vertikal: HP berputar dari mendatar ke tegak, lalu bergerak naik-turun pelan. */
+@keyframes hpTegak {
+  0%, 15% { transform: rotate(-90deg); }
+  40%, 60% { transform: rotate(0deg) translateY(0); }
+  72% { transform: rotate(0deg) translateY(-2px); }
+  84% { transform: rotate(0deg) translateY(2px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+.hp-tegak { animation: hpTegak 2.6s ease-in-out infinite; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .hp-tegak { animation: none; } }

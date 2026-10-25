@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
-import { formatLiter, formatSigned } from '@/lib/format'
+import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
+import { BATAS_CEK, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 export function FinishPanel({
@@ -54,6 +54,21 @@ export function FinishPanel({
   const anomaly = evaluation.densityAnomaly || report.status === 'anomali'
   const finished = report.status !== 'draft'
   const densityOk = x.densityResults.length > 0 && x.densityResults.every((r) => r.ok)
+  const lewat = (v: number | null, batas: number) => v !== null && Math.abs(v) > batas
+  const transportLebih = lewat(x.transportLoss, BATAS_CEK.lossL)
+  const dischargeLebih = lewat(x.gainLoss, BATAS_CEK.lossL)
+  const c = x.cek
+  const mm = (v: string) => {
+    const n = parseAngka(v)
+    return n !== null ? `${formatNumber(n)} mm` : '-'
+  }
+  // Satu baris rekap: nilai ATG vs deepstick dan selisihnya; merah bila melewati batas.
+  const selisih = (selMm: number | null, selL: number | null) => (
+    <span className={cn((lewat(selMm, BATAS_CEK.dipAtgMm) || lewat(selL, BATAS_CEK.dipAtgL)) && 'font-bold text-error')}>
+      {selMm !== null ? formatSigned(selMm, 0, ' mm') : '-'} · {selL !== null ? formatSigned(selL, 1, ' L') : '-'}
+    </span>
+  )
+  const merah = (on: boolean) => cn('flex flex-col gap-space-xs rounded-lg', on && 'bg-error-container/40 p-space-xs ring-2 ring-error')
 
   const copy = async () => {
     try {
@@ -93,13 +108,28 @@ export function FinishPanel({
 
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         <span className="text-tag uppercase text-primary">Rekap quantity</span>
-        <Ladder
-          rows={[['Batas toleransi (-0,15% kapasitas)', x.transportLossLimit !== null ? formatSigned(x.transportLossLimit, 2, ' L') : '-']]}
-          total={['Total transport loss', x.transportLoss !== null ? formatSigned(x.transportLoss, 2, ' L') : '-']}
-        />
+        {(transportLebih || dischargeLebih) && (
+          <StatusBanner
+            tone="error"
+            title={`Gain/loss di atas ${BATAS_CEK.lossL} L, lakukan pemeriksaan kembali`}
+            detail={[
+              transportLebih ? `Transport ${formatSigned(x.transportLoss ?? 0, 1, ' L')}: cek deepstick kompartemen & kepekaan buku tera` : null,
+              dischargeLebih ? `Discharge ${formatSigned(x.gainLoss ?? 0, 0, ' L')}: cek pembacaan ATG, volume DO & totalisator` : null,
+            ]
+              .filter(Boolean)
+              .join('. ')}
+          />
+        )}
+        <div className={merah(transportLebih)}>
+          <Ladder
+            rows={[['Batas toleransi (-0,15% kapasitas)', x.transportLossLimit !== null ? formatSigned(x.transportLossLimit, 2, ' L') : '-']]}
+            total={['Total transport loss', x.transportLoss !== null ? formatSigned(x.transportLoss, 2, ' L') : '-']}
+          />
+        </div>
         {x.transportLoss !== null && x.transportLossLimit !== null && x.transportLoss < x.transportLossLimit && (
           <StatusBanner tone="error" title="Transport loss melebihi batas toleransi" detail="Akan ditandai merah di Berita Acara" />
         )}
+        <div className={merah(dischargeLebih)}>
         <Ladder
           rows={[
             ['Stok awal (ATG)', x.stokAwal !== null ? formatLiter(x.stokAwal) : '-'],
@@ -108,6 +138,23 @@ export function FinishPanel({
             ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
           ]}
           total={['Discharge gain/loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')} dari volume DO)` : '-']}
+        />
+        </div>
+        <span className="text-tag uppercase text-on-surface-variant">Selisih ATG vs deepstick</span>
+        <Ladder
+          rows={[
+            ['Sebelum: ATG / deepstick', `${mm(d.atgBefore.tinggi)} / ${mm(d.dipBeforeMm)}`],
+            ['Sebelum: selisih', selisih(c.dipAtgMmBefore, c.dipAtgLBefore)],
+            ['Sesudah: ATG / deepstick', `${mm(d.atgAfter.tinggi)} / ${mm(d.dipAfterMm)}`],
+            ['Sesudah: selisih', selisih(c.dipAtgMmAfter, c.dipAtgLAfter)],
+          ]}
+        />
+        <Ladder
+          rows={[
+            ['Penerimaan ATG', x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : '-'],
+            ['Penerimaan P-Insyst', parseAngka(d.penerimaanPinsyst ?? '') !== null ? formatLiter(parseAngka(d.penerimaanPinsyst ?? '') ?? 0, 0) : '-'],
+          ]}
+          total={['Selisih P-Insyst − ATG', c.pinsyst !== null ? <span className={cn(lewat(c.pinsyst, BATAS_CEK.pinsystL) && 'text-error')}>{formatSigned(c.pinsyst, 0, ' L')}</span> : '-']}
         />
         <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>

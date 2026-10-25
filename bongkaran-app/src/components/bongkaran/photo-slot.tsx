@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Camera, LoaderCircle, X } from 'lucide-react'
+import { Camera, LoaderCircle, Smartphone, X } from 'lucide-react'
 import { Pill } from '@/components/ui/pill'
 import type { Photo } from '@/lib/sop'
 import { cn } from '@/lib/utils'
@@ -42,11 +42,11 @@ export function PhotoSlot({
       </div>
 
       {photos.length > 0 && (
-        <div className="grid grid-cols-3 gap-space-xs sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-space-xs sm:grid-cols-5">
           {photos.map((p, i) => {
             const src = srcOf(p)
             return (
-              <div key={p.id} className="glass-1 relative aspect-square overflow-hidden rounded-md">
+              <div key={p.id} className="glass-1 relative aspect-[3/4] overflow-hidden rounded-md">
                 {src ? (
                   <img src={src} alt={`${label} ${i + 1}`} loading="lazy" decoding="async" className="size-full object-cover" />
                 ) : (
@@ -68,6 +68,15 @@ export function PhotoSlot({
             )
           })}
         </div>
+      )}
+
+      {!disabled && !done && (
+        <span className="flex items-center gap-space-xs rounded-md bg-sky-50 px-space-sm py-1.5 text-xs font-medium text-sky-900">
+          <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-sky-700 shadow-sm">
+            <Smartphone className="hp-tegak size-4" />
+          </span>
+          Pegang HP tegak (vertikal) dan pastikan objek & angka terbaca jelas.
+        </span>
       )}
 
       {!disabled && (
