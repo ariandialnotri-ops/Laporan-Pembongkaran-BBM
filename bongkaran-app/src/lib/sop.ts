@@ -306,7 +306,7 @@ export interface Rules {
   batasAtgTabelL: number
   /** Volume deepstick vs volume ATG setelah bongkar (L). */
   batasDipAtgL: number
-  /** Transport / discharge gain-loss yang perlu diperiksa ulang (L). */
+  /** Transport gain/loss (total kompartemen) yang perlu diperiksa ulang (L). Discharge gain/loss tidak diberi batas. */
   batasLossL: number
   /** Penerimaan P-Insyst vs penerimaan ATG (L); 0,5 = beda ≥ 1 L setelah dibulatkan. */
   batasPinsystL: number

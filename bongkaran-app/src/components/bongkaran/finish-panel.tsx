@@ -99,7 +99,6 @@ export function FinishPanel({
   const rules = effectiveRules(settings.rules)
   const lewat = (v: number | null, batas: number) => v !== null && Math.abs(v) > batas
   const transportLebih = lewat(x.transportLoss, rules.batasLossL)
-  const dischargeLebih = lewat(x.gainLoss, rules.batasLossL)
   const c = x.cek
   const mm = (v: string) => {
     const n = parseAngka(v)
@@ -166,16 +165,11 @@ export function FinishPanel({
 
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         <span className="text-tag uppercase text-primary">Rekap quantity</span>
-        {(transportLebih || dischargeLebih) && (
+        {transportLebih && (
           <StatusBanner
             tone="error"
-            title={`Gain/loss di atas ${rules.batasLossL} L, lakukan pemeriksaan kembali`}
-            detail={[
-              transportLebih ? `Transport ${formatSigned(x.transportLoss ?? 0, 1, ' L')}: cek deepstick kompartemen & kepekaan buku tera` : null,
-              dischargeLebih ? `Discharge ${formatSigned(x.gainLoss ?? 0, 0, ' L')}: cek pembacaan ATG, volume DO & totalisator` : null,
-            ]
-              .filter(Boolean)
-              .join('. ')}
+            title={`Transport gain/loss di atas ${rules.batasLossL} L, lakukan pemeriksaan kembali`}
+            detail={`Transport ${formatSigned(x.transportLoss ?? 0, 1, ' L')}: cek deepstick kompartemen & kepekaan buku tera`}
           />
         )}
         <div className={merah(transportLebih)}>
@@ -187,7 +181,6 @@ export function FinishPanel({
         {x.transportLoss !== null && x.transportLossLimit !== null && x.transportLoss < x.transportLossLimit && (
           <StatusBanner tone="error" title="Transport loss melebihi batas toleransi" detail="Akan ditandai merah di Berita Acara" />
         )}
-        <div className={merah(dischargeLebih)}>
         <Ladder
           rows={[
             ['Stok awal (ATG)', x.stokAwal !== null ? formatLiter(x.stokAwal) : '-'],
@@ -197,7 +190,6 @@ export function FinishPanel({
           ]}
           total={['Discharge gain/loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')} dari volume DO)` : '-']}
         />
-        </div>
         <span className="text-tag uppercase text-on-surface-variant">Selisih ATG vs deepstick</span>
         <Ladder
           rows={[

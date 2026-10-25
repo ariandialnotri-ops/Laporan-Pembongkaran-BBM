@@ -310,14 +310,6 @@ export function StepContent(props: StepProps) {
                 ]}
                 total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
               />
-              <CekSilang
-                nilai={x.gainLoss}
-                batas={rules.batasLossL}
-                satuan=" L"
-                judulOk="Discharge gain/loss wajar"
-                judulLebih={`Discharge gain/loss di atas ${rules.batasLossL} L`}
-                saran="Periksa kembali pembacaan ATG awal/akhir, volume DO, dan totalisator"
-              />
             </Section>
           )}
           {step.id === 'atg_after' && (

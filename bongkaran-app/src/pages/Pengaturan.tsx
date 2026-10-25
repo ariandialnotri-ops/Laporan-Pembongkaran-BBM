@@ -221,7 +221,7 @@ export function AturanPemeriksaan() {
             <Field label="Deepstick vs ATG (langkah 14)" htmlFor="set-dip-l">
               <RuleInput id="set-dip-l" suffix="L" value={r.batasDipAtgL} onChange={(n) => setRule('batasDipAtgL', n)} />
             </Field>
-            <Field label="Gain/loss transport & discharge" htmlFor="set-loss">
+            <Field label="Transport gain/loss" htmlFor="set-loss">
               <RuleInput id="set-loss" suffix="L" value={r.batasLossL} onChange={(n) => setRule('batasLossL', n)} />
             </Field>
             <Field label="P-Insyst vs ATG" htmlFor="set-pinsyst" hint="0,5 = beda ≥ 1 L">

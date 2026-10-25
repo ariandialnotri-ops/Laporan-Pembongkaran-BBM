@@ -518,9 +518,9 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
   - Langkah 4 & 13: volume layar ATG vs volume tabel kalibrasi dari tinggi ATG, batas ±2 L.
   - Langkah 7: tinggi deepstick tangki pendam vs tinggi ATG sebelum bongkar, batas ±10 mm (kolom "Pembanding ATG" di sebelah input).
   - Langkah 9: per kompartemen bila selisih > 50 L; total transport gain/loss > 50 L. Tinggi T2 acuan buku tera tampil sebagai kotak biru muda bergaris putus (baca saja), berbeda dari input deepstick.
-  - Langkah 13: discharge gain/loss > 50 L; isian **Penerimaan real P-Insyst** (`penerimaanPinsyst`) dibandingkan langsung dengan penerimaan ATG, beda ≥ 1 L diberi peringatan.
+  - Langkah 13: isian **Penerimaan real P-Insyst** (`penerimaanPinsyst`) dibandingkan langsung dengan penerimaan ATG, beda ≥ 1 L diberi peringatan.
   - Langkah 14: volume deepstick vs volume ATG sesudah bongkar, batas ±20 L (mm ikut ditampilkan).
-- **Finish**: transport atau discharge gain/loss > 50 L → banner merah "lakukan pemeriksaan kembali" + kotak rekap bercincin merah. Rekap quantity menambah **Selisih ATG vs deepstick** (sebelum/sesudah, mm & L) dan **P-Insyst vs ATG**; baris yang sama masuk teks WA.
+- **Finish**: transport gain/loss > 50 L → banner merah (discharge gain/loss tidak diberi batas 50 L) "lakukan pemeriksaan kembali" + kotak rekap bercincin merah. Rekap quantity menambah **Selisih ATG vs deepstick** (sebelum/sesudah, mm & L) dan **P-Insyst vs ATG**; baris yang sama masuk teks WA.
 - **Lampiran foto BA (PDF)**: grid 4 kolom bingkai 3:4, foto dimuat utuh sesuai rasio asli (tidak gepeng/terpotong) di latar abu muda; dikelompokkan per tahap dengan pita bernomor, tahap kecil berbagi satu baris (12 foto/halaman), keterangan slot + jam foto, kepala halaman (BA, MT, produk, tanggal) dan nomor halaman.
 - **Aturan Pemeriksaan hanya Admin Aplikasi** (super admin, `app.superadmin`): ABH dan peran lain hanya melihat. Database menjaga lewat trigger `bbm_settings_jaga_aturan`: simpanan pengaturan dari selain super admin tetap tersimpan, tetapi `rules` dan `pinPenanggungJawab` dikembalikan ke nilai lama.
 - **Panduan foto vertikal**: slot foto kosong menampilkan ikon HP yang berputar dari mendatar ke tegak (`.hp-tegak`, mati saat reduced motion); pratinjau foto berbingkai 3:4.
