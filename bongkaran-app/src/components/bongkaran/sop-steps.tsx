@@ -22,7 +22,9 @@ import { shiftLabel } from '@/lib/shift'
 import {
   SIGNERS,
   newCompartment,
+  KEPEKAAN_MAKS,
   newDensityTest,
+  parseKepekaan,
   type AtgReading,
   type Evaluation,
   type Photo,
@@ -153,8 +155,15 @@ export function StepContent(props: StepProps) {
                     <Num id={`kap-${c.id}`} suffix="L" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                   <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
-                    <Num id={`kpk-${c.id}`} suffix="L/mm" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
+                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="mis. 0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
                   </Field>
+                  {/* Angka kepekaan yang terbaca, agar salah ketik (mis. 0.846 terbaca 846) langsung terlihat. */}
+                  {parseKepekaan(c.kepekaan) !== null && (
+                    <span className={cn('col-span-2 tabular text-body-sm', parseKepekaan(c.kepekaan)! > KEPEKAAN_MAKS ? 'font-semibold text-error' : 'text-on-surface-variant')}>
+                      Terbaca {parseKepekaan(c.kepekaan)!.toLocaleString('id-ID', { maximumFractionDigits: 4 })} L/mm · selisih 1 mm ≈ {parseKepekaan(c.kepekaan)!.toLocaleString('id-ID', { maximumFractionDigits: 2 })} L
+                      {parseKepekaan(c.kepekaan)! > KEPEKAAN_MAKS ? ' · tidak wajar, periksa buku tera' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

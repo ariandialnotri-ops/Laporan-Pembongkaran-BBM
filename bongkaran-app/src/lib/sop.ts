@@ -607,6 +607,23 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
 const has = (v: string | null | undefined) => v !== null && v !== undefined && v.trim() !== ''
 const num = (v: string | null | undefined) => parseAngka(v ?? '')
 
+/**
+ * Kepekaan buku tera MT (liter per mm, umumnya < 5): titik maupun koma dibaca sebagai desimal ("0.846" dan
+ * "0,846" = 0,846), dan angka berawalan 0 tanpa pemisah ("0726") dibaca 0,726. Format angka biasa memperlakukan
+ * titik dengan 3 digit sebagai pemisah ribuan, sehingga 0.846 terbaca 846 dan selisih 1 mm menjadi 846 L.
+ */
+export function parseKepekaan(v: string | null | undefined): number | null {
+  let t = (v ?? '').trim().replace(/\s/g, '')
+  if (!t) return null
+  if (/^0\d+$/.test(t)) t = `0.${t.slice(1)}`
+  else if ((t.match(/[.,]/g) ?? []).length === 1) t = t.replace(',', '.')
+  else return parseAngka(t)
+  const x = Number(t)
+  return Number.isFinite(x) ? x : null
+}
+/** Kepekaan di atas ini (L/mm) hampir pasti salah ketik. */
+export const KEPEKAAN_MAKS = 5
+
 export interface CompartmentResult extends Compartment {
   selisihMm: number | null
   estLiter: number | null
@@ -679,7 +696,7 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     const kapasitas = num(c.kapasitas)
     const mmPerL = num(c.kepekaanMmL ?? '')
     // Liter per mm: kepekaan buku tera; laporan lama: 1 / kepekaan mm per liter, atau kapasitas / tinggi.
-    const kepekaan = num(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
+    const kepekaan = parseKepekaan(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
     const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari T2
     // Sama dengan Berita Acara: kepekaan x selisih (mm). Contoh 0,3 L/mm x -5 mm = -1,5 L.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
@@ -796,8 +813,11 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.tanggalKeluar) || !has(d.jamKeluar)) issues.push('Isi tanggal & jam keluar MT dari depot')
       break
     case 'tera':
-      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((num(c.kepekaan) ?? 0) > 0))) {
+      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((parseKepekaan(c.kepekaan) ?? 0) > 0))) {
         issues.push('Isi tinggi T2, kapasitas, dan kepekaan (L/mm) dari buku tera MT untuk semua kompartemen')
+      }
+      if (d.compartments.some((c) => (parseKepekaan(c.kepekaan) ?? 0) > KEPEKAAN_MAKS)) {
+        issues.push(`Kepekaan tidak wajar (> ${KEPEKAAN_MAKS} L/mm). Periksa buku tera, mis. 0,3 L/mm`)
       }
       break
     case 'atg_before':

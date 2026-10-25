@@ -3,7 +3,7 @@
  * Alamat sel mengikuti template Excel referensi.
  */
 import { parseAngka } from '@/lib/format'
-import type { Derived, Report, Settings, SignerKey } from '@/lib/sop'
+import { parseKepekaan, type Derived, type Report, type Settings, type SignerKey } from '@/lib/sop'
 import { tankName } from '@/lib/tank'
 import type { CellSpec } from './xlsx'
 
@@ -88,7 +88,7 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
     set(`L${row}`, sel)
     // Template: M24 tanpa desimal, M25-M29 tiga desimal; disamakan (liter bulat).
     cells[`M${row}`] = { value: kap, fmt: KAPASITAS_FMT }
-    const kep = c ? n(c.kepekaan) : null
+    const kep = c ? parseKepekaan(c.kepekaan) : null
     const mmPerL = c ? n(c.kepekaanMmL ?? '') : null
     if (dip !== null && tera && kep) {
       // Kepekaan buku tera (L/mm): selisih liter = selisih mm x kepekaan.
