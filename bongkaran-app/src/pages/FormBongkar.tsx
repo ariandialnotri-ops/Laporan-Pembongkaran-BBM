@@ -483,7 +483,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         {readOnly ? (
           <span className="flex items-center gap-1.5 px-space-xs text-body-sm text-on-surface-variant">
             <Lock aria-hidden="true" className="size-4" />
-            Bongkaran selesai, data terkunci
+            {report.data.ttd?.pengawas?.img && report.data.ttd?.abh?.img ? 'Closing, data terkunci' : 'Bongkaran selesai, menunggu TTD pengawas & ABH'}
           </span>
         ) : (
           <Link to="/input/bongkar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>

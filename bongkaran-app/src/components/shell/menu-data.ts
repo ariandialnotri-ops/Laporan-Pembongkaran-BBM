@@ -52,6 +52,7 @@ import { formKategori, formTampil } from '@/lib/ops'
 import { namaModulPetty } from '@/lib/petty'
 import { loStatus, planBesokKurang } from '@/lib/plan'
 import { sampleMenunggu } from '@/lib/sample'
+import { sudahClosing } from '@/lib/sop'
 import { shiftLabel } from '@/lib/shift'
 import { takarStatus } from '@/lib/takar'
 
@@ -427,7 +428,9 @@ export function useRiwayatTerbuka(): Record<string, string> {
   const hariIni = todayIso()
   const out: Record<string, string> = {}
   const drafts = app.reports.filter((r) => r.status === 'draft').length
-  if (drafts) out['/laporan/bongkaran'] = `${drafts} bongkaran belum selesai`
+  const belumClosing = app.reports.filter((r) => r.status !== 'draft' && !sudahClosing(r)).length
+  const bongkar = [drafts && `${drafts} bongkaran belum selesai`, belumClosing && `${belumClosing} menunggu TTD pengawas & ABH`].filter(Boolean)
+  if (bongkar.length) out['/laporan/bongkaran'] = bongkar.join(' · ')
   const sample = sampleMenunggu(app.reports).length
   const qqSebagian = app.daily.filter((d) => d.kind === 'qq' && !d.data.selesaiAt && d.tanggal < hariIni).length
   const kual = [sample && `${sample} penerimaan belum diuji`, qqSebagian && `${qqSebagian} uji harian tidak diselesaikan`].filter(Boolean)

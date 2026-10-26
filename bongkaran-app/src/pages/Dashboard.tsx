@@ -67,7 +67,7 @@ const LO_DASH: { key: LoDisplayStatus; sub: string; tile: string; teks: string }
   { key: 'planned', sub: 'Antri MT', tile: 'bg-primary-fixed/50', teks: 'text-primary' },
   { key: 'delivery', sub: 'MT menuju SPBU', tile: 'bg-sky-50', teks: 'text-sky-700' },
   { key: 'delivered', sub: 'Sedang dibongkar', tile: 'bg-tertiary-fixed/40', teks: 'text-tertiary' },
-  { key: 'closed', sub: 'Bongkar selesai', tile: 'bg-emerald-50', teks: 'text-emerald-700' },
+  { key: 'closed', sub: 'TTD pengawas & ABH', tile: 'bg-emerald-50', teks: 'text-emerald-700' },
 ]
 
 const BULAN_SINGKAT = (d: Date) => d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })

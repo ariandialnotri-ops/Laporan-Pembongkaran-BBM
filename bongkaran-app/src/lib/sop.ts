@@ -295,10 +295,11 @@ export const TTD_CLOSING: SignerKey[] = ['pengawas', 'abh']
 
 /**
  * Laporan bongkaran berstatus Closing: sudah selesai/anomali DAN sudah ditandatangani pengawas serta ABH.
- * Ringkasan lama tanpa `ttdKurang` dianggap closing. Export BA tetap bisa sebelum closing (mis. oleh kepala shift).
+ * Tanpa catatan tanda tangan (`ttdKurang`) laporan TIDAK dianggap closing. Export BA tetap bisa sebelum closing
+ * (mis. oleh kepala shift).
  */
 export function sudahClosing(r: Pick<ReportSummary, 'status' | 'ttdKurang'>) {
-  return r.status !== 'draft' && !(r.ttdKurang ?? []).some((k) => TTD_CLOSING.includes(k))
+  return r.status !== 'draft' && Array.isArray(r.ttdKurang) && !r.ttdKurang.some((k) => TTD_CLOSING.includes(k))
 }
 
 /** Lama proses input bongkaran (menit) dari mulai tahap 1 sampai ditutup; draf dihitung sampai `sekarang`. */
