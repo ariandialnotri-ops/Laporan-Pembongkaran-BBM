@@ -2,7 +2,7 @@
  * Plan pengiriman: status SO/LO dan penyesuaian data plan lama.
  */
 import { formatTanggalIso } from '@/lib/date'
-import { DEFAULT_RULES, type JejakPlan, type LoStatus, type Plan, type PlanLo, type ReportSummary } from '@/lib/sop'
+import { DEFAULT_RULES, sudahClosing, type JejakPlan, type LoStatus, type Plan, type PlanLo, type ReportSummary } from '@/lib/sop'
 
 /** Status tampilan: "proses" = LO belum diterbitkan depot. */
 export type LoDisplayStatus = LoStatus | 'proses'
@@ -14,8 +14,8 @@ export const LO_STATUS: { key: LoDisplayStatus; label: string; desc: string; ton
   { key: 'delivery', label: 'On Delivery', desc: 'Dalam pengisian atau pengiriman', tone: 'primary' },
   { key: 'alih', label: 'Alih Supply', desc: 'Dipindahkan ke terminal/depot lain', tone: 'cyan' },
   { key: 'deleted', label: 'Deleted', desc: 'Dihapus oleh Supply Chain atau depot', tone: 'error' },
-  { key: 'delivered', label: 'Delivered', desc: 'Sudah sampai, dalam proses bongkar di SPBU', tone: 'primary' },
-  { key: 'closed', label: 'Closed', desc: 'Bongkar & administrasi selesai', tone: 'success' },
+  { key: 'delivered', label: 'Delivered', desc: 'Sudah sampai: bongkar berjalan atau BA menunggu tanda tangan pengawas & ABH', tone: 'primary' },
+  { key: 'closed', label: 'Closed', desc: 'Bongkar selesai dan BA ditandatangani pengawas & ABH', tone: 'success' },
 ]
 
 /** Status yang dapat dipilih manual; Delivered & Closed mengikuti data bongkaran. */
@@ -47,7 +47,8 @@ export const loStatusMeta = (k: LoDisplayStatus) => LO_STATUS.find((s) => s.key 
 export function loStatus(lo: PlanLo, used: Map<string, ReportSummary>): LoDisplayStatus {
   if (lo.status === 'deleted') return 'deleted'
   const r = used.get(lo.id)
-  if (r) return r.status === 'draft' ? 'delivered' : 'closed'
+  // Closed hanya bila BA sudah ditandatangani pengawas & ABH; sebelum itu tetap Delivered.
+  if (r) return sudahClosing(r) ? 'closed' : 'delivered'
   if (!lo.noLO.trim()) return 'proses'
   return lo.status
 }

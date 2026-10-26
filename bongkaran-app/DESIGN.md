@@ -559,6 +559,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Isi kartu: uji terakhir, daftar penerimaan belum diuji (tombol "Uji sekarang" untuk yang terlewat), 3 penerimaan terakhir yang sudah diuji.
 - Daftar = penerimaan 7 hari terakhir **ditambah semua penerimaan yang belum diuji berapa pun umurnya**, sehingga penerimaan terlewat tidak hilang dan tetap dapat diuji. Form uji menampilkan catatan "uji terlambat"; tanggal & jam uji tetap diisi sesuai pelaksanaan.
 
+### 9.14p Closing bongkaran, Simpan sementara, bagikan hasil density
+- **Closing** (`sudahClosing`, `TTD_CLOSING` di `sop.ts`): laporan selesai/anomali baru berstatus Closing setelah ditandatangani **pengawas dan ABH**. Sebelum itu: Finish menampilkan "Belum closing" + banner; Tracking LO tetap **Delivered** (Closed hanya setelah closing); Riwayat Bongkaran "Selesai · belum closing" / "Menunggu TTD pengawas & ABH". Slot TTD closing hanya dapat diisi pengawas/ABH (UI `bolehTtd`, database `bbm_reports_kunci`: hanya slot yang belum ditandatangani, hanya peran abh/pengawas). **Export BA tetap tersedia sebelum closing** (mis. kepala shift).
+- **Simpan sementara**: tombol di setiap tahap (14 tahap) menyimpan draf saat itu juga lalu membuka modal (Sheet): status simpan, tahap n dari 14, lengkap/belum lengkap (alasan), jumlah tahap lengkap, tombol "Keluar, lanjut nanti" / "Lanjut mengisi"; gagal → "Coba lagi".
+- **Density kompartemen**: kartu "Bagikan hasil uji density" (`density-bagikan.tsx`): pratinjau teks WA, **Export foto** (kolase foto density bercap waktu, MT/produk, hasil per kompartemen; lembar progres) dan **Kirim ke WhatsApp** (lembar berbagi HP berisi foto + teks; tanpa berbagi file: foto diunduh, teks dibuka di WhatsApp & disalin).
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

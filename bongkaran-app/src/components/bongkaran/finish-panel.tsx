@@ -12,11 +12,12 @@ import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
+import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
 import { formatDurasi } from '@/lib/sla'
-import { effectiveRules, lamaProses, suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
+import { effectiveRules, lamaProses, suggestNoBA, TTD_CLOSING, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Pilihan format unduhan Berita Acara (dropdown). PDF BA saja & PDF + foto memakai ikon yang sama. */
@@ -77,6 +78,7 @@ export function FinishPanel({
   waText: string
 }) {
   const toast = useToast()
+  const app = useApp()
   const [copied, setCopied] = useState(false)
   const [format, setFormat] = useState<ExportKind>(formatAwal)
   const pilihFormat = (v: string) => {
@@ -96,6 +98,10 @@ export function FinishPanel({
   const x = evaluation.derived
   const anomaly = evaluation.densityAnomaly || report.status === 'anomali'
   const finished = report.status !== 'draft'
+  // Closing = sudah ditandatangani pengawas & ABH; hanya pengawas/ABH yang dapat menandatangani slot itu.
+  const kurangClosing = TTD_CLOSING.filter((k) => !d.ttd?.[k]?.img)
+  const closing = finished && kurangClosing.length === 0
+  const bolehTtdClosing = ['abh', 'pengawas'].includes(app.role ?? '')
   const densityOk = x.densityResults.length > 0 && x.densityResults.every((r) => r.ok)
   const rules = effectiveRules(settings.rules)
   const lewat = (v: number | null, batas: number) => v !== null && Math.abs(v) > batas
@@ -134,7 +140,7 @@ export function FinishPanel({
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-center justify-between gap-2">
           <span className="text-tag uppercase text-primary">Finish proses</span>
-          {report.status === 'selesai' && <Pill tone="primary">Selesai</Pill>}
+          {finished && (closing ? <Pill tone="success">Closing</Pill> : <Pill tone="neutral">Belum closing</Pill>)}
           {report.status === 'anomali' && <Pill tone="error">Anomali</Pill>}
           {!finished && <Pill>Belum ditutup</Pill>}
         </div>
@@ -227,7 +233,23 @@ export function FinishPanel({
         </fieldset>
       </GlassCard>
 
-      {finished && <SignersSection report={report} setData={setData} readOnly={readOnly} keys={['pengawas', 'abh']} title="Tanda tangan pengawas & ABH" />}
+      {finished && !closing && (
+        <StatusBanner
+          tone="warn"
+          title={`Belum closing: menunggu tanda tangan ${kurangClosing.map((k) => (k === 'abh' ? 'ABH' : 'pengawas')).join(' & ')}`}
+          detail="Laporan berstatus Closing setelah ditandatangani pengawas dan ABH. Berita Acara tetap dapat diunduh sekarang (mis. oleh kepala shift)."
+        />
+      )}
+      {finished && (
+        <SignersSection
+          report={report}
+          setData={setData}
+          readOnly={readOnly}
+          bolehTtd={bolehTtdClosing}
+          keys={['pengawas', 'abh']}
+          title="Tanda tangan pengawas & ABH (closing)"
+        />
+      )}
 
       {!finished ? (
         <Button size="lg" variant={anomaly ? 'danger' : 'primary'} className="w-full" onClick={() => onFinish(anomaly ? 'anomali' : 'selesai')}>

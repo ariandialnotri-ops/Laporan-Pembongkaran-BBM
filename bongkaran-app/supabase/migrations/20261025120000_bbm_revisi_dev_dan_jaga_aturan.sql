@@ -65,7 +65,9 @@ drop trigger if exists bbm_0_revisi_dev on public.bbm_plans;
 create trigger bbm_0_revisi_dev before update on public.bbm_plans
   for each row execute function bbm_private.bbm_revisi_dev('meta');
 
--- Kunci laporan bongkaran yang sudah ditutup: tanda revisi bukan isi laporan (sama seperti sebelumnya, ditambah - 'revisiDev').
+-- Kunci laporan bongkaran yang sudah ditutup (selesai/anomali). Yang boleh berubah: nomor SO (pengawas/ABH),
+-- uji pasca penerimaan (sekali), tanda revisi developer, dan TANDA TANGAN CLOSING pengawas & ABH: hanya oleh
+-- pengawas/ABH dan hanya bila slot itu belum ditandatangani. Laporan Closing = sudah ditandatangani keduanya.
 create or replace function bbm_private.bbm_reports_kunci()
 returns trigger
 language plpgsql
@@ -73,6 +75,9 @@ set search_path to ''
 as $function$
 declare
   v_lama jsonb := old.data -> 'sample2Jam';
+  v_ttd_baru jsonb := coalesce(new.data -> 'ttd', '{}'::jsonb);
+  v_ttd_lama jsonb := coalesce(old.data -> 'ttd', '{}'::jsonb);
+  k text;
 begin
   if old.status = 'draft' then
     return new;
@@ -84,10 +89,21 @@ begin
   if new.status is distinct from old.status
      or new.photos is distinct from old.photos
      or new.finished_at is distinct from old.finished_at
-     or (new.data - 'noSO' - 'sample2Jam' - 'revisiDev') is distinct from (old.data - 'noSO' - 'sample2Jam' - 'revisiDev')
-     or (coalesce(new.summary, '{}'::jsonb) - 'noSO' - 'sample2Jam' - 'updatedAt' - 'revisiDev') is distinct from (coalesce(old.summary, '{}'::jsonb) - 'noSO' - 'sample2Jam' - 'updatedAt' - 'revisiDev') then
+     or (new.data - 'noSO' - 'sample2Jam' - 'revisiDev' - 'ttd') is distinct from (old.data - 'noSO' - 'sample2Jam' - 'revisiDev' - 'ttd')
+     or (v_ttd_baru - 'pengawas' - 'abh') is distinct from (v_ttd_lama - 'pengawas' - 'abh')
+     or (coalesce(new.summary, '{}'::jsonb) - 'noSO' - 'sample2Jam' - 'updatedAt' - 'revisiDev' - 'ttdKurang') is distinct from (coalesce(old.summary, '{}'::jsonb) - 'noSO' - 'sample2Jam' - 'updatedAt' - 'revisiDev' - 'ttdKurang') then
     raise exception 'Laporan sudah ditutup (%) dan terkunci', old.status;
   end if;
+  foreach k in array array['pengawas', 'abh'] loop
+    if v_ttd_baru -> k is distinct from v_ttd_lama -> k then
+      if coalesce(v_ttd_lama -> k ->> 'img', '') <> '' then
+        raise exception 'Tanda tangan % sudah ada dan terkunci', k;
+      end if;
+      if not bbm_private.bbm_has_role('abh', 'pengawas') then
+        raise exception 'Tanda tangan closing hanya oleh pengawas atau ABH';
+      end if;
+    end if;
+  end loop;
   if v_lama is not null and jsonb_typeof(v_lama) <> 'null' and new.data -> 'sample2Jam' is distinct from v_lama then
     raise exception 'Uji pasca penerimaan sudah tercatat dan terkunci';
   end if;

@@ -13,7 +13,7 @@ import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, formatSigned } from '@/lib/format'
 import { formatDurasi, slaOf } from '@/lib/sla'
-import { lamaProses, PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
+import { lamaProses, PRODUK_OPTIONS, STEPS, sudahClosing, type ReportSummary } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Keterangan hasil bongkar, seperti kolom keterangan pada rekap transaksi. */
@@ -29,11 +29,13 @@ function progress(r: ReportSummary) {
   if (r.status === 'draft') return `Tahap ${Math.min(r.doneCount + 1, STEPS.length)} dari ${STEPS.length}`
   if (r.status === 'anomali') return 'Tindak lanjut anomali'
   if (!r.sample2Jam) return 'Menunggu uji pasca penerimaan'
+  if (!sudahClosing(r)) return 'Menunggu TTD pengawas & ABH'
   if (r.ttdKurang?.length) return 'Menunggu tanda tangan'
-  return 'Selesai'
+  return 'Closing'
 }
 
-const STATUS = { selesai: 'Selesai', anomali: 'Anomali', draft: 'Berjalan' } as const
+/** Status: selesai/anomali baru menjadi Closing setelah ditandatangani pengawas & ABH. */
+const statusLaporan = (r: ReportSummary) => (r.status === 'draft' ? 'Berjalan' : sudahClosing(r) ? (r.status === 'anomali' ? 'Closing (anomali)' : 'Closing') : r.status === 'anomali' ? 'Anomali · belum closing' : 'Selesai · belum closing')
 
 type Row = ReportSummary & { sla: { permintaan: number | null; perjalanan: number | null } }
 
@@ -117,10 +119,10 @@ const COLS: Col<Row>[] = [
     },
     mobile: 'badge',
   },
-  { header: 'Status', cell: (r) => <span className="text-on-surface-variant">{STATUS[r.status]}</span>, mobile: 'hide' },
+  { header: 'Status', cell: (r) => <span className={cn('whitespace-nowrap', sudahClosing(r) ? 'font-semibold text-emerald-700' : 'text-on-surface-variant')}>{statusLaporan(r)}</span>, mobile: 'hide' },
   {
     header: 'Progress tindakan',
-    cell: (r) => <span className={cn('whitespace-nowrap', progress(r) === 'Selesai' ? 'text-on-surface-variant' : 'font-semibold text-primary')}>{progress(r)}</span>,
+    cell: (r) => <span className={cn('whitespace-nowrap', progress(r) === 'Closing' ? 'text-on-surface-variant' : 'font-semibold text-primary')}>{progress(r)}</span>,
     mobile: 'hide',
   },
 ]

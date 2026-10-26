@@ -80,7 +80,13 @@ function tahapLo(plan: Plan, lo: PlanLo, report: ReportSummary | undefined, stat
     {
       judul: 'Closed',
       waktu: status === 'closed' && report ? dariTanggalJam(report.tanggal, report.jamSelesai) : undefined,
-      rinci: [status === 'closed' ? `Bongkar & administrasi selesai${report?.noBA ? ` · BA ${report.noBA}` : ''}` : 'Menunggu bongkar & BA selesai'],
+      rinci: [
+        status === 'closed'
+          ? `BA ditandatangani pengawas & ABH${report?.noBA ? ` · BA ${report.noBA}` : ''}`
+          : report && report.status !== 'draft'
+            ? 'Bongkar selesai · menunggu tanda tangan pengawas & ABH'
+            : 'Menunggu bongkar & BA selesai',
+      ],
       tag: status === 'closed' ? 'CLOSED' : undefined,
       selesai: status === 'closed',
     },

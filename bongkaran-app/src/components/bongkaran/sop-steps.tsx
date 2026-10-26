@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
 import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SupplySelect } from '@/components/bongkaran/lo-fields'
+import { DensityBagikan } from '@/components/bongkaran/density-bagikan'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'
@@ -823,6 +824,7 @@ function DensityStep(props: StepProps) {
         <Plus aria-hidden="true" />
         Tambah pengukuran
       </Button>
+      <DensityBagikan report={report} x={x} rules={rules} />
     </>
   )
 }
@@ -1063,12 +1065,15 @@ export function SignersSection({
   readOnly,
   keys,
   title = 'Tanda tangan',
+  bolehTtd = true,
 }: {
   report: Report
   setData: (patch: Partial<ReportData>) => void
   readOnly: boolean
   keys: SignerKey[]
   title?: string
+  /** false: slot hanya dapat dilihat (mis. TTD closing oleh selain pengawas/ABH). */
+  bolehTtd?: boolean
 }) {
   const d = report.data
   const ttd = d.ttd ?? {}
@@ -1080,7 +1085,9 @@ export function SignersSection({
     <Section>
       <div className="flex flex-col">
         <span className="text-tag uppercase text-primary">{title}</span>
-        <span className="text-body-sm text-on-surface-variant">Penerima, security, dan supir tangki wajib. Pengawas dan ABH dapat menandatangani nanti dari laporan.</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {bolehTtd ? 'Penerima, security, dan supir tangki wajib. Pengawas dan ABH dapat menandatangani nanti dari laporan; laporan menjadi Closing setelah keduanya menandatangani.' : 'Tanda tangan closing hanya oleh pengawas dan ABH.'}
+        </span>
       </div>
       {SIGNERS.filter((s) => keys.includes(s.key)).map((s) => {
         const t = ttd[s.key]
@@ -1092,9 +1099,9 @@ export function SignersSection({
               {t?.img ? <Pill tone="success">Sudah tanda tangan</Pill> : <Pill tone={s.wajib ? 'error' : 'neutral'}>{s.wajib ? 'Wajib' : 'Bisa nanti'}</Pill>}
             </div>
             <Field label={`Nama ${s.label.toLowerCase()}`} htmlFor={`ttd-nama-${s.key}`}>
-              <Input id={`ttd-nama-${s.key}`} autoComplete="off" disabled={readOnly && !!t?.img} value={nama} onChange={(e) => set(s.key, { nama: e.target.value })} />
+              <Input id={`ttd-nama-${s.key}`} autoComplete="off" disabled={!bolehTtd || (readOnly && !!t?.img)} value={nama} onChange={(e) => set(s.key, { nama: e.target.value })} />
             </Field>
-            <SignaturePad label={s.label} value={t?.img ?? ''} disabled={readOnly && !!t?.img} onChange={(img) => set(s.key, { img, nama })} />
+            <SignaturePad label={s.label} value={t?.img ?? ''} disabled={!bolehTtd || (readOnly && !!t?.img)} onChange={(img) => set(s.key, { img, nama })} />
           </div>
         )
       })}
