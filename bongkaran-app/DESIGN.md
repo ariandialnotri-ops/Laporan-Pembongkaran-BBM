@@ -564,6 +564,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Simpan sementara**: tombol di setiap tahap (14 tahap) menyimpan draf saat itu juga lalu membuka modal (Sheet): status simpan, tahap n dari 14, lengkap/belum lengkap (alasan), jumlah tahap lengkap, tombol "Keluar, lanjut nanti" / "Lanjut mengisi"; gagal → "Coba lagi".
 - **Density kompartemen**: kartu "Bagikan hasil uji density" (`density-bagikan.tsx`): pratinjau teks WA, **Export foto** (kolase foto density bercap waktu, MT/produk, hasil per kompartemen; lembar progres) dan **Kirim ke WhatsApp** (lembar berbagi HP berisi foto + teks; tanpa berbagi file: foto diunduh, teks dibuka di WhatsApp & disalin).
 
+### 9.14q Input nomor SO & LO manual (Tahap 2)
+- Pilihan **Pilih dari Plan** / **Input manual** (`Choice`) di kartu "Nomor SO & LO". Manual: ketik nomor SO, nomor LO (bisa lebih dari satu, `TagInput`), pilih produk (mengisi tangki, Ship To per produk & daftar nozzle totalisator); volume DO diisi sesuai dokumen. Disimpan sebagai `data.soManual` (+ `summary.soManual`, label "manual" di Riwayat Bongkaran).
+- Peringatan: LO sudah dipakai laporan bongkaran lain (merah); LO ada di Plan Pengiriman (amber, sebaiknya pilih dari Plan). Input manual tidak mengubah status Tracking LO.
+- Validasi tahap: manual wajib SO, minimal satu LO, dan produk; mode Plan tetap wajib pilih SO & LO.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

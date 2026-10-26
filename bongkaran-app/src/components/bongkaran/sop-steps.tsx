@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
-import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
+import { CheckRow, Choice, Field, Ladder, TagInput } from '@/components/bongkaran/form-bits'
 import { SupplySelect } from '@/components/bongkaran/lo-fields'
 import { DensityBagikan } from '@/components/bongkaran/density-bagikan'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
@@ -22,6 +22,7 @@ import { genId } from '@/lib/image'
 import { loPickable, loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import { shiftLabel } from '@/lib/shift'
 import {
+  PRODUK_OPTIONS,
   SIGNERS,
   newCompartment,
   KEPEKAAN_MAKS,
@@ -589,6 +590,35 @@ function LoStep(props: StepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kunciPlan])
   const navigate = useNavigate()
+  const app = useApp()
+
+  // Input manual: SO/LO belum ada di Plan Pengiriman. Nomor diketik, produk dipilih; tidak mengubah status LO di Plan.
+  const manual = !!d.soManual
+  const setMode = (m: 'plan' | 'manual') => {
+    if ((m === 'manual') === manual) return
+    setData(
+      m === 'manual'
+        ? { soManual: true, planId: '', loIds: [], noSO: '', noLOs: [], segelLO: [] }
+        : { soManual: false, planId: '', loIds: [], noSO: '', noLOs: [], produk: '', volumeDO: '', segelLO: [], tankId: '' },
+    )
+  }
+  const setProdukManual = (produk: string) => {
+    if (produk === d.produk) return
+    const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    setData({
+      produk,
+      shipTo: settings.shipTo?.[produk] || d.shipTo,
+      soldTo: d.soldTo || settings.soldTo || '',
+      tankId: tankForProduk(produk)?.id ?? '',
+      totalisator: nozzles.map((n) => ({ nozzleId: n.id, nozzle: n.nama, awal: '', akhir: '' })),
+    })
+  }
+  const bersih = (v: string) => v.replace(/\s+/g, '').trim()
+  // Nomor LO manual yang sudah dipakai laporan lain atau ada di Plan (sebaiknya dipilih dari Plan).
+  const loDipakai = manual
+    ? d.noLOs.filter((no) => app.reports.some((r) => r.id !== report.id && r.status !== 'draft' && (r.noLOs ?? []).includes(no)))
+    : []
+  const loDiPlan = manual ? d.noLOs.filter((no) => plans.some((p) => p.los.some((lo) => lo.status !== 'deleted' && lo.noLO.trim() === no))) : []
 
   const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
   const removeComp = (id: string) =>
@@ -604,9 +634,50 @@ function LoStep(props: StepProps) {
     <>
       <StepPhotos {...props} />
       <Section>
-        <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
-        {plans.length === 0 ? (
-          <StatusBanner tone="warn" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
+        <span className="text-tag uppercase text-primary">Nomor SO & LO</span>
+        {!props.readOnly && (
+          <Choice
+            label="Sumber nomor SO & LO"
+            value={manual ? 'manual' : 'plan'}
+            onChange={setMode}
+            options={[
+              { value: 'plan', label: 'Pilih dari Plan' },
+              { value: 'manual', label: 'Input manual' },
+            ]}
+          />
+        )}
+        {manual ? (
+          <>
+            <Field label="Nomor SO" htmlFor="so-manual">
+              <Input id="so-manual" autoComplete="off" inputMode="numeric" placeholder="Ketik nomor SO" value={d.noSO} onChange={(e) => setData({ noSO: bersih(e.target.value) })} />
+            </Field>
+            <Field label="Nomor LO" htmlFor="lo-manual" hint="Ketik lalu tekan Enter / Tambah. Bisa lebih dari satu LO.">
+              <TagInput id="lo-manual" values={d.noLOs} onChange={(v) => setData({ noLOs: v.map(bersih).filter(Boolean) })} placeholder="Ketik nomor LO" />
+            </Field>
+            <Field label="Produk" htmlFor="produk-manual">
+              <Select value={d.produk} onValueChange={setProdukManual}>
+                <SelectTrigger id="produk-manual">
+                  <SelectValue placeholder="Pilih produk" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUK_OPTIONS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {loDipakai.length > 0 && (
+              <StatusBanner tone="error" title={`LO ${loDipakai.join(', ')} sudah dipakai laporan bongkaran lain`} detail="Periksa kembali nomor LO pada dokumen MT." />
+            )}
+            {loDiPlan.length > 0 && (
+              <StatusBanner tone="warn" title={`LO ${loDiPlan.join(', ')} ada di Plan Pengiriman`} detail="Sebaiknya pilih dari Plan agar status Tracking LO ikut diperbarui." />
+            )}
+            <span className="text-body-sm text-on-surface-variant">Input manual tidak mengubah status di Tracking LO. Volume DO diisi di bawah sesuai dokumen.</span>
+          </>
+        ) : plans.length === 0 ? (
+          <StatusBanner tone="warn" title="Belum ada SO siap dibongkar" detail="Pilih Input manual, atau isi dulu di menu Input, Plan Pengiriman." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -623,7 +694,7 @@ function LoStep(props: StepProps) {
             </Select>
           </Field>
         )}
-        {plan && (
+        {plan && !manual && (
           <div className="flex flex-col gap-space-xs">
             <span className="text-tag uppercase text-on-surface-variant">Nomor LO yang datang</span>
             {plan.los.map((lo) => {
@@ -688,16 +759,16 @@ function LoStep(props: StepProps) {
             <Input id="shipto" autoComplete="off" inputMode="numeric" placeholder="otomatis per produk" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
           </Field>
           <Field label="Produk" htmlFor="lo-produk">
-            <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />
+            <Fixed id="lo-produk" value={d.produk} placeholder={manual ? 'pilih di atas' : 'dari SO'} />
           </Field>
           <Field label="Nomor SO" htmlFor="lo-so">
-            <Fixed id="lo-so" value={d.noSO} placeholder="dari Plan" />
+            <Fixed id="lo-so" value={d.noSO} placeholder={manual ? 'input manual' : 'dari Plan'} />
           </Field>
           <Field label="Nomor LO" htmlFor="lo-lo">
-            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder="dari Plan" />
+            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder={manual ? 'input manual' : 'dari Plan'} />
           </Field>
         </div>
-        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan.' : undefined}>
+        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan.' : manual ? 'Isi sesuai dokumen DO/LO.' : undefined}>
           <Num id="volumedo" suffix="L" value={d.volumeDO} onChange={(v) => setData({ volumeDO: v })} />
         </Field>
       </Section>

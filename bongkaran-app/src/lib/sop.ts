@@ -91,6 +91,8 @@ export interface ReportData {
   noSO: string
   loIds: string[]
   noLOs: string[]
+  /** SO & LO diketik manual (tidak dari Plan), mis. SO/LO belum diinput di Plan Pengiriman. */
+  soManual?: boolean
   tanggalDatang: string
   jamDatang: string
   nopol: string
@@ -249,6 +251,7 @@ export interface ReportSummary {
   produk: string
   noSO: string
   noLOs: string[]
+  soManual?: boolean
   loIds: string[]
   doneCount: number
   volumeDO: number | null
@@ -879,7 +882,11 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.nopol)) issues.push('Isi nomor polisi mobil tangki')
       break
     case 'lo':
-      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan')
+      if (d.soManual) {
+        if (!has(d.noSO)) issues.push('Isi nomor SO')
+        if (!d.noLOs.some((n) => n.trim())) issues.push('Isi minimal satu nomor LO')
+        if (!has(d.produk)) issues.push('Pilih produk')
+      } else if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan, atau isi manual')
       if (!has(d.tanggalDatang) || !has(d.jamDatang)) issues.push('Isi tanggal & jam kedatangan MT')
       if (!has(d.namaDriver)) issues.push('Isi nama lengkap driver')
       if (!has(d.shipTo)) issues.push('Isi nomor Ship To')
@@ -1022,6 +1029,7 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     noSO: d.noSO,
     noLOs: d.noLOs,
     loIds: d.loIds,
+    soManual: d.soManual || undefined,
     doneCount: ev.doneCount,
     volumeDO: ev.derived.volumeDO,
     gainLoss: ev.derived.gainLoss,

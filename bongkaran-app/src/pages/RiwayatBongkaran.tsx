@@ -51,9 +51,18 @@ const COLS: Col<Row>[] = [
     mobileCell: (r) => `${formatTanggalIso(r.tanggal)} ${r.jam}`,
     mobile: 'title',
   },
-  { header: 'No SO', cell: (r) => <span className="tabular whitespace-nowrap">{r.noSO || '-'}</span>, mobile: 'hide' },
+  {
+    header: 'No SO',
+    cell: (r) => (
+      <span className="tabular whitespace-nowrap">
+        {r.noSO || '-'}
+        {r.soManual && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">manual</span>}
+      </span>
+    ),
+    mobile: 'hide',
+  },
   { header: 'No LO', cell: (r) => <span className="tabular whitespace-nowrap">{r.noLOs.join(', ') || '-'}</span>, mobile: 'hide' },
-  { header: 'SO / LO', cell: (r) => `SO ${r.noSO || '-'}, LO ${r.noLOs.join(', ') || '-'}`, mobile: 'sub', desktop: false },
+  { header: 'SO / LO', cell: (r) => `SO ${r.noSO || '-'}, LO ${r.noLOs.join(', ') || '-'}${r.soManual ? ' (manual)' : ''}`, mobile: 'sub', desktop: false },
   {
     header: 'Nopol & supir',
     cell: (r) => (
