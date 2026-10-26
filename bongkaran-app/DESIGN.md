@@ -554,6 +554,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Tampilan: lencana ungu "Revised by Developer" di setiap daftar riwayat `RecordTable` (otomatis lewat `revisiDari`), kartu LO; baris keterangan lengkap (waktu revisi & jumlah) di Detail LO, Finish bongkaran, detail insiden, petty cash, WBS, dan totalizer.
 - Migrasi: `supabase/migrations/20261025120000_bbm_revisi_dev_dan_jaga_aturan.sql` (juga berisi kunci Aturan Pemeriksaan).
 
+### 9.14o Kualitas Pasca Penerimaan: kartu dropdown berlogo, uji terlewat tetap bisa
+- Satu kartu dropdown per produk dengan `LogoProduk` (sama seperti Tracking LO), lencana jumlah belum diuji, status (n terlewat / belum diuji / lengkap) dan panah; isi dibuka-tutup dengan animasi grid-rows. Produk yang punya penerimaan belum diuji terbuka otomatis.
+- Isi kartu: uji terakhir, daftar penerimaan belum diuji (tombol "Uji sekarang" untuk yang terlewat), 3 penerimaan terakhir yang sudah diuji.
+- Daftar = penerimaan 7 hari terakhir **ditambah semua penerimaan yang belum diuji berapa pun umurnya**, sehingga penerimaan terlewat tidak hilang dan tetap dapat diuji. Form uji menampilkan catatan "uji terlambat"; tanggal & jam uji tetap diisi sesuai pelaksanaan.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { BellRing, ChevronRight, CircleCheck, Clock, FlaskConical, Fuel, LoaderCircle, Send, TriangleAlert, Truck } from 'lucide-react'
+import { BellRing, ChevronDown, ChevronRight, CircleCheck, Clock, FlaskConical, LoaderCircle, Send, TriangleAlert, Truck } from 'lucide-react'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
+import { LogoProduk } from '@/components/bongkaran/logo-produk'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -16,7 +17,6 @@ import { currentShift, shiftKey } from '@/lib/shift'
 import type { StatusIsi } from '@/lib/status-isi'
 import { useKeTerkirim } from '@/lib/terkirim'
 import { evaluateAll, normalizeReport, PRODUK_OPTIONS, summarize, type ReportSummary, type Sample2Jam as Sample } from '@/lib/sop'
-import { warnaProduk } from '@/components/dashboard/charts'
 import { cn } from '@/lib/utils'
 
 /** Jam sekarang (di luar render). */
@@ -52,27 +52,31 @@ function statusUji(r: ReportSummary): StatusIsi {
 }
 
 /**
- * Operation > Kualitas Pasca Penerimaan: satu kartu per produk (penerimaan 7 hari terakhir). Lencana di kartu
- * menandai penerimaan yang belum diuji (merah = shift bongkar sudah lewat, amber = masih dalam shift); di dalam
- * kartu tampil hasil uji terakhir dan daftar penerimaan yang menunggu uji (ketuk untuk membuka form).
+ * Operation > Kualitas Pasca Penerimaan: satu kartu dropdown per produk (logo produk seperti Tracking LO).
+ * Daftar memuat penerimaan 7 hari terakhir, ditambah SEMUA penerimaan yang belum diuji berapa pun umurnya:
+ * penerimaan terlewat tetap tampil dan tetap dapat diuji sampai hasil uji dikirim.
+ * Lencana merah = shift bongkar sudah lewat tanpa uji (terlewat), amber = masih dalam shift.
  */
 export function Sample2Jam() {
   const app = useApp()
+  const [buka, setBuka] = useState<Record<string, boolean>>({})
   if (!app.loaded) return <Loading />
   const batas = tujuhHariLalu()
   const daftar = app.reports
-    .filter((r) => r.status === 'selesai' && r.tanggal >= batas)
+    .filter((r) => r.status === 'selesai' && (r.tanggal >= batas || !r.sample2Jam))
     .sort((a, b) => (b.tanggal + (b.jamSelesai || b.jam)).localeCompare(a.tanggal + (a.jamSelesai || a.jam)))
   const adaTangki = [...new Set(app.tanks.map((t) => t.produk))]
   const produk = [...PRODUK_OPTIONS.filter((p) => adaTangki.includes(p) || daftar.some((r) => r.produk === p)), ...[...new Set(daftar.map((r) => r.produk))].filter((p) => p && !PRODUK_OPTIONS.includes(p))]
   const belumTotal = daftar.filter((r) => !r.sample2Jam).length
   const terlewatTotal = daftar.filter((r) => statusUji(r) === 'terlewat').length
+  // Produk yang punya penerimaan belum diuji terbuka otomatis; yang lain tertutup sampai diketuk.
+  const terbuka = (p: string) => buka[p] ?? daftar.some((r) => r.produk === p && !r.sample2Jam)
 
   return (
     <div className="flex flex-col gap-space-md">
       <InfoHalaman judul="Kualitas Pasca Penerimaan">
         <p><b className="text-on-surface">Wajib</b> untuk setiap penerimaan BBM: setelah bongkar selesai, ambil sampel dari tangki pendam dan ukur density. Jam uji diatur petugas.</p>
-        <p>Lencana merah: shift tempat bongkar selesai sudah lewat tanpa uji (terlewat). Amber: belum diuji, shift masih berjalan.</p>
+        <p>Lencana merah: shift tempat bongkar selesai sudah lewat tanpa uji (terlewat), <b className="text-on-surface">tetap dapat diuji</b> dan dicatat sebagai uji terlambat. Amber: belum diuji, shift masih berjalan.</p>
       </InfoHalaman>
       <div className={cn('animate-entrance-1 flex items-center gap-space-sm rounded-xl p-space-sm', belumTotal ? (terlewatTotal ? 'bg-error-container/60' : 'bg-amber-50 ring-1 ring-amber-200') : 'bg-emerald-50 ring-1 ring-emerald-200')}>
         <span aria-hidden="true" className={cn('flex size-10 shrink-0 items-center justify-center rounded-full', belumTotal ? (terlewatTotal ? 'bg-error text-on-error' : 'bg-amber-400 text-amber-950') : 'bg-emerald-600 text-white')}>
@@ -80,87 +84,106 @@ export function Sample2Jam() {
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="text-body-md font-bold text-on-surface">{belumTotal ? `${belumTotal} penerimaan belum diuji` : 'Semua penerimaan sudah diuji'}</span>
-          <span className="text-body-sm text-on-surface-variant">{terlewatTotal ? `${terlewatTotal} terlewat · ` : ''}7 hari terakhir · {daftar.length} penerimaan</span>
+          <span className="text-body-sm text-on-surface-variant">{terlewatTotal ? `${terlewatTotal} terlewat, tetap dapat diuji · ` : ''}7 hari terakhir · {daftar.length} penerimaan</span>
         </span>
       </div>
-      <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-space-sm lg:grid-cols-2 lg:items-start">
         {produk.map((p, i) => (
-          <KartuProdukUji key={p} produk={p} warna={warnaProduk(p, i)} daftar={daftar.filter((r) => r.produk === p)} />
+          <KartuProdukUji key={p} urut={i} produk={p} daftar={daftar.filter((r) => r.produk === p)} buka={terbuka(p)} onBuka={() => setBuka((x) => ({ ...x, [p]: !terbuka(p) }))} />
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
 
-function KartuProdukUji({ produk, warna, daftar }: { produk: string; warna: string; daftar: ReportSummary[] }) {
+function KartuProdukUji({ produk, daftar, urut, buka, onBuka }: { produk: string; daftar: ReportSummary[]; urut: number; buka: boolean; onBuka: () => void }) {
   const belum = daftar.filter((r) => !r.sample2Jam)
   const terlewat = belum.filter((r) => statusUji(r) === 'terlewat').length
-  const terakhir = daftar.find((r) => r.sample2Jam)
+  const sudah = daftar.filter((r) => r.sample2Jam)
+  const terakhir = sudah[0]
   const u = terakhir?.sample2Jam
+  const id = `uji-${produk.replace(/\s+/g, '-').toLowerCase()}`
   return (
-    <section aria-label={`${produk}: ${belum.length ? `${belum.length} belum diuji` : 'semua sudah diuji'}`} className="animate-entrance-2 relative flex flex-col gap-space-sm overflow-hidden rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5" style={{ background: warna }} />
-      <div className="flex items-center gap-space-sm">
-        <span aria-hidden="true" className="relative flex size-11 shrink-0 items-center justify-center rounded-xl" style={{ background: `${warna}1f`, color: warna }}>
-          <Fuel className="size-[22px]" />
-          {belum.length > 0 && (
-            <span className={cn('tabular absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ring-2 ring-surface-container-lowest', terlewat ? 'bg-error text-on-error' : 'bg-amber-400 text-amber-950')}>{belum.length}</span>
-          )}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-body-lg font-bold text-on-surface">{produk}</span>
-          <span className="text-body-sm text-on-surface-variant">{daftar.length ? `${daftar.length} penerimaan · 7 hari` : 'Tidak ada penerimaan 7 hari'}</span>
-        </span>
-        {belum.length ? (
-          <span className={cn('flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold', terlewat ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
-            {terlewat ? <TriangleAlert aria-hidden="true" className="size-3.5" /> : <Clock aria-hidden="true" className="size-3.5" />}
-            {terlewat ? 'Terlewat' : 'Belum diuji'}
+    <li className="kartu-lo min-w-0" style={{ animationDelay: `${Math.min(urut, 10) * 45}ms` }}>
+      <section aria-label={`${produk}: ${belum.length ? `${belum.length} belum diuji` : 'semua sudah diuji'}`} className={cn('overflow-hidden rounded-2xl border bg-surface-container-lowest shadow-sm', terlewat ? 'border-error/30' : belum.length ? 'border-amber-300' : 'border-outline-variant/40')}>
+        <button type="button" aria-expanded={buka} aria-controls={id} onClick={onBuka} className="group flex w-full items-center gap-space-sm p-space-sm text-left transition-colors hover:bg-surface-container-low/60 active:scale-[0.99]">
+          <span className="relative shrink-0">
+            <LogoProduk produk={produk} className="h-14 w-20" />
+            {belum.length > 0 && (
+              <span className={cn('tabular absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold ring-2 ring-surface-container-lowest', terlewat ? 'bg-error text-on-error' : 'bg-amber-400 text-amber-950')}>{belum.length}</span>
+            )}
           </span>
-        ) : daftar.length ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-            <CircleCheck aria-hidden="true" className="size-3.5" />
-            Lengkap
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-body-lg font-bold text-on-surface">{produk}</span>
+            <span className="text-body-sm text-on-surface-variant">{daftar.length ? `${daftar.length} penerimaan${belum.length ? ` · ${belum.length} belum diuji` : ''}` : 'Tidak ada penerimaan 7 hari'}</span>
+            {belum.length ? (
+              <span className={cn('flex w-max items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold', terlewat ? 'bg-error-container text-on-error-container' : 'bg-amber-100 text-amber-900')}>
+                {terlewat ? <TriangleAlert aria-hidden="true" className="size-3.5" /> : <Clock aria-hidden="true" className="size-3.5" />}
+                {terlewat ? `${terlewat} terlewat` : 'Belum diuji'}
+              </span>
+            ) : daftar.length ? (
+              <span className="flex w-max items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                <CircleCheck aria-hidden="true" className="size-3.5" />
+                Lengkap
+              </span>
+            ) : null}
           </span>
-        ) : null}
-      </div>
-      {u && terakhir && (
-        <div className="flex items-center gap-space-xs rounded-lg bg-surface-container-low px-space-sm py-space-xs text-body-sm">
-          <FlaskConical aria-hidden="true" className="size-4 shrink-0 text-on-surface-variant" />
-          <span className="tabular min-w-0 flex-1 text-on-surface-variant">
-            Uji terakhir {formatTanggalIso(u.tanggal)} {u.jam} · <b className="text-on-surface">{formatDensity(u.d15)}</b>
-            {u.selisih !== null ? ` (${formatDensitySigned(u.selisih)})` : ''}
-          </span>
-          {u.ok === false ? <TriangleAlert aria-label="Di luar toleransi" className="size-4 shrink-0 text-error" /> : u.ok ? <CircleCheck aria-label="Sesuai toleransi" className="size-4 shrink-0 text-emerald-600" /> : null}
-        </div>
-      )}
-      {belum.length > 0 && (
-        <ul className="flex flex-col gap-space-xs">
-          {belum.map((r) => {
-            const lewat = statusUji(r) === 'terlewat'
-            return (
-              <li key={r.id}>
-                <Link
-                  to={`/sample/${encodeURIComponent(r.id)}`}
-                  className={cn('flex min-h-12 items-center gap-space-sm rounded-lg border px-space-sm py-space-xs active:scale-[0.99]', lewat ? 'border-error/40 bg-error-container/30' : 'border-amber-300 bg-amber-50')}
-                >
-                  <Truck aria-hidden="true" className={cn('size-4 shrink-0', lewat ? 'text-error' : 'text-amber-700')} />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="tabular truncate text-body-sm font-semibold text-on-surface">{r.nopol || 'MT'}</span>
-                    <span className="tabular text-xs text-on-surface-variant">
-                      Bongkar {formatTanggalIso(r.tanggal)}, selesai {r.jamSelesai || '-'}
+          <ChevronDown aria-hidden="true" className={cn('size-5 shrink-0 text-on-surface-variant transition-transform duration-300 motion-reduce:transition-none', buka && 'rotate-180')} />
+        </button>
+        {/* Dropdown: tinggi dianimasikan lewat grid-rows 0fr → 1fr. */}
+        <div id={id} className={cn('grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none', buka ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="flex flex-col gap-space-xs border-t border-outline-variant/40 p-space-sm">
+              {u && terakhir && (
+                <div className="flex items-center gap-space-xs rounded-lg bg-surface-container-low px-space-sm py-space-xs text-body-sm">
+                  <FlaskConical aria-hidden="true" className="size-4 shrink-0 text-on-surface-variant" />
+                  <span className="tabular min-w-0 flex-1 text-on-surface-variant">
+                    Uji terakhir {formatTanggalIso(u.tanggal)} {u.jam} · <b className="text-on-surface">{formatDensity(u.d15)}</b>
+                    {u.selisih !== null ? ` (${formatDensitySigned(u.selisih)})` : ''}
+                  </span>
+                  {u.ok === false ? <TriangleAlert aria-label="Di luar toleransi" className="size-4 shrink-0 text-error" /> : u.ok ? <CircleCheck aria-label="Sesuai toleransi" className="size-4 shrink-0 text-emerald-600" /> : null}
+                </div>
+              )}
+              {belum.map((r) => {
+                const lewat = statusUji(r) === 'terlewat'
+                return (
+                  <Link
+                    key={r.id}
+                    to={`/sample/${encodeURIComponent(r.id)}`}
+                    className={cn('flex min-h-12 items-center gap-space-sm rounded-lg border px-space-sm py-space-xs transition-transform active:scale-[0.99]', lewat ? 'border-error/40 bg-error-container/30' : 'border-amber-300 bg-amber-50')}
+                  >
+                    <Truck aria-hidden="true" className={cn('size-4 shrink-0', lewat ? 'text-error' : 'text-amber-700')} />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="tabular truncate text-body-sm font-semibold text-on-surface">
+                        {r.nopol || 'MT'}
+                        {lewat && <span className="ml-1.5 text-xs font-bold text-error">· terlewat</span>}
+                      </span>
+                      <span className="tabular text-xs text-on-surface-variant">
+                        Bongkar {formatTanggalIso(r.tanggal)}, selesai {r.jamSelesai || '-'}
+                      </span>
                     </span>
+                    <span className={cn('flex shrink-0 items-center gap-0.5 rounded-full px-3 py-1.5 text-xs font-bold', lewat ? 'bg-error text-on-error' : 'bg-primary text-on-primary')}>
+                      {lewat ? 'Uji sekarang' : 'Uji'}
+                      <ChevronRight aria-hidden="true" className="size-3.5" />
+                    </span>
+                  </Link>
+                )
+              })}
+              {sudah.slice(0, 3).map((r) => (
+                <div key={r.id} className="tabular flex items-center gap-space-sm rounded-lg px-space-sm py-1 text-xs text-on-surface-variant">
+                  <CircleCheck aria-hidden="true" className="size-3.5 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {r.nopol || 'MT'} · bongkar {formatTanggalIso(r.tanggal)}
                   </span>
-                  <span className={cn('flex shrink-0 items-center gap-0.5 rounded-full px-3 py-1.5 text-xs font-bold', lewat ? 'bg-error text-on-error' : 'bg-primary text-on-primary')}>
-                    Uji
-                    <ChevronRight aria-hidden="true" className="size-3.5" />
-                  </span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </section>
+                  <span>diuji {r.sample2Jam ? `${formatTanggalIso(r.sample2Jam.tanggal)} ${r.sample2Jam.jam}` : ''}</span>
+                </div>
+              ))}
+              {!daftar.length && <span className="px-space-sm py-1 text-body-sm text-on-surface-variant">Tidak ada penerimaan {produk} dalam 7 hari terakhir.</span>}
+            </div>
+          </div>
+        </div>
+      </section>
+    </li>
   )
 }
 
@@ -247,6 +270,12 @@ export function Sample2JamForm() {
         <span className="text-body-sm text-on-surface-variant">
           Bongkar {formatTanggalIso(r.tanggal)}, selesai {r.jamSelesai || '-'}. Atur tanggal dan jam uji sesuai pelaksanaan.
         </span>
+        {statusUji(r) === 'terlewat' && (
+          <span role="note" className="flex items-start gap-2 rounded-md bg-amber-50 px-space-sm py-space-xs text-body-sm text-amber-900 ring-1 ring-amber-200">
+            <Clock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            Shift bongkar sudah lewat. Uji tetap dapat dikirim dan tercatat sebagai uji terlambat sesuai tanggal & jam uji yang diisi.
+          </span>
+        )}
       </GlassCard>
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         <div className="grid grid-cols-2 gap-space-sm">
