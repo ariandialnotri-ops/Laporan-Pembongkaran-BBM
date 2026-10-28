@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { LoaderCircle, Pencil, Send } from 'lucide-react'
 import { UnitCard } from '@/components/apar/unit-cek'
 import { Field } from '@/components/bongkaran/form-bits'
@@ -10,14 +10,14 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { useToast } from '@/components/ui/toast'
-import { aparUnitRecordId, cekDari, hasilCek, type AparCek, type AparTipe, type AparUnit } from '@/lib/apar'
+import { aparUnitRecordId, cekDari, hasilCek, tipeLabel, type AparCek, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { compressImage } from '@/lib/image'
 import { currentShift } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { usePhotoSrc } from '@/lib/use-photo-src'
 
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -46,8 +46,7 @@ export function InspeksiUnit() {
 
 function Form({ unit, tipe }: { unit: AparUnit; tipe: AparTipe }) {
   const app = useApp()
-  const toast = useToast()
-  const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const tanggal = todayIso()
   const rid = aparUnitRecordId(tanggal, unit.id)
   const ex = app.daily.find((d): d is AparRecord => d.kind === 'apar' && d.id === rid) ?? null
@@ -58,13 +57,11 @@ function Form({ unit, tipe }: { unit: AparUnit; tipe: AparTipe }) {
   const [petugas, setPetugas] = useState(() => ex?.data.petugas || (app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'foto' | 'kirim' | null>(null)
-  const [dirty, setDirty] = useState(false)
   const srcOf = usePhotoSrc(cek.foto)
-  const guard = useLeaveGuard({ active: ubah && dirty, title: 'Keluar tanpa mengirim?', detail: `Inspeksi ${unit.kode} belum dikirim. Foto yang sudah diambil akan dibuang.` })
+  const guard = useLeaveGuard({ active: ubah, title: 'Keluar tanpa mengirim?', detail: `Inspeksi ${unit.kode} belum dikirim. Foto yang sudah diambil akan dibuang.` })
 
   const set = (p: Partial<AparCek>) => {
     setError(null)
-    setDirty(true)
     setCek((c) => ({ ...c, ...p }))
   }
 
@@ -73,8 +70,7 @@ function Form({ unit, tipe }: { unit: AparUnit; tipe: AparTipe }) {
     try {
       const baru: Photo[] = []
       for (const f of files) baru.push(await app.backend.uploadPhoto(`daily-${rid}`, await compressImage(f), `${unit.kode || 'apar'}.jpg`))
-      setDirty(true)
-      setError(null)
+        setError(null)
       setCek((c) => ({ ...c, foto: [...c.foto, ...baru] }))
     } catch (e) {
       setError(`Gagal menyimpan foto: ${pesan(e)}`)
@@ -109,8 +105,21 @@ function Form({ unit, tipe }: { unit: AparUnit; tipe: AparTipe }) {
       }
       await app.saveDaily(rec)
       guard.bypass()
-      toast(`Inspeksi ${unit.kode} terkirim`)
-      navigate(`/apar/inspeksi?terkirim=${encodeURIComponent(unit.id)}`)
+      keTerkirim({
+        judul: `Inspeksi ${unit.kode} terkirim`,
+        detail: `${tipeLabel(tipe, unit.cadangan)}${unit.lokasi ? `, ${unit.lokasi}` : ''}`,
+        peringatan: h.temuan.length ? `${h.temuan.length} temuan: ${h.temuan.map((t) => t.label).join(', ')}.` : undefined,
+        baris: [
+          ['Tanggal', `${formatTanggalIso(tanggal)} ${rec.data.jam}`],
+          ['Hasil', h.temuan.length ? 'Ada temuan' : 'Semua butir baik'],
+          ['Foto', `${cek.foto.length} foto`],
+          ['Petugas', petugas.trim()],
+        ],
+        aksi: [
+          { to: '/apar/inspeksi', label: 'Pindai unit berikutnya' },
+          { to: '/laporan/apar', label: 'Riwayat inspeksi APAR' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
@@ -152,7 +161,7 @@ function Form({ unit, tipe }: { unit: AparUnit; tipe: AparTipe }) {
         <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-sm p-space-md">
           <div className="grid grid-cols-2 gap-space-sm">
             <Field label="Petugas" htmlFor="apar-petugas">
-              <Input id="apar-petugas" value={petugas} onChange={(e) => (setDirty(true), setPetugas(e.target.value))} />
+              <Input id="apar-petugas" value={petugas} onChange={(e) => setPetugas(e.target.value)} />
             </Field>
             <Field label="Tanggal">
               <span className="tabular flex h-12 items-center text-body-md font-semibold text-on-surface">{formatTanggalIso(tanggal)}</span>

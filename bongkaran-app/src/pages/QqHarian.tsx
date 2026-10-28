@@ -1,42 +1,43 @@
 import { useMemo, useState } from 'react'
-import { CircleCheck, CircleDot, Flag, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Beaker, Camera, ChevronRight, CircleCheck, Flag, Lock, Plus, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
-import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
-import { Choice, Field, Ladder } from '@/components/bongkaran/form-bits'
+import { Field, Ladder } from '@/components/bongkaran/form-bits'
+import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
+import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
+import { PilihHarian } from '@/components/bongkaran/pilih-harian'
+import { useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { Loading } from '@/components/bongkaran/load-state'
-import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SectionHeader } from '@/components/bongkaran/section-header'
+import { SimpanBaris } from '@/components/bongkaran/simpan-baris'
 import { StokGate, useStokShift } from '@/components/bongkaran/stok-gate'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
-import { usePhotoSrc } from '@/lib/use-photo-src'
 import {
-  BEJANA_LIMIT_ML,
-  bejanaStatus,
   newQqKualitas,
-  newQqKuantitas,
-  QQ_FOTO,
   qqD15,
   qqRecordId,
   totalPumpTest,
   type QqData,
-  type QqFotoKey,
   type QqKualitas,
-  type QqKuantitas,
   type QqRecord,
 } from '@/lib/daily'
-import { formatTanggalIso, nowHm } from '@/lib/date'
+import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
-import { compressImage } from '@/lib/image'
+import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
+import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
+import { simpanFotoHarian } from '@/lib/foto-harian'
+import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
+import { buatKolaseGrid } from '@/lib/kolase'
 import { acuanD15 } from '@/lib/ringkasan'
-import { shiftLabel, type Shift } from '@/lib/shift'
-import { PRODUK_OPTIONS, type Photo } from '@/lib/sop'
+import { PRODUK_OPTIONS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
+import { buildWaQq, type BarisQqWa } from '@/lib/wa'
 
 /** Waktu (di luar render). */
 const stamp = () => Date.now()
@@ -45,19 +46,55 @@ const jamDari = (iso?: string) => (iso ? new Date(iso).toTimeString().slice(0, 5
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const kualitasValid = (k: QqKualitas) => (!qqD15(k).d15 ? 'Lengkapi density dan suhu.' : null)
-const kuantitasValid = (n: QqKuantitas) => (bejanaStatus(n.selisihMl) === 'kosong' ? 'Isi hasil bejana (0 bila tepat).' : null)
 
 function upsert<T extends { id: string }>(list: T[], item: T) {
   return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
 }
 
-/** Input > Kualitas Harian: uji density per produk dan tera bejana 20 L per nozzle, disimpan per baris. */
+/** Operation > Kualitas Harian > Density Harian: sekali sehari di shift 1, paling lambat 10:00 (hijau selesai, oranye belum, merah terlewat). */
+export function QqHarianMenu() {
+  const app = useApp()
+  if (!app.loaded) return <Loading />
+  // Catatan lama per shift tetap dihitung untuk tanggalnya.
+  const rec = (tanggal: string) =>
+    app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.id === qqRecordId(tanggal, 1)) ??
+    app.daily.find((d): d is QqRecord => d.kind === 'qq' && d.tanggal === tanggal && !!d.data.selesaiAt)
+  return (
+    <div className="flex flex-col gap-space-md">
+      <PilihHarian
+        judul="Density harian"
+        status={(t) => statusHarian(t, !!rec(t)?.data.selesaiAt)}
+        keHalaman={(t) => `/kualitas/${t}/1`}
+        keterangan={(t, st) => {
+          const r = rec(t)
+          if (r?.data.selesaiAt) return `Selesai ${r.data.jam}${r.data.terlambat ? ' (terlambat)' : ''} · ${r.data.kualitas.map((x) => x.produk).join(', ') || '-'}`
+          if (r) return `${st === 'terlewat' ? 'Terlewat' : 'Belum selesai'} · sebagian tersimpan`
+          return st === 'belum' ? `Belum diuji · batas ${BATAS_HARIAN}` : undefined
+        }}
+      />
+    </div>
+  )
+}
+
+type SelesaiQq = { teks: string; files: File[]; urls: string[] }
+type FotoUmum = 'struk'
+/** Foto struk pump test: disimpan di riwayat aplikasi, tidak pernah ikut kolase WhatsApp grup SPBU. */
+const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
+  { key: 'struk', label: 'Foto struk pump test', hint: 'Struk pump test uji kualitas terbaca. Disimpan di riwayat aplikasi, tidak ikut kolase WhatsApp grup SPBU.' },
+]
+
+/**
+ * Halaman form Density Harian (hari ini, shift 1, paling lambat 10:00): density per produk (disimpan
+ * per baris), foto hydrometer tiap produk (kolase WhatsApp) dan struk pump test (disimpan
+ * di riwayat aplikasi). Foto kolase juga disimpan sementara di HP untuk laporan gabungan Kualitas Harian.
+ */
 export function QqHarian() {
   const app = useApp()
   const toast = useToast()
-  const { key: now } = useStokShift()
-  const [key, setKey] = useState<{ tanggal: string; shift: Shift }>(now)
-  const [range, setRange] = useDateRange('7d')
+  const { tanggal, shift, valid } = useKunciShift()
+  const bolehIsi = tanggal === todayIso() && shift === 1
+  const key = { tanggal, shift }
+  const { key: now, missing: stokKosong } = useStokShift()
   const records = useMemo(() => app.daily.filter((d): d is QqRecord => d.kind === 'qq'), [app.daily])
   const id = qqRecordId(key.tanggal, key.shift)
   const existing = records.find((r) => r.id === id) ?? null
@@ -70,20 +107,40 @@ export function QqHarian() {
     petugas: app.displayName === 'Mode lokal' ? app.settings.namaPetugasDefault : app.displayName,
     jam: nowHm(),
     kualitas: [newQqKualitas(PRODUK_OPTIONS[0])],
-    kuantitas: app.settings.nozzles.map((n) => newQqKuantitas(n.id, n.nama, n.produk)),
+    kuantitas: [],
     catatan: '',
   })
   const data: QqData = draft?.id === id ? draft.data : (existing?.data ?? fresh())
-  const allPhotos = Object.values(data.foto ?? {}).flat()
-  const srcOf = usePhotoSrc(allPhotos)
+  // Foto hanya di HP sampai dikirim ke WhatsApp: per baris produk + struk pump test.
+  const [foto, setFoto] = useState<Record<string, FotoLokal>>({})
+  const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
+  const [selesaiWa, setSelesaiWa] = useState<SelesaiQq | null>(null)
+  const [dibagikan, setDibagikan] = useState(false)
   const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
   const guard = useLeaveGuard({
-    active: belumSimpan > 0,
-    title: 'Keluar dari kualitas harian?',
-    detail: `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`,
+    active: bolehIsi && (!selesaiWa || !dibagikan),
+    title: selesaiWa ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari density harian?',
+    detail: selesaiWa
+      ? 'Hasil uji sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.'
+      : belumSimpan
+        ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
+        : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim. Foto yang sudah diambil akan hilang.',
   })
 
   if (!app.loaded) return <Loading />
+  if (!valid) return <GlassCard className="p-space-md">Shift tidak dikenal.</GlassCard>
+  if (!bolehIsi)
+    return (
+      <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
+        <span className="text-body-md font-bold text-on-surface">Uji kualitas harian {formatTanggalIso(tanggal)}</span>
+        <span className="text-body-sm text-on-surface-variant">
+          Uji kualitas harian diisi sekali sehari pada hari yang sama, shift 1, paling lambat pukul {BATAS_HARIAN}.{existing?.data.selesaiAt ? ` Uji tanggal ini selesai pukul ${existing.data.jam}.` : ''}
+        </span>
+        <Link to="/laporan/kualitas" className={buttonVariants({ variant: 'glass' })}>
+          Lihat riwayat kualitas
+        </Link>
+      </GlassCard>
+    )
 
   const setData = (patch: Partial<QqData>) => {
     setError(null)
@@ -91,7 +148,6 @@ export function QqHarian() {
   }
   // Mengubah baris membatalkan tanda "tersimpan" sampai disimpan lagi.
   const setK = (i: number, patch: Partial<QqKualitas>) => setData({ kualitas: data.kualitas.map((k, j) => (j === i ? { ...k, ...patch, savedAt: undefined } : k)) })
-  const setN = (i: number, patch: Partial<QqKuantitas>) => setData({ kuantitas: data.kuantitas.map((k, j) => (j === i ? { ...k, ...patch, savedAt: undefined } : k)) })
 
   /** Simpan ke server berdasar data yang sudah tersimpan (baris lain yang belum disimpan tidak ikut). */
   const persist = async (mutate: (base: QqData) => QqData) => {
@@ -112,7 +168,8 @@ export function QqHarian() {
 
   const simpanKualitas = async (i: number) => {
     const row = data.kualitas[i]
-    const err = kualitasValid(row)
+    const adaNozzle = (app.settings.nozzles ?? []).some((n) => n.produk === row.produk)
+    const err = kualitasValid(row) ?? (adaNozzle && !row.nozzleId ? 'Pilih nozzle tempat sampel pump test diambil.' : null)
     if (err) return setRowError({ ...rowError, [row.id]: err })
     const saved = { ...row, savedAt: isoNow() }
     setBusy(row.id)
@@ -128,28 +185,12 @@ export function QqHarian() {
     }
   }
 
-  const simpanKuantitas = async (i: number) => {
-    const row = data.kuantitas[i]
-    const err = kuantitasValid(row)
-    if (err) return setRowError({ ...rowError, [row.id]: err })
-    const saved = { ...row, savedAt: isoNow() }
-    setBusy(row.id)
-    try {
-      await persist((b) => ({ ...b, kuantitas: upsert(b.kuantitas, saved) }))
-      setDraft({ id, data: { ...data, kuantitas: data.kuantitas.map((k) => (k.id === row.id ? saved : k)) } })
-      setRowError({ ...rowError, [row.id]: '' })
-      const lewat = bejanaStatus(row.selisihMl) === 'lewat'
-      toast(lewat ? `${row.nozzle} tersimpan, di bawah batas ${BEJANA_LIMIT_ML} ml` : `${row.nozzle} tersimpan`, lewat ? TriangleAlert : undefined)
-    } catch (e) {
-      setRowError({ ...rowError, [row.id]: pesan(e) })
-    } finally {
-      setBusy(null)
-    }
-  }
-
   const hapusBaris = async (kind: 'kualitas' | 'kuantitas', rowId: string) => {
     const tersimpan = (existing?.data[kind] as { id: string }[] | undefined)?.some((x) => x.id === rowId)
-    if (kind === 'kualitas') setData({ kualitas: data.kualitas.filter((x) => x.id !== rowId) })
+    if (kind === 'kualitas') {
+      setData({ kualitas: data.kualitas.filter((x) => x.id !== rowId) })
+      buangFoto(rowId)
+    }
     else setData({ kuantitas: data.kuantitas.filter((x) => x.id !== rowId) })
     if (tersimpan) {
       try {
@@ -160,95 +201,146 @@ export function QqHarian() {
     }
   }
 
-  // Foto langsung diunggah & disimpan, supaya tidak hilang bila HP menutup aplikasi.
-  const tambahFoto = async (k: QqFotoKey, files: File[]) => {
-    setBusy(k)
+  const ambilFoto = async (key: string, files: File[]) => {
+    setBusy(`foto-${key}`)
     try {
-      const baru: Photo[] = []
-      for (const f of files) {
-        const blob = await compressImage(f)
-        baru.push(await app.backend.uploadPhoto(`daily-${id}`, blob, `${k}.jpg`))
-      }
-      const foto = { ...(data.foto ?? {}), [k]: [...(data.foto?.[k] ?? []), ...baru] }
-      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: [...(b.foto?.[k] ?? []), ...baru] } }))
-      setDraft({ id, data: { ...data, foto } })
+      // Satu foto per bagian: foto baru menggantikan yang lama. Cap ditulis saat kolase dibuat.
+      const waktu = capWaktu()
+      const blob = await compressImage(files[files.length - 1], { maxSize: 1600, quality: 0.85 })
+      const baru: FotoLokal = { id: genId('f'), blob, url: URL.createObjectURL(blob) }
+      setFoto((x) => {
+        if (x[key]) URL.revokeObjectURL(x[key].url)
+        return { ...x, [key]: baru }
+      })
+      setWaktuFoto((w) => ({ ...w, [baru.id]: waktu }))
     } catch (e) {
-      setError(`Gagal menyimpan foto: ${pesan(e)}`)
+      setError(`Gagal memproses foto: ${pesan(e)}`)
     } finally {
       setBusy(null)
     }
   }
-  const hapusFoto = async (k: QqFotoKey, index: number) => {
-    const target = data.foto?.[k]?.[index]
-    if (!target) return
-    const foto = { ...(data.foto ?? {}), [k]: (data.foto?.[k] ?? []).filter((_, j) => j !== index) }
-    setDraft({ id, data: { ...data, foto } })
-    try {
-      await persist((b) => ({ ...b, foto: { ...(b.foto ?? {}), [k]: (b.foto?.[k] ?? []).filter((p) => p.id !== target.id) } }))
-      await app.backend.deletePhoto(target)
-    } catch (e) {
-      setError(pesan(e))
-    }
-  }
+  const buangFoto = (key: string) =>
+    setFoto((x) => {
+      if (x[key]) URL.revokeObjectURL(x[key].url)
+      const { [key]: _, ...sisa } = x
+      return sisa
+    })
+  const fotoSlot = (key: string, label: string, hint: string) => (
+    <FotoWajib
+      key={key}
+      label={label}
+      hint={hint}
+      fotos={foto[key] ? [foto[key]] : []}
+      busy={busy === `foto-${key}`}
+      disabled={busy === 'selesai'}
+      onAdd={(files) => void ambilFoto(key, files)}
+      onRemove={() => buangFoto(key)}
+    />
+  )
 
-  const fotoKurang = (keys: QqFotoKey[]) => keys.filter((k) => !(data.foto?.[k]?.length))
+  /** Baris laporan per produk (D15, acuan uji pasca penerimaan terbaru, selisih). */
+  const barisWa = (): BarisQqWa[] =>
+    data.kualitas.map((k) => {
+      const { obs, d15 } = qqD15(k)
+      const ref = acuanD15(app.reports, k.produk, key.tanggal)
+      const selisih = d15 && ref ? Math.round((d15.value - ref.d15) * 10000) / 10000 : null
+      return { produk: k.produk, obs, suhu: k.suhu, d15: d15?.value ?? null, acuan: ref?.d15 ?? null, selisih, ok: selisih === null ? null : Math.abs(selisih) <= app.rules.densityTolerance + 1e-9, pumpTest: k.pumpTest }
+    })
+
   const selesaikan = async () => {
-    if (!data.kualitas.length && !data.kuantitas.length) return setError('Isi minimal satu uji kualitas atau tera.')
-    if (data.kualitas.some((k) => !k.savedAt) || data.kuantitas.some((n) => !n.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk/nozzle).')
-    const kurang = [...(data.kualitas.length ? fotoKurang(['kualitasStruk', 'kualitasKembali']) : []), ...(data.kuantitas.length ? fotoKurang(['kuantitasStruk', 'kuantitasKembali']) : [])]
-    if (kurang.length) return setError(`Foto wajib belum ada: ${[...new Set(kurang.map((k) => `${QQ_FOTO[k]} (${k.startsWith('kualitas') ? 'kualitas' : 'tera'})`))].join(', ')}.`)
+    if (!data.kualitas.length) return setError('Isi minimal satu uji kualitas.')
+    if (data.kualitas.some((k) => !k.savedAt)) return setError('Simpan dulu setiap baris uji (tombol Simpan di tiap produk).')
+    const tanpaFoto = data.kualitas.filter((k) => !foto[k.id]).map((k) => k.produk)
+    if (tanpaFoto.length) return setError(`Foto hydrometer belum ada: ${tanpaFoto.join(', ')}.`)
+    const kurang = FOTO_UMUM.filter((f) => !foto[f.key]).map((f) => f.label)
+    if (kurang.length) return setError(`Foto wajib belum ada: ${kurang.join(', ')}.`)
     if (!data.petugas.trim()) return setError('Isi nama petugas.')
     setBusy('selesai')
     try {
-      await persist(() => ({ ...data, selesaiAt: isoNow() }))
-      setDraft(null)
-      toast('Uji Q&Q harian selesai')
+      const jam = nowHm()
+      const terlambat = lewatBatas(jam)
+      // Struk pump test disimpan di aplikasi (riwayat kualitas), bukan dikirim ke grup WhatsApp.
+      const struk = await app.backend.uploadPhoto(`daily-${id}`, foto.struk.blob, `qq-struk-${key.tanggal}.jpg`)
+      await persist(() => ({ ...data, jam, foto: { kualitasStruk: [struk] }, selesaiAt: isoNow(), terlambat }))
+      const spbu = namaSpbuWa(app.settings)
+      const baris = barisWa()
+      const cap = (f: FotoLokal, ket: string) => ({ blob: f.blob, cap: [waktuFoto[f.id] ?? capWaktu(), spbu, ket] })
+      // Kolase hanya foto hydrometer per produk (struk pump test tidak pernah ikut).
+      const bagian = data.kualitas.map((k, i) => {
+        const b = baris[i]
+        return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
+      })
+      const kolase = await buatKolaseGrid(bagian)
+      // Disimpan sementara di HP untuk menu Kirim ke grup WA (gabungan density & water content).
+      void simpanFotoHarian(app.spbuId, key.tanggal, 'density', bagian)
+      const files = [new File([kolase], `Kontrol_Kualitas_Harian_${key.tanggal}.jpg`, { type: 'image/jpeg' })]
+      const teks = buildWaQq(
+        { tanggal: key.tanggal, jam, petugas: data.petugas.trim(), terlambat, totalPumpTest: totalPumpTest(data).kualitas, catatan: data.catatan?.trim() ?? '' },
+        baris,
+        spbu,
+        tanggalPanjang(key.tanggal),
+        zonaWaktu(),
+      )
+      setSelesaiWa({ teks, files, urls: [URL.createObjectURL(kolase)] })
+      setBusy(null)
+      window.scrollTo({ top: 0 })
     } catch (e) {
       setError(pesan(e))
-    } finally {
       setBusy(null)
     }
   }
 
+  if (selesaiWa) {
+    const lewat = barisWa().filter((b) => b.ok === false).map((b) => b.produk)
+    return (
+      <>
+        <LayarKirimWa
+          judul="Density harian tersimpan"
+          keterangan={lewat.length ? `${lewat.join(', ')} melebihi toleransi density. Kirim laporan ke WhatsApp sekarang.` : 'Semua produk sesuai toleransi. Kirim sekarang ke grup WhatsApp, atau kirim gabungan dengan water content dari menu Kualitas Harian.'}
+          teks={selesaiWa.teks}
+          files={selesaiWa.files}
+          urls={selesaiWa.urls}
+          dibagikan={dibagikan}
+          onDibagikan={() => setDibagikan(true)}
+        >
+          <Link to={`/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`} replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Lihat riwayat kualitas
+          </Link>
+          <Link to="/kualitas" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
+            Kembali ke Kualitas Harian
+          </Link>
+        </LayarKirimWa>
+        {guard.dialog}
+      </>
+    )
+  }
+
   const pump = totalPumpTest(data)
-  const history = records.filter((r) => inRange(r.tanggal, range)).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.shift - a.shift)
   const isNow = key.tanggal === now.tanggal && key.shift === now.shift
   const selesai = !!existing?.data.selesaiAt && !draft
-
-  const fotoSlot = (k: QqFotoKey) => (
-    <PhotoSlot key={k} label={QQ_FOTO[k]} photos={data.foto?.[k] ?? []} busy={busy === k} srcOf={srcOf} onAdd={(f) => void tambahFoto(k, f)} onRemove={(i) => void hapusFoto(k, i)} />
-  )
+  // Sama dengan Input Bongkaran: form shift berjalan dikunci sampai stok awal shift diisi.
+  const kunci = isNow && stokKosong
 
   return (
     <div className="flex flex-col gap-space-md">
       {isNow && <StokGate action="uji Q&Q" />}
 
+      <fieldset disabled={kunci} className="flex min-w-0 flex-col gap-space-md disabled:*:not-last:[filter:opacity(0.6)]">
+
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
-            <h2 className="text-headline-md font-bold text-on-surface">Uji Q&Q {shiftLabel(key.shift).split(' (')[0]}</h2>
-            <span className="text-body-sm text-on-surface-variant">{formatTanggalIso(key.tanggal)}</span>
+            <h2 className="text-headline-md font-bold text-on-surface">Density harian</h2>
+            <span className="text-body-sm text-on-surface-variant">
+              {formatTanggalIso(key.tanggal)} · Shift 1 · batas {BATAS_HARIAN}
+            </span>
+            {lewatBatas(nowHm()) && !existing?.data.selesaiAt && <span className="text-body-sm font-semibold text-error">Sudah lewat pukul {BATAS_HARIAN}: laporan dicatat terlambat.</span>}
           </div>
           {existing?.data.selesaiAt ? <Pill tone="success">Selesai</Pill> : existing ? <Pill tone="cyan">Sebagian tersimpan</Pill> : <Pill>Belum diuji</Pill>}
         </div>
-        <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Tanggal" htmlFor="qq-tgl">
-            <Input id="qq-tgl" type="date" value={key.tanggal} onChange={(e) => e.target.value && setKey({ ...key, tanggal: e.target.value })} />
-          </Field>
-          <Field label="Jam uji" htmlFor="qq-jam">
-            <Input id="qq-jam" type="time" value={data.jam} onChange={(e) => setData({ jam: e.target.value })} />
-          </Field>
-        </div>
-        <Choice
-          label="Shift"
-          value={String(key.shift) as '1' | '2' | '3'}
-          onChange={(v) => setKey({ ...key, shift: Number(v) as Shift })}
-          options={[
-            { value: '1', label: 'Shift 1' },
-            { value: '2', label: 'Shift 2' },
-            { value: '3', label: 'Shift 3' },
-          ]}
-        />
+        <Field label="Jam uji" htmlFor="qq-jam">
+          <Input id="qq-jam" type="time" value={data.jam} onChange={(e) => setData({ jam: e.target.value })} />
+        </Field>
         <Field label="Petugas" htmlFor="qq-petugas">
           <Input id="qq-petugas" value={data.petugas} onChange={(e) => setData({ petugas: e.target.value })} />
         </Field>
@@ -262,10 +354,10 @@ export function QqHarian() {
           const selisih = d15 && ref ? Math.round((d15.value - ref.d15) * 10000) / 10000 : null
           const ok = selisih === null ? null : Math.abs(selisih) <= app.rules.densityTolerance + 1e-9
           return (
-            <GlassCard key={k.id} level={2} className="flex flex-col gap-space-sm p-space-md">
+            <GlassCard key={k.id} level={2} className={cn('flex flex-col gap-space-sm p-space-md', !k.savedAt && 'border border-amber-300')}>
               <div className="grid grid-cols-[1fr_auto] items-end gap-space-xs">
                 <Field label="Produk" htmlFor={`qk-p-${k.id}`}>
-                  <Select value={k.produk} onValueChange={(v) => setK(i, { produk: v })}>
+                  <Select value={k.produk} onValueChange={(v) => setK(i, { produk: v, nozzleId: undefined, nozzle: undefined })}>
                     <SelectTrigger id={`qk-p-${k.id}`}>
                       <SelectValue />
                     </SelectTrigger>
@@ -282,9 +374,31 @@ export function QqHarian() {
                   <Trash2 aria-hidden="true" />
                 </Button>
               </div>
+              {(() => {
+                const pilihan = (app.settings.nozzles ?? []).filter((n) => n.produk === k.produk)
+                return pilihan.length ? (
+                  <Field label="Nozzle pump test" htmlFor={`qk-n-${k.id}`}>
+                    <Select
+                      value={pilihan.some((n) => n.id === k.nozzleId) ? k.nozzleId : undefined}
+                      onValueChange={(v) => setK(i, { nozzleId: v, nozzle: pilihan.find((n) => n.id === v)?.nama })}
+                    >
+                      <SelectTrigger id={`qk-n-${k.id}`}>
+                        <SelectValue placeholder="Pilih nozzle sampel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pilihan.map((n) => (
+                          <SelectItem key={n.id} value={n.id}>
+                            Nozzle {n.nama}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                ) : null
+              })()}
               <div className="grid grid-cols-3 gap-space-sm">
-                <Field label="Density" htmlFor={`qk-d-${k.id}`}>
-                  <Input id={`qk-d-${k.id}`} numeric inputMode="decimal" placeholder="0,7450" value={k.densityObs} onChange={(e) => setK(i, { densityObs: e.target.value })} />
+                <Field label="Density" htmlFor={`qk-d-${k.id}`} hint="Contoh: 0,7450">
+                  <Input id={`qk-d-${k.id}`} numeric inputMode="decimal" value={k.densityObs} onChange={(e) => setK(i, { densityObs: e.target.value })} />
                 </Field>
                 <Field label="Suhu" htmlFor={`qk-s-${k.id}`}>
                   <Input id={`qk-s-${k.id}`} numeric inputMode="decimal" suffix="°C" value={k.suhu} onChange={(e) => setK(i, { suhu: e.target.value })} />
@@ -296,11 +410,12 @@ export function QqHarian() {
               <Ladder
                 rows={[
                   ['Density observasi', formatDensity(obs)],
-                  ['Density @15°C', d15 ? formatDensity(d15.value) : '-'],
-                  [`Acuan D15 bongkaran ${ref ? formatTanggalIso(ref.tanggal) : 'terakhir'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
+                  ['Density std. 15 °C', d15 ? formatDensity(d15.value) : '-'],
+                  [`Acuan Density std. 15 °C pasca penerimaan ${ref ? formatTanggalIso(ref.tanggal) : 'terbaru'}`, ref ? formatDensity(ref.d15) : 'belum ada'],
                 ]}
                 total={['Selisih', selisih !== null ? formatDensitySigned(selisih) : '-']}
               />
+              {fotoSlot(k.id, `Foto hydrometer ${k.produk}`, 'Hydrometer & termometer di gelas ukur, angka density dan suhu terbaca.')}
               <SimpanBaris
                 ok={ok}
                 okText={ok ? 'Sesuai toleransi' : `Melebihi toleransi ${formatDensity(app.rules.densityTolerance)}`}
@@ -317,203 +432,69 @@ export function QqHarian() {
           <Plus aria-hidden="true" />
           Uji produk lain
         </Button>
-        {data.kualitas.length > 0 && (
-          <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
-            <span className="flex items-center gap-space-xs text-body-sm font-bold text-on-surface">
-              <Flag aria-hidden="true" className="size-4 text-primary" />
-              Langkah terakhir uji kualitas
-            </span>
-            {fotoSlot('kualitasStruk')}
-            {fotoSlot('kualitasKembali')}
-          </GlassCard>
-        )}
       </section>
 
-      <section aria-labelledby="uji-kuantitas" className="flex flex-col gap-space-sm">
-        <SectionHeader id="uji-kuantitas" title="Tera takaran (bejana 20 L)" />
-        <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-          <span className="text-body-sm text-on-surface-variant">
-            Isi selisih bejana ukur 20 liter dalam ml, lalu simpan tiap nozzle. Lebih kecil dari {formatNumber(BEJANA_LIMIT_ML)} ml ditandai merah.
+
+      {data.kualitas.length > 0 && (
+        <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
+          <span className="flex items-center gap-space-xs text-body-sm font-bold text-on-surface">
+            <Flag aria-hidden="true" className="size-4 text-primary" />
+            Langkah terakhir
           </span>
-          {data.kuantitas.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada nozzle. Tambahkan di Pengaturan atau langsung di bawah.</span>}
-          {data.kuantitas.map((n, i) => {
-            const st = bejanaStatus(n.selisihMl)
-            return (
-              <div key={n.id} className={cn('flex flex-col gap-space-xs rounded-md p-space-sm', st === 'lewat' ? 'bg-error-container/70' : 'bg-surface-container-low/60')}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-body-md font-semibold text-on-surface">
-                    {n.nozzle || `Nozzle ${i + 1}`}
-                    <span className="font-normal text-on-surface-variant">, {n.produk}</span>
-                  </span>
-                  <Button variant="ghost" size="icon" aria-label={`Hapus ${n.nozzle}`} onClick={() => void hapusBaris('kuantitas', n.id)}>
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-space-xs">
-                  <Field label="Selisih bejana" htmlFor={`qn-ml-${n.id}`}>
-                    <Input
-                      id={`qn-ml-${n.id}`}
-                      numeric
-                      inputMode="text"
-                      suffix="ml"
-                      placeholder="-20"
-                      value={n.selisihMl}
-                      onChange={(e) => setN(i, { selisihMl: e.target.value })}
-                      aria-invalid={st === 'lewat'}
-                    />
-                  </Field>
-                  <Field label="Pump test" htmlFor={`qn-v-${n.id}`}>
-                    <Input id={`qn-v-${n.id}`} numeric inputMode="decimal" suffix="L" value={n.pumpTest} onChange={(e) => setN(i, { pumpTest: e.target.value })} />
-                  </Field>
-                </div>
-                <SimpanBaris
-                  ok={st === 'kosong' ? null : st === 'ok'}
-                  okText={st === 'lewat' ? 'Di bawah batas' : 'Sesuai'}
-                  savedAt={n.savedAt}
-                  busy={busy === n.id}
-                  error={rowError[n.id]}
-                  onSave={() => void simpanKuantitas(i)}
-                  label={`Simpan ${n.nozzle}`}
-                />
-              </div>
-            )
-          })}
-          <div className="flex flex-wrap gap-space-xs">
-            {app.settings.nozzles.length > 0 && data.kuantitas.length < app.settings.nozzles.length && (
-              <Button
-                variant="soft"
-                size="sm"
-                onClick={() =>
-                  setData({
-                    kuantitas: [
-                      ...data.kuantitas,
-                      ...app.settings.nozzles.filter((nz) => !data.kuantitas.some((k) => k.nozzleId === nz.id)).map((nz) => newQqKuantitas(nz.id, nz.nama, nz.produk)),
-                    ],
-                  })
-                }
-              >
-                Muat semua nozzle
-              </Button>
-            )}
-            <Button variant="soft" size="sm" onClick={() => setData({ kuantitas: [...data.kuantitas, newQqKuantitas('', `Nozzle ${data.kuantitas.length + 1}`, PRODUK_OPTIONS[0])] })}>
-              <Plus aria-hidden="true" />
-              Nozzle
-            </Button>
-          </div>
+          {FOTO_UMUM.map((f) => fotoSlot(f.key, f.label, f.hint))}
+          <Field label="Catatan (opsional)" htmlFor="qq-catatan">
+            <Input id="qq-catatan" autoComplete="off" value={data.catatan ?? ''} onChange={(e) => setData({ catatan: e.target.value })} />
+          </Field>
+          <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+            <Camera aria-hidden="true" className="size-4 shrink-0" />
+            Foto hydrometer tiap produk digabung otomatis menjadi satu kolase bercap jam, SPBU, dan hasil untuk WhatsApp grup SPBU. Foto struk pump test tidak ikut kolase: disimpan di riwayat kualitas aplikasi.
+          </span>
         </GlassCard>
-        {data.kuantitas.length > 0 && (
-          <GlassCard level={1} className="flex flex-col gap-space-sm p-space-md">
-            <span className="flex items-center gap-space-xs text-body-sm font-bold text-on-surface">
-              <Flag aria-hidden="true" className="size-4 text-primary" />
-              Langkah terakhir tera takaran
-            </span>
-            {fotoSlot('kuantitasStruk')}
-            {fotoSlot('kuantitasKembali')}
-          </GlassCard>
-        )}
-      </section>
+      )}
+
+      {/* Tera takaran bejana 20 L kini modul tersendiri: Input > Uji Takaran. */}
+      {app.can('/takaran') && (
+        <Link to="/takaran" className="glass-1 flex min-h-14 items-center gap-space-sm rounded-lg p-space-sm active:scale-[0.99]">
+          <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
+            <Beaker className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-body-md font-semibold text-on-surface">Tera takaran bejana 20 L</span>
+            <span className="text-body-sm text-on-surface-variant">Menu Operation &gt; Uji Takaran (per nozzle, opsi Preset & Manual, foto)</span>
+          </span>
+          <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+        </Link>
+      )}
 
       <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
-        <Ladder
-          rows={[
-            ['Pump test uji kualitas', `${formatNumber(pump.kualitas, 1)} L`],
-            ['Pump test tera takaran', `${formatNumber(pump.kuantitas, 1)} L`],
-          ]}
-          total={['Total pump test', `${formatNumber(pump.kualitas + pump.kuantitas, 1)} L`]}
-        />
+        <Ladder rows={[['Pump test uji kualitas', `${formatNumber(pump.kualitas, 1)} L`]]} total={['Total pump test', `${formatNumber(pump.kualitas + pump.kuantitas, 1)} L`]} />
         {error && (
           <div role="alert" className="flex items-start gap-space-sm rounded-md bg-error-container/70 p-space-sm">
             <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-error" />
             <span className="text-body-sm font-semibold text-on-error-container">{error}</span>
           </div>
         )}
-        <Button size="lg" className="w-full" disabled={busy !== null || selesai} onClick={selesaikan}>
-          {selesai ? <CircleCheck aria-hidden="true" /> : <Save aria-hidden="true" />}
-          {selesai ? `Uji selesai ${jamDari(existing?.data.selesaiAt)}` : 'Selesaikan uji'}
-        </Button>
-      </GlassCard>
-
-      <section aria-labelledby="riwayat-qq" className="flex flex-col gap-space-sm">
-        <SectionHeader id="riwayat-qq" title="Riwayat Q&Q harian" />
-        <DateFilter id="qq-range" value={range} onChange={setRange} />
-        {history.length === 0 ? (
-          <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
-            Belum ada uji Q&Q pada rentang ini.
-          </GlassCard>
-        ) : (
-          history.map((r) => {
-            const lewat = r.data.kuantitas.filter((n) => bejanaStatus(n.selisihMl) === 'lewat')
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => {
-                  setKey({ tanggal: r.tanggal, shift: r.shift })
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                className="glass-1 flex min-h-14 items-center gap-space-sm rounded-lg p-space-sm text-left active:scale-[0.99]"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-body-md font-semibold text-on-surface">
-                    {formatTanggalIso(r.tanggal)}, shift {r.shift}
-                    {!r.data.selesaiAt && <span className="font-normal text-on-surface-variant"> (belum selesai)</span>}
-                  </span>
-                  <span className="truncate text-body-sm text-on-surface-variant">
-                    {r.data.kualitas.map((k) => `${k.produk} ${qqD15(k).d15 ? formatDensity(qqD15(k).d15!.value) : '-'}`).join(', ') || 'Tanpa uji kualitas'}
-                  </span>
-                </div>
-                {lewat.length ? <Pill tone="error">{lewat.length} nozzle lewat</Pill> : <Pill tone="success">{r.data.kuantitas.length} nozzle OK</Pill>}
-              </button>
-            )
-          })
+        {selesai && (
+          <span className="flex items-center gap-1.5 text-body-sm font-semibold text-primary">
+            <CircleCheck aria-hidden="true" className="size-4" />
+            Uji selesai {jamDari(existing?.data.selesaiAt)}; kirim ulang bila ada koreksi (ambil foto lagi).
+          </span>
         )}
-      </section>
-      {guard.dialog}
-    </div>
-  )
-}
+        {kunci ? (
+          <Button size="lg" variant="soft" className="w-full bg-neutral-200 text-neutral-700 shadow-none disabled:opacity-100" disabled>
+            <Lock aria-hidden="true" />
+            Isi stok awal dulu
+          </Button>
+        ) : (
+          <Button size="lg" className="w-full" disabled={busy !== null} onClick={selesaikan}>
+            <Send aria-hidden="true" />
+            {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang laporan ke WhatsApp' : 'Selesaikan & lanjut kirim ke WhatsApp'}
+          </Button>
+        )}
+      </GlassCard>
+      </fieldset>
 
-/** Status hasil + tombol simpan untuk satu baris uji. */
-function SimpanBaris({
-  ok,
-  okText,
-  savedAt,
-  busy,
-  error,
-  onSave,
-  label,
-}: {
-  ok: boolean | null
-  okText: string
-  savedAt?: string
-  busy: boolean
-  error?: string
-  onSave: () => void
-  label: string
-}) {
-  return (
-    <div className="flex flex-col gap-space-xs">
-      <div className="flex flex-wrap items-center justify-between gap-space-xs">
-        <span className="flex flex-wrap items-center gap-space-xs">
-          {ok !== null && <Pill tone={ok ? 'success' : 'error'}>{okText}</Pill>}
-          {savedAt ? (
-            <span className="flex items-center gap-1 text-body-sm text-primary">
-              <CircleCheck aria-hidden="true" className="size-4" />
-              Tersimpan {jamDari(savedAt)}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-body-sm text-on-surface-variant">
-              <CircleDot aria-hidden="true" className="size-4" />
-              Belum disimpan
-            </span>
-          )}
-        </span>
-        <Button size="sm" variant={savedAt ? 'glass' : 'primary'} disabled={busy} onClick={onSave} aria-label={label}>
-          <Save aria-hidden="true" />
-          Simpan
-        </Button>
-      </div>
-      {error && <span className="text-body-sm font-semibold text-error">{error}</span>}
+      {guard.dialog}
     </div>
   )
 }

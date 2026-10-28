@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 const STATUS: Record<KalengStatus, { label: string; tone: 'success' | 'error' | 'neutral' | 'cyan'; icon: typeof CircleCheck }> = {
   sesuai: { label: 'Sesuai', tone: 'success', icon: CircleCheck },
   perhatian: { label: 'Ada anomali', tone: 'error', icon: TriangleAlert },
-  menunggu: { label: 'D15 belum ada', tone: 'cyan', icon: Clock },
+  menunggu: { label: 'Density std. 15 °C belum ada', tone: 'cyan', icon: Clock },
   belum: { label: 'Belum ada sampel', tone: 'neutral', icon: CircleDashed },
 }
 
@@ -32,6 +32,9 @@ export function KalengSample() {
   const [buka, setBuka] = useState<Record<string, boolean>>({})
   const [detail, setDetail] = useState<{ k: Kaleng; slot: number } | null>(null)
   const [sop, setSop] = useState(false)
+  // Produk tanpa sampel diringkas satu baris (dibuka bila diketuk) agar keadaan kosong tidak memanjang.
+  const [lihatKosong, setLihatKosong] = useState(false)
+  const kosong = data.filter((d) => d.cans.length === 0)
 
   const sesuai = data.filter((d) => d.status === 'sesuai').length
   const anomali = data.filter((d) => d.status === 'perhatian').length
@@ -52,7 +55,7 @@ export function KalengSample() {
               Kaleng Sample
             </h2>
             <span className="text-body-sm text-on-surface-variant">
-              D15 sample mobil tangki (diuji saat bongkar) dari 3 bongkaran terakhir tiap produk, dibanding D15 depot (toleransi ±<span className="tabular">{tol}</span>).
+              Density std. 15 °C sample mobil tangki (diuji saat bongkar) dari 3 bongkaran terakhir tiap produk, dibanding Density std. 15 °C depot (toleransi ±<span className="tabular">{tol}</span>).
             </span>
           </div>
           <button
@@ -72,7 +75,22 @@ export function KalengSample() {
         </dl>
       </GlassCard>
 
-      {data.map((d) => {
+      {kosong.length > 0 && !lihatKosong && (
+        <button
+          type="button"
+          onClick={() => setLihatKosong(true)}
+          className="glass-1 rim-light flex min-h-14 items-center gap-space-sm rounded-lg px-space-md py-space-sm text-left active:scale-[0.99]"
+        >
+          <Cylinder aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-body-md font-semibold text-on-surface">Belum ada sampel: {kosong.length} produk</span>
+            <span className="text-body-sm text-on-surface-variant">{kosong.map((d) => d.produk).join(', ')}</span>
+          </span>
+          <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+        </button>
+      )}
+
+      {data.filter((d) => d.cans.length > 0 || lihatKosong).map((d) => {
         const meta = produkMeta(d.produk)
         const tank = tankForProduk(d.produk)
         const open = buka[d.produk] ?? d.cans.length > 0
@@ -105,9 +123,9 @@ export function KalengSample() {
                 {latest ? (
                   <span className="flex gap-space-md">
                     <span className="flex flex-col md:items-end">
-                      <span className="text-tag uppercase text-on-surface-variant">D15 terkini</span>
+                      <span className="text-tag uppercase text-on-surface-variant">Density std. 15 °C terkini</span>
                       {latest.menunggu ? (
-                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">D15 belum ada</span>
+                        <span className="text-body-sm font-semibold text-on-secondary-fixed-variant">Density std. 15 °C belum ada</span>
                       ) : (
                         <span className="tabular text-body-sm font-bold text-on-surface">
                           {formatDensity(latest.d15Sample)}{' '}
@@ -173,10 +191,10 @@ export function KalengSample() {
 
       <Sheet open={sop} onOpenChange={setSop} title="Ketentuan kaleng sample" description="Pemantauan mutu BBM tiap penerimaan.">
         <ol className="flex list-decimal flex-col gap-space-xs pl-5 text-body-md text-on-surface">
-          <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu D15-nya dibanding D15 dokumen depot. Sampel inilah isi kaleng sample.</li>
-          <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (menu Input). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
+          <li>Setiap penerimaan, sampel diambil dari kompartemen mobil tangki saat bongkar, diuji density dan suhu, lalu Density std. 15 °C-nya dibanding Density std. 15 °C dokumen depot. Sampel inilah isi kaleng sample.</li>
+          <li>Setelah bongkar selesai, wajib uji kualitas pasca penerimaan dari tangki pendam (Operation › Kualitas Pasca Penerimaan). Jam uji diatur petugas; hasilnya dicatat terpisah dari kaleng.</li>
           <li>
-            Selisih D15 maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
+            Selisih Density std. 15 °C maksimal ±<span className="tabular">{tol}</span>. Di luar itu, kaleng ditandai anomali.
           </li>
           <li>Sampel disimpan dalam kaleng bersegel sampai 3 bongkaran berikutnya untuk produk yang sama; kaleng terlama dibuang saat kaleng baru masuk.</li>
         </ol>
@@ -207,7 +225,7 @@ function Can({ label, produk, besar }: { label: string; produk: string; besar?: 
   return (
     <span aria-hidden="true" className={cn('relative flex shrink-0 flex-col overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-sm', besar ? 'h-16 w-14' : 'h-14 w-12')}>
       <span className="mx-1.5 mt-1.5 h-1.5 rounded-full bg-on-surface-variant/50" />
-      <span className="mx-1 mt-1 rounded-sm border border-outline-variant/70 bg-white px-0.5 text-center font-mono text-[10px] font-semibold leading-4 text-on-surface">{label}</span>
+      <span className="mx-1 mt-1 rounded-sm border border-outline-variant/70 bg-white px-0.5 text-center font-mono text-xs font-semibold leading-4 text-on-surface">{label}</span>
       <span className={cn('mt-auto h-1/3 w-full', meta.isi)} />
     </span>
   )
@@ -220,9 +238,9 @@ function NilaiSample({ k, besar }: { k: Kaleng; besar?: boolean }) {
       <span className="flex flex-col">
         <span className="flex items-center gap-1 text-body-sm font-semibold text-on-secondary-fixed-variant">
           <Clock aria-hidden="true" className="size-4" />
-          D15 sample MT belum ada
+          Density std. 15 °C sample MT belum ada
         </span>
-        <span className="tabular text-body-sm text-on-surface-variant">D15 depot {formatDensity(k.d15Depot)}</span>
+        <span className="tabular text-body-sm text-on-surface-variant">Density std. 15 °C depot {formatDensity(k.d15Depot)}</span>
       </span>
     )
   const ok = k.ok !== false

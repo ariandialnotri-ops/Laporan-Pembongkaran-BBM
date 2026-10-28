@@ -2,7 +2,7 @@
  * Proteksi kebakaran SPBU: daftar APAR (alat pemadam api ringan) dan APAB
  * (alat pemadam api berat/beroda) di Pengaturan, dan inspeksi berkala per unit.
  */
-import { addDays, todayIso as isoOf } from '@/lib/date'
+import { berlakuSertifikat, MASA_SERTIFIKAT_BULAN, statusSertifikat, statusTanggal } from '@/lib/berlaku'
 import { genId } from '@/lib/image'
 import type { Photo } from '@/lib/sop'
 
@@ -19,9 +19,29 @@ export interface AparUnit {
   cadangan: boolean
   /** Tanggal isi ulang berikutnya / kedaluwarsa (YYYY-MM-DD). */
   kedaluwarsa: string
+  /** Tanggal pemeriksaan terakhir oleh instansi berwenang (YYYY-MM-DD); berlaku maks. 12 bulan. */
+  periksaInstansi?: string
+  /** Nama instansi pemeriksa, mis. Disnaker atau Damkar. */
+  instansi?: string
+  /** Khusus powder (DCP): Pressure System (ada manometer) atau Cartridge (tanpa manometer). */
+  sistem?: SistemDcp
 }
 
 export const APAR_JENIS = ['Powder (DCP)', 'CO2', 'Foam (AFFF)', 'Clean agent'] as const
+
+export type SistemDcp = 'ps' | 'cartridge'
+export const SISTEM_DCP: { value: SistemDcp; label: string; desc: string }[] = [
+  { value: 'ps', label: 'Pressure System (PS)', desc: 'Tabung bertekanan, ada manometer' },
+  { value: 'cartridge', label: 'Cartridge', desc: 'Gas pendorong di cartridge, tanpa manometer' },
+]
+export const isDcp = (jenis: string) => /powder|dcp/i.test(jenis)
+/** Sistem DCP efektif; unit lama tanpa isian dianggap Pressure System. */
+export const sistemDari = (u: { jenis: string; sistem?: SistemDcp }): SistemDcp | null => (isDcp(u.jenis) ? (u.sistem ?? 'ps') : null)
+/** "Powder (DCP) · Cartridge" */
+export const jenisLengkap = (u: { jenis: string; sistem?: SistemDcp }) => {
+  const s = sistemDari(u)
+  return s ? `${u.jenis} · ${s === 'cartridge' ? 'Cartridge' : 'Pressure System'}` : u.jenis
+}
 
 /** Area awal SPBU (data utama); pengguna dapat menambah atau menghapus area. */
 export const DEFAULT_AREAS = [
@@ -51,6 +71,7 @@ export const unitBaru = (tipe: AparTipe, kode: string, lokasi = ''): AparUnit =>
   id: genId(tipe),
   kode,
   jenis: APAR_JENIS[0],
+  sistem: 'ps',
   kapasitasKg: tipe === 'apar' ? '6' : '50',
   lokasi,
   cadangan: false,
@@ -62,13 +83,14 @@ export function lokasiOptions(jumlahPulau: number, areas: string[] = DEFAULT_ARE
   return [...Array.from({ length: Math.max(0, jumlahPulau) }, (_, i) => namaPulau(i + 1)), ...areas]
 }
 
-export type CekKey = 'lokasi' | 'tanda' | 'tekanan' | 'pin' | 'tabung' | 'selang' | 'label' | 'kartu' | 'kedaluwarsa' | 'roda'
+export type CekKey = 'lokasi' | 'tanda' | 'tekanan' | 'cartridge' | 'pin' | 'tabung' | 'selang' | 'label' | 'kartu' | 'kedaluwarsa' | 'roda'
 
 /** Butir inspeksi umum APAR/APAB (pemeriksaan bulanan). */
 export const CEK_ITEMS: { key: CekKey; label: string; hint?: string; untuk?: AparTipe; aktifSaja?: boolean }[] = [
   { key: 'lokasi', label: 'Terpasang di tempatnya, mudah dijangkau, tidak terhalang', aktifSaja: true },
   { key: 'tanda', label: 'Tanda/label lokasi pemadam terpasang dan terlihat', aktifSaja: true },
   { key: 'tekanan', label: 'Tekanan manometer di zona hijau', hint: 'CO2 tanpa manometer: berat tabung sesuai' },
+  { key: 'cartridge', label: 'Cartridge gas pendorong terpasang, tersegel, dan beratnya sesuai', hint: 'APAR DCP cartridge tidak memiliki manometer' },
   { key: 'pin', label: 'Pin pengaman dan segel utuh' },
   { key: 'tabung', label: 'Tabung tidak penyok, berkarat, atau bocor' },
   { key: 'selang', label: 'Selang dan nozzle utuh, tidak retak atau tersumbat' },
@@ -78,7 +100,13 @@ export const CEK_ITEMS: { key: CekKey; label: string; hint?: string; untuk?: Apa
   { key: 'roda', label: 'Roda dan troli berfungsi baik', untuk: 'apab' },
 ]
 
-export const cekUntuk = (tipe: AparTipe, cadangan: boolean) => CEK_ITEMS.filter((c) => (!c.untuk || c.untuk === tipe) && (!c.aktifSaja || !cadangan))
+/** Butir untuk satu unit: DCP cartridge tanpa butir manometer, diganti butir cartridge. */
+export const cekUntuk = (tipe: AparTipe, cadangan: boolean, u?: { jenis: string; sistem?: SistemDcp }) => {
+  const cartridge = !!u && sistemDari(u) === 'cartridge'
+  return CEK_ITEMS.filter(
+    (c) => (!c.untuk || c.untuk === tipe) && (!c.aktifSaja || !cadangan) && (c.key === 'tekanan' ? !cartridge : c.key === 'cartridge' ? cartridge : true),
+  )
+}
 
 export type CekNilai = 'ok' | 'tidak'
 
@@ -92,6 +120,8 @@ export interface AparCek {
   lokasi: string
   cadangan: boolean
   kedaluwarsa: string
+  periksaInstansi?: string
+  sistem?: SistemDcp
   cek: Partial<Record<CekKey, CekNilai>>
   catatan: string
   foto: Photo[]
@@ -118,23 +148,26 @@ export function unitDariKode(kode: string, units: AparUnit[]) {
 }
 
 export function cekDari(u: AparUnit, tipe: AparTipe): AparCek {
-  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, cek: {}, catatan: '', foto: [] }
+  return { unitId: u.id, tipe, kode: u.kode, jenis: u.jenis, kapasitasKg: u.kapasitasKg, lokasi: u.lokasi, cadangan: u.cadangan, kedaluwarsa: u.kedaluwarsa, periksaInstansi: u.periksaInstansi ?? '', ...(sistemDari(u) ? { sistem: sistemDari(u)! } : {}), cek: {}, catatan: '', foto: [] }
 }
 
 /** Butir yang belum diisi, dan butir yang ditandai "Tidak" (temuan). */
 export function hasilCek(c: AparCek) {
-  const items = cekUntuk(c.tipe, c.cadangan)
+  const items = cekUntuk(c.tipe, c.cadangan, c)
   const kosong = items.filter((i) => !c.cek[i.key])
   const temuan = items.filter((i) => c.cek[i.key] === 'tidak')
   return { items, kosong, temuan }
 }
 
 /** Kedaluwarsa sudah lewat (atau dalam 30 hari). */
-export function statusKedaluwarsa(tgl: string, todayIso: string): 'lewat' | 'segera' | 'ok' | null {
-  if (!tgl) return null
-  if (tgl < todayIso) return 'lewat'
-  return tgl <= isoOf(addDays(new Date(`${todayIso}T00:00:00`), 30)) ? 'segera' : 'ok'
-}
+export const statusKedaluwarsa = statusTanggal
+
+/** Pemeriksaan oleh instansi berwenang paling lama 12 bulan sekali. */
+export const MASA_INSTANSI_BULAN = MASA_SERTIFIKAT_BULAN
+/** Batas berlaku pemeriksaan instansi: tanggal periksa + 12 bulan (YYYY-MM-DD). */
+export const berlakuInstansi = berlakuSertifikat
+/** Status pemeriksaan instansi: belum dicatat, lewat, ≤ 30 hari lagi, atau masih berlaku. */
+export const statusInstansi = statusSertifikat
 
 export type StatusUnit = 'baik' | 'temuan' | 'belum'
 
@@ -158,6 +191,8 @@ export interface KondisiUnit {
   /** Sudah diperiksa pada bulan berjalan. */
   bulanIni: boolean
   isiUlang: ReturnType<typeof statusKedaluwarsa>
+  /** Pemeriksaan instansi berwenang (maks. 12 bulan). */
+  instansi: ReturnType<typeof statusInstansi>
 }
 
 /** Kondisi terkini semua unit dari data utama, untuk dashboard dan halaman unit. */
@@ -172,6 +207,7 @@ export function kondisiSemua(s: { apar?: AparUnit[]; apab?: AparUnit[] }, record
       status: terakhir ? terakhir.status : 'belum',
       bulanIni: !!terakhir && terakhir.tanggal.startsWith(today.slice(0, 7)),
       isiUlang: statusKedaluwarsa(u.kedaluwarsa, today),
+      instansi: statusInstansi(u.periksaInstansi, today),
     }
   })
 }
@@ -179,10 +215,69 @@ export function kondisiSemua(s: { apar?: AparUnit[]; apab?: AparUnit[] }, record
 export const tipeLabel = (tipe: AparTipe, cadangan: boolean) => (tipe === 'apab' ? 'APAB' : cadangan ? 'APAR cadangan' : 'APAR')
 
 /** Tautan yang disimpan di QR label: membuka halaman data & kondisi unit. */
+/** Warna label QR: merah untuk unit terpasang & APAB, biru untuk APAR cadangan. */
+export const warnaLabel = (tipe: AparTipe, cadangan: boolean) => (tipe === 'apar' && cadangan ? '#1565c0' : '#c62828')
+
 export const aparUnitUrl = (id: string, origin = window.location.origin) => `${origin}/apar/unit/${encodeURIComponent(id)}`
 
 /** Ambil id unit dari isi QR (URL label FLOQ), atau null bila bukan label APAR. */
 export function unitIdDariQr(text: string) {
   const m = text.trim().match(/\/apar\/unit\/([^/?#\s]+)/)
   return m ? decodeURIComponent(m[1]) : null
+}
+
+/**
+ * Unit dari hasil pindai: URL label QR FLOQ (…/apar/unit/<id>), atau teks berisi kode unit
+ * (mis. barcode/QR lama yang hanya memuat "APAR-01").
+ */
+export function unitDariPindai(text: string, units: AparUnit[]): { unit: AparUnit | null; pesan: string | null } {
+  const id = unitIdDariQr(text)
+  if (id) {
+    const unit = units.find((u) => u.id === id) ?? null
+    return { unit, pesan: unit ? null : 'Unit pada label ini sudah tidak terdaftar di data utama.' }
+  }
+  const unit = unitDariKode(text, units)
+  return { unit, pesan: unit ? null : 'QR/barcode ini bukan label APAR/APAB FLOQ. Ketik kode unit bila label rusak.' }
+}
+
+export const NAMA_BULAN = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES']
+
+/**
+ * Status kepatuhan inspeksi per bulan:
+ * baik / temuan = sudah diinspeksi; terlewat = bulan lalu tanpa inspeksi;
+ * berjalan = bulan ini, belum diinspeksi; nanti = bulan mendatang; sebelum = sebelum unit terdaftar.
+ */
+export type StatusBulan = 'baik' | 'temuan' | 'terlewat' | 'berjalan' | 'nanti' | 'sebelum'
+
+export interface BulanKepatuhan {
+  bulan: number
+  status: StatusBulan
+  /** Inspeksi terakhir pada bulan itu. */
+  inspeksi: ReturnType<typeof riwayatUnit>[number] | null
+}
+
+/** Bulan unit terdaftar (YYYY-MM) dari id unit (genId memuat waktu pembuatan), atau null. */
+export function bulanTerdaftar(unitId: string) {
+  const ms = Number(unitId.split('_')[1])
+  if (!Number.isFinite(ms) || ms < 1e12) return null
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Kalender kepatuhan inspeksi bulanan satu unit pada satu tahun. */
+export function kepatuhanBulanan(unitId: string, records: { tanggal: string; data: AparData }[], tahun: number, todayIso: string) {
+  const riwayat = riwayatUnit(unitId, records)
+  const bulanIni = todayIso.slice(0, 7)
+  const pertama = riwayat.at(-1)?.tanggal.slice(0, 7)
+  const daftar = [bulanTerdaftar(unitId), pertama].filter((x): x is string => !!x).sort()[0] ?? bulanIni
+  const bulan: BulanKepatuhan[] = NAMA_BULAN.map((_, i) => {
+    const ym = `${tahun}-${String(i + 1).padStart(2, '0')}`
+    const inspeksi = riwayat.find((r) => r.tanggal.startsWith(ym)) ?? null
+    const status: StatusBulan = inspeksi ? inspeksi.status === 'temuan' ? 'temuan' : 'baik' : ym > bulanIni ? 'nanti' : ym < daftar ? 'sebelum' : ym === bulanIni ? 'berjalan' : 'terlewat'
+    return { bulan: i, status, inspeksi }
+  })
+  // Kepatuhan dihitung dari bulan wajib yang sudah lewat atau berjalan (bulan berjalan dihitung bila sudah diinspeksi).
+  const wajib = bulan.filter((b) => b.status === 'baik' || b.status === 'temuan' || b.status === 'terlewat')
+  const patuh = wajib.filter((b) => b.status !== 'terlewat').length
+  return { bulan, wajib: wajib.length, patuh }
 }

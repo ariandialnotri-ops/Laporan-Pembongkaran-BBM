@@ -1,6 +1,6 @@
 /**
- * SLA pengiriman: lama dari permintaan MS2 sampai bongkar selesai, dan dari
- * gate out depot sampai bongkar selesai. Dalam menit; null bila data belum lengkap.
+ * SLA pengiriman: waktu kirim (permintaan MS2 sampai bongkar selesai) dan waktu tempuh
+ * (gate out depot sampai bongkar selesai). Dalam menit; null bila data belum lengkap.
  */
 import type { Plan, ReportSummary } from '@/lib/sop'
 

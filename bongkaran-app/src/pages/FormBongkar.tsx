@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Beaker, Flag, Lock, Ruler, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Beaker, CircleCheck, CloudUpload, Flag, LoaderCircle, Lock, Ruler, Save, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
+import { ekspor, muatFoto, type Lapor } from '@/lib/ekspor'
 import type { ExportKind } from '@/lib/report/export'
 import { FinishPanel } from '@/components/bongkaran/finish-panel'
 import { LoadError, Loading } from '@/components/bongkaran/load-state'
@@ -9,6 +11,7 @@ import { StepContent } from '@/components/bongkaran/sop-steps'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
+import { Sheet } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
@@ -16,6 +19,9 @@ import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib
 import { compressImage } from '@/lib/image'
 import { evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
+import { formatTanggalIso } from '@/lib/date'
+import { diam } from '@/lib/proses'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 type Phase = 'bongkaran' | 'quality' | 'quantity'
@@ -66,10 +72,14 @@ export function FormBongkar() {
 
 function BongkarEditor({ initial, restored }: { initial: Report; restored: boolean }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
   const navigate = useNavigate()
+  const keTerkirim = useKeTerkirim()
   const [report, setReport] = useState(initial)
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
+  // Modal "Simpan sementara": menyimpan draf saat itu juga lalu menampilkan ringkasan tahap.
+  const [sementara, setSementara] = useState<'tutup' | 'menyimpan' | 'ok' | 'gagal'>('tutup')
   const [photoBusy, setPhotoBusy] = useState<string | null>(null)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
   const [generating, setGenerating] = useState<ExportKind | null>(null)
@@ -93,6 +103,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
   const firstRender = useRef(true)
   /** Simpan tanpa jeda (setelah foto ditambah/dihapus). */
   const urgent = useRef(false)
+  /** Penyimpanan terakhir gagal (untuk modal Simpan sementara). */
+  const gagalTerakhir = useRef(false)
 
   // save/flush harus stabil: bila ikut berubah setiap state aplikasi berubah,
   // efek autosave terpicu lagi dan menyimpan terus-menerus tanpa henti.
@@ -107,10 +119,12 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     upsertSummary(summary)
     chain.current = chain.current.then(async () => {
       try {
-        await backend.saveReport(r, summary)
+        await diam(() => backend.saveReport(r, summary))
         if (backend.mode === 'supabase') clearBackup(r.id, r.updatedAt)
+        gagalTerakhir.current = false
         if (!pending.current) setSaveState('saved')
       } catch (e) {
+        gagalTerakhir.current = true
         setSaveState('error')
         toast(`Gagal menyimpan: ${pesan(e)}`, TriangleAlert)
       }
@@ -136,6 +150,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     timer.current = setTimeout(() => void flush(), urgent.current ? 0 : 600)
     urgent.current = false
   }, [report, flush])
+
+  const [keRiwayat, setKeRiwayat] = useState(false)
 
   // Isian dari cadangan perangkat langsung dikirim ke server.
   useEffect(() => {
@@ -242,30 +258,45 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       updatedAt: Date.now(),
       data: { ...prev.data, noBA: prev.data.noBA || suggestNoBA(app.settings, prev) },
     }))
-    toast(status === 'anomali' ? 'Ditutup sebagai anomali' : 'Bongkaran selesai · Berita Acara siap')
+    setKeRiwayat(true)
   }
-  const reopen = () => {
-    if (!window.confirm('Buka kembali untuk koreksi? Status kembali menjadi draft.')) return
+  const reopen = async () => {
+    if (!(await konfirmasi({ jenis: 'ubah', judul: 'Ubah data bongkaran?', pesan: <>Laporan dibuka kembali untuk koreksi dan statusnya kembali menjadi <b>draft</b>. Berita Acara perlu ditandatangani ulang.</>, ya: 'Ya, buka & ubah' }))) return
     setReport((prev) => ({ ...prev, status: 'draft', finishedAt: null, updatedAt: Date.now() }))
   }
+  const simpanSementara = async () => {
+    setSementara('menyimpan')
+    try {
+      await flush()
+      setSementara(gagalTerakhir.current ? 'gagal' : 'ok')
+    } catch {
+      setSementara('gagal')
+    }
+  }
   const fileBase = `BA_Pembongkaran_${(report.data.nopol || 'MT').replace(/[^a-zA-Z0-9]/g, '')}_${report.data.tanggalDatang}`
-  const photoData = async () => {
-    const out: Record<string, string> = {}
-    for (const p of Object.values(report.photos).flat()) out[p.id] = await app.backend.photoDataUrl(p)
-    return out
+  const photoData = (lapor: Lapor) => muatFoto(Object.values(report.photos).flat(), (p) => app.backend.photoDataUrl(p), lapor, 12, 50)
+  const JUDUL_EKSPOR: Record<ExportKind, string> = {
+    xlsx: 'Membuat Excel Berita Acara',
+    jpg: 'Membuat JPG Berita Acara',
+    'pdf-ba': 'Membuat PDF Berita Acara',
+    pdf: 'Membuat PDF BA + lampiran foto',
   }
   // Laporan mengikuti template Excel referensi; modul dimuat saat dibutuhkan.
   const runExport = async (kind: ExportKind) => {
     setGenerating(kind)
     try {
-      await flush()
-      const ex = await import('@/lib/report/export')
-      const x = evaluation.derived
-      if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`)
-      else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`)
-      // PDF BA saja: tanpa memuat foto, jauh lebih cepat.
-      else if (kind === 'pdf-ba') await ex.exportBaPdf(report, x, app.settings, null, `${fileBase}.pdf`)
-      else await ex.exportBaPdf(report, x, app.settings, await photoData(), `${fileBase}_lampiran.pdf`)
+      await ekspor(JUDUL_EKSPOR[kind], async (lapor) => {
+        lapor(4, 'Menyimpan data terakhir')
+        await flush()
+        lapor(9, 'Memuat modul laporan')
+        const ex = await import('@/lib/report/export')
+        const x = evaluation.derived
+        if (kind === 'xlsx') await ex.exportBaXlsx(report, x, app.settings, `${fileBase}.xlsx`, lapor)
+        else if (kind === 'jpg') await ex.exportBaJpg(report, x, app.settings, `${fileBase}.jpg`, lapor)
+        // PDF BA saja: tanpa memuat foto, jauh lebih cepat.
+        else if (kind === 'pdf-ba') await ex.exportBaPdf(report, x, app.settings, null, `${fileBase}.pdf`, lapor)
+        else await ex.exportBaPdf(report, x, app.settings, await photoData(lapor), `${fileBase}_lampiran.pdf`, lapor)
+      })
     } catch (e) {
       toast(`Gagal membuat ${kind === 'xlsx' ? 'Excel' : kind === 'jpg' ? 'JPG' : 'PDF'}: ${pesan(e)}`, TriangleAlert)
     } finally {
@@ -278,11 +309,34 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     title: 'Keluar dari form bongkaran?',
     detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
     beforeLeave: flush,
+    // Halaman turunan (ubah nomor LO) bukan meninggalkan form.
+    izinkan: (path) => path.startsWith(`/input/${report.id}/`),
   })
+  // Setelah diselesaikan, pindah ke Riwayat Pembongkaran (penyimpanan terakhir dijalankan saat halaman ditutup).
+  useEffect(() => {
+    if (!keRiwayat || report.status === 'draft') return
+    guard.bypass()
+    const anomali = report.status === 'anomali'
+    keTerkirim({
+      judul: anomali ? 'Bongkaran ditutup sebagai anomali' : 'Bongkaran selesai terkirim',
+      detail: `${report.data.nopol || 'MT'}, ${formatTanggalIso(report.data.tanggalDatang)}. Berita Acara siap diunduh & ditandatangani.`,
+      peringatan: anomali ? 'Ditutup sebagai anomali: periksa catatan dan tindak lanjut.' : undefined,
+      baris: [
+        ['No. BA', report.data.noBA || '-'],
+        ['Langkah SOP', `${selesaiLangkah} dari ${evaluation.steps.length}`],
+      ],
+      aksi: [
+        ...(anomali ? [] : [{ to: `/sample/${encodeURIComponent(report.id)}`, label: 'Lanjut uji kualitas pasca penerimaan' }]),
+        { to: '/laporan/ba', label: 'Berita Acara' },
+        { to: `/laporan/bongkaran?baru=${encodeURIComponent(report.id)}`, label: 'Riwayat pembongkaran' },
+      ],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keRiwayat, report.status, report.id])
   const waText = useMemo(() => buildWaText(report, evaluation.derived, app.settings), [report, evaluation, app.settings])
 
   const hapus = async () => {
-    if (!window.confirm('Hapus data bongkaran ini beserta semua fotonya?')) return
+    if (!(await konfirmasi({ judul: 'Hapus data bongkaran?', pesan: <>Laporan bongkaran <b>{report.data.noBA || report.id}</b> beserta semua fotonya akan dihapus.</> }))) return
     if (timer.current) clearTimeout(timer.current)
     pending.current = null
     await chain.current
@@ -292,7 +346,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
       app.removeSummary(report.id)
       toast('Data bongkaran dihapus')
       guard.bypass()
-      navigate('/input/bongkar')
+      navigate('/input/bongkar', { replace: true })
     } catch (e) {
       toast(pesan(e), TriangleAlert)
     }
@@ -395,6 +449,12 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
             </GlassCard>
           )}
 
+          {!readOnly && (
+            <Button variant="soft" className="w-full" disabled={sementara === 'menyimpan'} onClick={() => void simpanSementara()}>
+              {sementara === 'menyimpan' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Save aria-hidden="true" />}
+              Simpan sementara
+            </Button>
+          )}
           <div className="grid grid-cols-[auto_1fr] gap-space-xs">
             <Button variant="glass" size="lg" aria-label="Langkah sebelumnya" disabled={index === 0} onClick={kembali}>
               <ArrowLeft aria-hidden="true" />
@@ -423,7 +483,7 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         {readOnly ? (
           <span className="flex items-center gap-1.5 px-space-xs text-body-sm text-on-surface-variant">
             <Lock aria-hidden="true" className="size-4" />
-            Bongkaran selesai, data terkunci
+            {report.data.ttd?.pengawas?.img && report.data.ttd?.abh?.img ? 'Closing, data terkunci' : 'Bongkaran selesai, menunggu TTD pengawas & ABH'}
           </span>
         ) : (
           <Link to="/input/bongkar" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
@@ -439,6 +499,52 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         )}
       </div>
       {guard.dialog}
+      <Sheet
+        open={sementara !== 'tutup'}
+        onOpenChange={(o) => !o && sementara !== 'menyimpan' && setSementara('tutup')}
+        title={sementara === 'menyimpan' ? 'Menyimpan sementara…' : sementara === 'gagal' ? 'Gagal menyimpan' : 'Tersimpan sementara'}
+        description={stepState ? `Tahap ${index + 1} dari ${ORDER.length} · ${stepState.title}` : undefined}
+      >
+        <div className="flex flex-col items-center gap-space-sm pb-space-md text-center">
+          <span
+            aria-hidden="true"
+            className={cn('flex size-16 items-center justify-center rounded-full', sementara === 'gagal' ? 'bg-error-container text-error' : sementara === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-primary/10 text-primary')}
+          >
+            {sementara === 'menyimpan' ? <CloudUpload className="size-8 animate-pulse" /> : sementara === 'gagal' ? <TriangleAlert className="size-8" /> : <CircleCheck className="size-8" />}
+          </span>
+          <span className="text-body-md text-on-surface">
+            {sementara === 'gagal'
+              ? 'Draf belum tersimpan ke server. Periksa sinyal lalu coba lagi; isian tetap ada di perangkat ini.'
+              : `Isian & foto ${report.data.nopol || 'MT'} ${report.data.produk || ''} aman sebagai draf. Lanjutkan kapan saja dari Input › Bongkaran.`}
+          </span>
+          {stepState && sementara === 'ok' && (
+            <span className={cn('w-full rounded-md px-space-sm py-space-xs text-left text-body-sm', stepState.complete ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900')}>
+              {stepState.complete ? 'Tahap ini sudah lengkap.' : `Tahap ini belum lengkap: ${stepState.issues.slice(0, 2).join('; ')}${stepState.issues.length > 2 ? '…' : ''}`}
+            </span>
+          )}
+          <span className="tabular text-xs text-on-surface-variant">{evaluation.steps.filter((x) => x.complete).length} dari {ORDER.length} tahap lengkap</span>
+          {sementara !== 'menyimpan' && (
+            <div className="grid w-full grid-cols-2 gap-space-xs">
+              {sementara === 'gagal' ? (
+                <Button variant="glass" onClick={() => void simpanSementara()}>
+                  Coba lagi
+                </Button>
+              ) : (
+                <Button
+                  variant="glass"
+                  onClick={() => {
+                    guard.bypass()
+                    navigate('/input/bongkar')
+                  }}
+                >
+                  Keluar, lanjut nanti
+                </Button>
+              )}
+              <Button onClick={() => setSementara('tutup')}>Lanjut mengisi</Button>
+            </div>
+          )}
+        </div>
+      </Sheet>
     </div>
   )
 }

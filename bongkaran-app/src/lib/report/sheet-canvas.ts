@@ -40,7 +40,7 @@ interface Cell {
   f?: string
   span?: [number, number]
 }
-interface Layout {
+export interface Layout {
   area: { c1: number; r1: number; c2: number; r2: number }
   cols: number[]
   rows: number[]
@@ -135,11 +135,31 @@ function strokeSide(ctx: CanvasRenderingContext2D, spec: string, x1: number, y1:
   ctx.restore()
 }
 
-export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: { red?: string[]; overlays?: Overlay[]; scale?: number; formats?: Record<string, string> } = {}) {
+type DrawOpts = { red?: string[]; overlays?: Overlay[]; scale?: number; formats?: Record<string, string> }
+
+export async function drawSheet(sheet: SheetKey, values: Record<string, CellValue>, opts: DrawOpts = {}) {
+  return drawLayout(getLayout(sheet), values, opts, sheet)
+}
+
+/** Potongan baris `dari`..`sampai` dari sebuah tata letak (satu kartu dari sheet yang memuat beberapa kartu). */
+export function potongLayout(l: Layout, dari: number, sampai: number): Layout {
+  const r1 = Math.max(dari, l.area.r1)
+  const r2 = Math.min(sampai, l.area.r2)
+  const cells: Record<string, Cell> = {}
+  for (const [ref, cell] of Object.entries(l.cells)) {
+    const { r } = parseRef(ref)
+    if (r < r1 || r > r2) continue
+    cells[ref] = cell.span && r + cell.span[0] - 1 > r2 ? { ...cell, span: [r2 - r + 1, cell.span[1]] } : cell
+  }
+  return { ...l, area: { ...l.area, r1, r2 }, rows: l.rows.slice(r1 - l.area.r1, r2 - l.area.r1 + 1), cells, images: [] }
+}
+
+/** Gambar tata letak sheet apa pun (mis. template laporan operasional) ke <canvas>. */
+export async function drawLayout(l: Layout, values: Record<string, CellValue>, opts: DrawOpts = {}, sheet?: SheetKey) {
   const { red = [], overlays = [], scale = 2, formats = {} } = opts
-  const l = getLayout(sheet)
   const { c1, r1, c2, r2 } = l.area
-  const { width, height } = sheetSize(sheet)
+  const width = l.cols.reduce((a, b) => a + b, 0)
+  const height = l.rows.reduce((a, b) => a + b, 0)
   const xs = [0]
   l.cols.forEach((w) => xs.push(xs[xs.length - 1] + w))
   const ys = [0]
@@ -254,10 +274,10 @@ export async function drawSheet(sheet: SheetKey, values: Record<string, CellValu
     const el = await loadImage(img.src)
     if (el) ctx.drawImage(el, img.x, img.y, img.w, img.h)
   }
-  for (const o of overlays) {
+  for (const o of sheet ? overlays : []) {
     const el = await loadImage(o.src)
     if (!el) continue
-    const { x: ax, y: ay, w: aw, h: ah } = overlayBox(sheet, o)
+    const { x: ax, y: ay, w: aw, h: ah } = overlayBox(sheet!, o)
     const s = Math.min(aw / el.naturalWidth, ah / el.naturalHeight)
     const w = el.naturalWidth * s
     const hh = el.naturalHeight * s

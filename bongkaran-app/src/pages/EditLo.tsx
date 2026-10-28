@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Lock, Repeat, Save, Scissors, Trash2 } from 'lucide-react'
+import { Lock, PencilLine, Repeat, Save, Scissors, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -11,13 +12,13 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/components/ui/toast'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { LO_MANUAL_STATUS, LO_MAX_LITER, loStatus, loStatusMeta, pecahVolume, planSupply, SHIFT_PERMINTAAN } from '@/lib/plan'
-import type { LoStatus, Plan, PlanLo } from '@/lib/sop'
+import { evaluateAll, normalizeReport, summarize, type LoStatus, type Plan, type PlanLo } from '@/lib/sop'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 /** Satu baris tabel edit. `asal` = LO tersimpan (kosong untuk hasil pecah LO lama di atas 8.000 L). */
@@ -27,7 +28,7 @@ type Baris = {
   noLO: string
   produk: string
   volume: string
-  shift: '' | '1' | '2'
+  shift: '' | '1' | '2' | '3'
   status: LoStatus
   /** Alih supply / pindah station: nomor LO baru dan supply point baru. */
   alihLO: string
@@ -35,6 +36,8 @@ type Baris = {
   hapus: boolean
 }
 
+/** Waktu simpan (di luar render). */
+const stamp = () => Date.now()
 const pesan = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /**
@@ -65,7 +68,7 @@ export function EditLo() {
         <span className="text-body-md font-semibold text-on-surface">Permintaan tidak ditemukan</span>
         <span className="text-body-sm text-on-surface-variant">Plan ini mungkin sudah dihapus dari perangkat lain.</span>
         <Link to="/plan" className={buttonVariants({ size: 'pill' })}>
-          Ke Tracking LO
+          Ke Plan & Tracking LO
         </Link>
       </GlassCard>
     )
@@ -75,7 +78,8 @@ export function EditLo() {
 
 function Form({ plan }: { plan: Plan }) {
   const app = useApp()
-  const toast = useToast()
+  const konfirmasi = useKonfirmasi()
+  const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const fokus = params.get('lo')
@@ -91,7 +95,7 @@ function Form({ plan }: { plan: Plan }) {
   const awal = useMemo(() => JSON.stringify({ noSO: plan.noSO, rows: barisDari(plan, bisaUbah) }), [plan]) // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = JSON.stringify({ noSO, rows }) !== awal
   const dipecah = rows.filter((r) => !r.asal).length
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa menyimpan?', detail: 'Perubahan nomor SO dan LO pada halaman ini belum disimpan.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari edit SO & LO?', detail: dirty ? 'Perubahan nomor SO dan LO pada halaman ini belum disimpan.' : 'Belum ada perubahan yang disimpan.' })
 
   useEffect(() => {
     // Baris LO yang diketuk di Tracking LO ditandai dan digulir ke tengah layar.
@@ -103,6 +107,9 @@ function Form({ plan }: { plan: Plan }) {
     setRows((rs) => rs.map((r) => (r.id === rid ? { ...r, ...p } : r)))
   }
   const semuaTerkunci = plan.los.every(terpakai)
+  // Kepala shift ikut memperbarui SO/LO yang sedang berjalan (tidak menghapus); pengawas & ABH juga menghapus.
+  const bolehUpdate = app.canManage || app.role === 'kashift'
+  const adaClosed = plan.los.some((lo) => loStatus(lo, app.usedLoIds) === 'closed')
 
   const simpan = async () => {
     const aktif = rows.filter((r) => !r.hapus)
@@ -143,13 +150,48 @@ function Form({ plan }: { plan: Plan }) {
       if (alihBaru(r) && r.asal) return { ...base, status: 'alih', noLOLama: r.noLO.trim(), supplyPointLama: planSupply(plan, r.asal), noLO: r.alihLO.trim(), supplyPoint: r.alihSP }
       return { ...base, noLO: r.noLO.trim(), status: r.status }
     })
+    // Nomor SO berubah: laporan bongkaran (BA) yang memakai LO permintaan ini ikut diperbarui.
+    const soBaru = noSO.trim()
+    const laporanSo = soBaru !== plan.noSO.trim() ? [...new Map(plan.los.flatMap((lo) => (app.usedLoIds.get(lo.id) ? [[app.usedLoIds.get(lo.id)!.id, app.usedLoIds.get(lo.id)!] as const] : []))).values()] : []
+    if (laporanSo.some((r) => r.status !== 'draft') && !app.canManage) return setError('Nomor SO pada laporan bongkaran yang sudah ditutup hanya dapat diubah pengawas atau ABH.')
+    if (
+      laporanSo.length &&
+      !(await konfirmasi({
+        jenis: 'ubah',
+        judul: 'Ubah nomor SO?',
+        pesan: (
+          <>
+            Nomor SO pada <b>{laporanSo.length} laporan bongkaran</b> terkait (termasuk BA yang sudah ditandatangani) ikut diubah dari <b>{plan.noSO || '-'}</b> menjadi <b>{soBaru || '-'}</b>.
+          </>
+        ),
+        ya: 'Ya, ubah SO',
+      }))
+    )
+      return
+    if (!los.length && !(await konfirmasi({ judul: 'Hapus permintaan?', pesan: <>Semua LO dihapus, sehingga permintaan kirim <b>{formatTanggalIso(plan.tanggal)}</b> ikut terhapus dari Plan & Tracking LO.</> }))) return
     setSaving(true)
     try {
-      if (los.length) await app.savePlan({ ...plan, noSO: noSO.trim(), los })
+      // Laporan bongkaran dulu, baru permintaan: bila gagal di tengah, simpan ulang tetap memperbarui laporan.
+      for (const ring of laporanSo) {
+        const raw = await app.backend.getReport(ring.id)
+        if (!raw) continue
+        const report = normalizeReport(raw)
+        const next = { ...report, updatedAt: stamp(), data: { ...report.data, noSO: soBaru } }
+        const summary = summarize(next, evaluateAll(next, app.rules))
+        await app.backend.saveReport(next, summary)
+        app.upsertSummary(summary)
+      }
+      if (los.length) await app.savePlan({ ...plan, noSO: soBaru, los })
       else await app.deletePlan(plan)
       guard.bypass()
-      toast(los.length ? 'SO & LO tersimpan' : 'Permintaan dihapus')
-      navigate(kembaliKe)
+      keTerkirim({
+        judul: los.length ? 'SO & LO terkirim' : 'Permintaan dihapus',
+        detail: `Kirim ${formatTanggalIso(plan.tanggal)}${soBaru ? `, SO ${soBaru}` : ''}${laporanSo.length ? ` · ${laporanSo.length} laporan bongkaran ikut diperbarui` : ''}`,
+        baris: los.map((lo): [string, string] => [`${lo.produk} ${formatNumber(lo.volume)} L`, lo.noLO ? `LO ${lo.noLO}` : 'LO belum terbit']),
+        aksi: [
+          { to: `${kembaliKe}?baru=${encodeURIComponent(plan.id)}`, label: kembaliKe.startsWith('/plan/lo/') ? 'Kembali ke detail LO' : 'Kembali ke Plan & Tracking LO' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
     } finally {
@@ -157,7 +199,7 @@ function Form({ plan }: { plan: Plan }) {
     }
   }
 
-  const keluar = () => navigate(kembaliKe)
+  const keluar = () => navigate(kembaliKe, { replace: true })
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -173,8 +215,18 @@ function Form({ plan }: { plan: Plan }) {
           <Info label="Permintaan MS2" value={`${formatTanggalIso(plan.ms2Tanggal)} ${plan.ms2Jam}`} />
           <Info label="Total" value={`${plan.los.length} LO, ${formatNumber(plan.los.reduce((n, l) => n + l.volume, 0))} L`} />
         </dl>
-        <Field label="Nomor SO" htmlFor="lo-so-edit" hint={`Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`}>
-          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={semuaTerkunci} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
+        <Field
+          label="Nomor SO"
+          htmlFor="lo-so-edit"
+          hint={
+            plan.los.some(terpakai)
+              ? app.canManage || !adaClosed
+                ? 'Satu SO untuk semua LO di permintaan ini. LO sudah dipakai laporan bongkaran: perubahan SO ikut memperbarui laporan bongkaran (BA) terkait.'
+                : 'Ada LO yang sudah Closed: nomor SO hanya dapat dikoreksi pengawas atau ABH.'
+              : `Satu SO untuk semua LO di permintaan ini. 1 LO maksimal ${formatNumber(LO_MAX_LITER)} L.`
+          }
+        >
+          <Input id="lo-so-edit" autoComplete="off" inputMode="numeric" disabled={adaClosed && !app.canManage} value={noSO} onChange={(e) => (setError(null), setNoSO(e.target.value))} />
         </Field>
       </GlassCard>
 
@@ -235,7 +287,7 @@ function Form({ plan }: { plan: Plan }) {
         <Button size="lg" variant="glass" onClick={keluar}>
           Batal
         </Button>
-        {!semuaTerkunci && (
+        {(!semuaTerkunci || noSO.trim() !== plan.noSO.trim()) && (
           <Button size="lg" className="flex-1" disabled={saving} onClick={simpan}>
             <Save aria-hidden="true" />
             {saving ? 'Menyimpan…' : 'Simpan & kembali'}
@@ -270,9 +322,19 @@ function Form({ plan }: { plan: Plan }) {
             </span>
             {r.asal.noLOLama && <span className="tabular block text-on-surface-variant">dari LO {r.asal.noLOLama}</span>}
             <span className="block text-on-surface-variant">MT {used.nopol || '-'}</span>
-            <span className="mt-1 inline-block">
+            <span className="mt-1 flex flex-wrap items-center gap-space-xs">
               <Pill tone={m.tone}>{m.label}</Pill>
+              {/* Bongkaran belum selesai (Delivered): nomor LO masih dapat diubah lewat bongkarannya; Closed terkunci. */}
+              {st === 'delivered' && bolehUpdate ? (
+                <Link to={`/input/${encodeURIComponent(used.id)}/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(r.asal.id)}`} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-primary/10 px-3 text-body-sm font-semibold text-primary">
+                  <PencilLine aria-hidden="true" className="size-3.5" />
+                  Ubah nomor LO
+                </Link>
+              ) : st === 'closed' ? (
+                <span className="text-xs text-on-surface-variant">Closed, terkunci</span>
+              ) : null}
             </span>
+            {st === 'delivered' && <span className="mt-1 block text-xs text-on-surface-variant">Sedang dibongkar: hapus LO lewat bongkarannya bila batal.</span>}
           </td>
         </tr>
       )

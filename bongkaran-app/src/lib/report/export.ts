@@ -5,6 +5,7 @@
  *   ke gambar; PDF Berita Acara ditambah lampiran foto evidence.
  */
 import { jsPDF } from 'jspdf'
+import type { Lapor } from '@/lib/ekspor'
 import { LEGACY_PHOTO_SLOTS, STEPS, type Derived, type Report, type Settings } from '@/lib/sop'
 import { buildBa } from './ba'
 import { paginate, persediaanCells, type PersediaanRow } from './persediaan'
@@ -25,6 +26,10 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
+
+const diam: Lapor = () => {}
+/** Beri kesempatan lembar progres tergambar di antara pekerjaan berat. */
+const jeda = () => new Promise<void>((r) => setTimeout(r, 0))
 
 const valuesOf = (cells: Record<string, CellSpec>) => Object.fromEntries(Object.entries(cells).map(([k, v]) => [k, v.value]))
 
@@ -56,13 +61,16 @@ function imageSize(src: string) {
   })
 }
 
-export async function exportBaXlsx(report: Report, x: Derived, settings: Settings, filename: string) {
+export async function exportBaXlsx(report: Report, x: Derived, settings: Settings, filename: string, lapor: Lapor = diam) {
+  lapor(30, 'Mengisi data Berita Acara')
   const ba = buildBa(report, x, settings)
+  lapor(40, 'Memuat template Excel')
   const wb = await Workbook.loadTemplate()
   await wb.removeSheet(PERSEDIAAN_SHEET)
   const path = await wb.sheetPath(BA_SHEET)
   await wb.setCells(path, ba.cells)
   const images: ImageSpec[] = []
+  lapor(55, 'Menempel tanda tangan')
   for (const s of ba.signatures) {
     const img = await trimSignature(s.img)
     const { w, h } = await imageSize(img)
@@ -91,6 +99,7 @@ export async function exportBaXlsx(report: Report, x: Derived, settings: Setting
     for (const f of [...d.getElementsByTagNameNS(NS, 'formula')]) if (f.textContent === '$K$31') f.textContent = '$K$30'
   })
   await wb.cleanup()
+  lapor(85, 'Menyusun file Excel')
   downloadBlob(await wb.toBlob(), filename)
 }
 
@@ -119,8 +128,11 @@ async function baRender(report: Report, x: Derived, settings: Settings) {
   return drawSheet('ba', valuesOf(ba.cells), { red: ba.red, overlays, formats })
 }
 
-export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string) {
+export async function exportBaJpg(report: Report, x: Derived, settings: Settings, filename: string, lapor: Lapor = diam) {
+  lapor(35, 'Menggambar Berita Acara')
   const canvas = await baRender(report, x, settings)
+  lapor(85, 'Menyimpan gambar JPG')
+  await jeda()
   const a = document.createElement('a')
   a.href = canvas.toDataURL('image/jpeg', 0.92)
   a.download = filename
@@ -139,76 +151,162 @@ function placeCanvas(doc: jsPDF, canvas: HTMLCanvasElement, margin = 24) {
   doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (pw - w) / 2, margin, w, h)
 }
 
+const BIRU: [number, number, number] = [21, 94, 168]
+const jamFoto = (iso: string) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Lampiran foto evidence: dikelompokkan per tahap SOP (pita judul bernomor), foto mengalir dalam grid 4 kolom
+ * berbingkai 3:4 (12 foto per halaman); kelompok kecil berbagi baris. Foto dimuat utuh sesuai rasio aslinya (tidak gepeng / tidak
+ * terpotong), sisa bingkai berwarna abu muda. Tiap foto diberi keterangan slot dan jam pengambilan.
+ */
+async function lampiranFoto(doc: jsPDF, report: Report, photoData: Record<string, string>, lapor: Lapor, dari: number, sampai: number) {
+  const groups = STEPS.map((step, si) => ({
+    no: si + 1,
+    title: step.title,
+    items: step.photos
+      .flatMap((p) => [p, ...(LEGACY_PHOTO_SLOTS[p.key] ?? [])])
+      .flatMap((p) => (report.photos[p.key] ?? []).map((ph) => ({ label: p.label, ph }))),
+  })).filter((g) => g.items.length)
+  if (!groups.length) return
+
+  const pw = doc.internal.pageSize.getWidth()
+  const ph = doc.internal.pageSize.getHeight()
+  const M = 28
+  const KOLOM = 4
+  const GAP = 8
+  const cw = (pw - M * 2 - GAP * (KOLOM - 1)) / KOLOM
+  const bh = cw * (4 / 3)
+  const CAP = 20
+  const rowH = bh + CAP + GAP + 4
+  const bawah = ph - M - 14
+  const d = report.data
+  const total = groups.reduce((n, g) => n + g.items.length, 0)
+  let hal = 0
+  let y = 0
+
+  const halamanBaru = () => {
+    doc.addPage('a4', 'portrait')
+    hal++
+    doc.setFillColor(...BIRU)
+    doc.rect(0, 0, pw, 4, 'F')
+    doc.setTextColor(20)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('LAMPIRAN FOTO EVIDENCE', M, M + 8)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(90)
+    const info = [d.noBA && `BA ${d.noBA}`, d.nopol && `MT ${d.nopol}`, d.produk, d.tanggalDatang].filter(Boolean).join('  ·  ')
+    doc.text(info, M, M + 20)
+    doc.text(`${total} foto`, pw - M, M + 8, { align: 'right' })
+    doc.setDrawColor(220)
+    doc.setLineWidth(0.5)
+    doc.line(M, M + 27, pw - M, M + 27)
+    doc.setFontSize(7)
+    doc.setTextColor(130)
+    doc.text(`Lampiran Berita Acara Pembongkaran BBM · hal. ${hal}`, pw / 2, ph - M + 6, { align: 'center' })
+    y = M + 38
+  }
+  halamanBaru()
+
+  // Kelompok dikemas berdampingan: tahap dengan 1-2 foto berbagi satu baris; kelompok yang tidak muat di
+  // sisa kolom pindah ke baris baru. Tiap potongan kelompok diberi pita judul selebar fotonya.
+  const HEAD = 18
+  let col = 0
+  const barisBaru = () => {
+    y += HEAD + rowH
+    col = 0
+    if (y + HEAD + bh + CAP > bawah) halamanBaru()
+  }
+  const pita = (g: (typeof groups)[number], c0: number, n: number, lanjut: boolean) => {
+    const x = M + c0 * (cw + GAP)
+    const w = n * cw + (n - 1) * GAP
+    doc.setFillColor(237, 243, 251)
+    doc.roundedRect(x, y, w, 14, 3, 3, 'F')
+    doc.setFillColor(...BIRU)
+    doc.circle(x + 7, y + 7, 5, 'F')
+    doc.setTextColor(255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(6.5)
+    doc.text(String(g.no), x + 7, y + 9.2, { align: 'center' })
+    doc.setTextColor(...BIRU)
+    doc.setFontSize(7.5)
+    doc.text(doc.splitTextToSize(`${g.title}${lanjut ? ' (lanjutan)' : ''}`, w - 20)[0] as string, x + 16, y + 9.6)
+  }
+  let ke = 0
+  for (const g of groups) {
+    if (col > 0 && col + g.items.length > KOLOM) barisBaru()
+    let mulai = 0
+    while (mulai < g.items.length) {
+      if (col >= KOLOM) barisBaru()
+      const n = Math.min(KOLOM - col, g.items.length - mulai)
+      pita(g, col, n, mulai > 0)
+      for (let i = 0; i < n; i++) {
+        const it = g.items[mulai + i]
+        lapor(dari + ((sampai - dari) * ke++) / total, `Menyusun lampiran foto ${ke}/${total}`)
+        if (ke % 4 === 0) await jeda()
+        const x = M + (col + i) * (cw + GAP)
+        const yy = y + HEAD
+        doc.setFillColor(244, 245, 247)
+        doc.roundedRect(x, yy, cw, bh, 3, 3, 'F')
+        const src = photoData[it.ph.id] || it.ph.dataUrl || ''
+        try {
+          // Muat utuh sesuai rasio asli: tidak gepeng, tidak terpotong.
+          const prop = doc.getImageProperties(src)
+          const k = Math.min(cw / prop.width, bh / prop.height)
+          const w = prop.width * k
+          const h = prop.height * k
+          doc.addImage(src, 'JPEG', x + (cw - w) / 2, yy + (bh - h) / 2, w, h)
+        } catch {
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(150)
+          doc.text('(gambar tidak dapat dimuat)', x + cw / 2, yy + bh / 2, { align: 'center' })
+        }
+        doc.setDrawColor(215)
+        doc.setLineWidth(0.4)
+        doc.roundedRect(x, yy, cw, bh, 3, 3, 'S')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(6.8)
+        doc.setTextColor(40)
+        doc.text(doc.splitTextToSize(it.label, cw)[0] as string, x, yy + bh + 8)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(6.3)
+        doc.setTextColor(120)
+        doc.text(jamFoto(it.ph.at), x, yy + bh + 15.5)
+      }
+      col += n
+      mulai += n
+    }
+  }
+  doc.setTextColor(0)
+}
+
 /** Jenis unduhan BA. `pdf-ba`: PDF tanpa lampiran foto (cepat). */
 export type ExportKind = 'pdf' | 'pdf-ba' | 'jpg' | 'xlsx'
 
 /** PDF Berita Acara; `photoData` null = tanpa lampiran foto evidence. */
-export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string> | null, filename: string) {
+export async function exportBaPdf(report: Report, x: Derived, settings: Settings, photoData: Record<string, string> | null, filename: string, lapor: Lapor = diam) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' })
+  lapor(photoData ? 52 : 30, 'Menggambar Berita Acara')
+  await jeda()
   placeCanvas(doc, await baRender(report, x, settings))
-  if (!photoData) {
-    doc.save(filename)
-    return
-  }
-
-  // Lampiran foto evidence per tahap.
-  const groups = STEPS.flatMap((step, si) =>
-    step.photos.flatMap((p) => [p, ...(LEGACY_PHOTO_SLOTS[p.key] ?? [])])
-      .filter((p) => (report.photos[p.key] ?? []).length)
-      .map((p) => ({ title: `Tahap ${si + 1} - ${step.title}: ${p.label}`, photos: report.photos[p.key] })),
-  )
-  if (groups.length) {
-    const pw = doc.internal.pageSize.getWidth()
-    const ph = doc.internal.pageSize.getHeight()
-    const margin = 36
-    doc.addPage()
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.text('LAMPIRAN FOTO EVIDENCE', margin, 44)
-    let y = 64
-    const imgW = 250
-    const imgH = 170
-    const gap = pw - margin * 2 - imgW * 2
-    for (const g of groups) {
-      if (y + 16 + imgH > ph - 36) {
-        doc.addPage()
-        y = 44
-      }
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8.5)
-      doc.text(g.title, margin, y)
-      y += 6
-      let col = 0
-      for (const p of g.photos) {
-        if (col === 0 && y + imgH > ph - 36) {
-          doc.addPage()
-          y = 44
-        }
-        const px = margin + col * (imgW + gap)
-        try {
-          doc.addImage(photoData[p.id] || p.dataUrl || '', 'JPEG', px, y, imgW, imgH)
-        } catch {
-          doc.setFont('helvetica', 'normal')
-          doc.text('(gambar tidak dapat dimuat)', px, y + imgH / 2)
-        }
-        col++
-        if (col > 1) {
-          col = 0
-          y += imgH + 8
-        }
-      }
-      if (col !== 0) y += imgH + 8
-      y += 10
-    }
-  }
+  if (photoData) await lampiranFoto(doc, report, photoData, lapor, 62, 92)
+  lapor(95, 'Menyimpan file PDF')
+  await jeda()
   doc.save(filename)
 }
 
-export async function exportPersediaanPdf(data: PersediaanExport, filename: string) {
+export async function exportPersediaanPdf(data: PersediaanExport, filename: string, lapor: Lapor = diam) {
   // Template: kertas Legal landscape.
   const doc = new jsPDF({ unit: 'pt', format: 'legal', orientation: 'landscape' })
   const pages = paginate(data.rows)
   for (let i = 0; i < pages.length; i++) {
+    lapor(20 + (70 * i) / pages.length, `Menggambar halaman ${i + 1}/${pages.length}`)
+    await jeda()
     if (i) doc.addPage()
     placeCanvas(doc, await drawSheet('persediaan', valuesOf(persediaanCells(pages[i], data.header))), 18)
   }

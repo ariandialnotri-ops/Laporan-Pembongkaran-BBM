@@ -2,12 +2,14 @@
  * Alur SOP pembongkaran BBM: tipe data, definisi tahapan, validasi tiap
  * tahap, dan perhitungan kuantitas/kualitas untuk Berita Acara.
  */
+import type { RevisiDev } from '@/lib/revisi'
+import type { AbsensiSetting } from '@/lib/absen'
 import { density15, normalizeDensity, type Density15 } from '@/lib/density'
 import { minutesBetween, nowHm, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 import { genId } from '@/lib/image'
 import { shiftKey, type Shift } from '@/lib/shift'
-import { getTank, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
+import { getTank, TANKS, volumeFromLevel, type Tank, type VolumeResult } from '@/lib/tank'
 import type { AparUnit } from '@/lib/apar'
 
 export interface Photo {
@@ -89,6 +91,8 @@ export interface ReportData {
   noSO: string
   loIds: string[]
   noLOs: string[]
+  /** SO & LO diketik manual (tidak dari Plan), mis. SO/LO belum diinput di Plan Pengiriman. */
+  soManual?: boolean
   tanggalDatang: string
   jamDatang: string
   nopol: string
@@ -126,6 +130,8 @@ export interface ReportData {
   jamBacaAtg: string
   atgAfter: AtgReading
   penjualanSelamaBongkar: string
+  /** Penerimaan real menurut P-Insyst (L), pembanding penerimaan ATG. */
+  penerimaanPinsyst?: string
   totalisator: Totalisator[]
   dipAfterMm: string
   ttd: Partial<Record<SignerKey, Signature>>
@@ -161,13 +167,26 @@ export interface PlanLo {
   /** Nomor segel per produk sesuai dokumen LO. */
   segel: string[]
   /** Shift permintaan untuk produk ini (boleh beda antar produk dalam satu permintaan). */
-  shift?: '' | '1' | '2'
+  shift?: '' | '1' | '2' | '3'
   /** Supply point LO ini bila berbeda dari plan (setelah alih supply). */
   supplyPoint?: string
   noLOLama?: string
   supplyPointLama?: string
   /** Plan lama: jumlah DO. */
   jumlahDO?: number
+}
+
+/** Satu catatan perubahan plan/LO (waktu submit & perubahan, ditampilkan di detail Tracking LO). */
+export interface JejakPlan {
+  /** Epoch ms. */
+  waktu: number
+  oleh: string
+  jenis: 'buat' | 'so' | 'lo' | 'status' | 'ubah'
+  teks: string
+  /** LO yang berubah; kosong = berlaku untuk seluruh permintaan (SO, tanggal kirim). */
+  loId?: string
+  /** Status baru (jenis "status"). */
+  status?: LoStatus
 }
 
 export interface Plan {
@@ -178,7 +197,7 @@ export interface Plan {
   ms2Tanggal: string
   ms2Jam: string
   /** Shift permintaan minyak lewat MS2 (hanya shift 1 & 2). */
-  ms2Shift: '' | '1' | '2'
+  ms2Shift: '' | '1' | '2' | '3'
   poSap: string
   shipTo: string
   supplyPoint: string
@@ -189,6 +208,10 @@ export interface Plan {
   /** Plan lama: Sold To. */
   soldTo: string
   los: PlanLo[]
+  /** Riwayat submit & perubahan (terbaru di akhir). */
+  riwayat?: JejakPlan[]
+  /** Tanda revisi oleh super admin, dicap database (lihat lib/revisi). */
+  revisiDev?: RevisiDev
 }
 
 export const SUPPLY_POINTS = ['IT Surabaya', 'FT Madiun', 'FT Boyolali']
@@ -228,6 +251,7 @@ export interface ReportSummary {
   produk: string
   noSO: string
   noLOs: string[]
+  soManual?: boolean
   loIds: string[]
   doneCount: number
   volumeDO: number | null
@@ -265,6 +289,27 @@ export interface ReportSummary {
   /** Gate out depot (ISO tanggal + jam). */
   tanggalKeluar?: string
   jamKeluar?: string
+  /** Waktu laporan ditutup (selesai/anomali); durasi proses = finishedAt − createdAt (mulai tahap 1). */
+  finishedAt?: number | null
+}
+
+/** Penanda tangan yang menutup (closing) laporan bongkaran; boleh menandatangani setelah laporan selesai. */
+export const TTD_CLOSING: SignerKey[] = ['pengawas', 'abh']
+
+/**
+ * Laporan bongkaran berstatus Closing: sudah selesai/anomali DAN sudah ditandatangani pengawas serta ABH.
+ * Tanpa catatan tanda tangan (`ttdKurang`) laporan TIDAK dianggap closing. Export BA tetap bisa sebelum closing
+ * (mis. oleh kepala shift).
+ */
+export function sudahClosing(r: Pick<ReportSummary, 'status' | 'ttdKurang'>) {
+  return r.status !== 'draft' && Array.isArray(r.ttdKurang) && !r.ttdKurang.some((k) => TTD_CLOSING.includes(k))
+}
+
+/** Lama proses input bongkaran (menit) dari mulai tahap 1 sampai ditutup; draf dihitung sampai `sekarang`. */
+export function lamaProses(r: Pick<ReportSummary, 'createdAt' | 'finishedAt' | 'status'>, sekarang?: number): number | null {
+  const akhir = r.finishedAt ?? (r.status === 'draft' ? sekarang : undefined)
+  if (!akhir || !r.createdAt || akhir < r.createdAt) return null
+  return Math.round((akhir - r.createdAt) / 60000)
 }
 
 export interface Rules {
@@ -272,6 +317,19 @@ export interface Rules {
   teraToleranceMm: number
   atgSettleMinutes: number
   literPerDO: number
+  /** Batas pemeriksaan silang input bongkaran; melewati batas = peringatan (tidak memblokir). */
+  /** Deepstick tangki pendam vs tinggi ATG (mm). */
+  batasDipAtgMm: number
+  /** Volume layar ATG vs volume tabel kalibrasi dari tinggi ATG (L). */
+  batasAtgTabelL: number
+  /** Volume deepstick vs volume ATG setelah bongkar (L). */
+  batasDipAtgL: number
+  /** Transport gain/loss (total kompartemen) yang perlu diperiksa ulang (L). Discharge gain/loss tidak diberi batas. */
+  batasLossL: number
+  /** Penerimaan P-Insyst vs penerimaan ATG (L); 0,5 = beda ≥ 1 L setelah dibulatkan. */
+  batasPinsystL: number
+  /** Penjualan totalisator digital vs manual per nozzle per shift (L). */
+  batasTotalisatorL: number
 }
 
 export interface Settings {
@@ -289,10 +347,26 @@ export interface Settings {
   /** Data SPBU: jumlah pulau pompa (juga lokasi APAR) dan jumlah dispenser. */
   jumlahPulau: number
   jumlahDispenser: number
+  dispensers: Dispenser[]
+  /** Nomor Sold To SPBU (satu) dan Ship To per produk; mengisi otomatis form bongkaran & permintaan MS2. */
+  soldTo: string
+  shipTo: Record<string, string>
   /** Data utama area/lokasi APAR selain pulau pompa. */
   aparArea: string[]
   apar: AparUnit[]
   apab: AparUnit[]
+  /** Fasilitas SPBU (modul Operasional); undefined = semua fasilitas ada. */
+  fasilitas?: string[]
+  /** Daftar personil SPBU (termasuk yang tidak punya akun aplikasi): modul Personil & Jadwal Shift. */
+  personil?: Personil[]
+  /** Titik lokasi, radius, dan token QR absensi personil. */
+  absensi?: AbsensiSetting
+  /** Lama foto bukti disimpan sebelum cut-off tanggal 5 (bulan, bawaan 3). */
+  fotoSimpanBulan?: number
+  /** Petty cash: plafon anggaran per bulan (0/kosong = tidak dibatasi). */
+  pettyPlafon?: number
+  /** Harga jual per liter per produk (closing shift: penjualan = liter totalizer × harga). */
+  hargaProduk?: Record<string, number>
   rules: Rules
 }
 
@@ -300,6 +374,34 @@ export interface Nozzle {
   id: string
   nama: string
   produk: string
+  /** Unit dispenser tempat nozzle ini terpasang. */
+  dispenserId?: string
+  /** Nomor sertifikat tera metrologi. */
+  teraNoSertifikat?: string
+  /** Tanggal keluar sertifikat tera metrologi; berlaku maks. 1 tahun. */
+  teraTanggal?: string
+}
+
+/** Unit dispenser (pompa) di SPBU. */
+/** Personil SPBU. `aktif` false = tidak lagi bertugas (tetap di riwayat jadwal). */
+export interface Personil {
+  id: string
+  nama: string
+  jabatan: string
+  hp: string
+  aktif: boolean
+  /** Akun FLOQ milik personil ini (absensi hanya untuk diri sendiri). */
+  akunId?: string
+}
+
+export interface Dispenser {
+  id: string
+  /** Nomor/nama unit, mis. "Dispenser 1". */
+  nama: string
+  merk: string
+  noSeri: string
+  /** Pulau pompa tempat dispenser dipasang. */
+  pulau: string
 }
 
 export const PRODUK_OPTIONS = ['Pertalite', 'Pertamax', 'Pertamax Turbo', 'Biosolar', 'Pertamina Dex']
@@ -309,6 +411,12 @@ export const DEFAULT_RULES: Rules = {
   teraToleranceMm: 10,
   atgSettleMinutes: 10,
   literPerDO: 8000,
+  batasDipAtgMm: 10,
+  batasAtgTabelL: 2,
+  batasDipAtgL: 20,
+  batasLossL: 50,
+  batasPinsystL: 0.5,
+  batasTotalisatorL: 5,
 }
 
 export type PhotoSlotDef = { key: string; label: string; optional?: boolean }
@@ -405,7 +513,7 @@ export const STEPS: StepDef[] = [
   {
     id: 'density',
     title: 'Kualitas Density',
-    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density 15°C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
+    desc: 'Pilih kompartemen, isi density pengukuran & suhu. Density std. 15 °C dihitung otomatis dan dibandingkan dengan dokumen DO depot.',
     photos: [{ key: 'density', label: 'Pembacaan hidrometer & termometer', optional: true }],
   },
   {
@@ -427,6 +535,26 @@ export const STEPS: StepDef[] = [
     photos: [{ key: 'dip_after', label: 'Dipping tangki pendam setelah bongkar' }],
   },
 ]
+
+/**
+ * Letak kompartemen pada kolom Berita Acara "Kompartemen 1..n": sesuai NOMOR kompartemen (bukan urutan input).
+ * Nomor di luar 1..n, ganda, atau kosong mengisi kolom yang masih kosong secara berurutan.
+ */
+export function slotKompartemen<T extends { no: string }>(list: T[], n = 6): (T | undefined)[] {
+  const slot: (T | undefined)[] = Array(n).fill(undefined)
+  const sisa: T[] = []
+  for (const c of list) {
+    const k = Number(c.no.trim())
+    if (Number.isInteger(k) && k >= 1 && k <= n && !slot[k - 1]) slot[k - 1] = c
+    else sisa.push(c)
+  }
+  for (const c of sisa) {
+    const i = slot.indexOf(undefined)
+    if (i < 0) break
+    slot[i] = c
+  }
+  return slot
+}
 
 export function newCompartment(no = ''): Compartment {
   return { id: genId('k'), no, tinggiTera: '', kapasitas: '', kepekaan: '', dipAktual: '', noSegel: '' }
@@ -498,7 +626,8 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
       jamDatang: nowHm(),
       nopol: '',
       namaDriver: '',
-      soldTo: '',
+      // Sold To SPBU dari Profil > Sold To & Ship To.
+      soldTo: settings.soldTo ?? '',
       shipTo: '',
       produk: '',
       jumlahDO: '',
@@ -545,6 +674,23 @@ export function blankReport(settings: Settings, createdBy: string | null): Repor
 
 const has = (v: string | null | undefined) => v !== null && v !== undefined && v.trim() !== ''
 const num = (v: string | null | undefined) => parseAngka(v ?? '')
+
+/**
+ * Kepekaan buku tera MT (liter per mm, umumnya < 5): titik maupun koma dibaca sebagai desimal ("0.846" dan
+ * "0,846" = 0,846), dan angka berawalan 0 tanpa pemisah ("0726") dibaca 0,726. Format angka biasa memperlakukan
+ * titik dengan 3 digit sebagai pemisah ribuan, sehingga 0.846 terbaca 846 dan selisih 1 mm menjadi 846 L.
+ */
+export function parseKepekaan(v: string | null | undefined): number | null {
+  let t = (v ?? '').trim().replace(/\s/g, '')
+  if (!t) return null
+  if (/^0\d+$/.test(t)) t = `0.${t.slice(1)}`
+  else if ((t.match(/[.,]/g) ?? []).length === 1) t = t.replace(',', '.')
+  else return parseAngka(t)
+  const x = Number(t)
+  return Number.isFinite(x) ? x : null
+}
+/** Kepekaan di atas ini (L/mm) hampir pasti salah ketik. */
+export const KEPEKAAN_MAKS = 5
 
 export interface CompartmentResult extends Compartment {
   selisihMm: number | null
@@ -593,8 +739,24 @@ export interface Derived {
   atgAfterTable: VolumeResult | null
   diterimaDip: number | null
   gainLossDip: number | null
+  /** Pemeriksaan silang untuk mencegah salah baca/salah ketik (batas di Rules). */
+  cek: CekSilang
   settleMinutes: number | null
   sample2Jam: Sample2JamResult | null
+}
+
+export interface CekSilang {
+  /** Volume ATG − volume tabel dari tinggi ATG. */
+  atgTabelBefore: number | null
+  atgTabelAfter: number | null
+  /** Tinggi deepstick − tinggi ATG (mm). */
+  dipAtgMmBefore: number | null
+  dipAtgMmAfter: number | null
+  /** Volume deepstick − volume ATG (L). */
+  dipAtgLBefore: number | null
+  dipAtgLAfter: number | null
+  /** Penerimaan P-Insyst − penerimaan ATG (L). */
+  pinsyst: number | null
 }
 
 /** Menit dari bongkar selesai sampai sampel diambil (melewati tengah malam bila jam selesai < jam datang). */
@@ -618,7 +780,7 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     const kapasitas = num(c.kapasitas)
     const mmPerL = num(c.kepekaanMmL ?? '')
     // Liter per mm: kepekaan buku tera; laporan lama: 1 / kepekaan mm per liter, atau kapasitas / tinggi.
-    const kepekaan = num(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
+    const kepekaan = parseKepekaan(c.kepekaan) || (mmPerL ? 1 / mmPerL : kapasitas !== null && tera ? kapasitas / tera : null)
     const selisihMm = tera !== null && dip !== null ? dip - tera : null // negatif = kurang dari T2
     // Sama dengan Berita Acara: kepekaan x selisih (mm). Contoh 0,3 L/mm x -5 mm = -1,5 L.
     const estLiter = selisihMm !== null && kepekaan !== null ? selisihMm * kepekaan : null
@@ -654,6 +816,21 @@ export function deriveReport(report: Report, rules: Rules): Derived {
   const diterimaDip =
     dipBefore?.volume !== undefined && dipAfter?.volume !== undefined ? dipAfter.volume - dipBefore.volume + penjualan : null
 
+  const atgBeforeTable = volumeFromLevel(d.tankId, d.atgBefore.tinggi)
+  const atgAfterTable = volumeFromLevel(d.tankId, d.atgAfter.tinggi)
+  const terimaAktual = realStok !== null && stokAwal !== null ? realStok - stokAwal + penjualan : null
+  const kurang = (a: number | null | undefined, b: number | null | undefined) => (a !== null && a !== undefined && b !== null && b !== undefined ? a - b : null)
+  const vol = (r: VolumeResult | null) => (r && r.error === undefined ? r.volume : null)
+  const cek: CekSilang = {
+    atgTabelBefore: kurang(stokAwal, vol(atgBeforeTable)),
+    atgTabelAfter: kurang(realStok, vol(atgAfterTable)),
+    dipAtgMmBefore: kurang(num(d.dipBeforeMm), num(d.atgBefore.tinggi)),
+    dipAtgMmAfter: kurang(num(d.dipAfterMm), num(d.atgAfter.tinggi)),
+    dipAtgLBefore: kurang(vol(dipBefore), stokAwal),
+    dipAtgLAfter: kurang(vol(dipAfter), realStok),
+    pinsyst: kurang(num(d.penerimaanPinsyst ?? ''), terimaAktual),
+  }
+
   const literComps = compartments.filter((c) => c.estLiter !== null)
   const kapasitasTotal = d.compartments.reduce((n, c) => n + (num(c.kapasitas) ?? 0), 0)
   const sk = shiftKey(d.tanggalDatang, d.jamDatang)
@@ -663,7 +840,7 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     transportLoss: literComps.length ? literComps.reduce((n, c) => n + (c.estLiter ?? 0), 0) : null,
     transportLossLimit: kapasitasTotal ? kapasitasTotal * -0.0015 : null,
     totalisator,
-    terimaAktual: realStok !== null && stokAwal !== null ? realStok - stokAwal + penjualan : null,
+    terimaAktual,
     shift: sk?.shift ?? null,
     tanggalShift: sk?.tanggal ?? d.tanggalDatang,
     d15Depot,
@@ -681,8 +858,9 @@ export function deriveReport(report: Report, rules: Rules): Derived {
     gainLossPct,
     dipBefore,
     dipAfter,
-    atgBeforeTable: volumeFromLevel(d.tankId, d.atgBefore.tinggi),
-    atgAfterTable: volumeFromLevel(d.tankId, d.atgAfter.tinggi),
+    atgBeforeTable,
+    atgAfterTable,
+    cek,
     diterimaDip,
     gainLossDip: diterimaDip !== null && volumeDO !== null ? diterimaDip - volumeDO : null,
     settleMinutes: minutesBetween(d.jamSelesaiBongkar, d.jamBacaAtg),
@@ -724,7 +902,11 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.nopol)) issues.push('Isi nomor polisi mobil tangki')
       break
     case 'lo':
-      if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan')
+      if (d.soManual) {
+        if (!has(d.noSO)) issues.push('Isi nomor SO')
+        if (!d.noLOs.some((n) => n.trim())) issues.push('Isi minimal satu nomor LO')
+        if (!has(d.produk)) issues.push('Pilih produk')
+      } else if (!d.planId || d.loIds.length === 0) issues.push('Pilih SO dan LO dari Plan, atau isi manual')
       if (!has(d.tanggalDatang) || !has(d.jamDatang)) issues.push('Isi tanggal & jam kedatangan MT')
       if (!has(d.namaDriver)) issues.push('Isi nama lengkap driver')
       if (!has(d.shipTo)) issues.push('Isi nomor Ship To')
@@ -735,12 +917,16 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!has(d.tanggalKeluar) || !has(d.jamKeluar)) issues.push('Isi tanggal & jam keluar MT dari depot')
       break
     case 'tera':
-      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((num(c.kepekaan) ?? 0) > 0))) {
+      if (d.compartments.some((c) => !((num(c.tinggiTera) ?? 0) > 0) || !((num(c.kapasitas) ?? 0) > 0) || !((parseKepekaan(c.kepekaan) ?? 0) > 0))) {
         issues.push('Isi tinggi T2, kapasitas, dan kepekaan (L/mm) dari buku tera MT untuk semua kompartemen')
+      }
+      if (d.compartments.some((c) => (parseKepekaan(c.kepekaan) ?? 0) > KEPEKAAN_MAKS)) {
+        issues.push(`Kepekaan tidak wajar (> ${KEPEKAAN_MAKS} L/mm). Periksa buku tera, mis. 0,3 L/mm`)
       }
       break
     case 'atg_before':
-      if (!d.tankId) issues.push('Pilih tangki pendam')
+      // SPBU tanpa database tangki: pilihan tangki belum ada, tahap tetap bisa diselesaikan.
+      if (!d.tankId && TANKS.length) issues.push('Pilih tangki pendam')
       if ([d.atgBefore.tinggi, d.atgBefore.volume, d.atgBefore.suhu].some((v) => num(v) === null)) {
         issues.push('Isi ketinggian, volume, dan suhu pembacaan ATG')
       }
@@ -775,7 +961,7 @@ function evaluateStep(step: StepDef, report: Report, x: Derived, rules: Rules): 
       if (!d.sampelSesuai) issues.push('Konfirmasi sampel atas & bawah sesuai')
       break
     case 'density':
-      if (x.d15Depot === null) issues.push('Density 15°C depot belum diisi (tahap Dokumen LO)')
+      if (x.d15Depot === null) issues.push('Density std. 15 °C depot belum diisi (tahap Dokumen LO)')
       if (x.densityResults.length === 0) issues.push('Tambahkan minimal satu pengukuran density')
       if (x.densityResults.some((r) => !r.kompartemenId || !r.d15)) issues.push('Lengkapi kompartemen, density, dan suhu pada setiap pengukuran')
       if (x.densityAnomaly) {
@@ -853,6 +1039,7 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     id: report.id,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt,
+    finishedAt: report.finishedAt,
     status: report.status,
     createdBy: report.createdBy,
     tanggal: d.tanggalDatang,
@@ -862,6 +1049,7 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     noSO: d.noSO,
     noLOs: d.noLOs,
     loIds: d.loIds,
+    soManual: d.soManual || undefined,
     doneCount: ev.doneCount,
     volumeDO: ev.derived.volumeDO,
     gainLoss: ev.derived.gainLoss,
