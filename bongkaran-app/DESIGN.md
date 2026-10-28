@@ -569,6 +569,10 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Peringatan: LO sudah dipakai laporan bongkaran lain (merah); LO ada di Plan Pengiriman (amber, sebaiknya pilih dari Plan). Input manual tidak mengubah status Tracking LO.
 - Validasi tahap: manual wajib SO, minimal satu LO, dan produk; mode Plan tetap wajib pilih SO & LO.
 
+### 9.14r Pilih kompartemen & kolom BA
+- Tahap 2 "Kompartemen yang dibongkar": tombol ketuk 1-6 (bisa lebih dari satu, terurut). Melepas kompartemen yang sudah berisi data (deepstick, segel, density) meminta konfirmasi.
+- Berita Acara (`slotKompartemen` di `sop.ts`): data diletakkan di kolom/baris "Kompartemen N" sesuai NOMOR kompartemen, bukan urutan input. Nomor di luar 1-6 atau ganda mengisi kolom kosong berurutan. BA lama ikut benar saat diunduh ulang.
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

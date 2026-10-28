@@ -10,6 +10,7 @@ import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-ban
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -548,6 +549,10 @@ export function StepContent(props: StepProps) {
   }
 }
 
+/** Kompartemen diurutkan menurut nomornya (angka dulu, lalu teks). */
+const urutKomp = <T extends { no: string }>(list: T[]) =>
+  [...list].sort((a, b) => (Number(a.no) || Infinity) - (Number(b.no) || Infinity) || a.no.localeCompare(b.no))
+
 function LoStep(props: StepProps) {
   const { report, evaluation, setData, plans, usedLoIds, settings } = props
   const d = report.data
@@ -620,9 +625,19 @@ function LoStep(props: StepProps) {
     : []
   const loDiPlan = manual ? d.noLOs.filter((no) => plans.some((p) => p.los.some((lo) => lo.status !== 'deleted' && lo.noLO.trim() === no))) : []
 
-  const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
-  const removeComp = (id: string) =>
-    setData({ compartments: d.compartments.filter((c) => c.id !== id), densityTests: d.densityTests.filter((t) => t.kompartemenId !== id) })
+  const konfirmasi = useKonfirmasi()
+  // Pilih kompartemen 1-6 dengan ketuk; nomor lain dari laporan lama tetap tampil agar bisa dilepas.
+  const pilihanKomp = [...new Set(['1', '2', '3', '4', '5', '6', ...urutKomp(d.compartments).map((c) => c.no.trim()).filter(Boolean)])]
+  const toggleComp = async (no: string) => {
+    const ada = d.compartments.find((c) => c.no.trim() === no)
+    if (!ada) {
+      setData({ compartments: urutKomp([...d.compartments, newCompartment(no)]) })
+      return
+    }
+    const terisi = [ada.tinggiTera, ada.kapasitas, ada.kepekaan, ada.dipAktual, ada.noSegel].some((v) => v?.trim()) || d.densityTests.some((t) => t.kompartemenId === ada.id && (t.densityObs || t.suhu))
+    if (terisi && !(await konfirmasi({ jenis: 'hapus', judul: `Lepas kompartemen ${no}?`, pesan: <>Data <b>kompartemen {no}</b> (deepstick, segel, density) ikut terhapus.</>, ya: 'Ya, lepas' }))) return
+    setData({ compartments: d.compartments.filter((c) => c.id !== ada.id), densityTests: d.densityTests.filter((t) => t.kompartemenId !== ada.id) })
+  }
 
   const depotBanner = x.depotCalc
     ? x.d15Depot !== null && Math.abs(x.d15Depot - x.depotCalc.value) > 0.0005
@@ -798,23 +813,31 @@ function LoStep(props: StepProps) {
       </Section>
 
       <Section>
-        <span className="text-tag uppercase text-primary">Kompartemen</span>
-        <div className="flex flex-wrap items-center gap-space-xs">
-          {d.compartments.map((c) => (
-            <div key={c.id} className="flex items-center gap-1">
-              <Input aria-label="Nomor kompartemen" className="w-20" numeric value={c.no} onChange={(e) => setComp(c.id, e.target.value)} />
-              {d.compartments.length > 1 && (
-                <Button variant="ghost" size="icon" aria-label={`Hapus kompartemen ${c.no}`} onClick={() => removeComp(c.id)}>
-                  <Trash2 aria-hidden="true" />
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button variant="soft" size="sm" onClick={() => setData({ compartments: [...d.compartments, newCompartment(String(d.compartments.length + 1))] })}>
-            <Plus aria-hidden="true" />
-            Kompartemen
-          </Button>
+        <span className="text-tag uppercase text-primary">Kompartemen yang dibongkar</span>
+        <span className="text-body-sm text-on-surface-variant">Ketuk nomor kompartemen sesuai dokumen LO. Bisa lebih dari satu.</span>
+        <div role="group" aria-label="Pilih kompartemen" className="grid grid-cols-6 gap-space-xs">
+          {pilihanKomp.map((no) => {
+            const c = d.compartments.find((k) => k.no.trim() === no)
+            return (
+              <button
+                key={no}
+                type="button"
+                aria-pressed={!!c}
+                disabled={props.readOnly}
+                onClick={() => void toggleComp(no)}
+                className={cn(
+                  'tabular flex min-h-11 items-center justify-center rounded-md text-body-lg font-bold transition-colors duration-200',
+                  c ? 'bg-primary text-on-primary shadow-sm' : 'inset-field text-on-surface-variant',
+                )}
+              >
+                {no}
+              </button>
+            )
+          })}
         </div>
+        <span className="text-body-sm text-on-surface-variant">
+          {d.compartments.length ? `Terpilih: kompartemen ${urutKomp(d.compartments).map((c) => c.no || '-').join(', ')}` : 'Belum ada kompartemen dipilih'}
+        </span>
       </Section>
     </>
   )

@@ -536,6 +536,26 @@ export const STEPS: StepDef[] = [
   },
 ]
 
+/**
+ * Letak kompartemen pada kolom Berita Acara "Kompartemen 1..n": sesuai NOMOR kompartemen (bukan urutan input).
+ * Nomor di luar 1..n, ganda, atau kosong mengisi kolom yang masih kosong secara berurutan.
+ */
+export function slotKompartemen<T extends { no: string }>(list: T[], n = 6): (T | undefined)[] {
+  const slot: (T | undefined)[] = Array(n).fill(undefined)
+  const sisa: T[] = []
+  for (const c of list) {
+    const k = Number(c.no.trim())
+    if (Number.isInteger(k) && k >= 1 && k <= n && !slot[k - 1]) slot[k - 1] = c
+    else sisa.push(c)
+  }
+  for (const c of sisa) {
+    const i = slot.indexOf(undefined)
+    if (i < 0) break
+    slot[i] = c
+  }
+  return slot
+}
+
 export function newCompartment(no = ''): Compartment {
   return { id: genId('k'), no, tinggiTera: '', kapasitas: '', kepekaan: '', dipAktual: '', noSegel: '' }
 }
