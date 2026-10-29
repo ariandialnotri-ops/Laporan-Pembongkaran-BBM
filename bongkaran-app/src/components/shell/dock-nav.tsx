@@ -10,7 +10,7 @@ import { grupAktif } from './sidebar'
  * Bar navigasi bawah yang statis: menempel penuh di bawah layar (di atas garis home iPhone),
  * tidak melayang, tidak bergeser, dan tanpa animasi. Berisi grup menu sesuai peran;
  * Finance (kecuali Admin/Cashier, modul utamanya), Report, dan Profil ada di sidebar. Urutan:
- * Dashboard, Operation, [tombol bulat biru pintasan Lapor Insiden, Near miss & Kerusakan], Delivery, HSSE. Di layar lebar diganti sidebar tetap.
+ * Dashboard, Operation, [tombol bulat biru pintasan Lapor Kejadian], Delivery, HSSE. Di layar lebar diganti sidebar tetap.
  */
 export function DockNav() {
   const { pathname, search } = useLocation()
@@ -77,13 +77,13 @@ export function DockNav() {
 }
 
 /**
- * Pintasan Lapor Insiden, Near miss & Kerusakan: tombol bulat biru (ikon pindai) yang menonjol di tengah bar;
+ * Pintasan Lapor Kejadian (insiden, near miss, temuan, kerusakan): tombol bulat biru (ikon pindai) yang menonjol di tengah bar;
  * membuka kamera (foto/video bercap waktu), lalu pilih jenis laporan.
  * Susunan sama dengan item lain (ruang ikon + label) supaya label sejajar.
  */
 function TombolLapor({ aktif }: { aktif: boolean }) {
   return (
-    <Link to="/lapor" aria-label="Lapor insiden, near miss & kerusakan" aria-current={aktif ? 'page' : undefined} className="relative flex w-[20%] shrink-0 flex-col items-center justify-center gap-0.5">
+    <Link to="/lapor" aria-label="Lapor kejadian: insiden, near miss, temuan & kerusakan" aria-current={aktif ? 'page' : undefined} className="relative flex w-[20%] shrink-0 flex-col items-center justify-center gap-0.5">
       <span aria-hidden="true" className="absolute -top-7 left-1/2 flex size-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-on-primary shadow-[0_6px_16px_rgba(0,80,203,0.35)] ring-4 ring-surface-container-lowest">
         <ScanLine className="size-7" strokeWidth={2} />
       </span>

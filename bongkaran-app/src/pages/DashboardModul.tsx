@@ -144,7 +144,7 @@ export function DashboardHsse({ periode }: { periode: Periode }) {
           />
         </Kartu>
       )}
-      <Kartu icon={ShieldAlert} judul="Laporan insiden & near miss" sub={`${ins.length} laporan pada periode`} ke="/laporan/insiden" aksi="Riwayat" className="animate-entrance-2">
+      <Kartu icon={ShieldAlert} judul="Lapor kejadian" sub={`${ins.length} laporan pada periode`} ke="/laporan/insiden" aksi="Riwayat" className="animate-entrance-2">
         <BarChart data={batangIns} warna={KATEGORI[1]} satuan=" laporan" format={(v) => String(Math.round(v))} label={`Laporan insiden per ${jumlahHari(periode) > HARIAN_MAKS ? 'pekan' : 'hari'}`} />
       </Kartu>
       <GrafikHenti periode={periode} />

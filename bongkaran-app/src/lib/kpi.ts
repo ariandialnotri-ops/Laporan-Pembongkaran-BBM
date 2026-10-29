@@ -537,9 +537,9 @@ export function kpiHsse(d: DataHsse): Kpi[] {
     rincian: `${ins.length} laporan pada periode ini`,
     target: '≥ 90%',
     status: ins.length ? statusMin(pi, 90, 20) : 'ok',
-    definisi: 'Persentase laporan insiden, near miss, dan kerusakan pada periode ini yang ditutup paling lambat 7 hari.',
+    definisi: 'Persentase laporan kejadian (insiden, near miss, temuan, kerusakan) pada periode ini yang ditutup paling lambat 7 hari.',
     rumus: 'ditutup ≤ 7 hari ÷ (ditutup + terbuka > 7 hari) × 100%',
-    sumber: 'HSSE › Lapor Insiden',
+    sumber: 'HSSE › Lapor Kejadian',
     ke: '/laporan/insiden',
   })
   const hentiP = d.henti.filter((x) => dalam(x.h.mulai.slice(0, 10), d.periode))

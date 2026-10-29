@@ -179,7 +179,7 @@ export function UnitBisnis() {
         <StatTile label="Data siap" value={`${nSiap}/${semua.length}`} hint="identitas & tangki lengkap" icon={CircleCheck} tone={nSiap === semua.length ? 'success' : 'error'} />
         <StatTile label="Q&Q hari ini" value={`${qqHariIni}/${semua.length}`} hint="SPBU sudah uji" icon={ClipboardCheck} tone={qqHariIni === semua.length ? 'success' : 'default'} />
         <StatTile label="Bongkaran bulan ini" value={bongkaran} hint={anomali ? `${anomali} anomali` : 'tanpa anomali'} icon={Truck} tone={anomali ? 'error' : 'primary'} />
-        <StatTile label="Insiden terbuka" value={insiden} hint="insiden, near miss, kerusakan" icon={ShieldAlert} tone={insiden ? 'error' : 'default'} />
+        <StatTile label="Insiden terbuka" value={insiden} hint="insiden, near miss, temuan, kerusakan" icon={ShieldAlert} tone={insiden ? 'error' : 'default'} />
       </section>
 
       <section aria-labelledby="progres-spbu" className="animate-entrance-3 flex flex-col gap-space-sm">

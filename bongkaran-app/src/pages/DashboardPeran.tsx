@@ -56,13 +56,13 @@ function Angka({ items }: { items: [string, string | number, boolean?][] }) {
   )
 }
 
-/** Laporan insiden, near miss & kerusakan: jumlah per status dan laporan terbaru. */
+/** Lapor kejadian (insiden, near miss, temuan, kerusakan): jumlah per status dan laporan terbaru. */
 export function KartuInsiden() {
   const app = useApp()
   const semua = app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden' && d.data.jenis !== 'henti').sort((a, b) => b.tanggal.localeCompare(a.tanggal) || b.updatedAt - a.updatedAt)
   const n = (s: string) => semua.filter((r) => r.data.status === s).length
   return (
-    <Kartu icon={ShieldAlert} judul="Laporan kerusakan, insiden & near miss" sub={JENIS_INSIDEN.map((j) => `${semua.filter((r) => r.data.jenis === j.value).length} ${j.label.toLowerCase()}`).join(' · ')} ke="/laporan/insiden" aksi="Riwayat">
+    <Kartu icon={ShieldAlert} judul="Lapor kejadian" sub={JENIS_INSIDEN.map((j) => `${semua.filter((r) => r.data.jenis === j.value).length} ${j.label.toLowerCase()}`).join(' · ')} ke="/laporan/insiden" aksi="Riwayat">
       <Angka
         items={[
           ['Terbuka', n('terbuka'), n('terbuka') > 0],

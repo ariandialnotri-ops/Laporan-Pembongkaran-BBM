@@ -45,7 +45,7 @@ function formatVideo() {
 
 /**
  * Tombol Lapor (tengah bar bawah): langsung membuka kamera. Mode Foto atau Video, semuanya bercap
- * tanggal & jam serta nama SPBU. Setelah itu pilih jenis laporan (insiden, near miss, kerusakan)
+ * tanggal & jam serta nama SPBU. Setelah itu pilih jenis laporan (insiden, near miss, temuan, kerusakan)
  * dan form khusus jenis itu terbuka dengan foto/video terlampir.
  */
 export function LaporCepat() {

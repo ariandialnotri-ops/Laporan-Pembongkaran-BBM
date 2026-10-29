@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, ChevronRight, CircleCheck, Clock, FileText, LoaderCircle, Paperclip, Plus, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
+import { Ban, ChevronRight, CircleCheck, Clock, FileText, LoaderCircle, Paperclip, Plus, ScanSearch, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -63,7 +63,7 @@ function useInsiden() {
   return useMemo(() => app.daily.filter((d): d is InsidenRecord => d.kind === 'insiden'), [app.daily])
 }
 
-/** Laporan stop penyaluran punya menu & riwayat sendiri; daftar insiden hanya insiden, near miss, kerusakan. */
+/** Laporan stop penyaluran punya menu & riwayat sendiri; daftar insiden hanya insiden, near miss, temuan, kerusakan. */
 const bukanHenti = (r: InsidenRecord) => r.data.jenis !== 'henti'
 
 function StatusPill({ s }: { s: StatusInsiden }) {
@@ -71,7 +71,7 @@ function StatusPill({ s }: { s: StatusInsiden }) {
   return <Pill tone={m.tone}>{m.label}</Pill>
 }
 
-const IKON_JENIS: Record<JenisInsiden, typeof Ban> = { insiden: ShieldAlert, nearmiss: TriangleAlert, kerusakan: Wrench, henti: Ban }
+const IKON_JENIS: Record<JenisInsiden, typeof Ban> = { insiden: ShieldAlert, nearmiss: TriangleAlert, temuan: ScanSearch, kerusakan: Wrench, henti: Ban }
 
 /** Keterangan ikon status di ujung kanan kartu. */
 function LegendaIkon() {
@@ -91,8 +91,8 @@ function LegendaIkon() {
 
 const tingkatTone = (t: TingkatInsiden) => (t === 'tinggi' ? 'text-error' : t === 'sedang' ? 'text-amber-700' : 'text-on-surface-variant')
 
-/** Input > Pelaporan Insiden: form satu laporan insiden / near miss / kerusakan. Kirim lalu ke riwayat. */
-/** HSSE > Laporan Insiden & Near miss: pilih jenis kejadian, lalu isi form di halaman berikutnya. */
+/** Lapor Kejadian: form satu laporan insiden / near miss / temuan / kerusakan. Kirim lalu ke riwayat. */
+/** HSSE > Lapor Kejadian: pilih jenis kejadian, lalu isi form di halaman berikutnya. */
 export function PilihJenisInsiden() {
   const app = useApp()
   if (!app.loaded) return <Loading />
@@ -100,7 +100,7 @@ export function PilihJenisInsiden() {
   const henti = app.daily.filter((x): x is InsidenRecord => x.kind === 'insiden' && !!x.data.henti && !x.data.henti.selesai)
   return (
     <div className="flex flex-col gap-space-md">
-      <InfoHalaman judul="Lapor Insiden">
+      <InfoHalaman judul="Lapor Kejadian">
         <p>Pilih jenis kejadian yang akan dilaporkan.</p>
       </InfoHalaman>
       {henti.map((r) => (
@@ -391,7 +391,7 @@ const COLS: Col<Row>[] = [
   { header: 'Status', cell: (x) => <StatusPill s={x.r.data.status} />, mobile: 'badge' },
 ]
 
-/** Laporan > Riwayat Insiden, Near miss & Kerusakan. */
+/** Laporan > Riwayat Lapor Kejadian (insiden, near miss, temuan, kerusakan). */
 export function RiwayatInsiden() {
   const app = useApp()
   useSyncOnOpen()
@@ -439,7 +439,7 @@ export function RiwayatInsiden() {
       </GlassCard>
       <div className="animate-entrance-2">
         <RecordTable
-          title="Insiden, Near miss & Kerusakan"
+          title="Riwayat Lapor Kejadian"
           rows={rows}
           total={all.length}
           cols={COLS}

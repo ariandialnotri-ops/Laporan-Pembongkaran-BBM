@@ -1,18 +1,19 @@
 /**
- * Pelaporan insiden, near miss, dan kerusakan SPBU. Disimpan di bbm_daily (kind 'insiden'),
+ * Lapor Kejadian: insiden, near miss, temuan, dan kerusakan SPBU. Disimpan di bbm_daily (kind 'insiden'),
  * satu record per laporan; tindak lanjut ditambahkan ke riwayat laporan yang sama.
  */
 import type { DailyRecord, InsidenRecord } from '@/lib/daily'
 import { PRODUK_OPTIONS, type Photo, type Settings } from '@/lib/sop'
 
 /** 'henti' = laporan stop penyaluran (menu tersendiri, bukan bagian laporan kerusakan). */
-export type JenisInsiden = 'insiden' | 'nearmiss' | 'kerusakan' | 'henti'
+export type JenisInsiden = 'insiden' | 'nearmiss' | 'temuan' | 'kerusakan' | 'henti'
 export type TingkatInsiden = 'rendah' | 'sedang' | 'tinggi'
 export type StatusInsiden = 'terbuka' | 'proses' | 'selesai'
 
 export const JENIS_INSIDEN: { value: JenisInsiden; label: string; desc: string }[] = [
   { value: 'insiden', label: 'Insiden', desc: 'Menimbulkan cedera, api, tumpahan BBM, atau kerugian' },
   { value: 'nearmiss', label: 'Near miss', desc: 'Hampir celaka, belum menimbulkan kerugian' },
+  { value: 'temuan', label: 'Temuan', desc: 'Kondisi atau tindakan tidak sesuai standar dari inspeksi, patroli, atau pengamatan' },
   { value: 'kerusakan', label: 'Kerusakan', desc: 'Peralatan atau fasilitas SPBU rusak' },
 ]
 
@@ -22,6 +23,7 @@ export const JENIS_HENTI = { value: 'henti' as const, label: 'Stop penyaluran', 
 export const KATEGORI_INSIDEN: Record<JenisInsiden, string[]> = {
   insiden: ['Cedera / kecelakaan kerja', 'Kebakaran / api', 'Tumpahan / kebocoran BBM', 'Kecelakaan kendaraan di area SPBU', 'Keamanan / pencurian', 'Lainnya'],
   nearmiss: ['Hampir tertabrak / terpeleset', 'Sumber api / merokok di area', 'Hampir tumpah saat bongkar / pengisian', 'Perilaku tidak aman', 'Kondisi tidak aman', 'Lainnya'],
+  temuan: ['Kondisi tidak aman', 'Tindakan tidak aman', 'Kelengkapan safety (APAR, rambu, P3K)', 'Kebersihan / housekeeping', 'Pelayanan / SOP operasional', 'Lingkungan (ceceran BBM, limbah)', 'Lainnya'],
   kerusakan: ['Dispenser / nozzle', 'Tangki pendam / ATG', 'Listrik / genset / panel', 'Bangunan / kanopi', 'APAR / proteksi kebakaran', 'Lainnya'],
   henti: ['Kerusakan dispenser / nozzle', 'Kualitas BBM tidak sesuai', 'Stok habis / dry out', 'Kendala pengiriman dari Depot / Fuel Terminal', 'Pemadaman listrik', 'Perbaikan / tera ulang', 'Instruksi Pertamina / manajemen', 'Lainnya'],
 }

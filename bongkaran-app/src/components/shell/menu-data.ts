@@ -278,7 +278,7 @@ export function useMenu(): GrupMenu[] {
       labelPendek: 'HSSE & Patrol',
       href: '/hsse',
       icon: ShieldCheck,
-      desc: 'Proteksi kebakaran, insiden & near miss, pantauan lingkungan, guard patrol (sampling penyaluran subsidi, whistleblowing)',
+      desc: 'Proteksi kebakaran, lapor kejadian, pantauan lingkungan, guard patrol (sampling penyaluran subsidi, whistleblowing)',
       items: [
         {
           to: '/apar',
@@ -294,8 +294,8 @@ export function useMenu(): GrupMenu[] {
           to: '/insiden/baru',
           path: '/insiden/baru',
           icon: ShieldAlert,
-          title: 'Laporan Insiden & Near miss',
-          desc: 'Insiden, near miss, dan kerusakan peralatan',
+          title: 'Lapor Kejadian',
+          desc: 'Insiden, near miss, temuan, dan kerusakan peralatan',
           status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
           badge: insidenTerbuka,
           nada: insidenTerbuka ? 'anomali' : 'ok',
@@ -457,7 +457,7 @@ const RIWAYAT: { path: string; icon: LucideIcon; title: string; desc: string }[]
   { path: '/laporan/apar', icon: FireExtinguisher, title: 'Riwayat Inspeksi APAR', desc: 'APAR, APAR cadangan, dan APAB' },
   { path: '/laporan/pump-test', icon: TestTubes, title: 'Riwayat Pump Test', desc: 'Pump test uji kualitas, uji kuantitas & uji takaran per nozzle dan produk' },
   { path: '/laporan/takaran', icon: Beaker, title: 'Riwayat Uji Takaran', desc: 'Bejana 20 L per nozzle, foto bercap waktu' },
-  { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Insiden & Near miss', desc: 'Insiden, near miss, kerusakan, dan tindak lanjut' },
+  { path: '/laporan/insiden', icon: ShieldAlert, title: 'Riwayat Lapor Kejadian', desc: 'Insiden, near miss, temuan, kerusakan, dan tindak lanjut' },
   { path: '/laporan/henti', icon: Ban, title: 'Riwayat Stop Penyaluran', desc: 'Produk yang dihentikan sementara, jam berhenti sampai penyaluran kembali, lama berhenti' },
   { path: '/laporan/gts', icon: ScanEye, title: 'Riwayat Sampling Penyaluran Subsidi', desc: 'Guard patrol: sampling JBT/JBKP per slot 2 jam, isian & kirim ulang teks WhatsApp' },
   { path: '/laporan/wbs', icon: Megaphone, title: 'Laporan WBS', desc: 'Whistleblowing system: rahasia, khusus ABH' },
