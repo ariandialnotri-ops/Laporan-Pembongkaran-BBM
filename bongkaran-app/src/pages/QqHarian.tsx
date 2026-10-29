@@ -4,7 +4,6 @@ import { Beaker, Camera, ChevronRight, CircleCheck, Flag, Lock, Plus, Send, Tras
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
-import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
 import { PilihHarian } from '@/components/bongkaran/pilih-harian'
 import { useKunciShift } from '@/components/bongkaran/pilih-shift'
 import { Loading } from '@/components/bongkaran/load-state'
@@ -29,15 +28,15 @@ import {
 } from '@/lib/daily'
 import { formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatNumber } from '@/lib/format'
-import { namaSpbuWa, tanggalPanjang } from '@/lib/gts'
+import { namaSpbuWa } from '@/lib/gts'
 import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
 import { simpanFotoHarian } from '@/lib/foto-harian'
-import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
-import { buatKolaseGrid } from '@/lib/kolase'
+import { capWaktu, compressImage, genId } from '@/lib/image'
 import { acuanD15 } from '@/lib/ringkasan'
 import { PRODUK_OPTIONS } from '@/lib/sop'
 import { cn } from '@/lib/utils'
-import { buildWaQq, type BarisQqWa } from '@/lib/wa'
+import { useKeTerkirim } from '@/lib/terkirim'
+import { type BarisQqWa } from '@/lib/wa'
 
 /** Waktu (di luar render). */
 const stamp = () => Date.now()
@@ -76,7 +75,6 @@ export function QqHarianMenu() {
   )
 }
 
-type SelesaiQq = { teks: string; files: File[]; urls: string[] }
 type FotoUmum = 'struk'
 /** Foto struk pump test: disimpan di riwayat aplikasi, tidak pernah ikut kolase WhatsApp grup SPBU. */
 const FOTO_UMUM: { key: FotoUmum; label: string; hint: string }[] = [
@@ -114,17 +112,14 @@ export function QqHarian() {
   // Foto hanya di HP sampai dikirim ke WhatsApp: per baris produk + struk pump test.
   const [foto, setFoto] = useState<Record<string, FotoLokal>>({})
   const [waktuFoto, setWaktuFoto] = useState<Record<string, string>>({})
-  const [selesaiWa, setSelesaiWa] = useState<SelesaiQq | null>(null)
-  const [dibagikan, setDibagikan] = useState(false)
+  const keTerkirim = useKeTerkirim()
   const belumSimpan = draft?.id === id && !data.selesaiAt ? data.kualitas.filter((k) => !k.savedAt).length + data.kuantitas.filter((n) => !n.savedAt).length : 0
   const guard = useLeaveGuard({
-    active: bolehIsi && (!selesaiWa || !dibagikan),
-    title: selesaiWa ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari density harian?',
-    detail: selesaiWa
-      ? 'Hasil uji sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.'
-      : belumSimpan
-        ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
-        : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim. Foto yang sudah diambil akan hilang.',
+    active: bolehIsi,
+    title: 'Keluar dari density harian?',
+    detail: belumSimpan
+      ? `${belumSimpan} baris uji belum disimpan dan akan hilang. Simpan tiap baris dengan tombol Simpan sebelum keluar.`
+      : 'Baris yang sudah disimpan tetap ada; uji baru dianggap selesai setelah dikirim. Foto yang sudah diambil akan hilang.',
   })
 
   if (!app.loaded) return <Loading />
@@ -270,49 +265,24 @@ export function QqHarian() {
         const b = baris[i]
         return cap(foto[k.id], `${k.produk} · Density std. 15 °C ${formatDensity(b.d15)}${b.selisih === null ? '' : ` · selisih ${formatDensitySigned(b.selisih)}`}`)
       })
-      const kolase = await buatKolaseGrid(bagian)
-      // Disimpan sementara di HP untuk menu Kirim ke grup WA (gabungan density & water content).
-      void simpanFotoHarian(app.spbuId, key.tanggal, 'density', bagian)
-      const files = [new File([kolase], `Kontrol_Kualitas_Harian_${key.tanggal}.jpg`, { type: 'image/jpeg' })]
-      const teks = buildWaQq(
-        { tanggal: key.tanggal, jam, petugas: data.petugas.trim(), terlambat, totalPumpTest: totalPumpTest(data).kualitas, catatan: data.catatan?.trim() ?? '' },
-        baris,
-        spbu,
-        tanggalPanjang(key.tanggal),
-        zonaWaktu(),
-      )
-      setSelesaiWa({ teks, files, urls: [URL.createObjectURL(kolase)] })
-      setBusy(null)
-      window.scrollTo({ top: 0 })
+      // Foto disimpan sementara di HP ini; laporan WA dikirim dari menu Kualitas Harian > Kirim laporan.
+      await simpanFotoHarian(app.spbuId, key.tanggal, 'density', bagian)
+      const lewat = baris.filter((x) => x.ok === false).map((x) => x.produk)
+      guard.bypass()
+      keTerkirim({
+        judul: 'Density harian terkirim',
+        detail: `${formatTanggalIso(key.tanggal)} · ${jam}${terlambat ? ' (terlambat)' : ''} · ${data.petugas.trim()}`,
+        baris: baris.map((x) => [x.produk, `${formatDensity(x.d15)}${x.selisih === null ? '' : ` · selisih ${formatDensitySigned(x.selisih)}`}`] as [string, string]),
+        peringatan: lewat.length ? `${lewat.join(', ')} melebihi toleransi density` : undefined,
+        aksi: [
+          { to: '/kualitas', label: 'Kirim laporan ke grup WA' },
+          { to: `/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`, label: 'Lihat riwayat kualitas' },
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
     }
-  }
-
-  if (selesaiWa) {
-    const lewat = barisWa().filter((b) => b.ok === false).map((b) => b.produk)
-    return (
-      <>
-        <LayarKirimWa
-          judul="Density harian tersimpan"
-          keterangan={lewat.length ? `${lewat.join(', ')} melebihi toleransi density. Kirim laporan ke WhatsApp sekarang.` : 'Semua produk sesuai toleransi. Kirim sekarang ke grup WhatsApp, atau kirim gabungan dengan water content dari menu Kualitas Harian.'}
-          teks={selesaiWa.teks}
-          files={selesaiWa.files}
-          urls={selesaiWa.urls}
-          dibagikan={dibagikan}
-          onDibagikan={() => setDibagikan(true)}
-        >
-          <Link to={`/laporan/kualitas?baru=${encodeURIComponent(`h.${id}.`)}`} replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
-            Lihat riwayat kualitas
-          </Link>
-          <Link to="/kualitas" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
-            Kembali ke Kualitas Harian
-          </Link>
-        </LayarKirimWa>
-        {guard.dialog}
-      </>
-    )
   }
 
   const pump = totalPumpTest(data)
@@ -477,7 +447,7 @@ export function QqHarian() {
         {selesai && (
           <span className="flex items-center gap-1.5 text-body-sm font-semibold text-primary">
             <CircleCheck aria-hidden="true" className="size-4" />
-            Uji selesai {jamDari(existing?.data.selesaiAt)}; kirim ulang bila ada koreksi (ambil foto lagi).
+            Uji selesai {jamDari(existing?.data.selesaiAt)}; kirim ulang bila ada koreksi (ambil foto lagi). Laporan WA dikirim dari menu Kualitas Harian.
           </span>
         )}
         {kunci ? (
@@ -488,7 +458,7 @@ export function QqHarian() {
         ) : (
           <Button size="lg" className="w-full" disabled={busy !== null} onClick={selesaikan}>
             <Send aria-hidden="true" />
-            {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang laporan ke WhatsApp' : 'Selesaikan & lanjut kirim ke WhatsApp'}
+            {busy === 'selesai' ? 'Menyimpan…' : selesai ? 'Kirim ulang hasil uji' : 'Kirim hasil uji'}
           </Button>
         )}
       </GlassCard>

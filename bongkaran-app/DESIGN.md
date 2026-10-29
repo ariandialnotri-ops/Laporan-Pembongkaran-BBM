@@ -577,6 +577,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Menu "Laporan Insiden & Near miss" berganti nama menjadi **Lapor Kejadian** (HSSE, judul halaman, riwayat "Riwayat Lapor Kejadian", kartu dashboard, pintasan Lapor).
 - Jenis baru **Temuan** (`jenis: 'temuan'`, ikon pindai): kondisi/tindakan tidak sesuai standar dari inspeksi, patroli, atau pengamatan. Kategori: kondisi tidak aman, tindakan tidak aman, kelengkapan safety, kebersihan, pelayanan/SOP, lingkungan, lainnya. Alur form, tindak lanjut, status, dan riwayat sama dengan insiden/near miss.
 
+### 9.14t Submit kualitas harian & kirim WA terpisah; peringatan memori HP
+- Form **Density Harian** dan **Water Content Harian** cukup di-submit ("Kirim hasil uji" / "Kirim hasil pemeriksaan") lalu ke halaman Terkirim. Foto disimpan sementara di HP (IndexedDB, 3 hari) untuk laporan WA.
+- Menu **Kualitas Harian**: dropdown "Kirim laporan ke grup WA" berisi **Lapor Kualitas Harian**, **Lapor Water Content**, **Lapor Semua** (`/kualitas/kirim?jenis=density|air|semua`). Pilihan yang datanya belum di-submit terkunci dengan alasannya.
+- **Peringatan memori HP** (`peringatan-ruang.tsx`, di atas setiap halaman): dicek tiap pindah halaman lewat `navigator.storage.estimate()`; sisa < 300 MB oranye "Memori HP menipis", < 100 MB merah "Memori HP hampir habis". Bisa ditutup sampai aplikasi dibuka ulang (muncul lagi bila memburuk ke kritis).
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

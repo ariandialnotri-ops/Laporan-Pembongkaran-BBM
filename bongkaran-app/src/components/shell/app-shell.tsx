@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { AmbientOrbs } from './ambient-orbs'
 import { AppHeader } from './app-header'
 import { DockNav } from './dock-nav'
+import { PeringatanRuang } from './peringatan-ruang'
 import { PlanReminder } from './plan-reminder'
 import { IndikatorSegarkan } from './pull-segarkan'
 import { usePullSegarkan } from './use-pull-segarkan'
@@ -75,6 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           {/* Kunci berganti setelah tarik-segarkan: isi halaman dipasang ulang dan memuat ulang datanya. */}
           <div key={segar.kunci} className="flex flex-1 flex-col">
+            <PeringatanRuang />
             {children}
           </div>
         </main>

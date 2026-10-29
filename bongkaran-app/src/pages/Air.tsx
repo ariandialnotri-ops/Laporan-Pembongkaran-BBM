@@ -4,7 +4,6 @@ import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Camera, Droplet, LoaderCircle, Send, Trash2 } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { FotoWajib, type FotoLokal } from '@/components/bongkaran/foto-lokal'
-import { LayarKirimWa } from '@/components/bongkaran/kirim-wa'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
@@ -17,15 +16,15 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
 import { useToast } from '@/components/ui/toast'
-import { airId, airLengkap, literAir, statusAir, tangkiBerair, teksWaAir, type AirRecord, type AirTangki } from '@/lib/air'
+import { airId, airLengkap, literAir, statusAir, tangkiBerair, type AirRecord, type AirTangki } from '@/lib/air'
 import { useApp } from '@/lib/app-state'
 import { addDays, formatTanggalIso, nowHm, todayIso } from '@/lib/date'
 import { formatLiter } from '@/lib/format'
 import { simpanFotoHarian } from '@/lib/foto-harian'
 import { namaSpbuWa } from '@/lib/gts'
 import { BATAS_HARIAN, lewatBatas, statusHarian } from '@/lib/harian'
-import { capWaktu, compressImage, genId, zonaWaktu } from '@/lib/image'
-import { buatKolaseGrid } from '@/lib/kolase'
+import { capWaktu, compressImage, genId } from '@/lib/image'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { shiftLabel } from '@/lib/shift'
 import { TANKS, tankName, type Tank } from '@/lib/tank'
 import { useAir } from '@/lib/use-air'
@@ -77,8 +76,6 @@ export function AirMenu() {
   )
 }
 
-type SelesaiAir = { rec: AirRecord; teks: string; files: File[]; urls: string[] }
-
 /**
  * Form water content hari ini: semua tangki pendam, tiap tangki disimpan dengan kotak Simpan sendiri.
  * Foto stik pasta air tiap tangki digabung menjadi satu kolase lalu dikirim ke WhatsApp (tidak diunggah;
@@ -101,17 +98,14 @@ export function AirForm() {
   const [catatan, setCatatan] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selesai, setSelesai] = useState<SelesaiAir | null>(null)
-  const [dibagikan, setDibagikan] = useState(false)
+  const keTerkirim = useKeTerkirim()
   const belum = Object.keys(isian).filter((k) => !jamSimpan[k]).length
   const guard = useLeaveGuard({
-    active: !selesai || !dibagikan,
-    title: selesai ? 'Foto belum dikirim ke WhatsApp' : 'Keluar dari water content?',
-    detail: selesai
-      ? 'Data water content sudah tersimpan, tetapi foto tidak disimpan di aplikasi dan akan hilang bila keluar sekarang.'
-      : belum
-        ? `${belum} tangki belum disimpan dan akan hilang. Simpan tiap tangki dengan tombol Simpan sebelum keluar.`
-        : 'Tangki yang sudah disimpan tetap ada. Foto yang sudah diambil akan hilang.',
+    active: true,
+    title: 'Keluar dari water content?',
+    detail: belum
+      ? `${belum} tangki belum disimpan dan akan hilang. Simpan tiap tangki dengan tombol Simpan sebelum keluar.`
+      : 'Tangki yang sudah disimpan tetap ada. Foto yang sudah diambil akan hilang.',
   })
 
   if (!app.loaded || !recs) return <Loading />
@@ -216,43 +210,24 @@ export function AirForm() {
       await app.backend.saveAir(rec)
       const spbu = namaSpbuWa(app.settings)
       const bagian = TANKS.map((t) => ({ blob: foto[t.id].blob, cap: [waktuFoto[foto[t.id].id] ?? capWaktu(), spbu, `${namaTangki(t)} · ${keteranganMm(rec.data.tangki[t.id], t)}`] }))
-      const kolase = await buatKolaseGrid(bagian)
-      // Disimpan sementara di HP untuk menu Kirim ke grup WA (gabungan density & water content).
-      void simpanFotoHarian(app.spbuId, tanggal, 'air', bagian)
-      const files = [new File([kolase], `Water_Content_${tanggal}.jpg`, { type: 'image/jpeg' })]
-      setSelesai({ rec, teks: teksWaAir(rec, TANKS, app.settings, zonaWaktu()), files, urls: [URL.createObjectURL(kolase)] })
-      setBusy(null)
-      window.scrollTo({ top: 0 })
+      // Foto disimpan sementara di HP ini; laporan WA dikirim dari menu Kualitas Harian > Kirim laporan.
+      await simpanFotoHarian(app.spbuId, tanggal, 'air', bagian)
+      const berair = tangkiBerair(rec, TANKS)
+      guard.bypass()
+      keTerkirim({
+        judul: 'Water content terkirim',
+        detail: `${formatTanggalIso(tanggal)} · ${jam}${rec.data.terlambat ? ' (terlambat)' : ''} · ${rec.data.petugas || '-'}`,
+        baris: TANKS.map((t) => [namaTangki(t), keteranganMm(rec.data.tangki[t.id], t)] as [string, string]),
+        peringatan: berair.length ? `Ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}: lakukan penyedotan/pengurasan dan laporkan ke pengawas` : undefined,
+        aksi: [
+          { to: '/kualitas', label: 'Kirim laporan ke grup WA' },
+          ...(app.can('/laporan/air') ? [{ to: '/laporan/air', label: 'Lihat riwayat water content' }] : []),
+        ],
+      })
     } catch (e) {
       setError(pesan(e))
       setBusy(null)
     }
-  }
-
-  if (selesai) {
-    const berair = tangkiBerair(selesai.rec, TANKS)
-    return (
-      <>
-        <LayarKirimWa
-          judul="Water content tersimpan"
-          keterangan={
-            berair.length
-              ? `Ada air di ${berair.map((t) => tankName(t.tankNo)).join(', ')}: lakukan penyedotan/pengurasan dan laporkan ke pengawas. Kirim laporan ke WhatsApp sekarang.`
-              : 'Semua tangki nihil air. Kirim sekarang ke grup WhatsApp, atau kirim gabungan dengan density dari menu Kualitas Harian.'
-          }
-          teks={selesai.teks}
-          files={selesai.files}
-          urls={selesai.urls}
-          dibagikan={dibagikan}
-          onDibagikan={() => setDibagikan(true)}
-        >
-          <Link to="/kualitas" replace className={buttonVariants({ variant: 'glass', size: 'lg' })}>
-            Kembali ke Kualitas Harian
-          </Link>
-        </LayarKirimWa>
-        {guard.dialog}
-      </>
-    )
   }
 
   return (
@@ -325,12 +300,12 @@ export function AirForm() {
         </div>
         <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
           <Camera aria-hidden="true" className="size-4 shrink-0" />
-          Foto semua tangki digabung otomatis menjadi satu kolase (jam, SPBU, tangki, hasil) untuk WhatsApp.
+          Foto disimpan di HP ini. Laporan WhatsApp (kolase foto + hasil) dikirim dari menu Kualitas Harian.
         </span>
         <ErrorBox text={error} />
         <Button size="lg" disabled={busy !== null} onClick={() => void kirim()}>
           {busy === 'kirim' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
-          {busy === 'kirim' ? 'Menyimpan…' : 'Selesaikan & lanjut kirim ke WhatsApp'}
+          {busy === 'kirim' ? 'Menyimpan…' : 'Kirim hasil pemeriksaan'}
         </Button>
       </GlassCard>
       {guard.dialog}
