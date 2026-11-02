@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CirclePlus, Clock, Cylinder, Eye, Fuel, Info, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleCheck, CircleDashed, CirclePlus, Clock, Cylinder, Eye, Info, TriangleAlert } from 'lucide-react'
 import { KalengDetail } from '@/components/bongkaran/kaleng-detail'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
@@ -7,6 +7,7 @@ import { Sheet } from '@/components/ui/sheet'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned } from '@/lib/format'
+import { LogoProduk } from '@/components/bongkaran/logo-produk'
 import { produkMeta } from '@/lib/produk'
 import { kalengSample, type Kaleng, type KalengStatus } from '@/lib/ringkasan'
 import { sampleMenunggu } from '@/lib/sample'
@@ -108,9 +109,7 @@ export function KalengSample() {
               className="flex w-full flex-col gap-space-sm p-space-md text-left transition-colors hover:bg-surface-container-lowest/40 md:flex-row md:items-center"
             >
               <span className="flex min-w-0 flex-1 items-center gap-space-sm">
-                <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-md', meta.tile)}>
-                  <Fuel className="size-5" />
-                </span>
+                <LogoProduk produk={d.produk} className="h-14 w-20" />
                 <span className="flex min-w-0 flex-col">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="text-body-lg font-bold text-on-surface">{d.produk}</span>
