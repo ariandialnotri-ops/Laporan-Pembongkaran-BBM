@@ -583,6 +583,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - Menu **Kualitas Harian**: dropdown "Kirim laporan ke grup WA" berisi **Lapor Kualitas Harian**, **Lapor Water Content**, **Lapor Semua** (`/kualitas/kirim?jenis=density|air|semua`). Pilihan yang datanya belum di-submit terkunci dengan alasannya.
 - **Peringatan memori HP** (`peringatan-ruang.tsx`, di atas setiap halaman): dicek tiap pindah halaman lewat `navigator.storage.estimate()`; sisa < 300 MB oranye "Memori HP menipis", < 100 MB merah "Memori HP hampir habis". Bisa ditutup sampai aplikasi dibuka ulang (muncul lagi bila memburuk ke kritis).
 
+### 9.14u PIC oleh ABH & status otomatis Lapor Kejadian
+- **PIC tindak lanjut** hanya ditetapkan **ABH** (tombol "Tetapkan / Ganti PIC tindak lanjut" di detail laporan): pilih dari daftar personil SPBU aktif (`settings.personil`, nama · jabatan) + target selesai opsional. Tersimpan `pic` (nama) & `picId`; riwayat mencatat langkah "PIC ditetapkan ABH" (status tidak berubah). Inbox ABH: "Tetapkan PIC lapor kejadian (n)".
+- **Status otomatis** (`statusSetelahTindakLanjut`), tidak ada pilihan status di form tindak lanjut: laporan baru = Terbuka; tindak lanjut tanpa lampiran = Ditindaklanjuti; tindak lanjut dengan foto bukti penyelesaian atau berita acara = **Closed**; stop penyaluran Closed saat jam penyaluran kembali diisi. Form menampilkan pratinjau "Status setelah disimpan (otomatis)".
+- Label status "Selesai" diganti **Closed** (pill, filter riwayat, stepper).
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

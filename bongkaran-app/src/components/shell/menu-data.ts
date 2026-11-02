@@ -296,7 +296,7 @@ export function useMenu(): GrupMenu[] {
           icon: ShieldAlert,
           title: 'Lapor Kejadian',
           desc: 'Insiden, near miss, temuan, dan kerusakan peralatan',
-          status: insidenTerbuka ? `${insidenTerbuka} laporan belum selesai` : 'Tidak ada laporan terbuka',
+          status: insidenTerbuka ? `${insidenTerbuka} laporan belum closed` : 'Tidak ada laporan terbuka',
           badge: insidenTerbuka,
           nada: insidenTerbuka ? 'anomali' : 'ok',
         },

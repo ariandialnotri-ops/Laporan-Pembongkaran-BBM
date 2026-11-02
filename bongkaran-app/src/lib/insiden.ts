@@ -37,10 +37,12 @@ export const TINGKAT_INSIDEN: { value: TingkatInsiden; label: string }[] = [
 export const STATUS_INSIDEN: { value: StatusInsiden; label: string; tone: 'error' | 'neutral' | 'success' }[] = [
   { value: 'terbuka', label: 'Terbuka', tone: 'error' },
   { value: 'proses', label: 'Ditindaklanjuti', tone: 'neutral' },
-  { value: 'selesai', label: 'Selesai', tone: 'success' },
+  { value: 'selesai', label: 'Closed', tone: 'success' },
 ]
 
 export interface InsidenLangkah {
+  /** 'pic' = penetapan PIC oleh ABH (tidak mengubah status). */
+  jenis?: 'pic'
   at: string
   oleh: string
   status: StatusInsiden
@@ -80,11 +82,24 @@ export interface InsidenData {
   /** Video bercap waktu dari kamera Lapor (maks. 1, 30 detik). */
   video?: Photo[]
   status: StatusInsiden
+  /** PIC tindak lanjut (nama), ditetapkan ABH dari daftar personil SPBU. */
   pic: string
+  /** id personil PIC (settings.personil); kosong untuk laporan lama yang PIC-nya diketik. */
+  picId?: string
   targetSelesai: string
   riwayat: InsidenLangkah[]
   /** Laporan stop penyaluran (jenis 'henti'); laporan kerusakan lama juga dapat memuatnya. */
   henti?: HentiPenyaluran
+}
+
+/**
+ * Status otomatis setelah sebuah tindak lanjut disimpan (bukan dipilih pengguna):
+ * stop penyaluran selesai bila jam penyaluran kembali diisi; laporan lain selesai bila tindak lanjut
+ * melampirkan bukti penyelesaian (foto kondisi setelah ditangani atau berita acara); selain itu Ditindaklanjuti.
+ */
+export function statusSetelahTindakLanjut(o: { hentiAktif: boolean; penyaluranKembali: boolean; adaBukti: boolean }): StatusInsiden {
+  if (o.hentiAktif) return o.penyaluranKembali ? 'selesai' : 'proses'
+  return o.adaBukti ? 'selesai' : 'proses'
 }
 
 export const jenisLabel = (j: JenisInsiden) => (j === 'henti' ? JENIS_HENTI.label : (JENIS_INSIDEN.find((x) => x.value === j)?.label ?? j))

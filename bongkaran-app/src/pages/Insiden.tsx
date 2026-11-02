@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, ChevronRight, CircleCheck, Clock, FileText, History, LoaderCircle, Paperclip, Plus, ScanSearch, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
+import { Ban, ChevronRight, CircleCheck, Clock, FileText, History, LoaderCircle, Paperclip, Plus, ScanSearch, Send, ShieldAlert, TriangleAlert, UserCheck, Wrench, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -40,6 +40,7 @@ import {
   KATEGORI_INSIDEN,
   STATUS_INSIDEN,
   statusMeta,
+  statusSetelahTindakLanjut,
   TINGKAT_INSIDEN,
   type HentiPenyaluran,
   type InsidenData,
@@ -48,6 +49,7 @@ import {
   type StatusInsiden,
   type TingkatInsiden,
 } from '@/lib/insiden'
+import { personilAktif } from '@/lib/personil'
 import { shiftKey } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
 import { usePhotoSrc } from '@/lib/use-photo-src'
@@ -87,7 +89,7 @@ function PintasanRiwayat() {
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-body-md font-bold text-on-surface">Riwayat pelaporan</span>
           <span className="text-body-sm text-on-surface-variant">
-            {semua.length} laporan · {terbuka ? `${terbuka} belum selesai ditindaklanjuti` : 'semua sudah selesai'}
+            {semua.length} laporan · {terbuka ? `${terbuka} belum closed` : 'semua sudah closed'}
           </span>
         </span>
         <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
@@ -163,7 +165,7 @@ export function PilihJenisInsiden() {
               status={n ? 'belum' : 'sudah'}
               judul={j.label}
               sub={j.desc}
-              keterangan={n ? `${n} laporan belum selesai ditindaklanjuti` : 'Tidak ada laporan terbuka'}
+              keterangan={n ? `${n} laporan belum closed` : 'Tidak ada laporan terbuka'}
             />
           )
         })}
@@ -458,7 +460,7 @@ export function RiwayatInsiden() {
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-center gap-space-sm">
           <ShieldAlert aria-hidden="true" className="size-5 text-error" />
-          <span className="flex-1 text-body-md font-bold text-on-surface">{terbuka} laporan belum selesai</span>
+          <span className="flex-1 text-body-md font-bold text-on-surface">{terbuka} laporan belum closed</span>
           {app.can('/insiden/baru') && (
             <Link to="/insiden/baru" className={buttonVariants({ size: 'sm' })}>
               <Plus aria-hidden="true" />
@@ -505,13 +507,14 @@ export function InsidenDetail() {
   const semua = useInsiden()
   const rec = semua.find((r) => r.id === id)
   const srcOf = usePhotoSrc([...(rec?.data.foto ?? []), ...(rec?.data.video ?? []), ...(rec?.data.riwayat ?? []).flatMap((l) => [...(l.foto ?? []), ...(l.ba ?? [])])])
-  const [status, setStatus] = useState<StatusInsiden | ''>('')
   // Lampiran tindak lanjut: foto (dikompres) dan berita acara (foto dokumen atau PDF), diunggah saat disimpan.
   const [tlFoto, setTlFoto] = useState<FotoLokal[]>([])
   const [tlBa, setTlBa] = useState<(FotoLokal & { nama: string; pdf: boolean })[]>([])
   const [olahFoto, setOlahFoto] = useState(false)
   const baRef = useRef<HTMLInputElement>(null)
-  const [pic, setPic] = useState('')
+  // Penetapan PIC oleh ABH (pop up tersendiri).
+  const [bukaPic, setBukaPic] = useState(false)
+  const [picId, setPicId] = useState('')
   const [target, setTarget] = useState('')
   const [catatan, setCatatan] = useState('')
   // Jam penyaluran dibuka kembali (wajib saat stop penyaluran ditutup).
@@ -533,17 +536,19 @@ export function InsidenDetail() {
   const d = rec.data
   // Semua anggota SPBU (termasuk security, cleaning service, Admin/Cashier) dapat menindaklanjuti dan menutup laporan.
   const bolehTL = !!app.role
-  // Bawaan form: laporan terbuka → ditindaklanjuti.
-  const statusBaru = status || (d.status === 'terbuka' ? 'proses' : d.status)
   const hentiAktif = !!d.henti && !d.henti.selesai
-  // Penyaluran dibuka kembali bila jam kembali diisi (bisa saat progress), wajib saat selesai.
-  const bukaKembali = hentiAktif && (!!jamKembali || statusBaru === 'selesai')
+  // Penyaluran dibuka kembali bila jam kembali diisi.
+  const bukaKembali = hentiAktif && !!jamKembali
   const kembali = jamKembali || waktuLokal()
+  // Status otomatis dari isi tindak lanjut (bukan dipilih pengguna).
+  const statusBaru = statusSetelahTindakLanjut({ hentiAktif, penyaluranKembali: bukaKembali, adaBukti: tlFoto.length + tlBa.length > 0 })
+  // Hanya ABH yang menetapkan PIC tindak lanjut, dari daftar personil SPBU aktif.
+  const bolehPic = app.role === 'abh'
+  const daftarPic = personilAktif(app.settings)
 
   const simpanTL = async () => {
     if (!catatan.trim()) return setError('Tulis catatan tindak lanjut.')
     if (statusBaru === 'selesai' && d.status !== 'selesai' && catatan.trim().length < 10) return setError('Jelaskan penyelesaiannya (minimal 10 karakter).')
-    if (bukaKembali && !jamKembali) return setError('Isi jam penyaluran kembali.')
     if (bukaKembali && kembali < d.henti!.mulai) return setError('Jam penyaluran kembali tidak boleh sebelum penyaluran dihentikan.')
     if (bukaKembali && kembali > waktuLokal()) return setError('Jam penyaluran kembali tidak boleh di masa depan.')
     setBusy(true)
@@ -556,8 +561,6 @@ export function InsidenDetail() {
       const data: InsidenData = {
         ...d,
         status: statusBaru,
-        pic: pic.trim() || d.pic,
-        targetSelesai: target || d.targetSelesai,
         riwayat: [
           ...d.riwayat,
           {
@@ -573,19 +576,52 @@ export function InsidenDetail() {
       }
       await app.saveDaily({ ...rec, data, updatedAt: stamp() })
       setCatatan('')
-      setStatus('')
       setJamKembali('')
       ;[...tlFoto, ...tlBa].forEach((f) => URL.revokeObjectURL(f.url))
       setTlFoto([])
       setTlBa([])
       setError(null)
       setBuka(false)
-      toast('Tindak lanjut tersimpan')
+      toast(statusBaru === 'selesai' ? 'Tindak lanjut tersimpan, laporan Closed' : 'Tindak lanjut tersimpan, status Ditindaklanjuti')
     } catch (e) {
       setError(pesan(e))
     } finally {
       setBusy(false)
     }
+  }
+
+  const simpanPic = async () => {
+    const p = daftarPic.find((x) => x.id === picId)
+    if (!p) return setError('Pilih PIC dari daftar personil.')
+    setBusy(true)
+    try {
+      const oleh = app.displayName === 'Mode lokal' ? app.settings.namaAbhDefault || 'ABH' : app.displayName
+      const tgt = target || d.targetSelesai
+      const data: InsidenData = {
+        ...d,
+        pic: p.nama,
+        picId: p.id,
+        targetSelesai: tgt,
+        riwayat: [
+          ...d.riwayat,
+          { jenis: 'pic', at: isoNow(), oleh, status: d.status, catatan: `PIC ${d.pic ? 'diganti' : 'ditetapkan'}: ${p.nama} (${p.jabatan})${tgt ? `, target selesai ${formatTanggalIso(tgt)}` : ''}` },
+        ],
+      }
+      await app.saveDaily({ ...rec, data, updatedAt: stamp() })
+      setError(null)
+      setBukaPic(false)
+      toast(`PIC ditetapkan: ${p.nama}`)
+    } catch (e) {
+      setError(pesan(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const bukaFormPic = () => {
+    setError(null)
+    setPicId(d.picId && daftarPic.some((x) => x.id === d.picId) ? d.picId : '')
+    setTarget(d.targetSelesai)
+    setBukaPic(true)
   }
 
   const bisaTL = bolehTL && d.status !== 'selesai'
@@ -616,7 +652,7 @@ export function InsidenDetail() {
   const langkah: Langkah[] = [
     ...riwayat.map((l, i): Langkah => ({
       key: `${l.at}_${i}`,
-      judul: i === 0 ? (d.jenis === 'henti' ? 'Stop penyaluran dilaporkan' : `${jenisLabel(d.jenis)} dilaporkan`) : l.status === 'selesai' ? 'Selesai' : l.status === 'terbuka' ? 'Dibuka kembali' : 'Tindak lanjut',
+      judul: i === 0 ? (d.jenis === 'henti' ? 'Stop penyaluran dilaporkan' : `${jenisLabel(d.jenis)} dilaporkan`) : l.jenis === 'pic' ? 'PIC ditetapkan ABH' : l.status === 'selesai' ? 'Closed' : l.status === 'terbuka' ? 'Dibuka kembali' : 'Tindak lanjut',
       waktu: l.at,
       oleh: l.oleh || '-',
       tag: statusMeta(l.status).label,
@@ -633,10 +669,10 @@ export function InsidenDetail() {
       ? [
           {
             key: 'selesai',
-            judul: 'Selesai / closing',
+            judul: 'Closed',
             nada: 'nanti' as const,
             kosong: d.targetSelesai ? `Target ${formatTanggalIso(d.targetSelesai)}` : 'Belum',
-            isi: d.pic ? <span>PIC {d.pic}</span> : undefined,
+            isi: d.pic ? <span>PIC {d.pic}</span> : <span className="text-on-surface-variant">PIC belum ditetapkan ABH</span>,
           },
         ]
       : []),
@@ -665,8 +701,14 @@ export function InsidenDetail() {
           {d.penyebab && <Item label="Dugaan penyebab" value={d.penyebab} />}
           <Item label="Tindakan yang sudah dilakukan" value={d.tindakanSegera} />
           <Item label="Pelapor" value={d.pelapor} />
-          {(d.pic || d.targetSelesai) && <Item label="PIC & target" value={`${d.pic || '-'}${d.targetSelesai ? `, target ${formatTanggalIso(d.targetSelesai)}` : ''}`} />}
+          <Item label="PIC tindak lanjut" value={`${d.pic || 'Belum ditetapkan'}${d.targetSelesai ? `, target ${formatTanggalIso(d.targetSelesai)}` : ''}`} />
         </dl>
+        {bolehPic && d.status !== 'selesai' && (
+          <Button variant="soft" size="sm" className="self-start" onClick={bukaFormPic}>
+            <UserCheck aria-hidden="true" />
+            {d.pic ? 'Ganti PIC tindak lanjut' : 'Tetapkan PIC tindak lanjut'}
+          </Button>
+        )}
         {d.foto.length > 0 && (
           <div className="flex gap-space-xs overflow-x-auto">
             {d.foto.map((p) => {
@@ -707,23 +749,24 @@ export function InsidenDetail() {
         }
       >
         <div className="flex flex-col gap-space-sm pb-space-sm">
-            <Field label="Status">
-              <Choice label="Status tindak lanjut" value={statusBaru} onChange={(v) => setStatus(v)} options={STATUS_INSIDEN.map((x) => ({ value: x.value, label: x.label }))} />
-            </Field>
-            <div className="grid grid-cols-2 gap-space-sm">
-              <Field label="PIC" htmlFor="ins-pic">
-                <Input id="ins-pic" autoComplete="off" placeholder={d.pic || 'Nama penanggung jawab'} value={pic} onChange={(e) => setPic(e.target.value)} />
-              </Field>
-              <Field label="Target selesai" htmlFor="ins-target">
-                <Input id="ins-target" type="date" value={target || d.targetSelesai} onChange={(e) => setTarget(e.target.value)} />
-              </Field>
+            <div className="flex items-start gap-space-sm rounded-md bg-surface-container-low p-space-sm">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-tag uppercase text-on-surface-variant">Status setelah disimpan (otomatis)</span>
+                <span className="text-body-sm text-on-surface-variant">
+                  {hentiAktif
+                    ? 'Isi jam penyaluran kembali untuk menutup laporan; tanpa itu status Ditindaklanjuti.'
+                    : 'Lampirkan foto kondisi setelah ditangani atau berita acara untuk menutup laporan; tanpa lampiran status Ditindaklanjuti.'}
+                </span>
+              </span>
+              <StatusPill s={statusBaru} />
             </div>
+            {d.pic && <span className="text-body-sm text-on-surface-variant">PIC: <b className="text-on-surface">{d.pic}</b>{d.targetSelesai ? `, target ${formatTanggalIso(d.targetSelesai)}` : ''}</span>}
             <Field label="Catatan" htmlFor="ins-catatan">
               <Textarea id="ins-catatan" className="min-h-[64px]" value={catatan} onChange={(e) => (setError(null), setCatatan(e.target.value))} />
             </Field>
             <FotoWajib
-              label="Foto tindak lanjut"
-              hint="Kondisi setelah ditangani, perbaikan, atau penggantian komponen (maks. 4)."
+              label="Foto bukti penyelesaian"
+              hint="Kondisi setelah ditangani, perbaikan, atau penggantian komponen (maks. 4). Melampirkan foto menandai laporan Closed."
               wajib={false}
               kamera={false}
               fotos={tlFoto}
@@ -814,13 +857,57 @@ export function InsidenDetail() {
                   {jamKembali && jamKembali >= d.henti!.mulai
                     ? `Penyaluran kembali ${labelWaktu(jamKembali, formatTanggalIso)} · lama berhenti ${durasiHenti({ ...d.henti!, selesai: jamKembali })}`
                     : statusBaru === 'selesai'
-                      ? 'Laporan selesai: isi jam penyaluran kembali.'
+                      ? 'Laporan closed: isi jam penyaluran kembali.'
                       : 'Biarkan kosong bila penyaluran masih berhenti; laporan tetap dapat ditindaklanjuti.'}
                 </span>
               </div>
             )}
         </div>
       </Sheet>
+
+      {bolehPic && (
+        <Sheet
+          open={bukaPic}
+          onOpenChange={setBukaPic}
+          title={d.pic ? 'Ganti PIC tindak lanjut' : 'Tetapkan PIC tindak lanjut'}
+          description="Pilih personil SPBU yang bertanggung jawab menindaklanjuti laporan ini."
+          footer={
+            <div className="flex flex-col gap-space-xs">
+              <ErrorBox text={error} />
+              <Button size="lg" disabled={busy || !daftarPic.length} onClick={simpanPic}>
+                {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <UserCheck aria-hidden="true" />}
+                Simpan PIC
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-space-sm pb-space-sm">
+            {daftarPic.length ? (
+              <Field label="PIC (daftar personil SPBU)" htmlFor="ins-pic">
+                <Select value={picId} onValueChange={(v) => (setError(null), setPicId(v))}>
+                  <SelectTrigger id="ins-pic">
+                    <SelectValue placeholder="Pilih personil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {daftarPic.map((x) => (
+                      <SelectItem key={x.id} value={x.id}>
+                        {x.nama} · {x.jabatan}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : (
+              <span className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">
+                Daftar personil SPBU masih kosong. Isi dulu di <Link to="/personil" className="font-semibold underline">Personil & Jadwal Shift</Link>.
+              </span>
+            )}
+            <Field label="Target selesai (opsional)" htmlFor="ins-target">
+              <Input id="ins-target" type="date" min={todayIso()} value={target} onChange={(e) => setTarget(e.target.value)} />
+            </Field>
+          </div>
+        </Sheet>
+      )}
     </div>
   )
 }

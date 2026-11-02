@@ -128,7 +128,13 @@ function inboxPersetujuan(app: ReturnType<typeof useApp>, petty: PettyRecord[]):
   const nama = app.displayName.trim().toLowerCase()
   const pic = app.daily.filter((d) => d.kind === 'insiden' && d.data.status !== 'selesai' && !!nama && d.data.pic?.trim().toLowerCase() === nama)
   if (pic.length)
-    out.push({ id: 'pic-insiden', jenis: 'tugas', judul: `Tindak lanjut insiden sebagai PIC (${pic.length})`, detail: 'Laporan menunggu tindak lanjut Anda', to: '/laporan/insiden', grup: GRUP_PERSETUJUAN, tingkat: 'tugas' })
+    out.push({ id: 'pic-insiden', jenis: 'tugas', judul: `Tindak lanjut lapor kejadian sebagai PIC (${pic.length})`, detail: 'Laporan menunggu tindak lanjut Anda', to: '/laporan/insiden', grup: GRUP_PERSETUJUAN, tingkat: 'tugas' })
+  // ABH: laporan kejadian terbuka yang belum ditetapkan PIC-nya.
+  if (app.role === 'abh') {
+    const tanpaPic = app.daily.filter((d) => d.kind === 'insiden' && d.data.jenis !== 'henti' && d.data.status !== 'selesai' && !d.data.pic?.trim())
+    if (tanpaPic.length)
+      out.push({ id: 'insiden-tanpa-pic', jenis: 'tugas', judul: `Tetapkan PIC lapor kejadian (${tanpaPic.length})`, detail: 'Laporan belum punya PIC tindak lanjut', to: tanpaPic.length === 1 ? `/laporan/insiden/${encodeURIComponent(tanpaPic[0].id)}` : '/laporan/insiden', grup: GRUP_PERSETUJUAN, tingkat: 'tugas' })
+  }
   return out
 }
 
