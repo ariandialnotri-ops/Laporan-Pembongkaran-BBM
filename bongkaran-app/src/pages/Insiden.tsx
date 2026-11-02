@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { Ban, ChevronRight, CircleCheck, Clock, FileText, LoaderCircle, Paperclip, Plus, ScanSearch, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
+import { Ban, ChevronRight, CircleCheck, Clock, FileText, History, LoaderCircle, Paperclip, Plus, ScanSearch, Send, ShieldAlert, TriangleAlert, Wrench, X } from 'lucide-react'
 import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
@@ -74,6 +74,47 @@ function StatusPill({ s }: { s: StatusInsiden }) {
 const IKON_JENIS: Record<JenisInsiden, typeof Ban> = { insiden: ShieldAlert, nearmiss: TriangleAlert, temuan: ScanSearch, kerusakan: Wrench, henti: Ban }
 
 /** Keterangan ikon status di ujung kanan kartu. */
+/** Pintasan Riwayat pelaporan di menu Lapor Kejadian: semua laporan, atau langsung per jenis. */
+function PintasanRiwayat() {
+  const semua = useInsiden().filter(bukanHenti)
+  const terbuka = semua.filter((r) => r.data.status !== 'selesai').length
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+      <Link to="/laporan/insiden" className="flex min-h-11 items-center gap-space-sm">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <History aria-hidden="true" className="size-5" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-md font-bold text-on-surface">Riwayat pelaporan</span>
+          <span className="text-body-sm text-on-surface-variant">
+            {semua.length} laporan · {terbuka ? `${terbuka} belum selesai ditindaklanjuti` : 'semua sudah selesai'}
+          </span>
+        </span>
+        <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-on-surface-variant" />
+      </Link>
+      <div className="flex flex-wrap gap-space-xs">
+        {JENIS_INSIDEN.map((j) => {
+          const n = semua.filter((r) => r.data.jenis === j.value).length
+          const buka = semua.filter((r) => r.data.jenis === j.value && r.data.status !== 'selesai').length
+          return (
+            <Link
+              key={j.value}
+              to={`/laporan/insiden?jenis=${j.value}`}
+              className={cn(
+                'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-body-sm font-semibold ring-1',
+                buka ? 'bg-orange-50 text-orange-800 ring-orange-200' : 'bg-surface-container-low text-on-surface-variant ring-outline-variant/50',
+              )}
+            >
+              {j.label}
+              <span className="tabular">{n}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </GlassCard>
+  )
+}
+
 function LegendaIkon() {
   return (
     <div className="flex flex-wrap items-center gap-x-space-sm gap-y-1 px-space-xs text-body-sm text-on-surface-variant">
@@ -103,6 +144,7 @@ export function PilihJenisInsiden() {
       <InfoHalaman judul="Lapor Kejadian">
         <p>Pilih jenis kejadian yang akan dilaporkan.</p>
       </InfoHalaman>
+      {app.can('/laporan/insiden') && <PintasanRiwayat />}
       {henti.map((r) => (
         <Link key={r.id} to={`/laporan/insiden/${encodeURIComponent(r.id)}`} className="animate-entrance-1">
           <HentiInfo h={r.data.henti!} />
@@ -398,7 +440,8 @@ export function RiwayatInsiden() {
   const [params] = useSearchParams()
   const baru = params.get('baru')
   const [range, setRange] = useDateRange('month')
-  const [jenis, setJenis] = useState<'semua' | JenisInsiden>('semua')
+  // ?jenis= dari pintasan Riwayat di menu Lapor Kejadian.
+  const [jenis, setJenis] = useState<'semua' | JenisInsiden>(() => JENIS_INSIDEN.find((j) => j.value === params.get('jenis'))?.value ?? 'semua')
   const [status, setStatus] = useState<'semua' | StatusInsiden>('semua')
   const semua = useInsiden()
   if (!app.loaded) return <Loading />

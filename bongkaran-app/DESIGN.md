@@ -575,6 +575,7 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 
 ### 9.14s Lapor Kejadian & Temuan
 - Menu "Laporan Insiden & Near miss" berganti nama menjadi **Lapor Kejadian** (HSSE, judul halaman, riwayat "Riwayat Lapor Kejadian", kartu dashboard, pintasan Lapor).
+- Pintasan **Riwayat pelaporan** di atas menu Lapor Kejadian: jumlah laporan & yang belum selesai, ditambah chip per jenis (oranye bila ada yang terbuka) yang membuka riwayat langsung tersaring (`/laporan/insiden?jenis=`).
 - Jenis baru **Temuan** (`jenis: 'temuan'`, ikon pindai): kondisi/tindakan tidak sesuai standar dari inspeksi, patroli, atau pengamatan. Kategori: kondisi tidak aman, tindakan tidak aman, kelengkapan safety, kebersihan, pelayanan/SOP, lingkungan, lainnya. Alur form, tindak lanjut, status, dan riwayat sama dengan insiden/near miss.
 
 ### 9.14t Submit kualitas harian & kirim WA terpisah; peringatan memori HP
