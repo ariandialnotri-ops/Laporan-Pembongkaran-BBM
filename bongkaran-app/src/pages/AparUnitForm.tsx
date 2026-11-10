@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Eye, Printer, Save, Trash2 } from 'lucide-react'
 import { CheckRow, Choice, Field } from '@/components/bongkaran/form-bits'
@@ -10,8 +11,10 @@ import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
-import { APAR_JENIS, DEFAULT_AREAS, kodeBerikut, lokasiOptions, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { APAR_JENIS, berlakuInstansi, DEFAULT_AREAS, isDcp, kodeBerikut, MASA_INSTANSI_BULAN, lokasiOptions, SISTEM_DCP, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { useApp } from '@/lib/app-state'
+import { formatTanggalIso, todayIso } from '@/lib/date'
 import { parseAngka } from '@/lib/format'
 
 const TIPE = [
@@ -24,6 +27,13 @@ export function AparUnitForm() {
   const app = useApp()
   const { id = 'baru' } = useParams()
   if (!app.loaded) return <Loading />
+  // Ubah & hapus data unit APAR/APAB hanya ABH dan pengawas.
+  if (!app.isAdmin && app.role !== 'pengawas')
+    return (
+      <GlassCard level={1} className="p-space-md text-center text-body-sm text-on-surface-variant">
+        Data unit APAR/APAB hanya dapat ditambah, diubah, atau dihapus oleh ABH dan pengawas.
+      </GlassCard>
+    )
   const s = app.settings
   const ada = [...(s.apar ?? []).map((u) => ({ u, tipe: 'apar' as const })), ...(s.apab ?? []).map((u) => ({ u, tipe: 'apab' as const }))].find((x) => x.u.id === id)
   if (id !== 'baru' && !ada)
@@ -40,7 +50,9 @@ export function AparUnitForm() {
 
 function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const toast = useToast()
+  const keTerkirim = useKeTerkirim()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const s = app.settings
@@ -49,7 +61,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
   const [u, setU] = useState<AparUnit>(() => awal?.u ?? unitBaru(tipe, kodeBerikut(tipe, semua)))
   const [error, setError] = useState<string | null>(null)
   const dirty = !awal || JSON.stringify(u) !== JSON.stringify(awal.u)
-  const guard = useLeaveGuard({ active: dirty, title: 'Keluar tanpa menyimpan?', detail: 'Isian unit APAR/APAB ini belum disimpan.' })
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari form unit?', detail: dirty ? 'Isian unit APAR/APAB ini belum disimpan.' : 'Belum ada perubahan yang disimpan.' })
   const lokasi = [...new Set([...lokasiOptions(s.jumlahPulau ?? 0, s.aparArea ?? DEFAULT_AREAS), ...(u.lokasi ? [u.lokasi] : [])])]
   const set = (p: Partial<AparUnit>) => (setError(null), setU({ ...u, ...p }))
 
@@ -67,21 +79,33 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
     if (!u.lokasi && !u.cadangan) return setError('Pilih lokasi unit.')
     const kap = parseAngka(u.kapasitasKg)
     if (!(kap && kap > 0)) return setError('Isi kapasitas (kg).')
+    if (u.periksaInstansi && u.periksaInstansi > todayIso()) return setError('Tanggal pemeriksaan instansi tidak boleh di masa depan.')
     const next = { ...u, kode }
     const list = (t: AparTipe) => (t === 'apar' ? (s.apar ?? []) : (s.apab ?? []))
     const ganti = (arr: AparUnit[]) => (arr.some((x) => x.id === u.id) ? arr.map((x) => (x.id === u.id ? next : x)) : [...arr, next])
     app.updateSettings(tipe === 'apar' ? { apar: ganti(list('apar')) } : { apab: ganti(list('apab')) })
     guard.bypass()
-    toast(`${kode} ${awal ? 'diperbarui' : 'ditambahkan'}`)
-    navigate('/apar/data')
+    keTerkirim({
+      judul: `${kode} ${awal ? 'diperbarui' : 'ditambahkan'}`,
+      detail: `${tipe === 'apar' ? (u.cadangan ? 'APAR cadangan' : 'APAR') : 'APAB'}${u.lokasi ? `, ${u.lokasi}` : ''}`,
+      baris: [
+        ['Kapasitas', `${u.kapasitasKg} kg`],
+        ['Lokasi', u.lokasi || (u.cadangan ? 'Cadangan' : '-')],
+      ],
+      aksi: [
+        { to: `/apar/data?baru=${encodeURIComponent(u.id)}`, label: 'Kembali ke Data Utama APAR' },
+        { to: `/apar/label`, label: 'Cetak label QR' },
+        { to: `/apar/data/unit/baru?tipe=${tipe}`, label: 'Tambah unit lain' },
+      ],
+    })
   }
 
-  const hapus = () => {
-    if (!awal || !window.confirm(`Hapus ${awal.u.kode} dari data utama? Label QR unit ini tidak berlaku lagi; riwayat inspeksinya tetap tersimpan.`)) return
+  const hapus = async () => {
+    if (!awal || !(await konfirmasi({ judul: 'Hapus unit?', pesan: <><b>{awal.u.kode}</b> dihapus dari data utama. Label QR unit ini tidak berlaku lagi; riwayat inspeksinya tetap tersimpan.</> }))) return
     app.updateSettings(awal.tipe === 'apar' ? { apar: (s.apar ?? []).filter((x) => x.id !== awal.u.id) } : { apab: (s.apab ?? []).filter((x) => x.id !== awal.u.id) })
     guard.bypass()
     toast(`${awal.u.kode} dihapus`)
-    navigate('/apar/data')
+    navigate('/apar/data', { replace: true })
   }
 
   return (
@@ -106,7 +130,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
             <Input id="unit-kap" numeric inputMode="decimal" suffix="kg" value={u.kapasitasKg} onChange={(e) => set({ kapasitasKg: e.target.value })} />
           </Field>
           <Field label="Jenis media" htmlFor="unit-jenis" className="col-span-2">
-            <Select value={u.jenis} onValueChange={(v) => set({ jenis: v })}>
+            <Select value={u.jenis} onValueChange={(v) => set({ jenis: v, sistem: isDcp(v) ? (u.sistem ?? 'ps') : undefined })}>
               <SelectTrigger id="unit-jenis">
                 <SelectValue />
               </SelectTrigger>
@@ -119,6 +143,11 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
               </SelectContent>
             </Select>
           </Field>
+          {isDcp(u.jenis) && (
+            <Field label="Sistem DCP" className="col-span-2" hint={u.sistem === 'cartridge' ? 'Inspeksi tanpa butir manometer; diganti pemeriksaan cartridge gas pendorong.' : 'Inspeksi memeriksa tekanan manometer di zona hijau.'}>
+              <Choice label="Sistem DCP" value={u.sistem ?? 'ps'} onChange={(v) => set({ sistem: v })} options={SISTEM_DCP.map((x) => ({ value: x.value, label: x.label }))} />
+            </Field>
+          )}
           <Field label={u.cadangan ? 'Tempat simpan' : 'Lokasi'} htmlFor="unit-lokasi" className="col-span-2">
             <Select value={u.lokasi || undefined} onValueChange={(v) => set({ lokasi: v })}>
               <SelectTrigger id="unit-lokasi">
@@ -136,6 +165,16 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
           <Field label="Jadwal isi ulang" htmlFor="unit-exp" className="col-span-2">
             <Input id="unit-exp" type="date" value={u.kedaluwarsa} onChange={(e) => set({ kedaluwarsa: e.target.value })} />
           </Field>
+          <Field
+            label="Pemeriksaan instansi terakhir"
+            htmlFor="unit-instansi-tgl"
+            hint={u.periksaInstansi ? `Berlaku sampai ${formatTanggalIso(berlakuInstansi(u.periksaInstansi))} (maks. ${MASA_INSTANSI_BULAN} bulan).` : `Wajib diperiksa instansi berwenang maks. ${MASA_INSTANSI_BULAN} bulan sekali.`}
+          >
+            <Input id="unit-instansi-tgl" type="date" max={todayIso()} value={u.periksaInstansi ?? ''} onChange={(e) => set({ periksaInstansi: e.target.value })} />
+          </Field>
+          <Field label="Instansi pemeriksa" htmlFor="unit-instansi">
+            <Input id="unit-instansi" autoComplete="off" placeholder="Mis. Disnaker / Damkar" value={u.instansi ?? ''} onChange={(e) => set({ instansi: e.target.value })} />
+          </Field>
         </div>
         {tipe === 'apar' && (
           <CheckRow checked={u.cadangan} onChange={(v) => set({ cadangan: v })}>
@@ -144,7 +183,7 @@ function Form({ awal }: { awal: { u: AparUnit; tipe: AparTipe } | null }) {
         )}
         <ErrorBox text={error} />
         <div className="flex gap-space-xs">
-          <Button size="lg" variant="glass" onClick={() => navigate('/apar/data')}>
+          <Button size="lg" variant="glass" onClick={() => navigate('/apar/data', { replace: true })}>
             Batal
           </Button>
           <Button size="lg" className="flex-1" onClick={simpan}>

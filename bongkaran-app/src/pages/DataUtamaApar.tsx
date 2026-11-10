@@ -1,21 +1,23 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { MapPin, Plus, QrCode, Settings2, Trash2, Wand2 } from 'lucide-react'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { Field } from '@/components/bongkaran/form-bits'
 import { Loading } from '@/components/bongkaran/load-state'
 import { ErrorBox } from '@/components/bongkaran/lo-fields'
-import { RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Sheet } from '@/components/ui/sheet'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { useToast } from '@/components/ui/toast'
-import { DEFAULT_AREAS, kodeBerikut, lokasiOptions, namaPulau, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
+import { berlakuInstansi, DEFAULT_AREAS, jenisLengkap, kodeBerikut, lokasiOptions, namaPulau, statusInstansi, statusKedaluwarsa, tipeLabel, unitBaru, type AparTipe, type AparUnit } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso, todayIso } from '@/lib/date'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 type Row = { u: AparUnit; tipe: AparTipe }
@@ -24,7 +26,7 @@ type Saring = 'semua' | 'apar' | 'cadangan' | 'apab'
 const COLS: Col<Row>[] = [
   { header: 'Kode', cell: (x) => <span className="tabular font-semibold">{x.u.kode || '-'}</span>, mobileCell: (x) => `${x.u.kode || '-'} (${tipeLabel(x.tipe, x.u.cadangan)})`, mobile: 'title' },
   { header: 'Tipe', cell: (x) => tipeLabel(x.tipe, x.u.cadangan), mobile: 'hide' },
-  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${x.u.jenis}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'sub' },
+  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${jenisLengkap(x.u)}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'sub' },
   { header: 'Lokasi', cell: (x) => x.u.lokasi || <span className="italic text-on-surface-variant">belum diatur</span>, mobile: 'sub' },
   {
     header: 'Isi ulang',
@@ -36,10 +38,29 @@ const COLS: Col<Row>[] = [
     mobile: 'sub',
   },
   {
+    header: 'Uji instansi (12 bln)',
+    cell: (x) => {
+      const st = statusInstansi(x.u.periksaInstansi, todayIso())
+      if (st === 'belum') return <span className="italic text-on-surface-variant">belum dicatat</span>
+      return (
+        <span className={cn('tabular whitespace-nowrap', st === 'lewat' ? 'font-semibold text-error' : st === 'segera' ? 'font-semibold text-amber-700' : '')}>
+          s/d {formatTanggalIso(berlakuInstansi(x.u.periksaInstansi))}
+        </span>
+      )
+    },
+    mobile: 'sub',
+  },
+  {
     header: 'Status',
     cell: (x) => {
-      const st = statusKedaluwarsa(x.u.kedaluwarsa, todayIso())
-      return st === 'lewat' ? <Pill tone="error">Isi ulang lewat</Pill> : st === 'segera' ? <Pill>Isi ulang ≤ 30 hari</Pill> : null
+      const t = todayIso()
+      const inst = statusInstansi(x.u.periksaInstansi, t)
+      const st = statusKedaluwarsa(x.u.kedaluwarsa, t)
+      if (inst === 'lewat') return <Pill tone="error">Uji instansi lewat</Pill>
+      if (st === 'lewat') return <Pill tone="error">Isi ulang lewat</Pill>
+      if (inst === 'segera') return <Pill>Uji instansi ≤ 30 hari</Pill>
+      if (st === 'segera') return <Pill>Isi ulang ≤ 30 hari</Pill>
+      return null
     },
     mobile: 'badge',
   },
@@ -51,14 +72,15 @@ const COLS: Col<Row>[] = [
  */
 export function DataUtamaApar() {
   const app = useApp()
+  const konfirmasi = useKonfirmasi()
   const navigate = useNavigate()
+  const baru = useSearchParams()[0].get('baru')
   const toast = useToast()
   const [saring, setSaring] = useState<Saring>('semua')
-  const [areaOpen, setAreaOpen] = useState(false)
   if (!app.loaded) return <Loading />
 
   const s = app.settings
-  const ubah = app.isAdmin
+  const ubah = app.isAdmin || app.role === 'pengawas'
   const pulau = s.jumlahPulau ?? 0
   const areas = s.aparArea ?? DEFAULT_AREAS
   const apar = s.apar ?? []
@@ -85,7 +107,7 @@ export function DataUtamaApar() {
           <Ringkas label="APAR cadangan" value={apar.filter((u) => u.cadangan).length} />
           <Ringkas label="APAB" value={apab.length} />
         </div>
-        {!ubah && <span className="text-body-sm text-on-surface-variant">Data utama hanya dapat diubah ABH.</span>}
+        {!ubah && <span className="text-body-sm text-on-surface-variant">Data utama hanya dapat diubah ABH atau pengawas.</span>}
         {ubah && (
           <div className="grid grid-cols-2 gap-space-xs">
             <Link to="/apar/data/unit/baru" className={cn(buttonVariants({ size: 'lg' }), 'col-span-2')}>
@@ -96,10 +118,14 @@ export function DataUtamaApar() {
               <QrCode aria-hidden="true" />
               Label QR
             </Link>
-            <Link to="/pengaturan" className={buttonVariants({ variant: 'glass' })}>
-              <Settings2 aria-hidden="true" />
-              Jumlah pulau
-            </Link>
+            {app.isAdmin ? (
+              <Link to="/pengaturan/identitas" className={buttonVariants({ variant: 'glass' })}>
+                <Settings2 aria-hidden="true" />
+                Jumlah pulau
+              </Link>
+            ) : (
+              <span className="flex items-center justify-center rounded-md bg-surface-container-low px-space-sm text-center text-body-sm text-on-surface-variant">Jumlah pulau diatur ABH</span>
+            )}
             {pulauTanpaApar.length > 0 && (
               <Button variant="soft" size="sm" className="col-span-2" onClick={isiPerPulau}>
                 <Wand2 aria-hidden="true" />
@@ -129,6 +155,7 @@ export function DataUtamaApar() {
           total={semua.length}
           cols={COLS}
           rowKey={(x) => x.u.id}
+          rowClass={(x) => (x.u.id === baru ? BARIS_BARU : undefined)}
           onRow={(x) => navigate(ubah ? `/apar/data/unit/${encodeURIComponent(x.u.id)}` : `/apar/unit/${encodeURIComponent(x.u.id)}`)}
           empty={semua.length ? 'Tidak ada unit pada saringan ini.' : 'Belum ada unit. Ketuk "Tambah APAR / APAB".'}
         />
@@ -140,7 +167,7 @@ export function DataUtamaApar() {
           title="Area / lokasi"
           action={
             ubah ? (
-              <button type="button" onClick={() => setAreaOpen(true)} className="touch-44 text-body-sm font-semibold text-primary">
+              <button type="button" onClick={() => navigate('/apar/data/area')} className="touch-44 text-body-sm font-semibold text-primary">
                 Tambah area
               </button>
             ) : undefined
@@ -164,7 +191,7 @@ export function DataUtamaApar() {
                     aria-label={`Hapus area ${l}`}
                     title={n ? 'Pindahkan dulu unit di area ini' : undefined}
                     disabled={n > 0}
-                    onClick={() => window.confirm(`Hapus area "${l}"?`) && app.updateSettings({ aparArea: areas.filter((x) => x !== l) })}
+                    onClick={async () => (await konfirmasi({ judul: 'Hapus area?', pesan: <>Area <b>{l}</b> akan dihapus dari daftar area APAR.</> })) && app.updateSettings({ aparArea: areas.filter((x) => x !== l) })}
                   >
                     <Trash2 aria-hidden="true" />
                   </Button>
@@ -177,10 +204,38 @@ export function DataUtamaApar() {
         </GlassCard>
       </section>
 
-      <Sheet open={areaOpen} onOpenChange={setAreaOpen} title="Tambah area" description="Area baru muncul di pilihan lokasi APAR/APAB.">
-        {areaOpen && <AreaBaru opsi={lokasiOptions(pulau, areas)} onSimpan={(nama) => (app.updateSettings({ aparArea: [...areas, nama] }), setAreaOpen(false), toast(`Area "${nama}" ditambahkan`))} />}
-      </Sheet>
     </div>
+  )
+}
+
+/** Data utama APAR > Tambah area (halaman tersendiri). */
+export function TambahAreaApar() {
+  const app = useApp()
+  const keTerkirim = useKeTerkirim()
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari tambah area?', detail: 'Area yang belum disimpan akan hilang.' })
+  if (!app.loaded) return <Loading />
+  const s = app.settings
+  const areas = s.aparArea ?? DEFAULT_AREAS
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-body-sm text-on-surface-variant">Area baru muncul di pilihan lokasi APAR/APAB.</span>
+      <AreaBaru
+        opsi={lokasiOptions(s.jumlahPulau ?? 0, areas)}
+        onSimpan={(nama) => {
+          app.updateSettings({ aparArea: [...areas, nama] })
+          guard.bypass()
+          keTerkirim({
+            judul: `Area "${nama}" tersimpan`,
+            detail: 'Area baru sudah bisa dipilih sebagai lokasi APAR/APAB.',
+            aksi: [
+              { to: '/apar/data', label: 'Kembali ke Data Utama APAR' },
+              { to: '/apar/data/area', label: 'Tambah area lain' },
+            ],
+          })
+        }}
+      />
+      {guard.dialog}
+    </GlassCard>
   )
 }
 

@@ -1,16 +1,18 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CircleCheck, Plus, Repeat, Trash2, TriangleAlert } from 'lucide-react'
-import { CheckRow, Field, Ladder } from '@/components/bongkaran/form-bits'
+import { CheckRow, Choice, Field, Ladder, TagInput } from '@/components/bongkaran/form-bits'
 import { SupplySelect } from '@/components/bongkaran/lo-fields'
+import { DensityBagikan } from '@/components/bongkaran/density-bagikan'
 import { PhotoSlot } from '@/components/bongkaran/photo-slot'
 import { SignaturePad } from '@/components/bongkaran/signature-pad'
 import { StatusBanner, type BannerTone } from '@/components/bongkaran/status-banner'
 import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
+import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Pill } from '@/components/ui/pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
@@ -21,9 +23,12 @@ import { genId } from '@/lib/image'
 import { loPickable, loStatus, loStatusMeta, planSupply } from '@/lib/plan'
 import { shiftLabel } from '@/lib/shift'
 import {
+  PRODUK_OPTIONS,
   SIGNERS,
   newCompartment,
+  KEPEKAAN_MAKS,
   newDensityTest,
+  parseKepekaan,
   type AtgReading,
   type Evaluation,
   type Photo,
@@ -69,8 +74,55 @@ function Section({ children, className }: { children: ReactNode; className?: str
   )
 }
 
-function Num({ id, value, onChange, placeholder, suffix }: { id?: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string }) {
-  return <Input id={id} numeric inputMode="decimal" autoComplete="off" value={value} placeholder={placeholder} suffix={suffix} onChange={(e) => onChange(e.target.value)} />
+function Num({ id, value, onChange, placeholder, suffix, bahaya }: { id?: string; value: string; onChange: (v: string) => void; placeholder?: string; suffix?: string; bahaya?: boolean }) {
+  return (
+    <Input
+      id={id}
+      numeric
+      inputMode="decimal"
+      autoComplete="off"
+      value={value}
+      placeholder={placeholder}
+      suffix={suffix}
+      aria-invalid={bahaya || undefined}
+      className={cn(bahaya && 'bg-error-container/40 ring-2 ring-error')}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+const lewat = (nilai: number | null, batas: number) => nilai !== null && Math.abs(nilai) > batas
+
+/**
+ * Pemeriksaan silang saat input (mis. deepstick vs ATG): hijau bila dalam batas, merah bila melewati batas.
+ * Saat nilai baru melewati batas dan berhenti diketik ±1 detik, muncul notifikasi toast agar petugas
+ * memeriksa ulang sebelum lanjut ke tahap berikutnya.
+ */
+function CekSilang({ nilai, batas, satuan, digit = 0, judulOk, judulLebih, saran, detail }: { nilai: number | null; batas: number; satuan: string; digit?: number; judulOk: string; judulLebih: string; saran: string; detail?: string }) {
+  const toast = useToast()
+  const lebih = lewat(nilai, batas)
+  const tadi = useRef(lebih)
+  useEffect(() => {
+    if (!lebih) {
+      tadi.current = false
+      return
+    }
+    if (tadi.current) return
+    const t = setTimeout(() => {
+      tadi.current = true
+      toast(`${judulLebih}. ${saran}`, TriangleAlert)
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [lebih, judulLebih, saran, toast])
+  if (nilai === null) return null
+  const angka = formatSigned(nilai, digit, satuan)
+  return (
+    <StatusBanner
+      tone={lebih ? 'error' : 'success'}
+      title={lebih ? judulLebih : judulOk}
+      detail={`${detail ?? `Selisih ${angka}`} · batas ±${formatNumber(batas)}${satuan}${lebih ? `. ${saran}` : ''}`}
+    />
+  )
 }
 
 function Fixed({ id, value, placeholder }: { id?: string; value: string; placeholder?: string }) {
@@ -151,11 +203,18 @@ export function StepContent(props: StepProps) {
                     <Num id={`tera-${c.id}`} suffix="mm" placeholder="dari buku tera" value={c.tinggiTera} onChange={(v) => setComp(c.id, { tinggiTera: v })} />
                   </Field>
                   <Field label="Kapasitas" htmlFor={`kap-${c.id}`}>
-                    <Num id={`kap-${c.id}`} suffix="L" placeholder="8000" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
+                    <Num id={`kap-${c.id}`} suffix="L" value={c.kapasitas} onChange={(v) => setComp(c.id, { kapasitas: v })} />
                   </Field>
                   <Field label="Kepekaan" htmlFor={`kpk-${c.id}`}>
-                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
+                    <Num id={`kpk-${c.id}`} suffix="L/mm" placeholder="mis. 0,3" value={c.kepekaan} onChange={(v) => setComp(c.id, { kepekaan: v })} />
                   </Field>
+                  {/* Angka kepekaan yang terbaca, agar salah ketik (mis. 0.846 terbaca 846) langsung terlihat. */}
+                  {parseKepekaan(c.kepekaan) !== null && (
+                    <span className={cn('col-span-2 tabular text-body-sm', parseKepekaan(c.kepekaan)! > KEPEKAAN_MAKS ? 'font-semibold text-error' : 'text-on-surface-variant')}>
+                      Terbaca {parseKepekaan(c.kepekaan)!.toLocaleString('id-ID', { maximumFractionDigits: 4 })} L/mm · selisih 1 mm ≈ {parseKepekaan(c.kepekaan)!.toLocaleString('id-ID', { maximumFractionDigits: 2 })} L
+                      {parseKepekaan(c.kepekaan)! > KEPEKAAN_MAKS ? ' · tidak wajar, periksa buku tera' : ''}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -170,12 +229,21 @@ export function StepContent(props: StepProps) {
       const reading = d[key]
       const setReading = (patch: Partial<AtgReading>) => setData({ [key]: { ...reading, ...patch } })
       const tableResult = step.id === 'atg_before' ? x.atgBeforeTable : x.atgAfterTable
+      const selisihTabel = step.id === 'atg_before' ? x.cek.atgTabelBefore : x.cek.atgTabelAfter
+      const atgLebih = lewat(selisihTabel, rules.batasAtgTabelL)
       const mismatch = x.tank && d.produk && x.tank.produk.toLowerCase() !== d.produk.toLowerCase()
       return (
         <>
           {step.id === 'atg_after' && <SettleTimer d={d} setData={setData} rules={rules} />}
           <StepPhotos {...props} />
-          {step.id === 'atg_before' && (
+          {step.id === 'atg_before' && TANKS.length === 0 && (
+            <Section>
+              <span className="rounded-md bg-amber-50 p-space-sm text-body-sm text-amber-900">
+                Database tangki SPBU ini belum diisi: pilihan tangki dan hitung volume dari tinggi deepstick belum tersedia. Isi data ATG seperti biasa.
+              </span>
+            </Section>
+          )}
+          {step.id === 'atg_before' && TANKS.length > 0 && (
             <Section>
               <Field label="Tangki pendam" htmlFor="tangki">
                 <Select value={d.tankId} onValueChange={(v) => setData({ tankId: v })}>
@@ -200,10 +268,10 @@ export function StepContent(props: StepProps) {
             </div>
             <div className="grid grid-cols-3 gap-space-sm">
               <Field label="Tinggi" htmlFor={`${key}-t`}>
-                <Num id={`${key}-t`} suffix="mm" value={reading.tinggi} onChange={(v) => setReading({ tinggi: v })} />
+                <Num id={`${key}-t`} suffix="mm" bahaya={atgLebih} value={reading.tinggi} onChange={(v) => setReading({ tinggi: v })} />
               </Field>
               <Field label="Volume" htmlFor={`${key}-v`}>
-                <Num id={`${key}-v`} suffix="L" value={reading.volume} onChange={(v) => setReading({ volume: v })} />
+                <Num id={`${key}-v`} suffix="L" bahaya={atgLebih} value={reading.volume} onChange={(v) => setReading({ volume: v })} />
               </Field>
               <Field label="Suhu" htmlFor={`${key}-s`}>
                 <Num id={`${key}-s`} suffix="°C" value={reading.suhu} onChange={(v) => setReading({ suhu: v })} />
@@ -217,7 +285,19 @@ export function StepContent(props: StepProps) {
             {mismatch && step.id === 'atg_before' ? (
               <StatusBanner tone="error" title="Tangki tidak sesuai produk" detail={`${x.tank!.produk} ≠ ${d.produk}`} />
             ) : (
-              <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', parseAngka(reading.volume), 'ATG vs tabel')} />
+              <>
+                <StatusBanner {...volumeBanner(tableResult, 'Volume dari tabel kalibrasi', null)} />
+                <CekSilang
+                  nilai={selisihTabel}
+                  batas={rules.batasAtgTabelL}
+                  satuan=" L"
+                  digit={1}
+                  judulOk="Volume ATG sesuai tabel kalibrasi"
+                  judulLebih="Volume ATG tidak sesuai tinggi ATG"
+                  saran="Periksa kembali tinggi & volume yang disalin dari layar ATG"
+                  detail={`ATG ${formatLiter(parseAngka(reading.volume) ?? 0, 1)} vs tabel, selisih ${formatSigned(selisihTabel ?? 0, 1, ' L')}`}
+                />
+              </>
             )}
           </Section>
           <TotalisatorSection {...props} fase={step.id === 'atg_before' ? 'awal' : 'akhir'} />
@@ -232,6 +312,30 @@ export function StepContent(props: StepProps) {
                   ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
                 ]}
                 total={['Gain / loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')})` : '-']}
+              />
+            </Section>
+          )}
+          {step.id === 'atg_after' && (
+            <Section>
+              <div className="flex flex-col">
+                <h3 className="text-body-lg font-bold text-on-surface">Penerimaan real P-Insyst</h3>
+                <span className="text-body-sm text-on-surface-variant">Salin angka penerimaan dari P-Insyst, langsung dibandingkan dengan penerimaan ATG.</span>
+              </div>
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Field label="Penerimaan P-Insyst" htmlFor="pinsyst">
+                  <Num id="pinsyst" suffix="L" bahaya={lewat(x.cek.pinsyst, rules.batasPinsystL)} value={d.penerimaanPinsyst ?? ''} onChange={(v) => setData({ penerimaanPinsyst: v })} />
+                </Field>
+                <Field label="Penerimaan ATG" htmlFor="terima-atg">
+                  <Fixed id="terima-atg" value={x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : ''} placeholder="isi ATG dulu" />
+                </Field>
+              </div>
+              <CekSilang
+                nilai={x.cek.pinsyst}
+                batas={rules.batasPinsystL}
+                satuan=" L"
+                judulOk="Penerimaan P-Insyst sama dengan ATG"
+                judulLebih="Penerimaan P-Insyst berbeda dengan ATG"
+                saran="Cocokkan kembali input P-Insyst dengan pembacaan ATG"
               />
             </Section>
           )}
@@ -265,14 +369,44 @@ export function StepContent(props: StepProps) {
       const key = step.id === 'dip_before' ? 'dipBeforeMm' : 'dipAfterMm'
       const result = step.id === 'dip_before' ? x.dipBefore : x.dipAfter
       const atgVol = step.id === 'dip_before' ? x.stokAwal : x.realStok
+      const atgTinggi = parseAngka(step.id === 'dip_before' ? d.atgBefore.tinggi : d.atgAfter.tinggi)
+      const selMm = step.id === 'dip_before' ? x.cek.dipAtgMmBefore : x.cek.dipAtgMmAfter
+      const selL = step.id === 'dip_before' ? x.cek.dipAtgLBefore : x.cek.dipAtgLAfter
+      const lebih = step.id === 'dip_before' ? lewat(selMm, rules.batasDipAtgMm) : lewat(selL, rules.batasDipAtgL)
       return (
         <>
           <StepPhotos {...props} />
           <Section>
-            <Field label={`Ketinggian deepstick · ${x.tank ? x.tank.label : 'tangki belum dipilih'}`} htmlFor={key}>
-              <Num id={key} suffix="mm" value={d[key]} onChange={(v) => setData({ [key]: v })} />
-            </Field>
+            <div className="grid grid-cols-2 gap-space-sm">
+              <Field label={`Deepstick · ${x.tank ? x.tank.label : 'tangki belum dipilih'}`} htmlFor={key}>
+                <Num id={key} suffix="mm" bahaya={lebih} value={d[key]} onChange={(v) => setData({ [key]: v })} />
+              </Field>
+              <Field label="Pembanding ATG" htmlFor={`${key}-atg`}>
+                <Fixed id={`${key}-atg`} value={atgTinggi !== null ? `${formatNumber(atgTinggi)} mm · ${atgVol !== null ? formatLiter(atgVol, 0) : '-'}` : ''} placeholder="isi tahap ATG" />
+              </Field>
+            </div>
             <StatusBanner {...volumeBanner(result, 'Volume dari tabel kalibrasi', atgVol, 'dengan ATG')} />
+            {step.id === 'dip_before' ? (
+              <CekSilang
+                nilai={selMm}
+                batas={rules.batasDipAtgMm}
+                satuan=" mm"
+                judulOk="Deepstick sesuai tinggi ATG"
+                judulLebih={`Deepstick selisih lebih dari ${rules.batasDipAtgMm} mm dengan ATG`}
+                saran="Ulangi deepstick tangki pendam dan periksa tinggi ATG"
+              />
+            ) : (
+              <CekSilang
+                nilai={selL}
+                batas={rules.batasDipAtgL}
+                satuan=" L"
+                digit={1}
+                judulOk="Volume deepstick sesuai ATG"
+                judulLebih={`Volume deepstick selisih lebih dari ${rules.batasDipAtgL} L dengan ATG`}
+                saran="Ulangi deepstick tangki pendam dan periksa pembacaan ATG"
+                detail={`Selisih ${formatSigned(selL ?? 0, 1, ' L')}${selMm !== null ? ` (${formatSigned(selMm, 0, ' mm')})` : ''}`}
+              />
+            )}
             {step.id === 'dip_after' && (
               <Ladder
                 rows={[
@@ -333,24 +467,51 @@ export function StepContent(props: StepProps) {
             <Section key={c.id}>
               <span className="text-tag uppercase text-primary">Kompartemen {c.no}</span>
               <div className="grid grid-cols-2 gap-space-sm">
-                <Field label="Tinggi T2" htmlFor={`tera-fix-${c.id}`}>
-                  <Fixed id={`tera-fix-${c.id}`} value={c.tinggiTera ? `${c.tinggiTera} mm` : ''} placeholder="dari buku tera" />
+                <Field label="Acuan T2 buku tera" htmlFor={`tera-fix-${c.id}`}>
+                  <Input
+                    id={`tera-fix-${c.id}`}
+                    numeric
+                    readOnly
+                    tabIndex={-1}
+                    suffix="mm"
+                    value={c.tinggiTera}
+                    placeholder="dari buku tera"
+                    className="border border-dashed border-sky-300 bg-sky-50 shadow-none [&_input]:text-sky-900"
+                  />
                 </Field>
                 <Field label="Hasil deepstick" htmlFor={`dip-${c.id}`}>
-                  <Num id={`dip-${c.id}`} suffix="mm" value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
+                  <Num id={`dip-${c.id}`} suffix="mm" bahaya={c.outOfLimit || lewat(c.estLiter, rules.batasLossL)} value={c.dipAktual} onChange={(v) => setDip(c.id, v)} />
                 </Field>
               </div>
               <StatusBanner
                 {...(c.selisihMm === null
                   ? IDLE
                   : {
-                      tone: (c.outOfLimit ? 'error' : 'success') as BannerTone,
-                      title: c.outOfLimit ? `Kurang lebih dari ${rules.teraToleranceMm} mm` : 'Sesuai tinggi T2 buku tera',
+                      tone: (c.outOfLimit || lewat(c.estLiter, rules.batasLossL) ? 'error' : 'success') as BannerTone,
+                      title: c.outOfLimit
+                        ? `Kurang lebih dari ${rules.teraToleranceMm} mm`
+                        : lewat(c.estLiter, rules.batasLossL)
+                          ? `Selisih di atas ${rules.batasLossL} L, periksa kembali deepstick & kepekaan`
+                          : 'Sesuai tinggi T2 buku tera',
                       detail: `Selisih ${formatSigned(c.selisihMm, 0, ' mm')}${c.estLiter !== null ? ` ≈ ${formatSigned(c.estLiter, 1, ' L')}` : ''}`,
                     })}
               />
             </Section>
           ))}
+          {x.transportLoss !== null && (
+            <Section>
+              <CekSilang
+                nilai={x.transportLoss}
+                batas={rules.batasLossL}
+                satuan=" L"
+                digit={1}
+                judulOk="Total transport gain/loss wajar"
+                judulLebih={`Transport gain/loss di atas ${rules.batasLossL} L`}
+                saran="Periksa kembali deepstick kompartemen, tinggi T2, dan kepekaan buku tera"
+                detail={`Total ${formatSigned(x.transportLoss, 1, ' L')}`}
+              />
+            </Section>
+          )}
           {x.teraOutOfLimit && <ApprovalCard {...props} />}
         </>
       )
@@ -388,6 +549,10 @@ export function StepContent(props: StepProps) {
   }
 }
 
+/** Kompartemen diurutkan menurut nomornya (angka dulu, lalu teks). */
+const urutKomp = <T extends { no: string }>(list: T[]) =>
+  [...list].sort((a, b) => (Number(a.no) || Infinity) - (Number(b.no) || Infinity) || a.no.localeCompare(b.no))
+
 function LoStep(props: StepProps) {
   const { report, evaluation, setData, plans, usedLoIds, settings } = props
   const d = report.data
@@ -408,10 +573,14 @@ function LoStep(props: StepProps) {
     const picked = plan!.los.filter((l) => loIds.includes(l.id))
     const produk = picked[0]?.produk ?? ''
     const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    // Ship To per produk dari Profil (bila ada), selain itu dari permintaan MS2.
+    const shipTo = (produk && settings.shipTo?.[produk]) || plan!.shipTo || d.shipTo
     setData({
       loIds,
       noLOs: picked.map((l) => l.noLO),
       produk,
+      shipTo,
+      soldTo: d.soldTo || settings.soldTo || '',
       volumeDO: picked.length ? String(picked.reduce((s, l) => s + l.volume, 0)) : '',
       segelLO: [...new Set(picked.flatMap((l) => l.segel))],
       tankId: produk !== d.produk ? (tankForProduk(produk)?.id ?? '') : d.tankId,
@@ -425,25 +594,105 @@ function LoStep(props: StepProps) {
     if (!props.readOnly && noLOsPlan && kunciPlan !== d.noLOs.join('|')) setData({ noLOs: noLOsPlan })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kunciPlan])
-  const [ubahLo, setUbahLo] = useState<PlanLo | null>(null)
+  const navigate = useNavigate()
+  const app = useApp()
 
-  const setComp = (id: string, no: string) => setData({ compartments: d.compartments.map((c) => (c.id === id ? { ...c, no } : c)) })
-  const removeComp = (id: string) =>
-    setData({ compartments: d.compartments.filter((c) => c.id !== id), densityTests: d.densityTests.filter((t) => t.kompartemenId !== id) })
+  // Input manual: SO/LO belum ada di Plan Pengiriman. Nomor diketik, produk dipilih; tidak mengubah status LO di Plan.
+  const manual = !!d.soManual
+  const setMode = (m: 'plan' | 'manual') => {
+    if ((m === 'manual') === manual) return
+    setData(
+      m === 'manual'
+        ? { soManual: true, planId: '', loIds: [], noSO: '', noLOs: [], segelLO: [] }
+        : { soManual: false, planId: '', loIds: [], noSO: '', noLOs: [], produk: '', volumeDO: '', segelLO: [], tankId: '' },
+    )
+  }
+  const setProdukManual = (produk: string) => {
+    if (produk === d.produk) return
+    const nozzles = settings.nozzles.filter((n) => n.produk === produk)
+    setData({
+      produk,
+      shipTo: settings.shipTo?.[produk] || d.shipTo,
+      soldTo: d.soldTo || settings.soldTo || '',
+      tankId: tankForProduk(produk)?.id ?? '',
+      totalisator: nozzles.map((n) => ({ nozzleId: n.id, nozzle: n.nama, awal: '', akhir: '' })),
+    })
+  }
+  const bersih = (v: string) => v.replace(/\s+/g, '').trim()
+  // Nomor LO manual yang sudah dipakai laporan lain atau ada di Plan (sebaiknya dipilih dari Plan).
+  const loDipakai = manual
+    ? d.noLOs.filter((no) => app.reports.some((r) => r.id !== report.id && r.status !== 'draft' && (r.noLOs ?? []).includes(no)))
+    : []
+  const loDiPlan = manual ? d.noLOs.filter((no) => plans.some((p) => p.los.some((lo) => lo.status !== 'deleted' && lo.noLO.trim() === no))) : []
+
+  const konfirmasi = useKonfirmasi()
+  // Pilih kompartemen 1-6 dengan ketuk; nomor lain dari laporan lama tetap tampil agar bisa dilepas.
+  const pilihanKomp = [...new Set(['1', '2', '3', '4', '5', '6', ...urutKomp(d.compartments).map((c) => c.no.trim()).filter(Boolean)])]
+  const toggleComp = async (no: string) => {
+    const ada = d.compartments.find((c) => c.no.trim() === no)
+    if (!ada) {
+      setData({ compartments: urutKomp([...d.compartments, newCompartment(no)]) })
+      return
+    }
+    const terisi = [ada.tinggiTera, ada.kapasitas, ada.kepekaan, ada.dipAktual, ada.noSegel].some((v) => v?.trim()) || d.densityTests.some((t) => t.kompartemenId === ada.id && (t.densityObs || t.suhu))
+    if (terisi && !(await konfirmasi({ jenis: 'hapus', judul: `Lepas kompartemen ${no}?`, pesan: <>Data <b>kompartemen {no}</b> (deepstick, segel, density) ikut terhapus.</>, ya: 'Ya, lepas' }))) return
+    setData({ compartments: d.compartments.filter((c) => c.id !== ada.id), densityTests: d.densityTests.filter((t) => t.kompartemenId !== ada.id) })
+  }
 
   const depotBanner = x.depotCalc
     ? x.d15Depot !== null && Math.abs(x.d15Depot - x.depotCalc.value) > 0.0005
-      ? { tone: 'error' as BannerTone, title: 'Density 15°C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
-      : { tone: 'success' as BannerTone, title: `Hitungan D15 depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
-    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek D15' }
+      ? { tone: 'error' as BannerTone, title: 'Density std. 15 °C dokumen berbeda dari hitungan', detail: `Hitungan ${formatDensity(x.depotCalc.value)}, dokumen ${formatDensity(x.d15Depot)}` }
+      : { tone: 'success' as BannerTone, title: `Hitungan Density std. 15 °C depot ${formatDensity(x.depotCalc.value)}`, detail: METHOD_LABEL[x.depotCalc.method] }
+    : { tone: 'idle' as BannerTone, title: 'Isi density & suhu OBS depot untuk cek Density std. 15 °C' }
 
   return (
     <>
       <StepPhotos {...props} />
       <Section>
-        <span className="text-tag uppercase text-primary">SO & LO dari Plan</span>
-        {plans.length === 0 ? (
-          <StatusBanner tone="error" title="Belum ada SO siap dibongkar" detail="SO/LO tidak bisa diketik manual. Isi di menu Input, Plan Pengiriman." />
+        <span className="text-tag uppercase text-primary">Nomor SO & LO</span>
+        {!props.readOnly && (
+          <Choice
+            label="Sumber nomor SO & LO"
+            value={manual ? 'manual' : 'plan'}
+            onChange={setMode}
+            options={[
+              { value: 'plan', label: 'Pilih dari Plan' },
+              { value: 'manual', label: 'Input manual' },
+            ]}
+          />
+        )}
+        {manual ? (
+          <>
+            <Field label="Nomor SO" htmlFor="so-manual">
+              <Input id="so-manual" autoComplete="off" inputMode="numeric" placeholder="Ketik nomor SO" value={d.noSO} onChange={(e) => setData({ noSO: bersih(e.target.value) })} />
+            </Field>
+            <Field label="Nomor LO" htmlFor="lo-manual" hint="Ketik lalu tekan Enter / Tambah. Bisa lebih dari satu LO.">
+              <TagInput id="lo-manual" values={d.noLOs} onChange={(v) => setData({ noLOs: v.map(bersih).filter(Boolean) })} placeholder="Ketik nomor LO" />
+            </Field>
+            <Field label="Produk" htmlFor="produk-manual">
+              <Select value={d.produk} onValueChange={setProdukManual}>
+                <SelectTrigger id="produk-manual">
+                  <SelectValue placeholder="Pilih produk" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUK_OPTIONS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {loDipakai.length > 0 && (
+              <StatusBanner tone="error" title={`LO ${loDipakai.join(', ')} sudah dipakai laporan bongkaran lain`} detail="Periksa kembali nomor LO pada dokumen MT." />
+            )}
+            {loDiPlan.length > 0 && (
+              <StatusBanner tone="warn" title={`LO ${loDiPlan.join(', ')} ada di Plan Pengiriman`} detail="Sebaiknya pilih dari Plan agar status Tracking LO ikut diperbarui." />
+            )}
+            <span className="text-body-sm text-on-surface-variant">Input manual tidak mengubah status di Tracking LO. Volume DO diisi di bawah sesuai dokumen.</span>
+          </>
+        ) : plans.length === 0 ? (
+          <StatusBanner tone="warn" title="Belum ada SO siap dibongkar" detail="Pilih Input manual, atau isi dulu di menu Input, Plan Pengiriman." />
         ) : (
           <Field label="Nomor SO" htmlFor="so">
             <Select value={d.planId} onValueChange={selectPlan}>
@@ -460,7 +709,7 @@ function LoStep(props: StepProps) {
             </Select>
           </Field>
         )}
-        {plan && (
+        {plan && !manual && (
           <div className="flex flex-col gap-space-xs">
             <span className="text-tag uppercase text-on-surface-variant">Nomor LO yang datang</span>
             {plan.los.map((lo) => {
@@ -484,7 +733,7 @@ function LoStep(props: StepProps) {
                     {lainProduk && <span className="text-on-surface-variant">. Produk berbeda, bongkar terpisah</span>}
                   </CheckRow>
                   {checked && !props.readOnly && (
-                    <Button variant="soft" size="sm" className="self-start" onClick={() => setUbahLo(lo)}>
+                    <Button variant="soft" size="sm" className="self-start" onClick={() => plan && navigate(`/input/${encodeURIComponent(props.report.id)}/lo/${encodeURIComponent(plan.id)}/${encodeURIComponent(lo.id)}`)}>
                       <Repeat aria-hidden="true" />
                       Ubah nomor LO / pindah station
                     </Button>
@@ -507,7 +756,6 @@ function LoStep(props: StepProps) {
         </span>
       </Section>
 
-      {plan && <UbahLoSheet plan={plan} lo={ubahLo} onClose={() => setUbahLo(null)} />}
 
       <Section>
         <span className="text-tag uppercase text-primary">Data LO mobil tangki</span>
@@ -519,20 +767,23 @@ function LoStep(props: StepProps) {
           <Input id="pengangkut" autoComplete="off" value={d.perusahaanPengangkut} onChange={(e) => setData({ perusahaanPengangkut: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-space-sm">
+          <Field label="No. Sold To" htmlFor="soldto">
+            <Input id="soldto" autoComplete="off" inputMode="numeric" placeholder="dari Profil" value={d.soldTo} onChange={(e) => setData({ soldTo: e.target.value })} />
+          </Field>
           <Field label="No. Ship To" htmlFor="shipto">
-            <Input id="shipto" autoComplete="off" inputMode="numeric" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
+            <Input id="shipto" autoComplete="off" inputMode="numeric" placeholder="otomatis per produk" value={d.shipTo} onChange={(e) => setData({ shipTo: e.target.value })} />
           </Field>
           <Field label="Produk" htmlFor="lo-produk">
-            <Fixed id="lo-produk" value={d.produk} placeholder="dari SO" />
+            <Fixed id="lo-produk" value={d.produk} placeholder={manual ? 'pilih di atas' : 'dari SO'} />
           </Field>
           <Field label="Nomor SO" htmlFor="lo-so">
-            <Fixed id="lo-so" value={d.noSO} placeholder="dari Plan" />
+            <Fixed id="lo-so" value={d.noSO} placeholder={manual ? 'input manual' : 'dari Plan'} />
           </Field>
           <Field label="Nomor LO" htmlFor="lo-lo">
-            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder="dari Plan" />
+            <Fixed id="lo-lo" value={d.noLOs.join(', ')} placeholder={manual ? 'input manual' : 'dari Plan'} />
           </Field>
         </div>
-        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan.' : undefined}>
+        <Field label="Volume DO" htmlFor="volumedo" hint={d.loIds.length ? 'Terisi dari volume LO di Plan.' : manual ? 'Isi sesuai dokumen DO/LO.' : undefined}>
           <Num id="volumedo" suffix="L" value={d.volumeDO} onChange={(v) => setData({ volumeDO: v })} />
         </Field>
       </Section>
@@ -540,15 +791,15 @@ function LoStep(props: StepProps) {
       <Section>
         <span className="text-tag uppercase text-primary">Density depot & keberangkatan</span>
         <div className="grid grid-cols-2 gap-space-sm">
-          <Field label="Density OBS depot" htmlFor="dobs-depot">
-            <Num id="dobs-depot" placeholder="0,7450" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
+          <Field label="Density OBS depot" htmlFor="dobs-depot" hint="Contoh: 0,7450">
+            <Num id="dobs-depot" value={d.densityObsDepot} onChange={(v) => setData({ densityObsDepot: v })} />
           </Field>
-          <Field label="Suhu OBS depot" htmlFor="suhu-depot">
-            <Num id="suhu-depot" suffix="°C" placeholder="30,0" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
+          <Field label="Suhu OBS depot" htmlFor="suhu-depot" hint="Contoh: 30,0">
+            <Num id="suhu-depot" suffix="°C" value={d.suhuObsDepot} onChange={(v) => setData({ suhuObsDepot: v })} />
           </Field>
         </div>
-        <Field label="Density at 15°C (dokumen DO)" htmlFor="d15-depot">
-          <Num id="d15-depot" placeholder="0,7567" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
+        <Field label="Density std. 15 °C (dokumen DO)" htmlFor="d15-depot" hint="Contoh: 0,7567 (4 desimal)">
+          <Num id="d15-depot" value={d.density15Depot} onChange={(v) => setData({ density15Depot: v })} />
         </Field>
         <StatusBanner {...depotBanner} />
         <div className="grid grid-cols-2 gap-space-sm">
@@ -562,23 +813,31 @@ function LoStep(props: StepProps) {
       </Section>
 
       <Section>
-        <span className="text-tag uppercase text-primary">Kompartemen</span>
-        <div className="flex flex-wrap items-center gap-space-xs">
-          {d.compartments.map((c) => (
-            <div key={c.id} className="flex items-center gap-1">
-              <Input aria-label="Nomor kompartemen" className="w-20" numeric value={c.no} onChange={(e) => setComp(c.id, e.target.value)} />
-              {d.compartments.length > 1 && (
-                <Button variant="ghost" size="icon" aria-label={`Hapus kompartemen ${c.no}`} onClick={() => removeComp(c.id)}>
-                  <Trash2 aria-hidden="true" />
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button variant="soft" size="sm" onClick={() => setData({ compartments: [...d.compartments, newCompartment(String(d.compartments.length + 1))] })}>
-            <Plus aria-hidden="true" />
-            Kompartemen
-          </Button>
+        <span className="text-tag uppercase text-primary">Kompartemen yang dibongkar</span>
+        <span className="text-body-sm text-on-surface-variant">Ketuk nomor kompartemen sesuai dokumen LO. Bisa lebih dari satu.</span>
+        <div role="group" aria-label="Pilih kompartemen" className="grid grid-cols-6 gap-space-xs">
+          {pilihanKomp.map((no) => {
+            const c = d.compartments.find((k) => k.no.trim() === no)
+            return (
+              <button
+                key={no}
+                type="button"
+                aria-pressed={!!c}
+                disabled={props.readOnly}
+                onClick={() => void toggleComp(no)}
+                className={cn(
+                  'tabular flex min-h-11 items-center justify-center rounded-md text-body-lg font-bold transition-colors duration-200',
+                  c ? 'bg-primary text-on-primary shadow-sm' : 'inset-field text-on-surface-variant',
+                )}
+              >
+                {no}
+              </button>
+            )
+          })}
         </div>
+        <span className="text-body-sm text-on-surface-variant">
+          {d.compartments.length ? `Terpilih: kompartemen ${urutKomp(d.compartments).map((c) => c.no || '-').join(', ')}` : 'Belum ada kompartemen dipilih'}
+        </span>
       </Section>
     </>
   )
@@ -598,7 +857,7 @@ function DensityStep(props: StepProps) {
     <>
       <GlassCard level={2} className="flex flex-col gap-space-xs p-space-md">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-tag uppercase text-primary">D15 dokumen DO depot</span>
+          <span className="text-tag uppercase text-primary">Density std. 15 °C dokumen DO depot</span>
           <Pill tone="cyan">Toleransi ±{String(rules.densityTolerance).replace('.', ',')}</Pill>
         </div>
         <span className="tabular text-numeric-lg font-bold text-on-surface">{formatDensity(x.d15Depot)}</span>
@@ -630,17 +889,17 @@ function DensityStep(props: StepProps) {
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-space-sm">
-            <Field label="Density observasi" htmlFor={`dobs-${r.id}`}>
-              <Num id={`dobs-${r.id}`} placeholder="0,7452" value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
+            <Field label="Density observasi" htmlFor={`dobs-${r.id}`} hint="Contoh: 0,7452">
+              <Num id={`dobs-${r.id}`} value={r.densityObs} onChange={(v) => setTest(r.id, { densityObs: v })} />
             </Field>
-            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`}>
-              <Num id={`dsuhu-${r.id}`} suffix="°C" placeholder="30,5" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
+            <Field label="Suhu observasi" htmlFor={`dsuhu-${r.id}`} hint="Contoh: 30,5">
+              <Num id={`dsuhu-${r.id}`} suffix="°C" value={r.suhu} onChange={(v) => setTest(r.id, { suhu: v })} />
             </Field>
           </div>
           <Ladder
             rows={[
-              ['Density @15°C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
-              ['D15 dokumen depot', formatDensity(x.d15Depot)],
+              ['Density std. 15 °C (ASTM 53)', r.d15 ? formatDensity(r.d15.value) : '-'],
+              ['Density std. 15 °C dokumen depot', formatDensity(x.d15Depot)],
             ]}
             total={['Selisih', r.selisih !== null ? formatDensitySigned(r.selisih) : '-']}
           />
@@ -659,6 +918,7 @@ function DensityStep(props: StepProps) {
         <Plus aria-hidden="true" />
         Tambah pengukuran
       </Button>
+      <DensityBagikan report={report} x={x} rules={rules} />
     </>
   )
 }
@@ -899,12 +1159,15 @@ export function SignersSection({
   readOnly,
   keys,
   title = 'Tanda tangan',
+  bolehTtd = true,
 }: {
   report: Report
   setData: (patch: Partial<ReportData>) => void
   readOnly: boolean
   keys: SignerKey[]
   title?: string
+  /** false: slot hanya dapat dilihat (mis. TTD closing oleh selain pengawas/ABH). */
+  bolehTtd?: boolean
 }) {
   const d = report.data
   const ttd = d.ttd ?? {}
@@ -916,7 +1179,9 @@ export function SignersSection({
     <Section>
       <div className="flex flex-col">
         <span className="text-tag uppercase text-primary">{title}</span>
-        <span className="text-body-sm text-on-surface-variant">Penerima, security, dan supir tangki wajib. Pengawas dan ABH dapat menandatangani nanti dari laporan.</span>
+        <span className="text-body-sm text-on-surface-variant">
+          {bolehTtd ? 'Penerima, security, dan supir tangki wajib. Pengawas dan ABH dapat menandatangani nanti dari laporan; laporan menjadi Closing setelah keduanya menandatangani.' : 'Tanda tangan closing hanya oleh pengawas dan ABH.'}
+        </span>
       </div>
       {SIGNERS.filter((s) => keys.includes(s.key)).map((s) => {
         const t = ttd[s.key]
@@ -928,9 +1193,9 @@ export function SignersSection({
               {t?.img ? <Pill tone="success">Sudah tanda tangan</Pill> : <Pill tone={s.wajib ? 'error' : 'neutral'}>{s.wajib ? 'Wajib' : 'Bisa nanti'}</Pill>}
             </div>
             <Field label={`Nama ${s.label.toLowerCase()}`} htmlFor={`ttd-nama-${s.key}`}>
-              <Input id={`ttd-nama-${s.key}`} autoComplete="off" disabled={readOnly && !!t?.img} value={nama} onChange={(e) => set(s.key, { nama: e.target.value })} />
+              <Input id={`ttd-nama-${s.key}`} autoComplete="off" disabled={!bolehTtd || (readOnly && !!t?.img)} value={nama} onChange={(e) => set(s.key, { nama: e.target.value })} />
             </Field>
-            <SignaturePad label={s.label} value={t?.img ?? ''} disabled={readOnly && !!t?.img} onChange={(img) => set(s.key, { img, nama })} />
+            <SignaturePad label={s.label} value={t?.img ?? ''} disabled={!bolehTtd || (readOnly && !!t?.img)} onChange={(img) => set(s.key, { img, nama })} />
           </div>
         )
       })}
@@ -942,17 +1207,9 @@ export function SignersSection({
  * Ubah nomor LO saat bongkar, mis. MT dialihkan ke station (supply point) lain dan LO terbit ulang.
  * Disimpan ke Plan sehingga Tracking LO dan laporan ikut berubah; LO lama tetap tercatat.
  */
-function UbahLoSheet({ plan, lo, onClose }: { plan: Plan; lo: PlanLo | null; onClose: () => void }) {
-  return (
-    <Sheet open={!!lo} onOpenChange={(o) => !o && onClose()} title="Ubah nomor LO" description={lo ? `${lo.produk}, ${formatLiter(lo.volume)}, SO ${plan.noSO || '-'}` : undefined}>
-      {lo && <UbahLoIsi key={lo.id} plan={plan} lo={lo} onClose={onClose} />}
-    </Sheet>
-  )
-}
-
-function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () => void }) {
+/** Isi halaman Ubah nomor LO (pages/UbahLo). `onClose(hasil)` dipanggil setelah tersimpan, tanpa hasil bila tidak ada perubahan. */
+export function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: (hasil?: { baru: string; pindah: boolean; sp: string }) => void }) {
   const app = useApp()
-  const toast = useToast()
   const asal = planSupply(plan, lo)
   const [no, setNo] = useState(lo.noLO)
   const [pindah, setPindah] = useState(false)
@@ -978,8 +1235,7 @@ function UbahLoIsi({ plan, lo, onClose }: { plan: Plan; lo: PlanLo; onClose: () 
     setSaving(true)
     try {
       await app.savePlan({ ...plan, los: plan.los.map((x) => (x.id === lo.id ? next : x)) })
-      toast(pindah ? `Pindah station: LO ${lo.noLO || '-'} menjadi ${baru}` : `Nomor LO menjadi ${baru}`)
-      onClose()
+      onClose({ baru, pindah, sp })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

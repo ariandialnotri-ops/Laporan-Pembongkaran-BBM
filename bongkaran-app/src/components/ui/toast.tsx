@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { CircleCheck, type LucideIcon } from 'lucide-react'
 
+import { prosesStore } from '@/lib/proses'
 import { cn } from '@/lib/utils'
 
 type ToastState = { message: string; icon: LucideIcon } | null
@@ -21,6 +22,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const show = React.useCallback(
     (message: string, icon: LucideIcon = CircleCheck) => {
+      // Saat lembar proses aktif, tanda berhasil sudah ditampilkan lembar itu; toast sukses tidak ditumpuk.
+      if (icon === CircleCheck && prosesStore.get().fase !== 'diam') return
       if (timer.current) clearTimeout(timer.current)
       setToast({ message, icon })
       timer.current = setTimeout(() => setToast(null), 2800)

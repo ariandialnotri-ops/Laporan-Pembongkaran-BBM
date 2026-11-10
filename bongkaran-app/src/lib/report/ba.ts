@@ -3,7 +3,7 @@
  * Alamat sel mengikuti template Excel referensi.
  */
 import { parseAngka } from '@/lib/format'
-import type { Derived, Report, Settings, SignerKey } from '@/lib/sop'
+import { parseKepekaan, slotKompartemen, type Derived, type Report, type Settings, type SignerKey } from '@/lib/sop'
 import { tankName } from '@/lib/tank'
 import type { CellSpec } from './xlsx'
 
@@ -57,8 +57,10 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
   set('D10', d.noSO ? idValue(d.noSO) : null)
 
   // Pemeriksaan kualitas per kompartemen
+  // Kolom mengikuti nomor kompartemen yang dipilih (mis. kompartemen 3 di kolom "Kompartemen 3").
+  const slotData = slotKompartemen(d.compartments, QCOLS.length)
   QCOLS.forEach((col, i) => {
-    const comp = d.compartments[i]
+    const comp = slotData[i]
     const r = comp ? x.densityResults.find((t) => t.kompartemenId === comp.id && t.d15) : undefined
     const obs = r?.obs ?? null
     const d15 = r?.d15?.value ?? null
@@ -74,9 +76,10 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
   const tankLabel = x.tank ? `T${x.tank.tankNo}` : null
   let totalKap = 0
   let totalLoss = 0
+  const slotHasil = slotKompartemen(x.compartments, 6)
   for (let i = 0; i < 6; i++) {
     const row = 24 + i
-    const c = x.compartments[i]
+    const c = slotHasil[i]
     const dip = c ? n(c.dipAktual) : null
     const tera = c ? n(c.tinggiTera) : null
     const kap = c ? n(c.kapasitas) : null
@@ -88,7 +91,7 @@ export function buildBa(report: Report, x: Derived, settings: Settings): BaBuild
     set(`L${row}`, sel)
     // Template: M24 tanpa desimal, M25-M29 tiga desimal; disamakan (liter bulat).
     cells[`M${row}`] = { value: kap, fmt: KAPASITAS_FMT }
-    const kep = c ? n(c.kepekaan) : null
+    const kep = c ? parseKepekaan(c.kepekaan) : null
     const mmPerL = c ? n(c.kepekaanMmL ?? '') : null
     if (dip !== null && tera && kep) {
       // Kepekaan buku tera (L/mm): selisih liter = selisih mm x kepekaan.

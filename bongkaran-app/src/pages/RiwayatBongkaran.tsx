@@ -1,15 +1,19 @@
 import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { FileDown } from 'lucide-react'
+import { BannerTerkirim } from '@/components/bongkaran/banner-terkirim'
 import { ChipFilter } from '@/components/bongkaran/chip-filter'
 import { DateFilter, inRange, useDateRange } from '@/components/bongkaran/date-filter'
 import { Loading } from '@/components/bongkaran/load-state'
-import { ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { BARIS_BARU, ProdukChip, RecordTable, type Col } from '@/components/bongkaran/record-table'
+import { buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber, formatSigned } from '@/lib/format'
 import { formatDurasi, slaOf } from '@/lib/sla'
-import { PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
+import { lamaProses, PRODUK_OPTIONS, STEPS, sudahClosing, type ReportSummary } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 /** Keterangan hasil bongkar, seperti kolom keterangan pada rekap transaksi. */
@@ -25,11 +29,13 @@ function progress(r: ReportSummary) {
   if (r.status === 'draft') return `Tahap ${Math.min(r.doneCount + 1, STEPS.length)} dari ${STEPS.length}`
   if (r.status === 'anomali') return 'Tindak lanjut anomali'
   if (!r.sample2Jam) return 'Menunggu uji pasca penerimaan'
+  if (!sudahClosing(r)) return 'Menunggu TTD pengawas & ABH'
   if (r.ttdKurang?.length) return 'Menunggu tanda tangan'
-  return 'Selesai'
+  return 'Closing'
 }
 
-const STATUS = { selesai: 'Selesai', anomali: 'Anomali', draft: 'Berjalan' } as const
+/** Status: selesai/anomali baru menjadi Closing setelah ditandatangani pengawas & ABH. */
+const statusLaporan = (r: ReportSummary) => (r.status === 'draft' ? 'Berjalan' : sudahClosing(r) ? (r.status === 'anomali' ? 'Closing (anomali)' : 'Closing') : r.status === 'anomali' ? 'Anomali · belum closing' : 'Selesai · belum closing')
 
 type Row = ReportSummary & { sla: { permintaan: number | null; perjalanan: number | null } }
 
@@ -45,9 +51,18 @@ const COLS: Col<Row>[] = [
     mobileCell: (r) => `${formatTanggalIso(r.tanggal)} ${r.jam}`,
     mobile: 'title',
   },
-  { header: 'No SO', cell: (r) => <span className="tabular whitespace-nowrap">{r.noSO || '-'}</span>, mobile: 'hide' },
+  {
+    header: 'No SO',
+    cell: (r) => (
+      <span className="tabular whitespace-nowrap">
+        {r.noSO || '-'}
+        {r.soManual && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">manual</span>}
+      </span>
+    ),
+    mobile: 'hide',
+  },
   { header: 'No LO', cell: (r) => <span className="tabular whitespace-nowrap">{r.noLOs.join(', ') || '-'}</span>, mobile: 'hide' },
-  { header: 'SO / LO', cell: (r) => `SO ${r.noSO || '-'}, LO ${r.noLOs.join(', ') || '-'}`, mobile: 'sub', desktop: false },
+  { header: 'SO / LO', cell: (r) => `SO ${r.noSO || '-'}, LO ${r.noLOs.join(', ') || '-'}${r.soManual ? ' (manual)' : ''}`, mobile: 'sub', desktop: false },
   {
     header: 'Nopol & supir',
     cell: (r) => (
@@ -85,16 +100,19 @@ const COLS: Col<Row>[] = [
     desktop: false,
   },
   {
-    header: 'SLA',
+    header: 'SLA & proses',
     cell: (r) => (
       <span className="flex flex-col whitespace-nowrap text-body-sm">
         <span title="Request MS2 sampai selesai bongkar">Req: {formatDurasi(r.sla.permintaan)}</span>
         <span className="text-on-surface-variant" title="Gate out depot sampai selesai bongkar">
           Gate out: {formatDurasi(r.sla.perjalanan)}
         </span>
+        <span className="font-semibold text-primary" title="Mulai tahap 1 sampai laporan bongkaran ditutup">
+          Proses: {formatDurasi(lamaProses(r))}
+        </span>
       </span>
     ),
-    mobileCell: (r) => `SLA request ${formatDurasi(r.sla.permintaan)}, gate out ${formatDurasi(r.sla.perjalanan)}`,
+    mobileCell: (r) => `Proses ${formatDurasi(lamaProses(r))}, SLA request ${formatDurasi(r.sla.permintaan)}, gate out ${formatDurasi(r.sla.perjalanan)}`,
     mobile: 'sub',
   },
   {
@@ -110,10 +128,10 @@ const COLS: Col<Row>[] = [
     },
     mobile: 'badge',
   },
-  { header: 'Status', cell: (r) => <span className="text-on-surface-variant">{STATUS[r.status]}</span>, mobile: 'hide' },
+  { header: 'Status', cell: (r) => <span className={cn('whitespace-nowrap', sudahClosing(r) ? 'font-semibold text-emerald-700' : 'text-on-surface-variant')}>{statusLaporan(r)}</span>, mobile: 'hide' },
   {
     header: 'Progress tindakan',
-    cell: (r) => <span className={cn('whitespace-nowrap', progress(r) === 'Selesai' ? 'text-on-surface-variant' : 'font-semibold text-primary')}>{progress(r)}</span>,
+    cell: (r) => <span className={cn('whitespace-nowrap', progress(r) === 'Closing' ? 'text-on-surface-variant' : 'font-semibold text-primary')}>{progress(r)}</span>,
     mobile: 'hide',
   },
 ]
@@ -123,13 +141,24 @@ export function RiwayatBongkaran() {
   const app = useApp()
   const [range, setRange] = useDateRange('month')
   const [produk, setProduk] = useState('semua')
+  const [params] = useSearchParams()
+  const baru = params.get('baru')
   if (!app.loaded) return <Loading />
+  const selesai = baru ? app.reports.find((r) => r.id === baru) : undefined
 
-  const rows: Row[] = app.reports.filter((r) => inRange(r.tanggal, range) && (produk === 'semua' || r.produk === produk)).map((r) => ({ ...r, sla: slaOf(r, app.plans) }))
+  const rows: Row[] = app.reports.filter((r) => (inRange(r.tanggal, range) || r.id === baru) && (produk === 'semua' || r.produk === produk)).map((r) => ({ ...r, sla: slaOf(r, app.plans) }))
   const liter = rows.filter((r) => r.status === 'selesai').reduce((n, r) => n + (r.volumeDO ?? 0), 0)
 
   return (
     <div className="flex flex-col gap-space-md">
+      {selesai && (
+        <BannerTerkirim teks={`Bongkaran ${selesai.nopol || 'MT'} (${selesai.produk}) ${selesai.status === 'anomali' ? 'ditutup sebagai anomali' : 'selesai'} dan disorot di bawah.`}>
+          <Link to={`/input/${selesai.id}`} className={buttonVariants({ size: 'sm', className: 'self-start' })}>
+            <FileDown aria-hidden="true" />
+            Laporan WA & unduh BA
+          </Link>
+        </BannerTerkirim>
+      )}
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <DateFilter id="mt-range" value={range} onChange={setRange} />
         <ChipFilter label="Produk" value={produk} onChange={setProduk} options={[{ value: 'semua', label: 'Semua produk' }, ...PRODUK_OPTIONS.map((p) => ({ value: p, label: p }))]} />
@@ -138,7 +167,7 @@ export function RiwayatBongkaran() {
         </span>
       </GlassCard>
       <div className="animate-entrance-2">
-        <RecordTable title="Pembongkaran MT" rows={rows} total={app.reports.length} cols={COLS} rowKey={(r) => r.id} to={(r) => `/input/${r.id}`} empty="Tidak ada bongkaran pada rentang ini." />
+        <RecordTable title="Pembongkaran MT" rows={rows} total={app.reports.length} cols={COLS} rowKey={(r) => r.id} to={(r) => `/input/${r.id}`} rowClass={(r) => (r.id === baru ? BARIS_BARU : undefined)} empty="Tidak ada bongkaran pada rentang ini." />
       </div>
     </div>
   )

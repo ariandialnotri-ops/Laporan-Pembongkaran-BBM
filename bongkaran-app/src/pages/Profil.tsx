@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Calculator, ChevronRight, Database, FileText, FireExtinguisher, FlaskConical, KeyRound, LogOut, MapPin, Settings2, ShieldCheck, TriangleAlert, Truck, Users } from 'lucide-react'
+import { Building2, Calculator, ChevronRight, Cylinder, Database, FileText, FireExtinguisher, FlaskConical, KeyRound, LogOut, MapPin, Receipt, Settings2, ShieldCheck, TriangleAlert, Truck, Users } from 'lucide-react'
 import { Field } from '@/components/bongkaran/form-bits'
 import { SectionHeader } from '@/components/bongkaran/section-header'
 import { StatTile } from '@/components/bongkaran/stat-tile'
@@ -9,10 +9,10 @@ import { Button } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
-import { Sheet } from '@/components/ui/sheet'
-import { useToast } from '@/components/ui/toast'
+import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { useApp } from '@/lib/app-state'
 import { roleLabel } from '@/lib/roles'
+import { useKeTerkirim } from '@/lib/terkirim'
 import { cn } from '@/lib/utils'
 
 export function Profil() {
@@ -26,7 +26,6 @@ export function Profil() {
   }).length
   const remote = app.backend.mode === 'supabase'
   const role = !remote ? 'Mode lokal' : roleLabel(app.role)
-  const [sandi, setSandi] = useState(false)
 
   return (
     <div className="flex flex-col gap-space-md">
@@ -83,11 +82,15 @@ export function Profil() {
       <section aria-labelledby="akun" className="animate-entrance-4 flex flex-col gap-space-sm">
         <SectionHeader id="akun" title="Akun & SPBU" />
         <GlassCard level={2} className="flex flex-col p-space-2xs">
-          {app.isAdmin && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (pulau pompa, dispenser, nozzle)" />}
+          {app.isAdmin && <MenuRow to="/unit" icon={Building2} label={`Unit bisnis (${app.spbuList.length} SPBU)`} />}
+          {app.can('/pengaturan') && <MenuRow to="/pengaturan" icon={Settings2} label="Pengaturan SPBU (identitas, dispenser, nozzle & tera)" />}
+          {!app.can('/pengaturan') && app.can('/pengaturan/identitas') && <MenuRow to="/pengaturan/identitas" icon={Settings2} label="Identitas SPBU" />}
+          {app.can('/pengaturan/tangki') && <MenuRow to="/pengaturan/tangki" icon={Cylinder} label="Database tangki & tabel kalibrasi" />}
+          {app.can('/pengaturan/sold-ship-to') && <MenuRow to="/pengaturan/sold-ship-to" icon={Receipt} label="Sold To & Ship To" />}
           {remote && app.isAdmin && <MenuRow to="/anggota" icon={Users} label="Anggota & akun per peran" />}
-          {app.isAdmin && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
-          {app.isAdmin && <MenuRow to="/pengaturan#data-acuan" icon={Database} label="Data Acuan Tabel" />}
-          {remote && <MenuRow icon={KeyRound} label="Ganti kata sandi" onClick={() => setSandi(true)} />}
+          {app.can('/apar/data') && <MenuRow to="/apar/data" icon={FireExtinguisher} label="Data utama APAR & APAB (area, unit)" />}
+          {app.isAdmin && <MenuRow to="/pengaturan/acuan" icon={Database} label="Data Acuan Tabel" />}
+          {remote && <MenuRow icon={KeyRound} label="Ganti kata sandi" to="/profil/sandi" />}
           {remote && <MenuRow icon={LogOut} label="Keluar" danger onClick={() => void app.signOut()} />}
         </GlassCard>
         {!remote && (
@@ -96,16 +99,15 @@ export function Profil() {
           </GlassCard>
         )}
       </section>
-      <Sheet open={sandi} onOpenChange={setSandi} title="Ganti kata sandi" description={app.session.user?.email}>
-        {sandi && <GantiSandi onDone={() => setSandi(false)} />}
-      </Sheet>
     </div>
   )
 }
 
-function GantiSandi({ onDone }: { onDone: () => void }) {
+/** Profil > Ganti kata sandi (halaman tersendiri). */
+export function GantiSandi() {
   const app = useApp()
-  const toast = useToast()
+  const keTerkirim = useKeTerkirim()
+  const guard = useLeaveGuard({ active: true, title: 'Keluar dari ganti kata sandi?', detail: 'Kata sandi belum diganti.' })
   const [a, setA] = useState('')
   const [b, setB] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -116,16 +118,16 @@ function GantiSandi({ onDone }: { onDone: () => void }) {
     setBusy(true)
     try {
       await app.backend.changePassword(a)
-      toast('Kata sandi diganti')
-      onDone()
+      guard.bypass()
+      keTerkirim({ judul: 'Kata sandi diganti', detail: `Gunakan kata sandi baru saat masuk berikutnya (${app.session.user?.email ?? ''}).`, aksi: [{ to: '/profil', label: 'Kembali ke Profil' }] })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
       setBusy(false)
     }
   }
   return (
-    <>
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-md p-space-md">
+      <span className="text-body-sm text-on-surface-variant">{app.session.user?.email}</span>
       <Field label="Kata sandi baru" htmlFor="sandi-baru">
         <Input id="sandi-baru" type="password" autoComplete="new-password" value={a} onChange={(e) => (setError(null), setA(e.target.value))} />
       </Field>
@@ -142,7 +144,8 @@ function GantiSandi({ onDone }: { onDone: () => void }) {
         <KeyRound aria-hidden="true" />
         Simpan kata sandi
       </Button>
-    </>
+      {guard.dialog}
+    </GlassCard>
   )
 }
 

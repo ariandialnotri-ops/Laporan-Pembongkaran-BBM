@@ -1,7 +1,8 @@
 /**
  * Plan pengiriman: status SO/LO dan penyesuaian data plan lama.
  */
-import { DEFAULT_RULES, type LoStatus, type Plan, type PlanLo, type ReportSummary } from '@/lib/sop'
+import { formatTanggalIso } from '@/lib/date'
+import { DEFAULT_RULES, sudahClosing, type JejakPlan, type LoStatus, type Plan, type PlanLo, type ReportSummary } from '@/lib/sop'
 
 /** Status tampilan: "proses" = LO belum diterbitkan depot. */
 export type LoDisplayStatus = LoStatus | 'proses'
@@ -13,8 +14,8 @@ export const LO_STATUS: { key: LoDisplayStatus; label: string; desc: string; ton
   { key: 'delivery', label: 'On Delivery', desc: 'Dalam pengisian atau pengiriman', tone: 'primary' },
   { key: 'alih', label: 'Alih Supply', desc: 'Dipindahkan ke terminal/depot lain', tone: 'cyan' },
   { key: 'deleted', label: 'Deleted', desc: 'Dihapus oleh Supply Chain atau depot', tone: 'error' },
-  { key: 'delivered', label: 'Delivered', desc: 'Sudah sampai, dalam proses bongkar di SPBU', tone: 'primary' },
-  { key: 'closed', label: 'Closed', desc: 'Bongkar & administrasi selesai', tone: 'success' },
+  { key: 'delivered', label: 'Delivered', desc: 'Sudah sampai: bongkar berjalan atau BA menunggu tanda tangan pengawas & ABH', tone: 'primary' },
+  { key: 'closed', label: 'Closed', desc: 'Bongkar selesai dan BA ditandatangani pengawas & ABH', tone: 'success' },
 ]
 
 /** Status yang dapat dipilih manual; Delivered & Closed mengikuti data bongkaran. */
@@ -30,10 +31,11 @@ export function pecahVolume(volume: number): number[] {
 
 export const LO_MANUAL_STATUS: LoStatus[] = ['os', 'planned', 'delivery', 'alih', 'deleted']
 
-/** Pilihan shift permintaan pengiriman (hanya shift 1 dan 2). */
+/** Pilihan shift permintaan pengiriman (MS2). */
 export const SHIFT_PERMINTAAN = [
   { value: '1' as const, label: 'Shift 1' },
   { value: '2' as const, label: 'Shift 2' },
+  { value: '3' as const, label: 'Shift 3' },
 ]
 
 export const loStatusMeta = (k: LoDisplayStatus) => LO_STATUS.find((s) => s.key === k)!
@@ -45,10 +47,14 @@ export const loStatusMeta = (k: LoDisplayStatus) => LO_STATUS.find((s) => s.key 
 export function loStatus(lo: PlanLo, used: Map<string, ReportSummary>): LoDisplayStatus {
   if (lo.status === 'deleted') return 'deleted'
   const r = used.get(lo.id)
-  if (r) return r.status === 'draft' ? 'delivered' : 'closed'
+  // Closed hanya bila BA sudah ditandatangani pengawas & ABH; sebelum itu tetap Delivered.
+  if (r) return sudahClosing(r) ? 'closed' : 'delivered'
   if (!lo.noLO.trim()) return 'proses'
   return lo.status
 }
+
+/** SO atau LO belum terbit dari depot (disorot oranye di Tracking LO); LO yang dihapus tidak dihitung. */
+export const belumTerbit = (plan: Plan, lo: PlanLo) => lo.status !== 'deleted' && (!plan.noSO.trim() || !lo.noLO.trim())
 
 /** LO yang boleh dipilih saat bongkar. */
 export function loPickable(lo: PlanLo, used: Map<string, ReportSummary>) {
@@ -74,6 +80,7 @@ export function normalizePlan(p: Partial<Plan> & { id: string; los?: Partial<Pla
     noSO: p.noSO ?? '',
     produk: p.produk ?? '',
     soldTo: p.soldTo ?? '',
+    ...(p.revisiDev ? { revisiDev: p.revisiDev } : {}),
     los: (p.los ?? []).map((lo) => ({
       id: lo.id ?? '',
       noLO: lo.noLO ?? '',
@@ -87,7 +94,47 @@ export function normalizePlan(p: Partial<Plan> & { id: string; los?: Partial<Pla
       supplyPointLama: lo.supplyPointLama,
       jumlahDO: lo.jumlahDO,
     })),
+    riwayat: p.riwayat ?? [],
   }
+}
+
+/** Batas catatan riwayat per permintaan (yang terlama dibuang). */
+const RIWAYAT_MAKS = 60
+
+/**
+ * Catatan perubahan dari plan lama ke baru: permintaan dibuat, SO/LO terbit atau diubah, status LO, alih supply,
+ * volume, dan tanggal kirim. Dipakai otomatis setiap plan disimpan.
+ */
+export function jejakPerubahan(lama: Plan | undefined, baru: Plan, oleh: string, waktu = Date.now()): JejakPlan[] {
+  const j = (x: Omit<JejakPlan, 'waktu' | 'oleh'>): JejakPlan => ({ waktu, oleh, ...x })
+  if (!lama) {
+    const out = [j({ jenis: 'buat', teks: `Permintaan MS2 dibuat: ${baru.los.length} LO, kirim ${formatTanggalIso(baru.tanggal)}` })]
+    if (baru.noSO.trim()) out.push(j({ jenis: 'so', teks: `SO ${baru.noSO} terbit` }))
+    for (const lo of baru.los) if (lo.noLO.trim()) out.push(j({ jenis: 'lo', loId: lo.id, teks: `LO ${lo.noLO} terbit (${lo.produk})` }))
+    return out
+  }
+  const out: JejakPlan[] = []
+  if (lama.noSO.trim() !== baru.noSO.trim())
+    out.push(j({ jenis: 'so', teks: lama.noSO.trim() ? `No SO diubah ${lama.noSO} → ${baru.noSO || '-'}` : `SO ${baru.noSO} terbit` }))
+  if (lama.tanggal !== baru.tanggal) out.push(j({ jenis: 'ubah', teks: `Tanggal kirim diubah ${formatTanggalIso(lama.tanggal)} → ${formatTanggalIso(baru.tanggal)}` }))
+  for (const lo of baru.los) {
+    const a = lama.los.find((x) => x.id === lo.id)
+    if (!a) {
+      out.push(j({ jenis: 'ubah', loId: lo.id, teks: `LO ${lo.produk} ${lo.noLO ? lo.noLO + ' ' : ''}ditambahkan` }))
+      continue
+    }
+    if (a.noLO.trim() !== lo.noLO.trim()) out.push(j({ jenis: 'lo', loId: lo.id, teks: a.noLO.trim() ? `No LO diubah ${a.noLO} → ${lo.noLO || '-'}` : `LO ${lo.noLO} terbit (${lo.produk})` }))
+    if (a.status !== lo.status) out.push(j({ jenis: 'status', loId: lo.id, status: lo.status, teks: `Status ${lo.produk}: ${loStatusMeta(a.status).label} → ${loStatusMeta(lo.status).label}` }))
+    if ((a.supplyPoint || '') !== (lo.supplyPoint || '') && lo.supplyPoint) out.push(j({ jenis: 'ubah', loId: lo.id, teks: `Alih supply ke ${lo.supplyPoint}` }))
+    if (a.volume !== lo.volume) out.push(j({ jenis: 'ubah', loId: lo.id, teks: `Volume ${lo.produk} diubah ${a.volume.toLocaleString('id-ID')} → ${lo.volume.toLocaleString('id-ID')} L` }))
+  }
+  return out
+}
+
+/** Plan baru dengan riwayat lama + perubahan terbaru (dibatasi RIWAYAT_MAKS). */
+export function denganJejak(lama: Plan | undefined, baru: Plan, oleh: string): Plan {
+  const riwayat = [...(lama?.riwayat ?? baru.riwayat ?? []), ...jejakPerubahan(lama, baru, oleh)]
+  return { ...baru, riwayat: riwayat.slice(-RIWAYAT_MAKS) }
 }
 
 /** Jam pengingat harian membuat plan pengiriman untuk besok. */

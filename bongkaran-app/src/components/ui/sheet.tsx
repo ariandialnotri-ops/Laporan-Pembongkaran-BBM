@@ -31,7 +31,7 @@ export function Sheet({
         <Dialog.Overlay className="sheet-overlay fixed inset-0 z-[60] bg-on-surface/30" />
         <Dialog.Content
           className={cn(
-            'sheet-content glass-3 fixed inset-x-0 bottom-0 z-[61] mx-auto flex max-h-[88dvh] w-full max-w-xl flex-col rounded-t-xl pb-[env(safe-area-inset-bottom,0px)] focus:outline-none',
+            'sheet-content glass-3 fixed inset-x-0 bottom-0 z-[61] mx-auto flex w-full max-w-xl flex-col rounded-t-xl pb-[env(safe-area-inset-bottom,0px)] focus:outline-none',
             className,
           )}
         >

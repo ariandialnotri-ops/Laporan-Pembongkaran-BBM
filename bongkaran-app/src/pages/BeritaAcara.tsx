@@ -8,7 +8,7 @@ import { Pill } from '@/components/ui/pill'
 import { useApp } from '@/lib/app-state'
 import { formatTanggalIso } from '@/lib/date'
 import { formatNumber } from '@/lib/format'
-import { SIGNERS, type ReportStatus, type ReportSummary } from '@/lib/sop'
+import { SIGNERS, sudahClosing, type ReportStatus, type ReportSummary } from '@/lib/sop'
 import { cn } from '@/lib/utils'
 
 const STATUS: Record<ReportStatus, { text: string; tone: 'primary' | 'error' | 'neutral'; icon: typeof CircleCheck }> = {
@@ -42,10 +42,12 @@ const COLS: Col<ReportSummary>[] = [
     cell: (r) => {
       const s = STATUS[r.status]
       const Icon = s.icon
+      // Closing hanya bila pengawas & ABH sudah tanda tangan.
+      const closing = sudahClosing(r)
       return (
         <Pill tone={s.tone}>
           <Icon aria-hidden="true" />
-          {s.text}
+          {r.status === 'draft' ? s.text : closing ? (r.status === 'anomali' ? 'Anomali · Closing' : 'Closing') : `${s.text} · belum closing`}
         </Pill>
       )
     },

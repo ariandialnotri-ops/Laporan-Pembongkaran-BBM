@@ -1,6 +1,6 @@
 /**
  * Isi sheet "Catatan Persediaan BBM" (per produk/tangki, satu baris per
- * shift) dari stok awal shift, data bongkaran, dan pengeluaran dispenser.
+ * shift) dari stok awal shift, data bongkaran, dan pengeluaran dispenser (totalizer shift itu).
  *
  *   a stok awal shift        b volume penerimaan PNBP (DO)
  *   c penerimaan aktual      d = c - b
@@ -34,7 +34,11 @@ export interface PersediaanRow {
 
 const r2 = (v: number) => Number(v.toFixed(3))
 
-export function persediaanRows(produk: string, from: string, to: string, stok: StokRecord[], reports: ReportSummary[]): PersediaanRow[] {
+/**
+ * `jual`: penjualan per produk dari totalizer, kunci shiftId. Pengeluaran dispenser diambil dari sini;
+ * isian lama `pengeluaran` di stok awal (sebelum dihapus dari form) tetap dipakai bila ada.
+ */
+export function persediaanRows(produk: string, from: string, to: string, stok: StokRecord[], reports: ReportSummary[], jual: Map<string, Map<string, number>> = new Map()): PersediaanRow[] {
   const byShift = new Map(stok.map((s) => [shiftId(s), s]))
   const receipts = reports.filter((r) => r.produk === produk && r.status !== 'draft' && r.shift)
   const keys = new Map<string, { tanggal: string; shift: Shift }>()
@@ -49,7 +53,7 @@ export function persediaanRows(produk: string, from: string, to: string, stok: S
       const next = byShift.get(shiftId(nextShift(k)))?.data.items[produk]
       const rc = receipts.filter((r) => r.tanggalShift === k.tanggal && r.shift === k.shift).sort((x, y) => x.jam.localeCompare(y.jam))
       const a = item ? parseAngka(item.volume) : null
-      const e = item ? parseAngka(item.pengeluaran) : null
+      const e = (item?.pengeluaran ? parseAngka(item.pengeluaran) : null) ?? jual.get(shiftId(k))?.get(produk) ?? null
       const b = rc.length ? rc.reduce((s, r) => s + (r.volumeDO ?? 0), 0) : null
       const c = rc.length ? rc.reduce((s, r) => s + (r.terimaAktual ?? 0), 0) : null
       const g = next ? parseAngka(next.volume) : null

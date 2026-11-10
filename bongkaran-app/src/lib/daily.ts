@@ -8,6 +8,8 @@ import { genId } from '@/lib/image'
 import type { Shift } from '@/lib/shift'
 import type { Photo } from '@/lib/sop'
 import type { AparData } from '@/lib/apar'
+import type { InsidenData } from '@/lib/insiden'
+import type { TakarData } from '@/lib/takar'
 
 export interface StokItem {
   /** Ketinggian ATG/deepstick (mm). */
@@ -32,6 +34,9 @@ export interface QqKualitas {
   suhu: string
   /** Volume pump test untuk sampel uji kualitas (L). */
   pumpTest: string
+  /** Nozzle tempat sampel pump test diambil (riwayat pump test per nozzle). */
+  nozzleId?: string
+  nozzle?: string
   /** Waktu baris ini terakhir disimpan; kosong bila belum/berubah setelah disimpan. */
   savedAt?: string
 }
@@ -66,6 +71,8 @@ export interface QqData {
   foto?: Partial<Record<QqFotoKey, Photo[]>>
   /** Diisi saat uji diselesaikan (semua baris & foto lengkap). */
   selesaiAt?: string
+  /** Diselesaikan setelah batas harian pukul 10:00. */
+  terlambat?: boolean
 }
 
 interface DailyBase {
@@ -79,7 +86,9 @@ interface DailyBase {
 export type StokRecord = DailyBase & { kind: 'stok'; data: StokData }
 export type QqRecord = DailyBase & { kind: 'qq'; data: QqData }
 export type AparRecord = DailyBase & { kind: 'apar'; data: AparData }
-export type DailyRecord = StokRecord | QqRecord | AparRecord
+export type InsidenRecord = DailyBase & { kind: 'insiden'; data: InsidenData }
+export type TakarRecord = DailyBase & { kind: 'takar'; data: TakarData }
+export type DailyRecord = StokRecord | QqRecord | AparRecord | InsidenRecord | TakarRecord
 
 /** Toleransi uji bejana 20 liter: selisih di bawah -60 ml ditandai. */
 export const BEJANA_LIMIT_ML = -60

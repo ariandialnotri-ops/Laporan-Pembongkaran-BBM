@@ -6,7 +6,7 @@ import { Loading } from '@/components/bongkaran/load-state'
 import { RecordTable, type Col } from '@/components/bongkaran/record-table'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Pill } from '@/components/ui/pill'
-import { hasilCek, type AparCek } from '@/lib/apar'
+import { hasilCek, jenisLengkap, type AparCek } from '@/lib/apar'
 import { useApp } from '@/lib/app-state'
 import type { AparRecord } from '@/lib/daily'
 import { formatTanggalIso } from '@/lib/date'
@@ -19,7 +19,7 @@ const COLS: Col<Row>[] = [
   { header: 'Tanggal', cell: (x) => <span className="tabular whitespace-nowrap">{formatTanggalIso(x.tanggal)}</span>, mobile: 'sub' },
   { header: 'Kode', cell: (x) => <span className="tabular font-semibold">{x.u.kode || '-'}</span>, mobileCell: (x) => `${x.u.kode || '-'} (${tipeLabel(x.u)})`, mobile: 'title' },
   { header: 'Tipe', cell: (x) => tipeLabel(x.u), mobile: 'hide' },
-  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${x.u.jenis}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'hide' },
+  { header: 'Jenis & kapasitas', cell: (x) => <span className="whitespace-nowrap">{`${jenisLengkap(x.u)}, ${x.u.kapasitasKg || '-'} kg`}</span>, mobile: 'hide' },
   { header: 'Lokasi', cell: (x) => x.u.lokasi || '-', mobile: 'sub' },
   { header: 'Temuan', cell: (x) => (x.temuan.length ? <span className="text-error">{x.temuan.join('; ')}</span> : <span className="text-on-surface-variant">-</span>), mobile: 'sub' },
   { header: 'Tindak lanjut', cell: (x) => x.u.catatan || '-', mobile: 'hide' },

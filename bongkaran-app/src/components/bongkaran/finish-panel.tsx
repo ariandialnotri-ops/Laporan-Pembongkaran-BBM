@@ -1,19 +1,49 @@
 import { useState } from 'react'
-import { CircleCheck, Copy, FileSpreadsheet, FileText, ImageIcon, Images, LoaderCircle, RotateCcw, Send, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Clock, Copy, Download, FileSpreadsheet, FileText, ImageIcon, LoaderCircle, RotateCcw, Send, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type { ExportKind } from '@/lib/report/export'
 import { Field, Ladder } from '@/components/bongkaran/form-bits'
 import { SignersSection } from '@/components/bongkaran/sop-steps'
 import { StatusBanner } from '@/components/bongkaran/status-banner'
+import { TandaRevisi } from '@/components/ui/tanda-revisi'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/ui/pill'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
-import { formatLiter, formatSigned } from '@/lib/format'
+import { useApp } from '@/lib/app-state'
+import { formatTanggalIso } from '@/lib/date'
+import { formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
 import { shiftLabel } from '@/lib/shift'
-import { suggestNoBA, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
+import { formatDurasi } from '@/lib/sla'
+import { effectiveRules, lamaProses, suggestNoBA, TTD_CLOSING, type Evaluation, type Report, type ReportData, type ReportStatus, type Settings } from '@/lib/sop'
 import { cn } from '@/lib/utils'
+
+/** Pilihan format unduhan Berita Acara (dropdown). PDF BA saja & PDF + foto memakai ikon yang sama. */
+const FORMAT_BA: { kind: ExportKind; label: string; desc: string; icon: LucideIcon }[] = [
+  { kind: 'xlsx', label: 'Excel (template BA)', desc: 'File Excel sesuai template', icon: FileSpreadsheet },
+  { kind: 'pdf-ba', label: 'PDF BA saja', desc: 'Cepat, tanpa lampiran foto', icon: FileText },
+  { kind: 'pdf', label: 'PDF BA + foto', desc: 'Dengan lampiran foto evidence', icon: FileText },
+  { kind: 'jpg', label: 'JPG', desc: 'Gambar BA untuk dibagikan', icon: ImageIcon },
+]
+const KUNCI_FORMAT = 'floq-format-ba'
+const formatAwal = (): ExportKind => {
+  try {
+    const v = localStorage.getItem(KUNCI_FORMAT)
+    return FORMAT_BA.some((f) => f.kind === v) ? (v as ExportKind) : 'pdf'
+  } catch {
+    return 'pdf'
+  }
+}
+const jamMenit = (ms: number) => {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+}
+const tglIso = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 export function FinishPanel({
   report,
@@ -48,12 +78,46 @@ export function FinishPanel({
   waText: string
 }) {
   const toast = useToast()
+  const app = useApp()
   const [copied, setCopied] = useState(false)
+  const [format, setFormat] = useState<ExportKind>(formatAwal)
+  const pilihFormat = (v: string) => {
+    setFormat(v as ExportKind)
+    try {
+      localStorage.setItem(KUNCI_FORMAT, v)
+    } catch {
+      // abaikan
+    }
+  }
+  const unduh: Record<ExportKind, () => void> = { xlsx: onXlsx, 'pdf-ba': onPdfBa, pdf: onPdf, jpg: onJpg }
+  const fmt = FORMAT_BA.find((f) => f.kind === format)!
+  // Lama proses: mulai tahap 1 (laporan dibuat) sampai laporan ditutup; draf dihitung sampai saat ini.
+  const [sekarang] = useState(() => Date.now())
+  const lama = lamaProses({ createdAt: report.createdAt, finishedAt: report.finishedAt, status: report.status }, sekarang)
   const d = report.data
   const x = evaluation.derived
   const anomaly = evaluation.densityAnomaly || report.status === 'anomali'
   const finished = report.status !== 'draft'
+  // Closing = sudah ditandatangani pengawas & ABH; hanya pengawas/ABH yang dapat menandatangani slot itu.
+  const kurangClosing = TTD_CLOSING.filter((k) => !d.ttd?.[k]?.img)
+  const closing = finished && kurangClosing.length === 0
+  const bolehTtdClosing = ['abh', 'pengawas'].includes(app.role ?? '')
   const densityOk = x.densityResults.length > 0 && x.densityResults.every((r) => r.ok)
+  const rules = effectiveRules(settings.rules)
+  const lewat = (v: number | null, batas: number) => v !== null && Math.abs(v) > batas
+  const transportLebih = lewat(x.transportLoss, rules.batasLossL)
+  const c = x.cek
+  const mm = (v: string) => {
+    const n = parseAngka(v)
+    return n !== null ? `${formatNumber(n)} mm` : '-'
+  }
+  // Satu baris rekap: nilai ATG vs deepstick dan selisihnya; merah bila melewati batas.
+  const selisih = (selMm: number | null, selL: number | null) => (
+    <span className={cn((lewat(selMm, rules.batasDipAtgMm) || lewat(selL, rules.batasDipAtgL)) && 'font-bold text-error')}>
+      {selMm !== null ? formatSigned(selMm, 0, ' mm') : '-'} · {selL !== null ? formatSigned(selL, 1, ' L') : '-'}
+    </span>
+  )
+  const merah = (on: boolean) => cn('flex flex-col gap-space-xs rounded-lg', on && 'bg-error-container/40 p-space-xs ring-2 ring-error')
 
   const copy = async () => {
     try {
@@ -76,7 +140,7 @@ export function FinishPanel({
       <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
         <div className="flex items-center justify-between gap-2">
           <span className="text-tag uppercase text-primary">Finish proses</span>
-          {report.status === 'selesai' && <Pill tone="primary">Selesai</Pill>}
+          {finished && (closing ? <Pill tone="success">Closing</Pill> : <Pill tone="neutral">Belum closing</Pill>)}
           {report.status === 'anomali' && <Pill tone="error">Anomali</Pill>}
           {!finished && <Pill>Belum ditutup</Pill>}
         </div>
@@ -84,6 +148,22 @@ export function FinishPanel({
           {d.nopol || 'MT'}, {d.produk || '-'}
         </span>
         <span className="text-body-sm text-on-surface-variant">Bongkaran {shiftLabel(x.shift)}</span>
+        <TandaRevisi dari={report} />
+        {lama !== null && (
+          <div className="flex items-center gap-space-sm rounded-lg bg-primary/5 px-space-sm py-space-xs">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Clock className="size-5" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{finished ? 'Lama proses bongkaran' : 'Berjalan sejak tahap 1'}</span>
+              <span className="tabular text-body-sm text-on-surface-variant">
+                Mulai {formatTanggalIso(tglIso(report.createdAt))}, {jamMenit(report.createdAt)}
+                {report.finishedAt ? ` → selesai ${tglIso(report.finishedAt) === tglIso(report.createdAt) ? '' : `${formatTanggalIso(tglIso(report.finishedAt))}, `}${jamMenit(report.finishedAt)}` : ''}
+              </span>
+            </span>
+            <span className="tabular shrink-0 text-numeric-md font-bold text-primary">{formatDurasi(lama)}</span>
+          </div>
+        )}
         <StatusBanner
           tone={anomaly ? 'error' : densityOk ? 'success' : 'idle'}
           title={anomaly ? 'Anomali density, pembongkaran dihentikan' : 'Quality & quantity lengkap'}
@@ -93,10 +173,19 @@ export function FinishPanel({
 
       <GlassCard level={2} className="animate-entrance-2 flex flex-col gap-space-md p-space-md">
         <span className="text-tag uppercase text-primary">Rekap quantity</span>
-        <Ladder
-          rows={[['Batas toleransi (-0,15% kapasitas)', x.transportLossLimit !== null ? formatSigned(x.transportLossLimit, 2, ' L') : '-']]}
-          total={['Total transport loss', x.transportLoss !== null ? formatSigned(x.transportLoss, 2, ' L') : '-']}
-        />
+        {transportLebih && (
+          <StatusBanner
+            tone="error"
+            title={`Transport gain/loss di atas ${rules.batasLossL} L, lakukan pemeriksaan kembali`}
+            detail={`Transport ${formatSigned(x.transportLoss ?? 0, 1, ' L')}: cek deepstick kompartemen & kepekaan buku tera`}
+          />
+        )}
+        <div className={merah(transportLebih)}>
+          <Ladder
+            rows={[['Batas toleransi (-0,15% kapasitas)', x.transportLossLimit !== null ? formatSigned(x.transportLossLimit, 2, ' L') : '-']]}
+            total={['Total transport loss', x.transportLoss !== null ? formatSigned(x.transportLoss, 2, ' L') : '-']}
+          />
+        </div>
         {x.transportLoss !== null && x.transportLossLimit !== null && x.transportLoss < x.transportLossLimit && (
           <StatusBanner tone="error" title="Transport loss melebihi batas toleransi" detail="Akan ditandai merah di Berita Acara" />
         )}
@@ -108,6 +197,22 @@ export function FinishPanel({
             ['Real stok (ATG)', x.realStok !== null ? formatLiter(x.realStok) : '-'],
           ]}
           total={['Discharge gain/loss', x.gainLoss !== null ? `${formatSigned(x.gainLoss, 0, ' L')} (${formatSigned(x.gainLossPct ?? 0, 2, '%')} dari volume DO)` : '-']}
+        />
+        <span className="text-tag uppercase text-on-surface-variant">Selisih ATG vs deepstick</span>
+        <Ladder
+          rows={[
+            ['Sebelum: ATG / deepstick', `${mm(d.atgBefore.tinggi)} / ${mm(d.dipBeforeMm)}`],
+            ['Sebelum: selisih', selisih(c.dipAtgMmBefore, c.dipAtgLBefore)],
+            ['Sesudah: ATG / deepstick', `${mm(d.atgAfter.tinggi)} / ${mm(d.dipAfterMm)}`],
+            ['Sesudah: selisih', selisih(c.dipAtgMmAfter, c.dipAtgLAfter)],
+          ]}
+        />
+        <Ladder
+          rows={[
+            ['Penerimaan ATG', x.terimaAktual !== null ? formatLiter(x.terimaAktual, 0) : '-'],
+            ['Penerimaan P-Insyst', parseAngka(d.penerimaanPinsyst ?? '') !== null ? formatLiter(parseAngka(d.penerimaanPinsyst ?? '') ?? 0, 0) : '-'],
+          ]}
+          total={['Selisih P-Insyst − ATG', c.pinsyst !== null ? <span className={cn(lewat(c.pinsyst, rules.batasPinsystL) && 'text-error')}>{formatSigned(c.pinsyst, 0, ' L')}</span> : '-']}
         />
         <Ladder rows={[['Penerimaan menurut deepstick', x.diterimaDip !== null ? formatLiter(x.diterimaDip, 1) : '-']]} total={['Gain / loss deepstick', x.gainLossDip !== null ? formatSigned(x.gainLossDip, 1, ' L') : '-']} />
       </GlassCard>
@@ -128,7 +233,23 @@ export function FinishPanel({
         </fieldset>
       </GlassCard>
 
-      {finished && <SignersSection report={report} setData={setData} readOnly={readOnly} keys={['pengawas', 'abh']} title="Tanda tangan pengawas & ABH" />}
+      {finished && !closing && (
+        <StatusBanner
+          tone="warn"
+          title={`Belum closing: menunggu tanda tangan ${kurangClosing.map((k) => (k === 'abh' ? 'ABH' : 'pengawas')).join(' & ')}`}
+          detail="Laporan berstatus Closing setelah ditandatangani pengawas dan ABH. Berita Acara tetap dapat diunduh sekarang (mis. oleh kepala shift)."
+        />
+      )}
+      {finished && (
+        <SignersSection
+          report={report}
+          setData={setData}
+          readOnly={readOnly}
+          bolehTtd={bolehTtdClosing}
+          keys={['pengawas', 'abh']}
+          title="Tanda tangan pengawas & ABH (closing)"
+        />
+      )}
 
       {!finished ? (
         <Button size="lg" variant={anomaly ? 'danger' : 'primary'} className="w-full" onClick={() => onFinish(anomaly ? 'anomali' : 'selesai')}>
@@ -139,25 +260,31 @@ export function FinishPanel({
         <>
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">
             <span className="text-tag uppercase text-primary">Berita Acara Pembongkaran (Q&Q)</span>
-            <Button size="pill" disabled={generating !== null} onClick={onXlsx}>
-              {generating === 'xlsx' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileSpreadsheet aria-hidden="true" />}
-              Excel (template BA)
+            <Field label="Pilih format unduhan" htmlFor="format-ba">
+              <Select value={format} onValueChange={pilihFormat} disabled={generating !== null}>
+                <SelectTrigger id="format-ba" className="[&_.fmt-desc]:hidden">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAT_BA.map((f) => (
+                    <SelectItem key={f.kind} value={f.kind}>
+                      <span className="flex items-center gap-2.5">
+                        <f.icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
+                        <span className="flex flex-col">
+                          <span className="font-semibold">{f.label}</span>
+                          <span className="fmt-desc text-xs text-on-surface-variant">{f.desc}</span>
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Button size="pill" disabled={generating !== null} onClick={unduh[format]}>
+              {generating !== null ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}
+              Unduh {fmt.label}
             </Button>
-            <div className="grid grid-cols-2 gap-space-xs">
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdfBa}>
-                {generating === 'pdf-ba' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <FileText aria-hidden="true" />}
-                PDF BA saja
-              </Button>
-              <Button variant="glass" size="pill" disabled={generating !== null} onClick={onPdf}>
-                {generating === 'pdf' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Images aria-hidden="true" />}
-                PDF + foto
-              </Button>
-              <Button variant="glass" size="pill" className="col-span-2" disabled={generating !== null} onClick={onJpg}>
-                {generating === 'jpg' ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <ImageIcon aria-hidden="true" />}
-                JPG
-              </Button>
-            </div>
-            <span className="text-body-sm text-on-surface-variant">PDF BA saja lebih cepat, tanpa lampiran foto evidence.</span>
+            <span className="text-body-sm text-on-surface-variant">Pilihan format diingat untuk unduhan berikutnya.</span>
           </GlassCard>
 
           <GlassCard level={2} className="flex flex-col gap-space-sm p-space-md">

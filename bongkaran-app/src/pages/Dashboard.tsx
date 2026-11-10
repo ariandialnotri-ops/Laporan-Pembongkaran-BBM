@@ -1,40 +1,63 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  CalendarDays,
+  ArrowDownLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Beaker,
+  BrushCleaning,
+  CalendarClock,
   ChevronDown,
   ChevronLeft,
+  Clock,
   ChevronRight,
   CircleCheck,
   ClipboardCheck,
   Ellipsis,
   FireExtinguisher,
   FlaskConical,
+  Fuel,
   Gauge,
   Minus,
   Network,
+  ScanEye,
+  ShieldCheck,
   SlidersHorizontal,
   Timer,
+  TrendingUp,
   TriangleAlert,
   Truck,
+  type LucideIcon,
 } from 'lucide-react'
+import { ArsipFotoBanner } from '@/components/bongkaran/arsip-foto'
 import { DateFilter, inRange, presetLabel, useDateRange } from '@/components/bongkaran/date-filter'
 import { KalengSample } from '@/components/bongkaran/kaleng-sample'
+import { KualitasHighlight, kunciHarian } from '@/components/bongkaran/kualitas-highlight'
+import { TangkiBelumAda } from '@/components/bongkaran/stok-gate'
+import { KartuStopPenyaluran } from '@/components/insiden/henti'
 import { Loading } from '@/components/bongkaran/load-state'
 import { QQPill } from '@/components/bongkaran/qq-pill'
+import { buttonVariants } from '@/components/ui/button'
 import { Pill } from '@/components/ui/pill'
+import { KpiOperation } from '@/components/dashboard/kpi-highlight'
+import { BarChart, KATEGORI, warnaProduk } from '@/components/dashboard/charts'
+import { periodeSebelum } from '@/lib/kpi'
+import { HARIAN_MAKS, jumlahHari, kelompokPeriode, periodeDari, PilihPeriode, type PeriodeDashboard } from '@/components/dashboard/periode'
 import { Sheet } from '@/components/ui/sheet'
 import { useApp, useSyncOnOpen } from '@/lib/app-state'
 import { kondisiSemua } from '@/lib/apar'
-import { bejanaStatus, qqD15, type AparRecord, type QqKualitas, type QqRecord } from '@/lib/daily'
+import { berlakuSertifikat, statusSertifikat } from '@/lib/berlaku'
+import { qqD15, type AparRecord, type QqKualitas, type QqRecord, type TakarRecord } from '@/lib/daily'
 import { addDays, formatTanggalIso, formatTanggalPanjang, formatTanggalSingkat, isoWeek, startOfWeek, todayIso } from '@/lib/date'
 import { formatDensity, formatDensitySigned, formatLiter, formatNumber, formatSigned, parseAngka } from '@/lib/format'
-import { LO_STATUS, loStatus, loStatusMeta, planSupply, type LoDisplayStatus } from '@/lib/plan'
+import { LO_STATUS, loStatus, loStatusMeta, planBesokKurang, planSupply, type LoDisplayStatus } from '@/lib/plan'
 import { produkMeta } from '@/lib/produk'
+import { formatMl, opsiLabel, takarStatus } from '@/lib/takar'
 import { acuanD15, detailTanggal, kalenderMinggu, labelQQ, qqOf, type CalendarDay } from '@/lib/ringkasan'
 import { currentShift, shiftLabel } from '@/lib/shift'
 import { formatDurasi, rataRata, slaOf } from '@/lib/sla'
 import { PRODUK_OPTIONS, STEPS, type ReportSummary } from '@/lib/sop'
+import { barisPumpTest, LABEL_PUMP_TEST } from '@/lib/pumptest'
 import { cn } from '@/lib/utils'
 
 /** Status LO yang diringkas di kartu Status Alur LO; Alih Supply & Deleted ada di riwayat. */
@@ -44,7 +67,7 @@ const LO_DASH: { key: LoDisplayStatus; sub: string; tile: string; teks: string }
   { key: 'planned', sub: 'Antri MT', tile: 'bg-primary-fixed/50', teks: 'text-primary' },
   { key: 'delivery', sub: 'MT menuju SPBU', tile: 'bg-sky-50', teks: 'text-sky-700' },
   { key: 'delivered', sub: 'Sedang dibongkar', tile: 'bg-tertiary-fixed/40', teks: 'text-tertiary' },
-  { key: 'closed', sub: 'Bongkar selesai', tile: 'bg-emerald-50', teks: 'text-emerald-700' },
+  { key: 'closed', sub: 'TTD pengawas & ABH', tile: 'bg-emerald-50', teks: 'text-emerald-700' },
 ]
 
 const BULAN_SINGKAT = (d: Date) => d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })
@@ -53,8 +76,189 @@ const BULAN_SINGKAT = (d: Date) => d.toLocaleDateString('id-ID', { month: 'short
  * Dashboard hanya menampilkan data: status operasional, kalender pekan,
  * bongkaran, rencana vs realisasi, kualitas harian, kaleng sample, dan alur LO.
  * Semua pengisian ada di menu Input, semua riwayat di menu Laporan.
+ * Cleaning Service dan Security memakai dashboard sesuai peruntukannya (DashboardPeran).
  */
 export function Dashboard() {
+  const app = useApp()
+  const pilihan = pilihanDashboard(app.role)
+  const [pilih, setPilih] = useState<JenisDashboard>(() => {
+    try {
+      const x = localStorage.getItem('floq:dashboard') as JenisDashboard | null
+      return x && pilihan.some((p) => p.value === x) ? x : pilihan[0].value
+    } catch {
+      return pilihan[0].value
+    }
+  })
+  // Periode tarikan dashboard (grafik & KPI); bawaan bulan berjalan.
+  const [periode, setPeriode] = useState<PeriodeDashboard>(() => periodeDari('bulan'))
+  const aktif = pilihan.some((p) => p.value === pilih) ? pilih : pilihan[0].value
+  const ganti = (v: JenisDashboard) => {
+    setPilih(v)
+    try {
+      localStorage.setItem('floq:dashboard', v)
+    } catch {
+      // abaikan: pilihan hanya kenyamanan per perangkat
+    }
+  }
+  const pakaiPeriode = aktif === 'operation' || aktif === 'sales' || aktif === 'hsse'
+  return (
+    <div className="flex flex-col gap-space-md">
+      <HeroDashboard>
+        <PanelDashboard pilihan={pilihan} value={aktif} onChange={ganti} />
+      </HeroDashboard>
+      {/* Filter Tanggal: di bawah header biru, di atas kartu KPI. */}
+      {pakaiPeriode && <PilihPeriode value={periode} onChange={setPeriode} className="animate-entrance-1 w-full sm:ml-auto sm:w-auto sm:min-w-80" />}
+      <Suspense fallback={<Loading />}>
+        {aktif === 'cs' ? <DashboardCs /> : aktif === 'security' ? <DashboardSecurity /> : aktif === 'hsse' ? <DashboardHsse periode={periode} /> : aktif === 'sales' ? <DashboardSales periode={periode} /> : <DashboardUtama periode={periode} />}
+      </Suspense>
+    </div>
+  )
+}
+
+type JenisDashboard = 'operation' | 'sales' | 'hsse' | 'cs' | 'security'
+type PilihanDashboard = { value: JenisDashboard; label: string; pendek: string; sub: string; icon: LucideIcon; nada: string }
+/**
+ * Dashboard yang dapat dipilih per peran: ABH semua (Operation, Sales/Finance, HSSE & Guard Patrol); pengawas &
+ * kepala shift tanpa Sales/Finance; Admin/Cashier Sales/Finance; Security & Cleaning Service sesuai tugasnya.
+ */
+function pilihanDashboard(role: string | null): PilihanDashboard[] {
+  const op: PilihanDashboard = { value: 'operation', label: 'Operation', pendek: 'Operation', sub: 'Bongkaran, kualitas, stok & perawatan', icon: Fuel, nada: 'from-[#0050cb] to-[#2a78d6]' }
+  const sales: PilihanDashboard = { value: 'sales', label: 'Sales & Finance', pendek: 'Sales', sub: 'Penjualan, closing & petty cash', icon: TrendingUp, nada: 'from-[#00694a] to-[#1baf7a]' }
+  const hsse: PilihanDashboard = { value: 'hsse', label: 'HSSE & Patrol', pendek: 'HSSE', sub: 'APAR, insiden, guard tour & stop penyaluran', icon: ShieldCheck, nada: 'from-[#9a3412] to-[#eb6834]' }
+  if (role === 'abh') return [op, sales, hsse]
+  if (role === 'admin') return [sales]
+  if (role === 'security') return [{ value: 'security', label: 'Security', pendek: 'Security', sub: 'Guard tour, bongkaran & LO', icon: ScanEye, nada: 'from-[#3b2a9e] to-[#6250d6]' }, hsse]
+  if (role === 'cs') return [{ value: 'cs', label: 'Housekeeping', pendek: 'Housekeeping', sub: 'Progres & kepatuhan kebersihan', icon: BrushCleaning, nada: 'from-[#00694a] to-[#1baf7a]' }]
+  return [op, hsse]
+}
+
+/**
+ * Lanjutan header biru di halaman Dashboard (gaya beranda aplikasi HP): tanggal & shift, lalu panel pemilih
+ * dashboard di atas latar biru. Di HP menempel ke header dan selebar layar; di laptop menjadi panel membulat.
+ */
+function HeroDashboard({ children }: { children: ReactNode }) {
+  const now = new Date()
+  const shift = currentShift(now)
+  return (
+    <div className="relative -mx-margin -mt-space-md overflow-hidden rounded-b-[28px] bg-gradient-to-b from-[#0047b8] to-[#1f6ad8] px-margin pb-space-md pt-space-sm text-white shadow-[0_12px_28px_-14px_rgba(0,71,184,0.6)] lg:mx-0 lg:mt-0 lg:rounded-3xl lg:pt-space-md">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-white/[0.07]" />
+      <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-10 size-48 rounded-full bg-white/[0.05]" />
+      <div className="relative flex flex-col gap-space-sm">
+        {/* Tanggal operasional & shift berjalan (nama SPBU sudah di header). */}
+        <div className="flex items-center justify-between gap-space-sm">
+          <span className="flex min-w-0 flex-col">
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/70">Operasional SPBU</span>
+            <span className="truncate text-body-lg font-bold leading-tight" title={formatTanggalPanjang(now)}>
+              {formatTanggalPanjang(now).split(', ')[0]}, {formatTanggalSingkat(now)}
+            </span>
+          </span>
+          <span className="tabular flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold ring-1 ring-inset ring-white/20">
+            <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-emerald-400 motion-reduce:animate-none" />
+            {shiftLabel(shift.shift)}
+          </span>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Lengkung cekung (r 12 px) yang menyambungkan tab aktif ke panel putih, seperti tab kartu aplikasi Telkomsel. */
+const LENGKUNG_KIRI = { background: 'radial-gradient(circle at 0 0, transparent 11.5px, #fff 12px)' }
+const LENGKUNG_KANAN = { background: 'radial-gradient(circle at 100% 0, transparent 11.5px, #fff 12px)' }
+
+/**
+ * Pemilih dashboard bergaya tab kartu (seperti SIMPATI | Halo | IndiHome di aplikasi Telkomsel): tab sama lebar
+ * di atas latar biru; tab aktif berwarna putih dan menyatu ke panel di bawahnya lewat lengkung cekung. Panel
+ * berisi ikon, nama & cakupan dashboard aktif. Satu pilihan saja → tanpa baris tab.
+ */
+/** Menit dari (tanggal, jam) a ke b; jam "HH:MM". */
+function menitAntara(t1: string, j1: string, t2: string, j2: string) {
+  const a = Date.parse(`${t1}T${(j1 || '00:00').slice(0, 5)}:00`)
+  const b = Date.parse(`${t2}T${(j2 || '00:00').slice(0, 5)}:00`)
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.round((b - a) / 60000) : null
+}
+const BLN_SINGKAT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+/** "24 Okt 08.30" */
+const waktuSingkat = (tanggal: string, jam: string) => `${Number(tanggal.slice(8, 10))} ${BLN_SINGKAT[Number(tanggal.slice(5, 7)) - 1] ?? ''} ${(jam || '').slice(0, 5).replace(':', '.')}`.trim()
+
+function PanelDashboard({ pilihan, value, onChange }: { pilihan: PilihanDashboard[]; value: JenisDashboard; onChange: (v: JenisDashboard) => void }) {
+  const i = Math.max(0, pilihan.findIndex((p) => p.value === value))
+  const p = pilihan[i]
+  const Ikon = p.icon
+  const tab = pilihan.length > 1
+  const pindah = (n: number) => {
+    const q = pilihan[(n + pilihan.length) % pilihan.length]
+    onChange(q.value)
+    document.getElementById(`tab-dash-${q.value}`)?.focus()
+  }
+  return (
+    <div className="flex flex-col">
+      {tab && (
+        <div
+          role="tablist"
+          aria-label="Pilih dashboard"
+          className="grid"
+          style={{ gridTemplateColumns: `repeat(${pilihan.length}, minmax(0, 1fr))` }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') pindah(i + 1)
+            else if (e.key === 'ArrowLeft') pindah(i - 1)
+          }}
+        >
+          {pilihan.map((q, j) => {
+            const on = j === i
+            const IkonTab = q.icon
+            return (
+              <button
+                key={q.value}
+                id={`tab-dash-${q.value}`}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                aria-controls="panel-dashboard"
+                tabIndex={on ? 0 : -1}
+                onClick={() => onChange(q.value)}
+                className={cn(
+                  'relative flex min-h-12 items-center justify-center gap-1.5 rounded-t-2xl px-1 text-body-sm transition-colors duration-200',
+                  on ? 'bg-white font-bold text-primary' : 'font-semibold text-white/80 hover:text-white',
+                )}
+              >
+                {on && j > 0 && <span aria-hidden="true" className="absolute -left-3 bottom-0 size-3" style={LENGKUNG_KIRI} />}
+                {on && j < pilihan.length - 1 && <span aria-hidden="true" className="absolute -right-3 bottom-0 size-3" style={LENGKUNG_KANAN} />}
+                <IkonTab aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">{q.pendek}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <div
+        id="panel-dashboard"
+        role={tab ? 'tabpanel' : undefined}
+        aria-labelledby={tab ? `tab-dash-${p.value}` : undefined}
+        className={cn('flex flex-col rounded-2xl bg-white p-space-sm text-on-surface shadow-[0_10px_24px_-12px_rgba(0,20,60,0.5)]', tab && i === 0 && 'rounded-tl-none', tab && i === pilihan.length - 1 && 'rounded-tr-none')}
+      >
+        <div key={p.value} className="animate-entrance-1 flex items-center gap-space-sm">
+          <span aria-hidden="true" className={cn('flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md', p.nada)}>
+            <Ikon className="size-[22px]" />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-body-lg font-bold leading-tight">{p.label}</span>
+            <span className="text-body-sm leading-snug text-on-surface-variant">{p.sub}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const DashboardHsse = lazy(() => import('@/pages/DashboardModul').then((m) => ({ default: m.DashboardHsse })))
+const DashboardSales = lazy(() => import('@/pages/DashboardModul').then((m) => ({ default: m.DashboardSales })))
+
+const DashboardCs = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardCs })))
+const DashboardSecurity = lazy(() => import('@/pages/DashboardPeran').then((m) => ({ default: m.DashboardSecurity })))
+
+function DashboardUtama({ periode: periodeDash }: { periode: PeriodeDashboard }) {
   const app = useApp()
   const now = new Date()
   const [weekAnchor, setWeekAnchor] = useState(() => new Date())
@@ -62,6 +266,8 @@ export function Dashboard() {
   const [range, setRange] = useDateRange('today')
   const [filter, setFilter] = useState(false)
   const [buka, setBuka] = useState<string | null>(null)
+  const [ujiKunci, setUjiKunci] = useState<string | null>(null)
+  const [lihatBelum, setLihatBelum] = useState(false)
 
   // Uji kualitas harian terakhir tiap produk.
   const harian = useMemo(() => {
@@ -72,6 +278,8 @@ export function Dashboard() {
       .forEach((rec) => rec.data.kualitas.forEach((k) => k.produk && qqD15(k).d15 && m.set(k.produk, { k, rec })))
     return m
   }, [app.daily])
+  // Produk yang belum pernah diuji diringkas satu baris (dibuka bila diketuk).
+  const belumUji = PRODUK_OPTIONS.filter((p) => !harian.has(p))
 
   const loCounts = useMemo(() => {
     const c = new Map<LoDisplayStatus, number>()
@@ -88,11 +296,11 @@ export function Dashboard() {
   if (!app.loaded) return <Loading />
 
   const hariIni = todayIso(now)
+  const teraMasalah = (app.settings.nozzles ?? []).filter((n) => ['lewat', 'segera'].includes(statusSertifikat(n.teraTanggal, hariIni)))
   const calendarWeek = kalenderMinggu(app.reports, weekAnchor, app.daily, now)
   const planDates = new Set(app.plans.filter((p) => p.los.some((lo) => lo.status !== 'deleted')).map((p) => p.tanggal))
   const senin = startOfWeek(weekAnchor)
   const thisWeek = todayIso(senin) === todayIso(startOfWeek(now))
-  const shift = currentShift(now).shift
 
   const periode = app.reports.filter((r) => r.status === 'selesai' && inRange(r.tanggal, range))
   const sum = (rs: ReportSummary[], f: (r: ReportSummary) => number | null | undefined) => rs.reduce((n, r) => n + (f(r) ?? 0), 0)
@@ -109,8 +317,8 @@ export function Dashboard() {
     discharge: sum(periode, (r) => r.gainLoss),
   }
   const sla = periode.map((r) => slaOf(r, app.plans))
-  const slaPermintaan = rataRata(sla.map((x) => x.permintaan))
-  const slaPerjalanan = rataRata(sla.map((x) => x.perjalanan))
+  const waktuKirim = sla.map((x) => x.permintaan).filter((m): m is number => m !== null)
+  const waktuTempuh = sla.map((x) => x.perjalanan).filter((m): m is number => m !== null)
 
   // Rencana vs realisasi hari ini per produk: volume plan vs yang sudah dibongkar.
   const losHariIni = app.plans.filter((pl) => pl.tanggal === hariIni).flatMap((pl) => pl.los.filter((lo) => loStatus(lo, app.usedLoIds) !== 'deleted'))
@@ -134,30 +342,17 @@ export function Dashboard() {
   const tol = app.rules.densityTolerance + 1e-9
   const loTotal = LO_DASH.reduce((n, x) => n + (loCounts.get(x.key) ?? 0), 0)
   const isToday = range.preset === 'today'
-  const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
-  const aparTemuan = apar.filter((k) => k.status === 'temuan').length
-  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat').length
 
   return (
     <div className="flex flex-col gap-space-md">
-      {/* 1. Operasional & shift */}
-      <section aria-label="Operasional SPBU" className="animate-entrance-1 flex items-center justify-between gap-space-sm rounded-md bg-surface-container-lowest/85 p-3.5 shadow-sm">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-primary">
-            <CalendarDays className="size-[18px]" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-outline">Operasional SPBU</span>
-            <span className="truncate text-body-md font-bold text-on-surface" title={formatTanggalPanjang(now)}>
-              {formatTanggalPanjang(now).split(', ')[0]}, {formatTanggalSingkat(now)}
-            </span>
-          </span>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-container-high/90 px-3 py-1.5 text-primary shadow-sm">
-          <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-emerald-500 motion-reduce:animate-none" />
-          <span className="tabular whitespace-nowrap text-[11px] font-bold sm:text-tag">{shiftLabel(shift)}</span>
-        </span>
-      </section>
+      <ArsipFotoBanner />
+      <TangkiBelumAda className="animate-entrance-1" />
+      {/* Highlight KPI bulan berjalan (lib/kpi.ts, docs/KPI.md). */}
+      <KpiOperation periode={periodeDash} className="animate-entrance-1" />
+      <GrafikOperation periode={periodeDash} />
+      <KartuPumpTest periode={periodeDash} />
+      <PengingatPlan />
+      <KartuStopPenyaluran className="animate-entrance-1" />
 
       {/* 2. Kalender pekan */}
       <section aria-labelledby="kalender" className="animate-entrance-1 flex flex-col gap-2 rounded-md bg-surface-container-lowest p-3.5 shadow-sm">
@@ -192,23 +387,25 @@ export function Dashboard() {
         </ol>
         <div className="flex flex-wrap items-center justify-between gap-x-space-md gap-y-1 px-1 pt-1">
           <Legend className="bg-amber-500" label="Plan pengiriman" />
-          <Legend className="bg-error" label="Anomali susut/D15" />
+          <Legend className="bg-error" label="Anomali susut/Density std. 15 °C" />
         </div>
       </section>
 
+      {/* Laptop (lg): dua kolom berpasangan; HP tetap satu kolom dengan urutan DESIGN.md 9.2. */}
+      <div className="grid grid-cols-1 gap-space-md lg:grid-cols-2 lg:items-start">
       {/* 3. Bongkaran */}
       <Kartu
         id="total-bongkaran"
         icon={Truck}
         title={isToday ? 'Bongkaran Hari Ini' : 'Total Bongkaran'}
-        className="animate-entrance-2"
+        className="animate-entrance-2 lg:order-1"
         action={
           <button
             type="button"
             aria-expanded={filter}
             aria-controls="dash-filter"
             onClick={() => setFilter(!filter)}
-            className="touch-44 flex items-center gap-1 rounded-full bg-surface-container px-2.5 py-1 text-[11px] font-bold text-primary active:scale-95"
+            className="touch-44 flex items-center gap-1 rounded-full bg-surface-container px-2.5 py-1 text-xs font-bold text-primary active:scale-95"
           >
             {range.preset === 'custom' ? `${formatTanggalIso(range.from)} - ${formatTanggalIso(range.to)}` : presetLabel(range.preset)}
             <SlidersHorizontal aria-hidden="true" className="size-3.5" />
@@ -228,7 +425,7 @@ export function Dashboard() {
 
         {/* Per produk, ketuk untuk rincian MT, diterima, transport loss, dan discharge loss. */}
         <div className="flex flex-col rounded-md bg-surface-container-low/70 p-3">
-          <div className="flex items-center justify-between pb-1 text-[11px] font-bold uppercase text-outline">
+          <div className="flex items-center justify-between pb-1 text-xs font-bold uppercase text-on-surface-variant">
             <span>Produk</span>
             <span>Vol. diterima</span>
           </div>
@@ -250,7 +447,7 @@ export function Dashboard() {
                   >
                     <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', meta.dot)} />
                     <span className="min-w-0 truncate text-body-md font-bold text-on-surface">{x.produk}</span>
-                    <span className="tabular shrink-0 rounded-sm bg-surface-container px-1.5 text-[10px] text-on-surface-variant">{x.mt} MT</span>
+                    <span className="tabular shrink-0 rounded-sm bg-surface-container px-1.5 text-xs text-on-surface-variant">{x.mt} MT</span>
                     <span className="tabular ml-auto whitespace-nowrap text-numeric-md font-bold text-on-surface">{formatNumber(x.liter)} L</span>
                     <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-outline transition-transform', open && 'rotate-180')} />
                   </button>
@@ -294,9 +491,19 @@ export function Dashboard() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <SlaTile icon={Timer} label="Req MS2 → selesai" value={formatDurasi(slaPermintaan)} title="Rata-rata request MS2 sampai selesai bongkar" />
-          <SlaTile icon={Gauge} label="Gate out → selesai" value={formatDurasi(slaPerjalanan)} title="Rata-rata gate out depot sampai selesai bongkar" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <SlaTile
+            icon={Timer}
+            label="Rata-rata waktu kirim"
+            value={formatDurasi(rataRata(waktuKirim))}
+            keterangan={waktuKirim.length ? `Pemesanan (MS2) → selesai bongkar · ${waktuKirim.length} MT` : 'Pemesanan (MS2) → selesai bongkar · belum ada data'}
+          />
+          <SlaTile
+            icon={Gauge}
+            label="Rata-rata waktu tempuh"
+            value={formatDurasi(rataRata(waktuTempuh))}
+            keterangan={waktuTempuh.length ? `Gate out depot → selesai bongkar · ${waktuTempuh.length} MT` : 'Gate out depot → selesai bongkar · belum ada data'}
+          />
         </div>
       </Kartu>
 
@@ -305,7 +512,7 @@ export function Dashboard() {
         id="plan-hari-ini"
         icon={ClipboardCheck}
         title="Rencana vs Realisasi"
-        className="animate-entrance-3"
+        className="animate-entrance-3 lg:order-2"
         action={targetHariIni > 0 && <span className="tabular whitespace-nowrap text-numeric-sm text-outline">Target {formatNumber(targetHariIni)} L</span>}
       >
         {planHariIni.length === 0 ? (
@@ -321,7 +528,7 @@ export function Dashboard() {
                     <span aria-hidden="true" className={cn('size-2.5 rounded-full', meta.dot)} />
                     <span className="text-body-md font-bold text-on-surface">{x.produk}</span>
                   </span>
-                  <span className={cn('tabular text-[11px] font-bold', meta.teks)}>
+                  <span className={cn('tabular text-xs font-bold', meta.teks)}>
                     {x.selesai} dari {x.lo} LO dibongkar ({pct}%){x.jalan ? `, +${x.jalan} berjalan` : ''}
                   </span>
                 </div>
@@ -336,7 +543,7 @@ export function Dashboard() {
                   <div className={cn('h-full transition-[width] duration-500', meta.dot)} style={{ width: `${(x.volSelesai / x.volume) * 100}%` }} />
                   <div className={cn('h-full opacity-40 transition-[width] duration-500', meta.dot)} style={{ width: `${(x.volJalan / x.volume) * 100}%` }} />
                 </div>
-                <div className="tabular flex items-center justify-between gap-2 text-[11px] text-outline">
+                <div className="tabular flex items-center justify-between gap-2 text-xs text-on-surface-variant">
                   <span>
                     {formatNumber(x.volSelesai)} L dibongkar{x.volJalan ? ` (${formatNumber(x.volJalan)} L berjalan)` : ''}
                   </span>
@@ -348,46 +555,123 @@ export function Dashboard() {
         )}
       </Kartu>
 
+      {/* Sertifikat tera metrologi nozzle (maks. 1 tahun) yang lewat atau tinggal ≤ 30 hari. */}
+      {teraMasalah.length > 0 && (
+        <div role="status" className="animate-entrance-3 flex lg:col-span-2 items-start gap-space-sm rounded-lg border border-amber-300 bg-amber-50 p-space-sm">
+          <Gauge aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-700" />
+          <span className="min-w-0 flex-1 text-body-sm text-on-surface">
+            <b>Tera metrologi:</b> {teraMasalah.map((n) => `${n.nama} ${statusSertifikat(n.teraTanggal, hariIni) === 'lewat' ? 'lewat' : 's/d ' + formatTanggalIso(berlakuSertifikat(n.teraTanggal))}`).join(', ')}
+          </span>
+          {app.can('/pengaturan/nozzle') && (
+            <Link to="/pengaturan/nozzle" className="shrink-0 text-body-sm font-semibold text-primary">
+              Atur
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* 5. Kualitas harian */}
       <Kartu
         id="kualitas-harian"
         icon={FlaskConical}
-        title="Kualitas Harian (D15)"
-        sub="Uji density terakhir tiap produk, dibanding D15 bongkaran terakhir."
-        className="animate-entrance-3"
-        action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-[11px] font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
+        title="Kualitas Harian (Density std. 15 °C)"
+        sub="Uji density terakhir tiap produk, dibanding Density std. 15 °C uji pasca penerimaan terbaru."
+        className="animate-entrance-3 lg:order-3"
+        action={<span className="tabular whitespace-nowrap rounded-full bg-tertiary-fixed/60 px-2 py-0.5 text-xs font-bold text-tertiary">±{formatDensity(app.rules.densityTolerance)}</span>}
       >
-        {PRODUK_OPTIONS.map((p) => {
+        {belumUji.length > 0 && !lihatBelum && (
+          <button
+            type="button"
+            onClick={() => setLihatBelum(true)}
+            className="flex min-h-14 w-full items-center gap-2.5 rounded-md bg-surface-container-low p-3 text-left active:scale-[0.99]"
+          >
+            <span aria-hidden="true" className="h-8 w-1.5 shrink-0 rounded-full bg-outline-variant" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-body-md font-bold text-on-surface">
+                {belumUji.length === PRODUK_OPTIONS.length ? `${belumUji.length} produk belum diuji` : `${belumUji.length} produk lain belum diuji`}
+              </span>
+              <span className="truncate text-body-sm text-on-surface-variant">{belumUji.join(', ')}</span>
+            </span>
+            <Pill>Belum</Pill>
+          </button>
+        )}
+        {PRODUK_OPTIONS.filter((p) => harian.has(p) || lihatBelum).map((p) => {
           const h = harian.get(p)
           const d15 = h ? qqD15(h.k).d15?.value ?? null : null
           const ref = h ? acuanD15(app.reports, p, h.rec.tanggal) : null
           const selisih = d15 !== null && ref ? Math.round((d15 - ref.d15) * 10000) / 10000 : null
           const ok = selisih !== null ? Math.abs(selisih) <= tol : null
-          return (
-            <div key={p} className="flex min-h-14 items-center gap-2.5 rounded-md bg-surface-container-low p-3">
+          // Rentang waktu: uji pasca penerimaan (acuan) → uji kualitas harian terakhir produk ini.
+          const selang = h && ref ? menitAntara(ref.tanggal, ref.jam, h.rec.tanggal, h.rec.data.jam) : null
+          const isi = (
+            <>
               <span aria-hidden="true" className={cn('h-8 w-1.5 shrink-0 rounded-full', h ? produkMeta(p).dot : 'bg-outline-variant')} />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-body-md font-bold text-on-surface">{p}</span>
                 <span className="tabular truncate text-body-sm text-outline">
-                  {h ? (ref ? `D15 acuan ${formatDensity(ref.d15)}` : `${formatTanggalIso(h.rec.tanggal)}, shift ${h.rec.shift}`) : 'Belum diuji'}
+                  {h ? (ref ? `Density std. 15 °C acuan ${formatDensity(ref.d15)}` : `${formatTanggalIso(h.rec.tanggal)}, shift ${h.rec.shift}`) : 'Belum diuji'}
                 </span>
               </span>
               {h && (
                 <span className="tabular flex flex-col items-end">
                   <span className="whitespace-nowrap text-numeric-md font-bold text-on-surface">
-                    {formatDensity(d15)} <span className="text-[10px] font-normal text-outline">g/ml</span>
+                    {formatDensity(d15)} <span className="text-xs font-normal text-on-surface-variant">g/ml</span>
                   </span>
-                  <span className={cn('text-[11px] font-bold', ok === false ? 'text-error' : ok ? 'text-emerald-700' : 'text-outline')}>{selisih !== null ? formatDensitySigned(selisih) : 'tanpa acuan'}</span>
+                  <span className={cn('text-xs font-bold', ok === false ? 'text-error' : ok ? 'text-emerald-700' : 'text-on-surface-variant')}>{selisih !== null ? formatDensitySigned(selisih) : 'tanpa acuan'}</span>
                 </span>
               )}
               {ok === null ? <Pill>{h ? 'Tanpa acuan' : 'Belum'}</Pill> : ok ? <Pill tone="success">Sesuai</Pill> : <Pill tone="error">Tidak sesuai</Pill>}
+            </>
+          )
+          const garisWaktu = h && ref && (
+            <span className="tabular flex w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 border-t border-outline-variant/40 pt-1.5 pl-4 text-xs text-on-surface-variant">
+              <Clock aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+              <span>
+                Pasca penerimaan <b className="font-semibold text-on-surface">{waktuSingkat(ref.tanggal, ref.jam)}</b>
+              </span>
+              <ArrowRight aria-hidden="true" className="size-3 shrink-0" />
+              <span>
+                uji harian <b className="font-semibold text-on-surface">{waktuSingkat(h.rec.tanggal, h.rec.data.jam)}</b>
+              </span>
+              <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary">{selang !== null && selang >= 0 ? `selang ${formatDurasi(selang)}` : 'selang -'}</span>
+            </span>
+          )
+          // Ketuk produk yang sudah diuji: pop up highlight hasil uji terakhir.
+          return h ? (
+            <button
+              key={p}
+              type="button"
+              aria-label={`Lihat hasil uji ${p}`}
+              onClick={() => setUjiKunci(kunciHarian(h.rec.id, h.k.id))}
+              className="flex min-h-14 w-full flex-col gap-1.5 rounded-md bg-surface-container-low p-3 text-left transition-colors hover:bg-primary-fixed/30 active:scale-[0.99]"
+            >
+              <span className="flex w-full items-center gap-2.5">{isi}</span>
+              {garisWaktu}
+            </button>
+          ) : (
+            <div key={p} className="flex min-h-14 items-center gap-2.5 rounded-md bg-surface-container-low p-3">
+              {isi}
             </div>
           )
         })}
       </Kartu>
 
-      <div className="animate-entrance-4">
+      <Sheet open={!!ujiKunci} onOpenChange={(o) => !o && setUjiKunci(null)} title="Hasil uji kualitas harian" description="Highlight data uji terakhir produk ini.">
+        {ujiKunci && <KualitasHighlight kunci={ujiKunci} />}
+        {ujiKunci && app.can('/laporan/kualitas') && (
+          <Link to="/laporan/kualitas" className={buttonVariants({ variant: 'glass' })}>
+            Riwayat kualitas harian
+          </Link>
+        )}
+      </Sheet>
+
+      <div className="animate-entrance-4 lg:order-5 lg:col-span-2">
         <KalengSample />
+      </div>
+
+      {/* Uji takaran bejana 20 L */}
+      <div className="lg:order-6">
+        <KartuTakaran hariIni={hariIni} />
       </div>
 
       {/* 7. Status alur LO */}
@@ -396,65 +680,229 @@ export function Dashboard() {
         icon={Network}
         title="LO Tracking"
         sub="Status alur Loading Order"
-        className="animate-entrance-5"
+        className="animate-entrance-5 lg:order-4"
         action={
-          <Link to="/laporan/lo" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
+          <Link to="/plan" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
             Total {loTotal} LO <ChevronRight aria-hidden="true" className="size-4" />
           </Link>
         }
       >
         <div className="grid grid-cols-3 gap-2">
           {LO_DASH.map((x) => (
-            <Link key={x.key} to="/laporan/lo" className={cn('flex min-w-0 flex-col items-center rounded-md p-2.5 text-center active:scale-[0.98]', x.tile)}>
-              <span className={cn('truncate text-[10px] font-bold uppercase', x.teks)}>{LO_STATUS.find((s) => s.key === x.key)!.label}</span>
+            <Link key={x.key} to="/plan" className={cn('flex min-w-0 flex-col items-center rounded-md p-2.5 text-center active:scale-[0.98]', x.tile)}>
+              <span className={cn('truncate text-xs font-bold uppercase', x.teks)}>{LO_STATUS.find((s) => s.key === x.key)!.label}</span>
               <span className={cn('tabular text-numeric-lg font-bold', x.teks)}>{loCounts.get(x.key) ?? 0}</span>
-              <span className={cn('text-[10px] leading-tight', x.teks)}>{x.sub}</span>
+              <span className={cn('text-xs leading-tight', x.teks)}>{x.sub}</span>
             </Link>
           ))}
         </div>
       </Kartu>
 
-      {/* 8. Proteksi kebakaran (APAR & APAB) */}
-      {apar.length > 0 && (
-        <Kartu
-          id="proteksi"
-          icon={FireExtinguisher}
-          title="Proteksi Kebakaran"
-          sub="Kondisi APAR & APAB dari inspeksi terakhir"
-          className="animate-entrance-5"
-          action={
-            <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-primary">
-              {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
-            </Link>
-          }
-        >
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
-              <span className="text-[10px] font-bold uppercase text-emerald-700">Baik</span>
-              <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
-            </Link>
-            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-[10px] font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
-              <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
-            </Link>
-            <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
-              <span className="text-[10px] font-bold uppercase text-amber-700">Belum bulan ini</span>
-              <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
-            </Link>
-            <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
-              <span className={cn('text-[10px] font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang lewat</span>
-              <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
-            </Link>
-          </div>
-        </Kartu>
-      )}
+
+      </div>
 
       <DetailHari iso={hari} onClose={() => setHari(null)} />
     </div>
   )
 }
 
+/** Proteksi kebakaran (APAR & APAB): kondisi dari inspeksi terakhir. Dipakai di Dashboard HSSE & Guard Patrol. */
+export function KartuProteksi({ className }: { className?: string }) {
+  const app = useApp()
+  const hariIni = todayIso()
+  const apar = kondisiSemua(app.settings, app.daily.filter((d): d is AparRecord => d.kind === 'apar'), hariIni)
+  const aparTemuan = apar.filter((k) => k.status === 'temuan').length
+  const aparLewat = apar.filter((k) => k.isiUlang === 'lewat' || k.instansi === 'lewat').length
+  if (!apar.length) return null
+  return (
+      <Kartu
+        id="proteksi"
+        icon={FireExtinguisher}
+        title="Proteksi Kebakaran"
+        sub="Kondisi APAR & APAB dari inspeksi terakhir"
+        className={className}
+        action={
+          <Link to="/apar" className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
+            {apar.length} unit <ChevronRight aria-hidden="true" className="size-4" />
+          </Link>
+        }
+      >
+        <div className="mb-2 grid grid-cols-3 divide-x divide-outline-variant/50 rounded-md bg-primary-fixed/50">
+          {[
+            { label: 'APAR terpasang', value: apar.filter((k) => k.tipe === 'apar' && !k.unit.cadangan).length },
+            { label: 'APAR cadangan', value: apar.filter((k) => k.unit.cadangan).length },
+            { label: 'APAB', value: apar.filter((k) => k.tipe === 'apab').length },
+          ].map((x) => (
+            <Link key={x.label} to="/apar" className="flex min-w-0 flex-col items-center px-1 py-2 text-center active:scale-[0.98]">
+              <span className="tabular text-numeric-lg font-bold text-on-surface">{x.value}</span>
+              <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{x.label}</span>
+            </Link>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Link to="/apar" className="flex flex-col rounded-md bg-emerald-50 p-2.5">
+            <span className="text-xs font-bold uppercase text-emerald-700">Baik</span>
+            <span className="tabular text-numeric-lg font-bold text-emerald-700">{apar.filter((k) => k.status === 'baik').length}</span>
+          </Link>
+          <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparTemuan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+            <span className={cn('text-xs font-bold uppercase', aparTemuan ? 'text-error' : 'text-on-surface-variant')}>Ada temuan</span>
+            <span className={cn('tabular text-numeric-lg font-bold', aparTemuan ? 'text-error' : 'text-on-surface')}>{aparTemuan}</span>
+          </Link>
+          <Link to="/apar" className="flex flex-col rounded-md bg-amber-50 p-2.5">
+            <span className="text-xs font-bold uppercase text-amber-700">Belum bulan ini</span>
+            <span className="tabular text-numeric-lg font-bold text-amber-700">{apar.filter((k) => !k.bulanIni).length}</span>
+          </Link>
+          <Link to="/apar" className={cn('flex flex-col rounded-md p-2.5', aparLewat ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+            <span className={cn('text-xs font-bold uppercase', aparLewat ? 'text-error' : 'text-on-surface-variant')}>Isi ulang / uji instansi lewat</span>
+            <span className={cn('tabular text-numeric-lg font-bold', aparLewat ? 'text-error' : 'text-on-surface')}>{aparLewat}</span>
+          </Link>
+        </div>
+      </Kartu>
+  )
+}
+
+/** Grafik Dashboard Operation: volume diterima per hari/minggu dan komposisi penerimaan per produk. */
+function GrafikOperation({ periode }: { periode: PeriodeDashboard }) {
+  const app = useApp()
+  const dalam = (p: { dari: string; sampai: string }) => app.reports.filter((r) => r.status !== 'draft' && r.tanggal >= p.dari && r.tanggal <= p.sampai)
+  const rows = dalam(periode)
+  const vol = (r: (typeof rows)[number]) => r.terimaAktual ?? r.volumeDO ?? 0
+  const batang = kelompokPeriode(periode, rows.map((r) => ({ tanggal: r.tanggal, value: vol(r) })))
+  const perProduk = new Map<string, { v: number; n: number }>()
+  for (const r of rows) {
+    const x = perProduk.get(r.produk) ?? { v: 0, n: 0 }
+    perProduk.set(r.produk, { v: x.v + vol(r), n: x.n + 1 })
+  }
+  const produk = [...perProduk.entries()].sort((a, b) => b[1].v - a[1].v)
+  const total = rows.reduce((a, r) => a + vol(r), 0)
+  const lalu = dalam(periodeSebelum(periode)).reduce((a, r) => a + vol(r), 0)
+  const delta = lalu > 0 ? ((total - lalu) / lalu) * 100 : null
+  const anomali = rows.filter((r) => r.status === 'anomali').length
+  return (
+    <section aria-labelledby="grafik-penerimaan" className="animate-entrance-2 flex flex-col gap-space-md rounded-md bg-surface-container-lowest p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-space-sm">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="grafik-penerimaan" className="flex items-center gap-2 text-body-md font-semibold text-on-surface-variant">
+            <Truck aria-hidden="true" className="size-4 text-primary" />
+            Volume diterima
+          </h2>
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="tabular text-[2rem] font-bold leading-none text-on-surface">{formatNumber(total)}</span>
+            <span className="text-body-md font-semibold text-on-surface-variant">liter</span>
+            {delta !== null && (
+              <span className={cn('tabular inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-semibold', delta >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
+                {delta >= 0 ? <ArrowUpRight aria-hidden="true" className="size-3" /> : <ArrowDownLeft aria-hidden="true" className="size-3" />}
+                {Math.abs(delta).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%<span className="sr-only"> dibanding periode sebelumnya</span>
+              </span>
+            )}
+          </span>
+          <span className="text-body-sm text-on-surface-variant">
+            {rows.length} bongkaran{anomali ? ` · ${anomali} anomali` : ''}{lalu > 0 ? ` · periode lalu ${formatNumber(lalu)} L` : ''}
+          </span>
+        </div>
+      </div>
+      {produk.length > 0 && (
+        <ul className="grid grid-cols-2 gap-space-xs sm:grid-cols-3 lg:grid-cols-5" aria-label="Volume diterima per produk">
+          {produk.map(([p, x], i) => (
+            <li key={p} className="flex flex-col gap-0.5 rounded-md bg-surface-container-low px-space-sm py-space-xs">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
+                <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: warnaProduk(p, i) }} />
+                <span className="truncate">{p}</span>
+              </span>
+              <span className="tabular text-body-lg font-bold text-on-surface">
+                {formatNumber(x.v)} <span className="text-xs font-semibold text-on-surface-variant">L</span>
+              </span>
+              <span className="text-xs text-on-surface-variant">
+                {x.n} bongkaran · {total ? Math.round((x.v / total) * 100) : 0}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Volume per {jumlahHari(periode) > HARIAN_MAKS ? 'pekan' : 'hari'}</span>
+        <BarChart data={batang} warna={KATEGORI[0]} satuan=" L" label="Volume diterima" />
+      </div>
+    </section>
+  )
+}
+
+/** Pump test pada periode: total liter (pengurang penjualan totalisator), jumlah uji, per jenis & per produk. */
+function KartuPumpTest({ periode }: { periode: PeriodeDashboard }) {
+  const app = useApp()
+  const rows = barisPumpTest(app.daily, app.settings.nozzles ?? []).filter((r) => r.tanggal >= periode.dari && r.tanggal <= periode.sampai)
+  const total = rows.reduce((n, r) => n + r.liter, 0)
+  const perJenis = (['kualitas', 'kuantitas', 'takaran'] as const).map((j) => ({ j, n: rows.filter((r) => r.jenis === j).length, l: rows.filter((r) => r.jenis === j).reduce((a, r) => a + r.liter, 0) }))
+  const perProduk = new Map<string, number>()
+  for (const r of rows) perProduk.set(r.produk, (perProduk.get(r.produk) ?? 0) + r.liter)
+  const urut = PRODUK_OPTIONS.filter((p) => perProduk.has(p)).concat([...perProduk.keys()].filter((p) => !PRODUK_OPTIONS.includes(p)))
+  const lewat = rows.filter((r) => r.lewat).length
+  return (
+    <section aria-labelledby="kartu-pump-test" className="animate-entrance-2 flex flex-col gap-space-sm rounded-md bg-surface-container-lowest p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-space-sm">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 id="kartu-pump-test" className="flex items-center gap-2 text-body-md font-semibold text-on-surface-variant">
+            <FlaskConical aria-hidden="true" className="size-4 text-primary" />
+            Pump test
+          </h2>
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            <span className="tabular text-[2rem] font-bold leading-none text-on-surface">{formatNumber(total)}</span>
+            <span className="text-body-md font-semibold text-on-surface-variant">liter</span>
+          </span>
+          <span className="text-body-sm text-on-surface-variant">
+            {rows.length} uji{lewat ? ` · ${lewat} di luar toleransi` : ''} · dikurangkan dari penjualan totalisator
+          </span>
+        </div>
+        {app.can('/laporan/pump-test') && (
+          <Link to="/laporan/pump-test" className="touch-44 flex shrink-0 items-center gap-0.5 text-body-sm font-semibold text-primary">
+            Riwayat
+            <ChevronRight aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+      </div>
+      <ul className="grid grid-cols-3 gap-space-xs" aria-label="Pump test per jenis uji">
+        {perJenis.map((x) => (
+          <li key={x.j} className="flex flex-col rounded-md bg-surface-container-low px-space-sm py-space-xs">
+            <span className="tabular text-body-lg font-bold text-on-surface">{x.n}</span>
+            <span className="text-xs leading-tight text-on-surface-variant">{LABEL_PUMP_TEST[x.j]}</span>
+            <span className="tabular text-xs text-on-surface-variant">{formatNumber(x.l)} L</span>
+          </li>
+        ))}
+      </ul>
+      {urut.length > 0 && (
+        <ul className="flex flex-wrap gap-space-xs" aria-label="Pump test per produk">
+          {urut.map((p, i) => (
+            <li key={p} className="tabular flex items-center gap-1.5 rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface">
+              <span aria-hidden="true" className="size-2.5 rounded-full" style={{ background: warnaProduk(p, i) }} />
+              {p} {formatNumber(perProduk.get(p)!)} L
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 /** Satu hari pada kalender pekan: label, tanggal, titik plan, dan ikon status. */
+/** Pengingat plan pengiriman besok: baris amber di alur halaman (tidak menutupi kartu tanggal & shift). */
+function PengingatPlan() {
+  const app = useApp()
+  const besok = app.spbuSiap && app.can('/plan') ? planBesokKurang(app.plans) : null
+  if (!besok) return null
+  return (
+    <Link to="/plan" className="animate-entrance-1 flex min-h-14 items-center gap-space-sm rounded-md border border-amber-300 bg-amber-50 p-space-sm active:scale-[0.99]">
+      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950">
+        <CalendarClock className="size-[18px]" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-body-md font-bold text-amber-950">Plan pengiriman besok belum dibuat</span>
+        <span className="text-body-sm text-amber-900">Kirim {formatTanggalIso(besok)} · buat permintaan MS2 di Plan Pengiriman</span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-amber-900" />
+    </Link>
+  )
+}
+
 function HariTile({ day, plan, future, onOpen }: { day: CalendarDay & { iso: string }; plan: boolean; future: boolean; onOpen: () => void }) {
   const anomali = day.status === 'catatan'
   const status = anomali ? 'ada anomali' : day.status === 'sesuai' ? 'bongkaran sesuai' : day.isToday ? 'berjalan' : 'tidak ada data'
@@ -470,7 +918,7 @@ function HariTile({ day, plan, future, onOpen }: { day: CalendarDay & { iso: str
         future && !plan && 'opacity-60',
       )}
     >
-      <span className={cn('text-[10px] font-bold uppercase', day.isToday ? 'text-primary' : anomali ? 'text-error' : future ? 'text-outline' : 'text-on-surface-variant')}>{day.label}</span>
+      <span className={cn('text-xs font-bold uppercase', day.isToday ? 'text-primary' : anomali ? 'text-error' : future ? 'text-on-surface-variant' : 'text-on-surface-variant')}>{day.label}</span>
       <span
         className={cn(
           'tabular relative flex size-8 items-center justify-center rounded-full text-numeric-sm font-semibold',
@@ -500,7 +948,7 @@ function Kartu({ id, icon: Icon, title, sub, action, className, children }: { id
             <h2 id={id} className="scroll-mt-24 text-headline-md font-bold text-on-surface">
               {title}
             </h2>
-            {sub && <span className="text-[11px] text-outline">{sub}</span>}
+            {sub && <span className="text-xs text-on-surface-variant">{sub}</span>}
           </span>
         </div>
         {action}
@@ -513,11 +961,11 @@ function Kartu({ id, icon: Icon, title, sub, action, className, children }: { id
 function Stat({ label, value, unit, sub, subTone }: { label: string; value: string; unit: string; sub: string; subTone: 'primary' | 'ok' | 'error' }) {
   return (
     <div className="flex min-w-0 flex-col justify-between rounded-md bg-surface-container-low p-2.5">
-      <span className="text-[10px] font-bold uppercase leading-tight text-on-surface-variant">{label}</span>
+      <span className="text-xs font-bold uppercase leading-tight text-on-surface-variant">{label}</span>
       <span className={cn('tabular mt-1 truncate text-numeric-md font-bold', subTone === 'error' ? 'text-error' : 'text-on-surface')}>
-        {value} <span className="text-[10px] font-normal text-outline">{unit}</span>
+        {value} <span className="text-xs font-normal text-on-surface-variant">{unit}</span>
       </span>
-      <span className={cn('tabular mt-0.5 truncate text-[10px] font-semibold', subTone === 'primary' ? 'text-primary' : subTone === 'error' ? 'text-error' : 'text-emerald-700')}>{sub}</span>
+      <span className={cn('tabular mt-0.5 truncate text-xs font-semibold', subTone === 'primary' ? 'text-primary' : subTone === 'error' ? 'text-error' : 'text-emerald-700')}>{sub}</span>
     </div>
   )
 }
@@ -525,7 +973,7 @@ function Stat({ label, value, unit, sub, subTone }: { label: string; value: stri
 function Mini({ label, value, sub, bad }: { label: string; value: string; sub?: string; bad?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col rounded-sm bg-surface-container-lowest/80 px-2 py-1.5">
-      <dt className="text-[10px] font-bold uppercase text-outline">{label}</dt>
+      <dt className="text-xs font-bold uppercase text-on-surface-variant">{label}</dt>
       <dd className={cn('tabular text-body-sm font-bold', bad ? 'text-error' : 'text-on-surface')}>
         {value}
         {sub && <span className="ml-1 font-semibold">({sub})</span>}
@@ -534,13 +982,14 @@ function Mini({ label, value, sub, bad }: { label: string; value: string; sub?: 
   )
 }
 
-function SlaTile({ icon: Icon, label, value, title }: { icon: typeof Timer; label: string; value: string; title: string }) {
+function SlaTile({ icon: Icon, label, value, keterangan }: { icon: typeof Timer; label: string; value: string; keterangan: string }) {
   return (
-    <div title={title} className="flex min-w-0 items-center gap-2.5 rounded-md bg-surface-container p-2.5">
+    <div className="flex min-w-0 items-center gap-2.5 rounded-md bg-surface-container p-2.5">
       <Icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[10px] font-semibold uppercase leading-tight text-outline">{label}</span>
+        <span className="truncate text-xs font-semibold uppercase leading-tight text-on-surface-variant">{label}</span>
         <span className="tabular text-numeric-md font-bold text-on-surface">{value}</span>
+        <span className="text-xs leading-tight text-on-surface-variant">{keterangan}</span>
       </span>
     </div>
   )
@@ -550,17 +999,115 @@ function Legend({ className, label }: { className: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
       <span aria-hidden="true" className={cn('size-2 rounded-full', className)} />
-      <span className="text-[11px] text-outline">{label}</span>
+      <span className="text-xs text-on-surface-variant">{label}</span>
     </span>
   )
 }
 
 /** Detail satu tanggal: penerimaan, kualitas, kuantitas, dan stok shift. */
+/**
+ * Dashboard > Uji Takaran: ringkasan uji bejana 20 L (hari ini, bulan ini) dan hasil terakhir
+ * tiap nozzle untuk opsi Preset & Manual. Data dari modul Input > Uji Takaran.
+ */
+function KartuTakaran({ hariIni }: { hariIni: string }) {
+  const app = useApp()
+  const semua = app.daily.filter((x): x is TakarRecord => x.kind === 'takar').sort((a, b) => a.createdAt - b.createdAt)
+  const bulan = hariIni.slice(0, 7)
+  const hari = semua.filter((r) => r.tanggal === hariIni)
+  const diBulan = semua.filter((r) => r.tanggal.startsWith(bulan))
+  const lewatBulan = diBulan.filter((r) => takarStatus(r.data.hasilMl) === 'lewat').length
+  const lewatHari = hari.filter((r) => takarStatus(r.data.hasilMl) === 'lewat').length
+  const kunci = (n: string) => n.trim().toUpperCase()
+  const nozzleBulan = new Set(diBulan.map((r) => kunci(r.data.nozzle)))
+  const totalNozzle = Math.max((app.settings.nozzles ?? []).length, nozzleBulan.size)
+  const terakhir = semua[semua.length - 1]
+  // Hasil terakhir tiap nozzle per opsi.
+  const perNozzle = new Map<string, { nozzle: string; produk: string; P?: TakarRecord; M?: TakarRecord }>()
+  for (const r of semua) {
+    const k = kunci(r.data.nozzle)
+    const cur = perNozzle.get(k) ?? { nozzle: r.data.nozzle, produk: r.data.produk }
+    perNozzle.set(k, { ...cur, produk: r.data.produk, [r.data.opsi]: r })
+  }
+  const nozzles = [...perNozzle.values()].sort((a, b) => a.nozzle.localeCompare(b.nozzle, 'id', { numeric: true }))
+  const nilai = (r?: TakarRecord) =>
+    r ? <span className={cn('tabular font-bold', takarStatus(r.data.hasilMl) === 'lewat' ? 'text-error' : 'text-on-surface')}>{formatMl(r.data.hasilMl)}</span> : <span className="text-outline">-</span>
+  return (
+    <Kartu
+      id="uji-takaran"
+      icon={Beaker}
+      title="Uji Takaran"
+      sub="Bejana ukur 20 L, batas -60 ml"
+      className="animate-entrance-5"
+      action={
+        <Link to={app.can('/laporan/takaran') ? '/laporan/takaran' : '/takaran'} className="touch-44 flex items-center gap-0.5 whitespace-nowrap text-xs font-bold text-primary">
+          Riwayat <ChevronRight aria-hidden="true" className="size-4" />
+        </Link>
+      }
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className={cn('flex flex-col rounded-md p-2.5', hari.length ? 'bg-emerald-50' : 'bg-amber-50')}>
+          <span className={cn('text-xs font-bold uppercase', hari.length ? 'text-emerald-700' : 'text-amber-700')}>Hari ini</span>
+          <span className={cn('tabular text-numeric-lg font-bold', hari.length ? 'text-emerald-700' : 'text-amber-700')}>{hari.length}</span>
+          <span className={cn('text-xs', lewatHari ? 'font-semibold text-error' : hari.length ? 'text-emerald-700' : 'text-amber-700')}>{lewatHari ? `${lewatHari} lewat toleransi` : hari.length ? 'hasil uji' : 'belum ada uji'}</span>
+        </div>
+        <div className={cn('flex flex-col rounded-md p-2.5', lewatBulan ? 'bg-error-container/60' : 'bg-surface-container-low')}>
+          <span className={cn('text-xs font-bold uppercase', lewatBulan ? 'text-error' : 'text-on-surface-variant')}>Lewat toleransi</span>
+          <span className={cn('tabular text-numeric-lg font-bold', lewatBulan ? 'text-error' : 'text-on-surface')}>{lewatBulan}</span>
+          <span className="text-xs text-on-surface-variant">bulan ini</span>
+        </div>
+        <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
+          <span className="text-xs font-bold uppercase text-on-surface-variant">Nozzle diuji</span>
+          <span className="tabular text-numeric-lg font-bold text-on-surface">
+            {nozzleBulan.size}
+            <span className="text-body-sm font-semibold text-outline">/{totalNozzle}</span>
+          </span>
+          <span className="text-xs text-on-surface-variant">bulan ini</span>
+        </div>
+        <div className="flex flex-col rounded-md bg-surface-container-low p-2.5">
+          <span className="text-xs font-bold uppercase text-on-surface-variant">Uji terakhir</span>
+          <span className="tabular truncate text-body-md font-bold text-on-surface">{terakhir ? formatTanggalIso(terakhir.tanggal) : '-'}</span>
+          <span className="truncate text-xs text-on-surface-variant">{terakhir ? `${terakhir.data.jam}, Nozzle ${terakhir.data.nozzle}` : 'belum ada'}</span>
+        </div>
+      </div>
+      {nozzles.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Hasil terakhir per nozzle</span>
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {nozzles.map((n) => {
+              const lewat = [n.P, n.M].some((r) => r && takarStatus(r.data.hasilMl) === 'lewat')
+              return (
+                <div key={n.nozzle} className={cn('flex items-center gap-2 rounded-md px-2.5 py-1.5 text-body-sm', lewat ? 'bg-error-container/50' : 'bg-surface-container-low')}>
+                  <span className="tabular w-16 shrink-0 font-bold text-on-surface">Nozzle {n.nozzle}</span>
+                  <span className="min-w-0 flex-1 truncate text-on-surface-variant">{n.produk}</span>
+                  <span className="text-xs font-bold text-on-surface-variant">P</span>
+                  {nilai(n.P)}
+                  <span className="text-xs font-bold text-on-surface-variant">M</span>
+                  {nilai(n.M)}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-container-low p-2.5 text-body-sm text-on-surface-variant">
+          Belum ada hasil uji takaran.
+          {app.can('/takaran') && (
+            <Link to="/takaran" className="font-bold text-primary">
+              Mulai uji takaran
+            </Link>
+          )}
+        </div>
+      )}
+    </Kartu>
+  )
+}
+
 function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void }) {
   const app = useApp()
   const d = iso ? detailTanggal(iso, app.reports, app.daily) : null
   const plans = iso ? app.plans.filter((p) => p.tanggal === iso) : []
   const diterima = d ? d.bongkaran.filter((r) => r.status !== 'draft').reduce((n, r) => n + (r.volumeDO ?? 0), 0) : 0
+  const takarHari = iso ? app.daily.filter((x): x is TakarRecord => x.kind === 'takar' && x.tanggal === iso).sort((a, b) => a.data.jam.localeCompare(b.data.jam)) : []
   return (
     <Sheet open={!!iso} onOpenChange={(o) => !o && onClose()} title={iso ? formatTanggalIso(iso) : ''} description="Plan pengiriman, penerimaan, kualitas, dan kuantitas pada tanggal ini.">
       {d && (
@@ -629,7 +1176,7 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
                     Bongkar {r.produk} {r.nopol}
                   </span>
                   <span className={cn('tabular font-semibold', r.densityOk === false ? 'text-error' : 'text-on-surface')}>
-                    D15 {formatDensity(r.d15)}
+                    Density std. 15 °C {formatDensity(r.d15)}
                     {r.d15Depot !== null ? ` (${formatDensitySigned(Math.round((r.d15! - r.d15Depot) * 10000) / 10000)})` : ''}
                   </span>
                 </div>
@@ -642,7 +1189,7 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
                     <span className="text-on-surface">
                       Uji harian shift {q.shift}, {k.produk}
                     </span>
-                    <span className="tabular font-semibold text-on-surface">D15 {v ? formatDensity(v.value) : '-'}</span>
+                    <span className="tabular font-semibold text-on-surface">Density std. 15 °C {v ? formatDensity(v.value) : '-'}</span>
                   </div>
                 )
               }),
@@ -651,20 +1198,18 @@ function DetailHari({ iso, onClose }: { iso: string | null; onClose: () => void 
 
           <section aria-label="Kuantitas" className="flex flex-col gap-space-xs">
             <h3 className="text-body-md font-bold text-on-surface">Kuantitas</h3>
-            {d.qq.every((q) => !q.data.kuantitas.length) && d.stok.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada uji bejana atau stok shift.</span>}
-            {d.qq.flatMap((q) =>
-              q.data.kuantitas.map((n) => {
-                const lewat = bejanaStatus(n.selisihMl) === 'lewat'
-                return (
-                  <div key={n.id} className="flex items-center justify-between gap-2 text-body-sm">
-                    <span className="text-on-surface">
-                      Shift {q.shift}, {n.nozzle} ({n.produk})
-                    </span>
-                    <span className={cn('tabular font-semibold', lewat ? 'text-error' : 'text-on-surface')}>{n.selisihMl || '-'} ml</span>
-                  </div>
-                )
-              }),
-            )}
+            {takarHari.length === 0 && d.stok.length === 0 && <span className="text-body-sm text-on-surface-variant">Belum ada uji takaran atau stok shift.</span>}
+            {takarHari.map((r) => {
+              const lewat = takarStatus(r.data.hasilMl) === 'lewat'
+              return (
+                <div key={r.id} className="flex items-center justify-between gap-2 text-body-sm">
+                  <span className="text-on-surface">
+                    Uji takaran {r.data.jam}, Nozzle {r.data.nozzle} ({r.data.produk}) {opsiLabel(r.data.opsi)}
+                  </span>
+                  <span className={cn('tabular font-semibold', lewat ? 'text-error' : 'text-on-surface')}>{formatMl(r.data.hasilMl)}</span>
+                </div>
+              )
+            })}
             {d.stok.map((s) => (
               <div key={s.id} className="flex flex-col gap-1 text-body-sm">
                 <span className="text-on-surface">

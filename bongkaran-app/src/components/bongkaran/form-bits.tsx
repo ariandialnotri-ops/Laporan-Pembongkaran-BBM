@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { parseAngka } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 export function Field({ label, htmlFor, hint, children, className }: { label: string; htmlFor?: string; hint?: ReactNode; children: ReactNode; className?: string }) {
@@ -140,5 +142,25 @@ export function TagInput({ id, values, onChange, placeholder }: { id: string; va
         </button>
       </div>
     </div>
+  )
+}
+
+/** Isian bilangan bulat 0..max (mis. jumlah pulau pompa). */
+export function JumlahField({ id, label, value, max, onChange }: { id: string; label: string; value: number; max: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(() => (value ? String(value) : ''))
+  return (
+    <Field label={label} htmlFor={id}>
+      <Input
+        id={id}
+        numeric
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          const n = parseAngka(e.target.value)
+          onChange(n !== null && n >= 0 ? Math.min(Math.round(n), max) : 0)
+        }}
+      />
+    </Field>
   )
 }
