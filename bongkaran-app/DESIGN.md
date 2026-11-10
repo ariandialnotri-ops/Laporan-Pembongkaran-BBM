@@ -588,6 +588,11 @@ Semua laporan yang punya alur pengajuan/tindak lanjut memakai stepper vertikal y
 - **Status otomatis** (`statusSetelahTindakLanjut`), tidak ada pilihan status di form tindak lanjut: laporan baru = Terbuka; tindak lanjut tanpa lampiran = Ditindaklanjuti; tindak lanjut dengan foto bukti penyelesaian atau berita acara = **Closed**; stop penyaluran Closed saat jam penyaluran kembali diisi. Form menampilkan pratinjau "Status setelah disimpan (otomatis)".
 - Label status "Selesai" diganti **Closed** (pill, filter riwayat, stepper).
 
+### 9.14v Bongkaran paralel (1 MT, beberapa produk)
+- Input Bongkaran: tombol **Bongkaran paralel (1 MT, 2 produk)** membuat 2 draf dengan `data.grupMt` sama; di dalam form, **Tambah produk (MT sama)** menambah produk berikutnya (atau mengubah bongkaran biasa menjadi paralel lewat kartu "MT ini membawa produk lain?").
+- Data administrasi MT (`grup-mt.ts`: nopol & foto MT, driver, pengangkut, Sold To, tanggal/jam datang & keluar depot, safety, foto dokumen LO, buku tera, safety) diisi sekali; setiap simpan otomatis yang mengubahnya menyalin ke laporan lain dalam grup yang masih draft (latar, tanpa lembar proses). Data per produk (SO/LO, tangki, kompartemen, ATG, deepstick, density, TTD) tetap per laporan.
+- Panel **Bongkaran paralel · n produk** di atas form: daftar produk dengan tahapnya, pindah antar produk tanpa konfirmasi keluar. Foto administrasi yang dihapus tidak dihapus dari penyimpanan (dipakai laporan lain). Daftar Bongkaran Berjalan menandai "Paralel ·".
+
 ### 9.14d Pengajuan Anggaran (petty cash)
 - Disebut **Pengajuan Anggaran** (ikon tangan & koin) untuk peran selain ABH & Admin/Cashier; seluruh personil kecuali ABH dapat mengajukan.
 - Alur: pengajuan → persetujuan 1 Admin/Cashier → persetujuan akhir ABH → **Create Settlement** oleh pengaju (foto struk pembelian + foto barang, nominal belanja; status "Menunggu Settlement") → realisasi Admin/Cashier dengan akun COA → **Cetak voucher petty cash** (PDF) dengan filter rentang tanggal pengajuan, berisi daftar realisasi ber-COA, total & terbilang, tanda tangan, dan halaman lampiran foto struk & barang per pengajuan.

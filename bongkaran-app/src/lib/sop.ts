@@ -93,6 +93,8 @@ export interface ReportData {
   noLOs: string[]
   /** SO & LO diketik manual (tidak dari Plan), mis. SO/LO belum diinput di Plan Pengiriman. */
   soManual?: boolean
+  /** Bongkaran paralel: laporan lain dari MT yang sama memakai id grup ini (lihat grup-mt.ts). */
+  grupMt?: string
   tanggalDatang: string
   jamDatang: string
   nopol: string
@@ -252,6 +254,7 @@ export interface ReportSummary {
   noSO: string
   noLOs: string[]
   soManual?: boolean
+  grupMt?: string
   loIds: string[]
   doneCount: number
   volumeDO: number | null
@@ -1050,6 +1053,7 @@ export function summarize(report: Report, ev: Evaluation): ReportSummary {
     noLOs: d.noLOs,
     loIds: d.loIds,
     soManual: d.soManual || undefined,
+    grupMt: d.grupMt || undefined,
     doneCount: ev.doneCount,
     volumeDO: ev.derived.volumeDO,
     gainLoss: ev.derived.gainLoss,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useKonfirmasi } from '@/components/ui/konfirmasi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Beaker, CircleCheck, CloudUpload, Flag, LoaderCircle, Lock, Ruler, Save, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Beaker, CircleCheck, CloudUpload, Flag, Layers, LoaderCircle, Lock, Plus, Ruler, Save, Trash2, Truck, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { useLeaveGuard } from '@/components/bongkaran/leave-guard'
 import { ekspor, muatFoto, type Lapor } from '@/lib/ekspor'
 import type { ExportKind } from '@/lib/report/export'
@@ -17,7 +17,8 @@ import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/lib/app-state'
 import { clearBackup, readBackup, readStep, writeBackup, writeStep } from '@/lib/draft-backup'
 import { compressImage } from '@/lib/image'
-import { evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
+import { grupMtBaru, KETERANGAN_BERSAMA, kunciBersama, SLOT_BERSAMA, terapkanBersama } from '@/lib/grup-mt'
+import { blankReport, evaluateAll, normalizeReport, summarize, suggestNoBA, type StepState, type Photo, type Report, type ReportData, type ReportStatus, type StepId } from '@/lib/sop'
 import { buildWaText } from '@/lib/wa'
 import { formatTanggalIso } from '@/lib/date'
 import { diam } from '@/lib/proses'
@@ -108,10 +109,27 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
 
   // save/flush harus stabil: bila ikut berubah setiap state aplikasi berubah,
   // efek autosave terpicu lagi dan menyimpan terus-menerus tanpa henti.
-  const latest = useRef({ backend: app.backend, upsertSummary: app.upsertSummary, rules, toast })
+  const latest = useRef({ backend: app.backend, upsertSummary: app.upsertSummary, rules, toast, reports: app.reports })
   useEffect(() => {
-    latest.current = { backend: app.backend, upsertSummary: app.upsertSummary, rules, toast }
+    latest.current = { backend: app.backend, upsertSummary: app.upsertSummary, rules, toast, reports: app.reports }
   })
+  /** Data administrasi MT terakhir yang sudah disalin ke bongkaran paralel (grup MT yang sama). */
+  const kunciGrup = useRef(kunciBersama(initial))
+
+  const sinkronGrup = async (sumber: Report) => {
+    const { backend, upsertSummary, rules, reports } = latest.current
+    const saudara = reports.filter((s) => s.grupMt === sumber.data.grupMt && s.id !== sumber.id && s.status === 'draft')
+    for (const s of saudara) {
+      // Penyalinan latar: tanpa lembar proses yang menutupi form.
+      const t = await diam(() => backend.getReport(s.id))
+      if (!t || t.status !== 'draft') continue
+      const n = terapkanBersama(normalizeReport(t), sumber)
+      if (kunciBersama(n) === kunciBersama(normalizeReport(t))) continue
+      const ringkas = summarize(n, evaluateAll(n, rules))
+      await diam(() => backend.saveReport(n, ringkas))
+      upsertSummary(ringkas)
+    }
+  }
 
   const save = useCallback((r: Report) => {
     const { backend, upsertSummary, rules, toast } = latest.current
@@ -122,6 +140,12 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         await diam(() => backend.saveReport(r, summary))
         if (backend.mode === 'supabase') clearBackup(r.id, r.updatedAt)
         gagalTerakhir.current = false
+        // Bongkaran paralel: data administrasi MT yang berubah disalin ke laporan lain MT ini (yang masih draft).
+        const kunci = kunciBersama(r)
+        if (r.data.grupMt && r.status === 'draft' && kunci !== kunciGrup.current) {
+          kunciGrup.current = kunci
+          await sinkronGrup(r).catch((e: unknown) => toast(`Gagal menyalin data MT ke bongkaran paralel: ${pesan(e)}`, TriangleAlert))
+        }
         if (!pending.current) setSaveState('saved')
       } catch (e) {
         gagalTerakhir.current = true
@@ -215,7 +239,36 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     const photo = report.photos[slot]?.[index]
     urgent.current = true
     setReport((prev) => ({ ...prev, updatedAt: Date.now(), photos: { ...prev.photos, [slot]: (prev.photos[slot] ?? []).filter((_, i) => i !== index) } }))
-    if (photo) void app.backend.deletePhoto(photo).catch(() => {})
+    // Foto administrasi MT bongkaran paralel juga dipakai laporan lain: file tidak dihapus dari penyimpanan.
+    const dipakaiBersama = !!report.data.grupMt && (SLOT_BERSAMA as readonly string[]).includes(slot)
+    if (photo && !dipakaiBersama) void app.backend.deletePhoto(photo).catch(() => {})
+  }
+
+  // ---------- Bongkaran paralel (1 MT, beberapa produk) ----------
+  const [tambahBusy, setTambahBusy] = useState(false)
+  /** Buat laporan produk lain untuk MT yang sama; data administrasi MT ikut tersalin, lalu pindah ke laporan baru. */
+  const tambahParalel = async () => {
+    setTambahBusy(true)
+    try {
+      const grupMt = report.data.grupMt || grupMtBaru()
+      const kini: Report = { ...report, updatedAt: Date.now(), data: { ...report.data, grupMt } }
+      if (timer.current) clearTimeout(timer.current)
+      pending.current = null
+      kunciGrup.current = kunciBersama(kini)
+      setReport(kini)
+      await save(kini)
+      const baru = terapkanBersama(blankReport(app.settings, app.session.user?.id ?? null), kini)
+      const ringkas = summarize(baru, evaluateAll(baru, rules))
+      await app.backend.saveReport(baru, ringkas)
+      app.upsertSummary(ringkas)
+      toast('Bongkaran paralel dibuat, data administrasi MT sudah tersalin')
+      guard.bypass()
+      navigate(`/input/${baru.id}`)
+    } catch (e) {
+      toast(`Gagal membuat bongkaran paralel: ${pesan(e)}`, TriangleAlert)
+    } finally {
+      setTambahBusy(false)
+    }
   }
 
   // ---------- Navigasi langkah ----------
@@ -309,8 +362,10 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
     title: 'Keluar dari form bongkaran?',
     detail: `Bongkaran ${report.data.nopol || 'MT'} belum selesai (${selesaiLangkah} dari ${evaluation.steps.length} langkah). Data tersimpan otomatis sebagai draf dan dapat dilanjutkan dari menu Input > Input Bongkaran.`,
     beforeLeave: flush,
-    // Halaman turunan (ubah nomor LO) bukan meninggalkan form.
-    izinkan: (path) => path.startsWith(`/input/${report.id}/`),
+    // Halaman turunan (ubah nomor LO) dan pindah ke bongkaran paralel MT yang sama bukan meninggalkan form.
+    izinkan: (path) =>
+      path.startsWith(`/input/${report.id}/`) ||
+      (!!report.data.grupMt && app.reports.some((r) => r.grupMt === report.data.grupMt && path === `/input/${encodeURIComponent(r.id)}`)),
   })
   // Setelah diselesaikan, pindah ke Riwayat Pembongkaran (penyimpanan terakhir dijalankan saat halaman ditutup).
   useEffect(() => {
@@ -397,6 +452,8 @@ function BongkarEditor({ initial, restored }: { initial: Report; restored: boole
         </Pill>
         {app.backend.mode === 'local' && <Pill>Mode lokal</Pill>}
       </div>
+
+      <GrupMtPanel report={report} readOnly={readOnly} busy={tambahBusy} onTambah={() => void tambahParalel()} />
 
       {view === 'finish' ? (
         <FinishPanel
@@ -590,5 +647,75 @@ function StepRail({ steps, view, onGo }: { steps: StepState[]; view: StepId | 'f
         )
       })}
     </ol>
+  )
+}
+
+/**
+ * Bongkaran paralel: daftar bongkaran lain dari MT yang sama (pindah cepat antar produk) dan tombol
+ * tambah produk. Data administrasi MT cukup diisi sekali; laporan lain menerima salinannya otomatis.
+ */
+function GrupMtPanel({ report, readOnly, busy, onTambah }: { report: Report; readOnly: boolean; busy: boolean; onTambah: () => void }) {
+  const app = useApp()
+  const grup = report.data.grupMt
+  const anggota = grup ? app.reports.filter((r) => r.grupMt === grup).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)) : []
+  if (readOnly && anggota.length < 2) return null
+  if (!grup)
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onTambah}
+        className="animate-entrance-1 flex min-h-12 items-center gap-space-sm rounded-lg bg-surface-container-lowest p-space-sm text-left shadow-sm ring-1 ring-outline-variant/40 active:scale-[0.99] disabled:opacity-60"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          {busy ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" /> : <Layers aria-hidden="true" className="size-5" />}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-sm font-bold text-on-surface">MT ini membawa produk lain? Bongkar paralel</span>
+          <span className="text-xs text-on-surface-variant">Buat bongkaran produk kedua; data administrasi MT tidak perlu diisi ulang.</span>
+        </span>
+        <Plus aria-hidden="true" className="size-5 shrink-0 text-primary" />
+      </button>
+    )
+  return (
+    <GlassCard level={2} className="animate-entrance-1 flex flex-col gap-space-sm p-space-md">
+      <div className="flex items-center gap-space-xs">
+        <Layers aria-hidden="true" className="size-5 text-primary" />
+        <span className="flex-1 text-body-md font-bold text-on-surface">Bongkaran paralel · {anggota.length} produk</span>
+      </div>
+      <span className="text-xs text-on-surface-variant">Diisi sekali, tersalin otomatis ke semua produk MT ini: {KETERANGAN_BERSAMA}.</span>
+      <div className="flex flex-col gap-space-xs">
+        {anggota.map((r) => {
+          const ini = r.id === report.id
+          const isi = (
+            <>
+              <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold', r.status !== 'draft' ? 'bg-emerald-100 text-emerald-700' : ini ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant')}>
+                {r.status !== 'draft' ? <CircleCheck aria-hidden="true" className="size-4" /> : anggota.indexOf(r) + 1}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-body-sm font-semibold text-on-surface">{r.produk || 'Produk belum dipilih'}{ini ? ' (sedang dibuka)' : ''}</span>
+                <span className="text-xs text-on-surface-variant">{r.status !== 'draft' ? 'Selesai' : `Tahap ${Math.min(r.doneCount + 1, ORDER.length)}/${ORDER.length}`}</span>
+              </span>
+              {!ini && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-on-surface-variant" />}
+            </>
+          )
+          return ini ? (
+            <div key={r.id} aria-current="page" className="flex min-h-11 items-center gap-space-sm rounded-md bg-primary/5 px-space-xs ring-1 ring-primary/30">
+              {isi}
+            </div>
+          ) : (
+            <Link key={r.id} to={`/input/${encodeURIComponent(r.id)}`} className="flex min-h-11 items-center gap-space-sm rounded-md px-space-xs active:bg-surface-container-low">
+              {isi}
+            </Link>
+          )
+        })}
+      </div>
+      {!readOnly && (
+        <Button variant="soft" size="sm" className="self-start" disabled={busy} onClick={onTambah}>
+          {busy ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Plus aria-hidden="true" />}
+          Tambah produk (MT sama)
+        </Button>
+      )}
+    </GlassCard>
   )
 }
